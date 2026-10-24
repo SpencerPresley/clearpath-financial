@@ -114,15 +114,13 @@ class ReviewItem(models.Model):
     updated_at = models.DateTimeField()
 
     # Queue order (spec §4.3 Review): re-reviews of live content first, then risk tier; age breaks ties via
-    # submitted_at in the index. A re-review is a reopened item still in review (needs_rereview, or in_review
-    # after a reviewer opened it), so it keeps its priority once picked up; an expired reopened item does not.
+    # submitted_at in the index. A re-review is a queued item with a reopen_reason, so it keeps its priority
+    # when a reviewer opens it (in_review) and through a changes_requested -> submitted loop. An expired item
+    # is not queued. Contract for E: clear reopen_reason when the re-review resolves (approve, reaffirm,
+    # withdraw) and when a marketer starts a new round from expired.
     queue_priority = models.GeneratedField(
         expression=Case(
-            When(
-                Q(reopen_reason__isnull=False)
-                & Q(status__in=[ItemStatus.NEEDS_REREVIEW.value, ItemStatus.IN_REVIEW.value]),
-                then=Value(0),
-            ),
+            When(Q(reopen_reason__isnull=False) & Q(status__in=QUEUE_STATUSES), then=Value(0)),
             default=Value(10),
         )
         + Case(

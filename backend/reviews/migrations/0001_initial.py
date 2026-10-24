@@ -96,7 +96,7 @@ class Migration(migrations.Migration):
                 ('retention_until', models.DateField(blank=True, null=True)),
                 ('created_at', models.DateTimeField()),
                 ('updated_at', models.DateTimeField()),
-                ('queue_priority', models.GeneratedField(db_persist=True, expression=django.db.models.expressions.CombinedExpression(models.Case(models.When(models.Q(('reopen_reason__isnull', False), ('status__in', ['needs_rereview', 'in_review'])), then=models.Value(0)), default=models.Value(10)), '+', models.Case(models.When(risk_tier='high', then=models.Value(0)), models.When(risk_tier='medium', then=models.Value(1)), default=models.Value(2))), output_field=models.PositiveSmallIntegerField()),
+                ('queue_priority', models.GeneratedField(db_persist=True, expression=django.db.models.expressions.CombinedExpression(models.Case(models.When(models.Q(('reopen_reason__isnull', False), ('status__in', ('submitted', 'in_review', 'needs_rereview'))), then=models.Value(0)), default=models.Value(10)), '+', models.Case(models.When(risk_tier='high', then=models.Value(0)), models.When(risk_tier='medium', then=models.Value(1)), default=models.Value(2))), output_field=models.PositiveSmallIntegerField()),
         ),
                 ('assignee', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='assigned_items', to=settings.AUTH_USER_MODEL)),
                 ('owner', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='owned_items', to=settings.AUTH_USER_MODEL)),

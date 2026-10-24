@@ -225,6 +225,10 @@ def test_rereview_keeps_priority_once_a_reviewer_opens_it(marketer: User) -> Non
     reopened_in_review = make_item(
         marketer, status=ItemStatus.IN_REVIEW, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.LOW
     )
+    # A re-review sent back for changes and resubmitted is still live content waiting on review.
+    resubmitted_rereview = make_item(
+        marketer, status=ItemStatus.SUBMITTED, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.LOW
+    )
     fresh_high = make_item(marketer, status=ItemStatus.SUBMITTED, risk_tier=RiskTier.HIGH)
     expired = make_item(
         marketer, status=ItemStatus.EXPIRED, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.HIGH
@@ -232,7 +236,8 @@ def test_rereview_keeps_priority_once_a_reviewer_opens_it(marketer: User) -> Non
 
     ordered = list(ReviewItem.objects.order_by("queue_priority", "pk").values_list("pk", flat=True))
 
-    assert ordered.index(reopened_in_review.pk) < ordered.index(fresh_high.pk) < ordered.index(expired.pk)
+    rereviews_last = max(ordered.index(reopened_in_review.pk), ordered.index(resubmitted_rereview.pk))
+    assert rereviews_last < ordered.index(fresh_high.pk) < ordered.index(expired.pk)
 
 
 @pytest.mark.django_db
