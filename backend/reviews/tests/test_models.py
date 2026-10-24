@@ -15,6 +15,7 @@ from core.domain import (
     DecisionOutcome,
     ExpiryRule,
     ItemStatus,
+    ReopenReason,
     RiskTier,
 )
 from reviews.models import Attachment, Comment, Decision, ExpiryPolicy, Placement, ReviewItem, Version
@@ -198,14 +199,100 @@ def test_planned_run_dates_ordered(marketer: User) -> None:
 
 
 @pytest.mark.django_db
+def test_needs_rereview_requires_a_reopen_reason(marketer: User) -> None:
+    with pytest.raises(IntegrityError) as caught, transaction.atomic():
+        make_item(marketer, status=ItemStatus.NEEDS_REREVIEW)
+
+    assert constraint_name(caught.value) == "item_rereview_has_reason"
+
+
+@pytest.mark.django_db
 def test_queue_priority_puts_rereview_first_then_tier(marketer: User) -> None:
-    rereview_low = make_item(marketer, status=ItemStatus.NEEDS_REREVIEW, risk_tier=RiskTier.LOW)
+    rereview_low = make_item(
+        marketer, status=ItemStatus.NEEDS_REREVIEW, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.LOW
+    )
     submitted_high = make_item(marketer, status=ItemStatus.SUBMITTED, risk_tier=RiskTier.HIGH)
     submitted_medium = make_item(marketer, status=ItemStatus.SUBMITTED, risk_tier=RiskTier.MEDIUM)
 
     ordered = list(ReviewItem.objects.order_by("queue_priority").values_list("pk", flat=True))
 
     assert ordered == [rereview_low.pk, submitted_high.pk, submitted_medium.pk]
+
+
+@pytest.mark.django_db
+def test_rereview_keeps_priority_once_a_reviewer_opens_it(marketer: User) -> None:
+    # needs_rereview -> in_review is allowed; the item is still live content at risk.
+    reopened_in_review = make_item(
+        marketer, status=ItemStatus.IN_REVIEW, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.LOW
+    )
+    fresh_high = make_item(marketer, status=ItemStatus.SUBMITTED, risk_tier=RiskTier.HIGH)
+    expired = make_item(
+        marketer, status=ItemStatus.EXPIRED, reopen_reason=ReopenReason.TERMS_CHANGED, risk_tier=RiskTier.HIGH
+    )
+
+    ordered = list(ReviewItem.objects.order_by("queue_priority", "pk").values_list("pk", flat=True))
+
+    assert ordered.index(reopened_in_review.pk) < ordered.index(fresh_high.pk) < ordered.index(expired.pk)
+
+
+@pytest.mark.django_db
+def test_decision_version_must_belong_to_the_item(marketer: User, reviewer: User) -> None:
+    item, other = make_item(marketer), make_item(marketer)
+    make_version(item)
+    foreign = make_version(other)
+
+    with pytest.raises(IntegrityError) as caught, transaction.atomic():
+        Decision.objects.create(
+            item=item,
+            version=foreign,
+            outcome=DecisionOutcome.REJECTED,
+            lane=DecisionLane.STANDARD,
+            approver=reviewer,
+            reason="No.",
+            ruleset_date=date(2026, 10, 1),
+            decided_at=AT,
+        )
+
+    assert constraint_name(caught.value) == "decision_version_same_item"
+
+
+@pytest.mark.django_db
+def test_placement_and_current_version_must_belong_to_the_item(marketer: User) -> None:
+    item, other = make_item(marketer), make_item(marketer)
+    foreign = make_version(other)
+
+    with pytest.raises(IntegrityError) as caught, transaction.atomic():
+        Placement.objects.create(
+            item=item,
+            approved_version=foreign,
+            location="x",
+            first_run=date(2026, 11, 1),
+            created_by=marketer,
+            created_at=AT,
+        )
+    assert constraint_name(caught.value) == "placement_version_same_item"
+
+    with pytest.raises(IntegrityError) as caught, transaction.atomic():
+        ReviewItem.objects.filter(pk=item.pk).update(current_version=foreign)
+    assert constraint_name(caught.value) == "item_current_version_same_item"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("column", "sql"),
+    [
+        ("title", "SELECT id FROM reviews_reviewitem WHERE UPPER(title::text) LIKE UPPER(%s)"),
+        ("content_text", "SELECT id FROM reviews_version WHERE UPPER(content_text::text) LIKE UPPER(%s)"),
+    ],
+)
+def test_case_insensitive_contains_uses_a_trigram_index(column: str, sql: str) -> None:
+    # Django compiles icontains to UPPER(col::text) LIKE UPPER(%s); the index must be on that expression.
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL enable_seqscan = off")
+        cursor.execute(f"EXPLAIN {sql}", ["%loan%"])
+        plan = "\n".join(row[0] for row in cursor.fetchall())
+
+    assert "trgm" in plan, plan
 
 
 @pytest.mark.django_db

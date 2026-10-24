@@ -15,7 +15,7 @@ from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.db import models
 from django.db.models import Case, F, Q, Value, When
-from django.db.models.functions import Length, Trim
+from django.db.models.functions import Cast, Length, Trim, Upper
 from django.db.models.lookups import GreaterThan
 
 from core.domain import (
@@ -113,10 +113,18 @@ class ReviewItem(models.Model):
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
 
-    # Queue order (spec §4.3 Review): re-reviews of live content first (needs_rereview requires live content,
-    # spec §4.1), then risk tier; age breaks ties via submitted_at in the index.
+    # Queue order (spec §4.3 Review): re-reviews of live content first, then risk tier; age breaks ties via
+    # submitted_at in the index. A re-review is a reopened item still in review (needs_rereview, or in_review
+    # after a reviewer opened it), so it keeps its priority once picked up; an expired reopened item does not.
     queue_priority = models.GeneratedField(
-        expression=Case(When(status=ItemStatus.NEEDS_REREVIEW.value, then=Value(0)), default=Value(10))
+        expression=Case(
+            When(
+                Q(reopen_reason__isnull=False)
+                & Q(status__in=[ItemStatus.NEEDS_REREVIEW.value, ItemStatus.IN_REVIEW.value]),
+                then=Value(0),
+            ),
+            default=Value(10),
+        )
         + Case(
             When(risk_tier=RiskTier.HIGH.value, then=Value(0)),
             When(risk_tier=RiskTier.MEDIUM.value, then=Value(1)),
@@ -141,6 +149,11 @@ class ReviewItem(models.Model):
                 condition=Q(is_legacy=True) | Q(markets__len__gte=1), name="item_has_market_unless_legacy"
             ),
             models.CheckConstraint(condition=Q(round__gte=1), name="item_round_positive"),
+            # The queue's re-review priority keys on reopen_reason; needs_rereview always carries one.
+            models.CheckConstraint(
+                condition=~Q(status=ItemStatus.NEEDS_REREVIEW.value) | Q(reopen_reason__isnull=False),
+                name="item_rereview_has_reason",
+            ),
             models.CheckConstraint(
                 condition=Q(planned_last_run__isnull=True)
                 | Q(planned_first_run__isnull=True)
@@ -162,7 +175,10 @@ class ReviewItem(models.Model):
                 condition=Q(status__in=QUEUE_STATUSES),
                 name="item_assignee_queue_idx",
             ),
-            GinIndex(OpClass(F("title"), name="gin_trgm_ops"), name="item_title_trgm_idx"),
+            # Matches Django's icontains SQL, UPPER(col::text) LIKE UPPER(%s), so the planner can use it.
+            GinIndex(
+                OpClass(Upper(Cast("title", models.TextField())), name="gin_trgm_ops"), name="item_title_trgm_idx"
+            ),
             GinIndex(fields=["tags"], name="item_tags_gin_idx"),
             models.Index(fields=["owner", "-updated_at"], name="item_owner_idx"),
             models.Index(fields=["partner", "-submitted_at"], name="item_partner_idx"),
@@ -201,12 +217,15 @@ class Version(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["item", "n"], name="version_unique_n_per_item"),
+            # Target of the composite FKs (reviews 0006) that keep a decision's, placement's, and item's
+            # version on the same item.
+            models.UniqueConstraint(fields=["id", "item"], name="version_id_item_unique"),
             models.CheckConstraint(condition=Q(n__gte=1), name="version_n_positive"),
             models.CheckConstraint(condition=Q(content_sha256__regex=_SHA256_HEX), name="version_sha256_hex"),
         ]
         indexes = [
             GinIndex(fields=["search_vector"], name="version_search_idx"),
-            GinIndex(OpClass(F("content_text"), name="gin_trgm_ops"), name="version_content_trgm_idx"),
+            GinIndex(OpClass(Upper("content_text"), name="gin_trgm_ops"), name="version_content_trgm_idx"),
         ]
 
     def __str__(self) -> str:

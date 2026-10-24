@@ -8,7 +8,7 @@ from accounts.models import User
 from checks.models import Finding
 from conftest import UserFactory
 from core.clock import FixedClock
-from core.domain import Channel, FindingSource, ItemStatus, Market, Product, RiskTier, Severity
+from core.domain import Channel, FindingSource, ItemStatus, Market, Product, ReopenReason, RiskTier, Severity
 from core.errors import InvalidInput
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Placement, ReviewItem
@@ -25,7 +25,13 @@ def test_queue_order_rereview_then_tier_then_age(marketer: User, reviewer: User,
     old_low = make_item(marketer, risk_tier=RiskTier.LOW, submitted_at=AT - timedelta(days=5))
     new_high = make_item(marketer, risk_tier=RiskTier.HIGH, submitted_at=AT)
     old_high = make_item(marketer, risk_tier=RiskTier.HIGH, submitted_at=AT - timedelta(days=1))
-    rereview = make_item(marketer, status=ItemStatus.NEEDS_REREVIEW, risk_tier=RiskTier.LOW, submitted_at=AT)
+    rereview = make_item(
+        marketer,
+        status=ItemStatus.NEEDS_REREVIEW,
+        reopen_reason=ReopenReason.TERMS_CHANGED,
+        risk_tier=RiskTier.LOW,
+        submitted_at=AT,
+    )
 
     page = list_items(viewer=reviewer, filters=ItemFilter(), clock=clock)
 
@@ -214,7 +220,7 @@ def test_cursor_from_another_sort_is_invalid_input(marketer: User, reviewer: Use
 def test_queue_stats(marketer: User, reviewer: User, clock: FixedClock) -> None:
     make_item(marketer, assignee=reviewer)
     make_item(marketer, submitted_at=clock.now() - timedelta(days=4))
-    make_item(marketer, status=ItemStatus.NEEDS_REREVIEW, assignee=reviewer)
+    make_item(marketer, status=ItemStatus.NEEDS_REREVIEW, reopen_reason=ReopenReason.TERMS_CHANGED, assignee=reviewer)
     make_item(marketer, status=ItemStatus.APPROVED)
     make_item(None, status=ItemStatus.APPROVED, is_legacy=True, legacy_ref="REQ-1", markets=[])
     ReviewItem.objects.update(submitted_at=clock.now() - timedelta(days=4))

@@ -99,12 +99,50 @@ def test_offer_terms_values_validated_on_save(lead: User) -> None:
 
 @pytest.mark.django_db
 def test_offer_terms_values_product_must_match_column(lead: User) -> None:
-    terms = _terms(lead, PL, 1, JAN, None)
-
-    with pytest.raises(IntegrityError) as caught, transaction.atomic(), connection.cursor() as cursor:
-        cursor.execute("UPDATE terms_offerterms SET product = 'credit_card' WHERE id = %s", [terms.pk])
+    # Bypass save()'s validation to reach the CHECK (rows are immutable, so only an INSERT can try it).
+    with pytest.raises(IntegrityError) as caught, transaction.atomic():
+        OfferTerms.objects.bulk_create(
+            [
+                OfferTerms(
+                    product=Product.CREDIT_CARD,
+                    version=1,
+                    effective_range=DateTimeTZRange(JAN, None, "[)"),
+                    values=PL.model_dump(mode="json"),
+                    created_by=lead,
+                    created_at=JAN,
+                )
+            ]
+        )
 
     assert constraint_name(caught.value) == "terms_values_product_matches"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "UPDATE terms_offerterms SET values = jsonb_set(values, '{apr_min}', '\"5.00\"') WHERE id = %s",
+        "UPDATE terms_offerterms SET effective_range = tstzrange('2025-01-01', NULL) WHERE id = %s",
+        "UPDATE terms_offerterms SET note = 'edited' WHERE id = %s",
+        "DELETE FROM terms_offerterms WHERE id = %s",
+    ],
+)
+def test_offer_terms_are_immutable_once_written(lead: User, sql: str) -> None:
+    # Decisions record the terms versions they quote; editing one would rewrite every past approval.
+    terms = _terms(lead, PL, 1, JAN, None)
+
+    with pytest.raises(IntegrityError, match="immutable"), transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute(sql, [terms.pk])
+
+
+@pytest.mark.django_db
+def test_offer_terms_range_can_be_closed_once(lead: User) -> None:
+    terms = _terms(lead, PL, 1, JAN, None)
+
+    OfferTerms.objects.filter(pk=terms.pk).update(effective_range=DateTimeTZRange(JAN, JUN, "[)"))
+
+    with pytest.raises(IntegrityError, match="immutable"), transaction.atomic():
+        OfferTerms.objects.filter(pk=terms.pk).update(effective_range=DateTimeTZRange(JAN, DEC, "[)"))
 
 
 @pytest.mark.django_db
