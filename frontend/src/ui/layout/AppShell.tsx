@@ -155,6 +155,7 @@ export function AppShell() {
               aria-expanded={assistant.open}
               aria-controls={assistant.open ? ASSISTANT_PANEL_ID : undefined}
               aria-keyshortcuts="Meta+. Control+."
+              data-active={assistant.open ? 'true' : undefined}
               onPress={toggleAssistant}
             >
               <Icon name="nav.assistant" size={18} />

@@ -16,7 +16,9 @@ import { RelativeAge } from '../../../ui/RelativeAge';
 import { SkeletonTable } from '../../../ui/Skeleton';
 
 /** Sent, To, Subject, Item, Requested by, Approved by. */
-const COLUMNS = ['4.5rem', '24%', 'auto', '6rem', '9rem', '9rem'] as const;
+const COLUMNS = ['4.5rem', '22%', 'auto', '5.5rem', '9rem', '9rem'] as const;
+/** With a message open the detail pane carries To and the people, so the list keeps Sent, Subject, Item. */
+const COMPACT_COLUMNS = ['4.5rem', 'auto', '5.5rem'] as const;
 const SKELETON_COLUMNS = COLUMNS.map((width) => (width === 'auto' ? '1fr' : width));
 
 const sentFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
@@ -37,11 +39,13 @@ function ItemLink({ id }: { id: number | null }) {
 function OutboxRow({
   email,
   selected,
+  compact,
   onSelect,
   now,
 }: {
   email: OutboxEmailOut;
   selected: boolean;
+  compact: boolean;
   onSelect: () => void;
   now: Date;
 }) {
@@ -51,9 +55,11 @@ function OutboxRow({
       <td className="app-outbox-sent">
         <RelativeAge at={email.sent_at} now={now} />
       </td>
-      <td className="app-outbox-to" title={to}>
-        {to}
-      </td>
+      {!compact && (
+        <td className="app-outbox-to" title={to}>
+          {to}
+        </td>
+      )}
       <td className="app-outbox-subject-cell">
         <button type="button" className="app-outbox-subject" aria-pressed={selected} onClick={onSelect}>
           {email.subject}
@@ -62,8 +68,8 @@ function OutboxRow({
       <td>
         <ItemLink id={email.item_id} />
       </td>
-      <td className="app-outbox-person">{email.requested_by.name}</td>
-      <td className="app-outbox-person">{email.approved_by.name}</td>
+      {!compact && <td className="app-outbox-person">{email.requested_by.name}</td>}
+      {!compact && <td className="app-outbox-person">{email.approved_by.name}</td>}
     </tr>
   );
 }
@@ -155,22 +161,23 @@ export function OutboxPage() {
       </EmptyState>
     );
   } else {
+    const compact = selected !== undefined;
     body = (
-      <div className="app-outbox-split">
+      <div className="app-outbox-split" data-detail={compact ? 'true' : undefined}>
         <table className="app-mine-table app-outbox-table" aria-label="Sent emails">
           <colgroup>
-            {COLUMNS.map((width, index) => (
+            {(compact ? COMPACT_COLUMNS : COLUMNS).map((width, index) => (
               <col key={index} style={width === 'auto' ? undefined : { width }} />
             ))}
           </colgroup>
           <thead>
             <tr className="app-outbox-head">
               <th scope="col">Sent</th>
-              <th scope="col">To</th>
+              {!compact && <th scope="col">To</th>}
               <th scope="col">Subject</th>
               <th scope="col">Item</th>
-              <th scope="col">Requested by</th>
-              <th scope="col">Approved by</th>
+              {!compact && <th scope="col">Requested by</th>}
+              {!compact && <th scope="col">Approved by</th>}
             </tr>
           </thead>
           <tbody>
@@ -179,6 +186,7 @@ export function OutboxPage() {
                 key={email.id}
                 email={email}
                 now={now}
+                compact={compact}
                 selected={email.id === selectedId}
                 onSelect={() => {
                   setSelectedId(email.id === selectedId ? null : email.id);
