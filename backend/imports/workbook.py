@@ -6,9 +6,9 @@ keeps file links in hyperlink targets whose display text is only a file name or 
 
 import io
 import zipfile
-from pathlib import Path
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import IO, Final
 
 import openpyxl
@@ -31,7 +31,7 @@ _MIN_HEADER_CELLS: Final = 3
 _MIN_TRACKER_TARGETS: Final = 3
 
 
-class UnreadableWorkbook(ValueError):
+class UnreadableWorkbookError(ValueError):
     """The upload isn't a workbook the importer can read. The message is one line for the admin."""
 
 
@@ -142,7 +142,9 @@ def _sheet(name: str, rows: Sequence[tuple[int, list[RawCell]]], header_row: int
             continue
         body.append(RawRow(row_number=row_number, cells=tuple(padded)))
     if len(body) > MAX_DATA_ROWS:
-        raise UnreadableWorkbook(f"The sheet has {len(body)} rows; split it into files of {MAX_DATA_ROWS} or fewer.")
+        raise UnreadableWorkbookError(
+            f"The sheet has {len(body)} rows; split it into files of {MAX_DATA_ROWS} or fewer."
+        )
     return RawSheet(name=name, header_row=header_row, headers=tuple(headers), rows=tuple(body))
 
 
@@ -205,11 +207,13 @@ def read_workbook(source: IO[bytes]) -> RawWorkbook:
     a sheet with "Partner Name" + "Type" supplies the partner directory; a "Reviewer" column supplies names."""
     data = source.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
-        raise UnreadableWorkbook("The file is over 10 MB; remove unused sheets or split it.")
+        raise UnreadableWorkbookError("The file is over 10 MB; remove unused sheets or split it.")
     try:
         wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     except (zipfile.BadZipFile, InvalidFileException, KeyError, OSError, ValueError) as exc:
-        raise UnreadableWorkbook("This file isn't an .xlsx workbook. Save it from Excel as .xlsx and retry.") from exc
+        raise UnreadableWorkbookError(
+            "This file isn't an .xlsx workbook. Save it from Excel as .xlsx and retry."
+        ) from exc
 
     sheets: list[tuple[str, list[tuple[int, list[RawCell]]], int, list[str]]] = []
     for ws in wb.worksheets:
@@ -219,7 +223,7 @@ def read_workbook(source: IO[bytes]) -> RawWorkbook:
             sheets.append((ws.title, rows, header[0], header[1]))
     scored = sorted(((_score(s[3]), i) for i, s in enumerate(sheets)), key=lambda p: (-p[0], p[1]))
     if not scored or scored[0][0] < _MIN_TRACKER_TARGETS:
-        raise UnreadableWorkbook("No sheet has tracker columns (Request ID, Status, Product, ...) in its header.")
+        raise UnreadableWorkbookError("No sheet has tracker columns (Request ID, Status, Product, ...) in its header.")
     tracker_i = scored[0][1]
     tracker = _sheet(*sheets[tracker_i])
 

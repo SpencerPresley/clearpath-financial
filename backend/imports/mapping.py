@@ -152,9 +152,7 @@ IMPORTABLE_STATUSES: Final = frozenset(
 )
 
 
-def _with_enum_values[E: Product | Channel | RiskTier](
-    labels: Mapping[str, E], enum: Iterable[E]
-) -> Mapping[str, E]:
+def _with_enum_values[E: Product | Channel | RiskTier](labels: Mapping[str, E], enum: Iterable[E]) -> Mapping[str, E]:
     return {**{value_key(e.value): e for e in enum}, **labels}
 
 

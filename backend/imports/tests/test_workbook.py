@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from imports.workbook import RawWorkbook, UnreadableWorkbook, read_workbook
+from imports.workbook import RawWorkbook, UnreadableWorkbookError, read_workbook
 
 
 def test_reads_the_tracker_sheet_with_every_row_below_the_header(sample_workbook: RawWorkbook) -> None:
@@ -49,7 +49,7 @@ def test_round_trips_through_json(sample_workbook: RawWorkbook) -> None:
 
 @pytest.mark.parametrize("data", [b"PK...", b"Request ID,Status\nMCR-25-001,Approved\n", b""])
 def test_rejects_files_that_are_not_xlsx(data: bytes) -> None:
-    with pytest.raises(UnreadableWorkbook, match=r"isn't an \.xlsx workbook"):
+    with pytest.raises(UnreadableWorkbookError, match=r"isn't an \.xlsx workbook"):
         read_workbook(io.BytesIO(data))
 
 
@@ -65,5 +65,5 @@ def test_rejects_a_workbook_without_tracker_columns() -> None:
     wb.save(buf)
     buf.seek(0)
 
-    with pytest.raises(UnreadableWorkbook, match="No sheet has tracker columns"):
+    with pytest.raises(UnreadableWorkbookError, match="No sheet has tracker columns"):
         read_workbook(buf)
