@@ -7,10 +7,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
 import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
-import type { DecisionIn, FastTrackIn, FindingOut, ItemDetailOut } from '../../api/generated/model';
+import type {
+  CommentOut,
+  DecisionIn,
+  FastTrackIn,
+  FindingOut,
+  ItemDetailOut,
+} from '../../api/generated/model';
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
 import {
+  COMMENTS,
   DECISION_APPROVED,
   FINDINGS_OPEN,
   dismissedAll,
@@ -122,6 +129,7 @@ function nthButton(name: string, index: number): HTMLElement {
   return button;
 }
 const approveButton = () => nthButton('Approve', 0);
+const COMMENT_301 = 'Footer disclosure looks right now. Waiting on the APR range.';
 
 describe('ReviewPage', () => {
   afterEach(() => {
@@ -432,6 +440,63 @@ describe('ReviewPage', () => {
       await screen.findByText(/Viewing v1\. Findings are read-only here; decisions apply to v2\./),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  });
+
+  it('brings a linked comment into view: focused and marked (?comment=)', async () => {
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=301' });
+
+    const body = await screen.findByText('Footer disclosure looks right now. Waiting on the APR range.');
+    const comment = body.closest('li');
+    await waitFor(() => {
+      expect(comment).toHaveFocus();
+    });
+    expect(comment).toHaveAttribute('data-linked', 'true');
+    expect(comment).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('brings a linked comment into view once, not on every return to Comments', async () => {
+    const user = userEvent.setup();
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=301' });
+    const first = (await screen.findByText(COMMENT_301)).closest('li');
+    await waitFor(() => {
+      expect(first).toHaveFocus();
+    });
+
+    await user.click(screen.getByRole('tab', { name: /Findings/ }));
+    await user.click(screen.getByRole('tab', { name: /Comments/ }));
+
+    const again = (await screen.findByText(COMMENT_301)).closest('li');
+    expect(again).not.toHaveFocus();
+    expect(again).not.toHaveAttribute('data-linked');
+    expect(again).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('brings a second link on the same page into view (a new mention while Comments is open)', async () => {
+    const reply = { ...COMMENTS[0], id: 302, body: 'APR range added in the footer.' } as CommentOut;
+    const { router } = renderReview({
+      path: '/items/1042?tab=comments&v=2&comment=301',
+      comments: [...COMMENTS, reply],
+    });
+    const first = (await screen.findByText(COMMENT_301)).closest('li');
+    await waitFor(() => {
+      expect(first).toHaveFocus();
+    });
+
+    await router.navigate({ to: '.', search: (prev) => ({ ...prev, comment: 302 }) });
+
+    const second = screen.getByText('APR range added in the footer.').closest('li');
+    await waitFor(() => {
+      expect(second).toHaveFocus();
+    });
+    expect(second).toHaveAttribute('data-linked', 'true');
+    expect(first).not.toHaveAttribute('data-linked');
+  });
+
+  it('ignores a linked comment that is not on the version shown', async () => {
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=999' });
+
+    await screen.findByText('Footer disclosure looks right now. Waiting on the APR range.');
+    expect(document.querySelector('[data-linked]')).toBeNull();
   });
 
   it("links the partner on the Details tab to the partner's page (agreement and evidence)", async () => {

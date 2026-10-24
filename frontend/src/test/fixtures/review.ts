@@ -143,6 +143,7 @@ const ROW_KEYS = [
   'reopen_reason',
   'llm_check_status',
   'is_legacy',
+  'legacy_ref',
   'markets',
   'tags',
   'open_findings_count',

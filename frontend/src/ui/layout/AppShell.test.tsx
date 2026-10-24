@@ -85,11 +85,11 @@ describe('AppShell', () => {
     expect(within(nav).getByText('My submissions')).toBeInTheDocument();
   });
 
-  it('shows search as visibly disabled until search ships', async () => {
+  it('puts the quick-jump box in the topbar, enabled', async () => {
     renderApp();
-    const search = await screen.findByRole('searchbox', { name: 'Search items' });
-    expect(search).toBeDisabled();
-    expect(search).toHaveAttribute('placeholder', 'Search (soon)');
+    const jump = await screen.findByRole('combobox', { name: 'Jump to item' });
+    expect(jump).toBeEnabled();
+    expect(jump).toHaveAttribute('placeholder', 'Jump to item (CP-1042 or title)');
   });
 
   it('opens the account panel with the signed-in user, roles, and sign out', async () => {

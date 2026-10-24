@@ -1,0 +1,13 @@
+{
+  "before": "TEXTAREA#react-aria2129956675-_r_20_  draft note",
+  "afterEscEmpty": "BODY#  \n    Skip to contentClearPathC",
+  "tabAfterEscEmpty": "BUTTON#react-aria2129956675-_r_f_ Notifications ",
+  "afterEsc2WithText": {
+    "active": "INPUT#react-aria2129956675-_r_7_ Jump to item ",
+    "value": "fall"
+  },
+  "leftWithText": {
+    "active": "BUTTON#react-aria2129956675-_r_f_ Notifications ",
+    "value": "fall"
+  }
+}

@@ -43,7 +43,11 @@ class ItemFilter(Schema):
     Empty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view
     like "My queue" works for whoever opens it."""
 
-    q: str | None = Field(default=None, max_length=200, description="Title contains, or a display key like CP-1042.")
+    q: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
+    )
     status: list[ItemStatus] = Field(default_factory=list)
     product: list[Product] = Field(default_factory=list)
     channel: list[Channel] = Field(default_factory=list)

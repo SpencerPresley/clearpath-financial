@@ -161,7 +161,7 @@ describe('NotificationBell', () => {
     expect(within(dialog).getByText('3 unread')).toBeInTheDocument();
   });
 
-  it('marks a row read and opens the comment’s version when a mention is clicked', async () => {
+  it('marks a row read and opens the comment, on its version, when a mention is clicked', async () => {
     const user = userEvent.setup();
     const api = serveInbox(pageOf(ROWS));
     const { router } = renderBell();
@@ -171,7 +171,7 @@ describe('NotificationBell', () => {
 
     expect(await screen.findByText('Review screen')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/items/1042');
-    expect(router.state.location.search).toEqual({ tab: 'comments', v: 2 });
+    expect(router.state.location.search).toEqual({ tab: 'comments', v: 2, comment: 311 });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(api.posted).toEqual(['read 8']);

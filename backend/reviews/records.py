@@ -273,7 +273,6 @@ class ItemDetail(ItemRow):
     is_prescreen: bool
     risk_tier_overridden: bool
     source_url: str | None
-    legacy_ref: str | None
     legacy_submitter: str
     legacy_reviewer: str
     legacy_history: str
@@ -339,7 +338,6 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
         is_prescreen=item.is_prescreen,
         risk_tier_overridden=item.risk_tier_overridden,
         source_url=item.source_url or None,
-        legacy_ref=item.legacy_ref,
         legacy_submitter=item.legacy_submitter,
         legacy_reviewer=item.legacy_reviewer,
         legacy_history=item.legacy_history,

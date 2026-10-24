@@ -37,7 +37,7 @@ export const CreateExportBody = zod.object({
   "owner_id": zod.array(zod.int()).optional(),
   "partner_id": zod.array(zod.int()).optional(),
   "product": zod.array(zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal'])).optional(),
-  "q": zod.union([zod.string().max(createExportBodyFiltersOneQOneMax),zod.null()]).optional().describe('Title contains, or a display key like CP-1042.'),
+  "q": zod.union([zod.string().max(createExportBodyFiltersOneQOneMax),zod.null()]).optional().describe('Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.'),
   "reopen_reason": zod.array(zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')).optional(),
   "risk_tier": zod.array(zod.enum(['high', 'medium', 'low'])).optional(),
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
@@ -221,6 +221,7 @@ export const GetEvidencePackResponse = zod.object({
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
 }).describe('The latest decision as a queue row shows it; `DecisionOut` is the full record.'),zod.null()]),
+  "legacy_ref": zod.union([zod.string(),zod.null()]).optional().describe('The old tracker\'s Request ID (MCR-26-045) on imported items.'),
   "llm_check_status": zod.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']),
   "markets": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')),
   "notes": zod.string(),

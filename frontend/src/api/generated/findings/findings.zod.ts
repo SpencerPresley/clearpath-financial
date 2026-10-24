@@ -235,6 +235,7 @@ export const RetryLlmCheckResponse = zod.object({
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
 }).describe('The latest decision as a queue row shows it; `DecisionOut` is the full record.'),zod.null()]),
+  "legacy_ref": zod.union([zod.string(),zod.null()]).optional().describe('The old tracker\'s Request ID (MCR-26-045) on imported items.'),
   "llm_check_status": zod.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']),
   "markets": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')),
   "notes": zod.string(),

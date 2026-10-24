@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   getGetItemHistoryQueryKey,
@@ -55,17 +55,44 @@ function PanelError({ what, error, onRetry }: { what: string; error: unknown; on
 
 // ---- Comments ------------------------------------------------------------------------------------
 
+const commentDomId = (id: number) => `comment-${String(id)}`;
+
 export function CommentsTab({
   itemId,
   versionN,
   canComment,
+  highlightId,
+  shownLinks,
 }: {
   itemId: number;
   versionN: number;
   canComment: boolean;
+  /** A linked comment (`?comment=`): scrolled into view, focused and briefly highlighted once it loads. */
+  highlightId?: number;
+  /**
+   * Links already brought into view on this page. The tab panel remounts on every return to Comments while
+   * `?comment=` stays in the URL; only the first showing takes focus and plays the highlight.
+   */
+  shownLinks?: Set<number>;
 }) {
   const queryClient = useQueryClient();
   const comments = useListComments(itemId, { version_n: versionN });
+  // Per link, not per mount: a second mention opened while Comments is showing must still be brought into view.
+  // `shownLinks` is stable, so this recomputes only when the link changes (or the panel remounts).
+  const fresh = useMemo(
+    () => highlightId !== undefined && !(shownLinks?.has(highlightId) ?? false),
+    [highlightId, shownLinks],
+  );
+  const loaded = comments.data?.some((c) => c.id === highlightId) === true;
+  const done = useRef<number | null>(null);
+  useEffect(() => {
+    if (!fresh || !loaded || highlightId === undefined || done.current === highlightId) return;
+    done.current = highlightId;
+    shownLinks?.add(highlightId);
+    const node = document.getElementById(commentDomId(highlightId));
+    node?.scrollIntoView({ block: 'center' });
+    node?.focus({ preventScroll: true });
+  }, [fresh, loaded, highlightId, shownLinks]);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const add = useAddComment({
@@ -92,7 +119,14 @@ export function CommentsTab({
       ) : (
         <ol className="app-timeline">
           {comments.data.map((comment) => (
-            <li key={comment.id} className="app-comment">
+            <li
+              key={comment.id}
+              id={commentDomId(comment.id)}
+              className="app-comment"
+              {...(comment.id === highlightId
+                ? { tabIndex: -1, 'aria-current': 'true' as const, 'data-linked': fresh ? 'true' : undefined }
+                : {})}
+            >
               <p className="app-timeline-meta">
                 <span className="app-timeline-actor">{comment.author.name}</span>{' '}
                 <RelativeAge at={comment.created_at} />

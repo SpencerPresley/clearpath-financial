@@ -1,0 +1,450 @@
+{
+  "pasteEnter": {
+    "url": "http://localhost:4394/queue?view=mine&status=%5B%22submitted%22%2C%22in_review%22%2C%22needs_rereview%22%5D&is_legacy=false&mine=true",
+    "value": "CP-1042",
+    "asked": [
+      "CP-1042"
+    ],
+    "active": {
+      "tag": "INPUT",
+      "id": "react-aria8186419265-_r_7_",
+      "role": "combobox",
+      "label": "Jump to item",
+      "text": "",
+      "focusVisible": true
+    }
+  },
+  "pasteEnterSecond": {
+    "url": "http://localhost:4394/items/1042"
+  },
+  "typeFastEnter": {
+    "url": "http://localhost:4394/queue?view=mine&status=%5B%22submitted%22%2C%22in_review%22%2C%22needs_rereview%22%5D&is_legacy=false&mine=true"
+  },
+  "staleEnter": {
+    "typed": "fall promo landing",
+    "optionsShownAtEnter": [
+      "CP-1042Fall personal loan promo — paid socialIn review",
+      "CP-1061Fall personal loan promo — emailApproved",
+      "CP-1188Fall personal loan promo — radio read (2025)MCR-26-045Approved",
+      "CP-1070Fall promo landing page, LendRightChanges requested"
+    ],
+    "url": "http://localhost:4394/items/1042",
+    "asked": [
+      "fall"
+    ]
+  },
+  "staleEnterKey": {
+    "typed": "CP-1188",
+    "optionsShownAtEnter": [
+      "CP-1042Fall personal loan promo — paid socialIn review",
+      "CP-1061Fall personal loan promo — emailApproved",
+      "CP-1188Fall personal loan promo — radio read (2025)MCR-26-045Approved",
+      "CP-1070Fall promo landing page, LendRightChanges requested"
+    ],
+    "url": "http://localhost:4394/items/1042"
+  },
+  "slowStale": {
+    "typed": "MCR-26",
+    "optionsShown600msAfter": [
+      "CP-1042Fall personal loan promo — paid socialIn review",
+      "CP-1061Fall personal loan promo — emailApproved",
+      "CP-1188Fall personal loan promo — radio read (2025)MCR-26-045Approved",
+      "CP-1070Fall promo landing page, LendRightChanges requested"
+    ],
+    "searchingNoteCount": 0,
+    "url": "http://localhost:4394/items/1042"
+  },
+  "geometry1440": {
+    "field": {
+      "x": 287.390625,
+      "y": 8,
+      "w": 448,
+      "h": 32
+    },
+    "input": {
+      "x": 320.390625,
+      "y": 14,
+      "w": 408,
+      "h": 20
+    },
+    "popover": {
+      "x": 320.390625,
+      "y": 40,
+      "w": 512,
+      "h": 154
+    },
+    "title": [
+      {
+        "text": "Fall personal loan promo — paid social",
+        "client": 306,
+        "scroll": 306,
+        "titleAttr": null
+      },
+      {
+        "text": "Fall personal loan promo — email",
+        "client": 302,
+        "scroll": 302,
+        "titleAttr": null
+      },
+      {
+        "text": "Fall personal loan promo — radio read (2025)",
+        "client": 230,
+        "scroll": 278,
+        "titleAttr": null
+      },
+      {
+        "text": "Fall promo landing page, LendRight",
+        "client": 246,
+        "scroll": 246,
+        "titleAttr": null
+      }
+    ]
+  },
+  "highlight": {
+    "activeBefore": {
+      "tag": "INPUT",
+      "id": "react-aria9692375377-_r_7_",
+      "role": "combobox",
+      "label": "Jump to item",
+      "text": "",
+      "focusVisible": true
+    },
+    "afterArrowDown1": {
+      "text": "CP-1042Fall personal loan promo — paid socialIn review",
+      "bg": "oklch(0.25 0.025 258 / 0.06)",
+      "outline": "none",
+      "boxShadow": "none"
+    },
+    "activedescendant": "react-aria9692375377-_r_4_-option-1061"
+  },
+  "highlightEnter": {
+    "url": "http://localhost:4394/items/1061",
+    "active": {
+      "tag": "MAIN",
+      "id": "main",
+      "role": null,
+      "label": null,
+      "text": "Fall personal loan promo — paid socialCP-1042In reviewMedium",
+      "focusVisible": true
+    },
+    "value": ""
+  },
+  "clickOption": {
+    "url": "http://localhost:4394/items/1070",
+    "active": {
+      "tag": "MAIN",
+      "id": "main",
+      "role": null,
+      "label": null,
+      "text": "Fall personal loan promo — paid socialCP-1042In reviewMedium",
+      "focusVisible": true
+    }
+  },
+  "srHint": {
+    "listbox": "- listbox \"Suggestions\":\n  - option \"Type a CP key, title words or tracker ID.\":\n    - paragraph: Type a CP key, title words or tracker ID.\n- button \"Dismiss\"",
+    "boxAttrs": {
+      "expanded": "true",
+      "controls": "react-aria5364470681-_r_4_",
+      "keyshortcuts": "Meta+K Control+K /",
+      "describedby": null
+    },
+    "live": [
+      {
+        "live": "assertive",
+        "text": "0 options available."
+      },
+      {
+        "live": "polite",
+        "text": ""
+      }
+    ],
+    "emptyWrapper": {
+      "role": "option",
+      "tag": "DIV",
+      "attrs": [
+        "role=option",
+        "style=display: contents;"
+      ]
+    }
+  },
+  "srResults": {
+    "listbox": "- listbox \"Suggestions\":\n  - option \"CP-1042 Fall personal loan promo — paid social In review\"\n  - option \"CP-1061 Fall personal loan promo — email Approved\"\n  - option \"CP-1188 Fall personal loan promo — radio read (2025) MCR-26-045 Approved\"\n  - option \"CP-1070 Fall promo landing page, LendRight Changes requested\"\n- button \"Dismiss\"",
+    "boxAttrs": {
+      "expanded": "true",
+      "controls": "react-aria5364470681-_r_4_",
+      "keyshortcuts": "Meta+K Control+K /",
+      "describedby": null
+    },
+    "live": [
+      {
+        "live": "assertive",
+        "text": "0 options available.4 options available."
+      },
+      {
+        "live": "polite",
+        "text": ""
+      }
+    ],
+    "emptyWrapper": null
+  },
+  "srLegacy": {
+    "listbox": "- listbox \"Suggestions\":\n  - option \"CP-1042 Fall personal loan promo — paid social In review\"\n  - option \"CP-1061 Fall personal loan promo — email Approved\"\n  - option \"CP-1188 Fall personal loan promo — radio read (2025) MCR-26-045 Approved\"\n  - option \"CP-1070 Fall promo landing page, LendRight Changes requested\"\n- button \"Dismiss\"",
+    "boxAttrs": {
+      "expanded": "true",
+      "controls": "react-aria5364470681-_r_4_",
+      "keyshortcuts": "Meta+K Control+K /",
+      "describedby": null
+    },
+    "live": [
+      {
+        "live": "assertive",
+        "text": "0 options available.4 options available."
+      },
+      {
+        "live": "polite",
+        "text": ""
+      }
+    ],
+    "emptyWrapper": null
+  },
+  "srNoMatch": {
+    "listbox": "- listbox \"Suggestions\":\n  - option \"No items match “zzz”.\":\n    - paragraph: No items match “zzz”.\n- button \"Dismiss\"",
+    "boxAttrs": {
+      "expanded": "true",
+      "controls": "react-aria5364470681-_r_4_",
+      "keyshortcuts": "Meta+K Control+K /",
+      "describedby": null
+    },
+    "live": [
+      {
+        "live": "assertive",
+        "text": "0 options available.4 options available.0 options available."
+      },
+      {
+        "live": "polite",
+        "text": ""
+      }
+    ],
+    "emptyWrapper": {
+      "role": "option",
+      "tag": "DIV",
+      "attrs": [
+        "role=option",
+        "style=display: contents;"
+      ]
+    }
+  },
+  "srError": {
+    "listbox": "- listbox \"Suggestions\":\n  - option \"Search is temporarily unavailable.\":\n    - paragraph: Search is temporarily unavailable.\n- button \"Dismiss\"",
+    "live": [
+      {
+        "live": "assertive",
+        "text": "0 options available."
+      },
+      {
+        "live": "polite",
+        "text": ""
+      }
+    ]
+  },
+  "srErrorRetype": {
+    "stillError": 1
+  },
+  "escape": {
+    "tabOrder": [
+      {
+        "tag": "BUTTON",
+        "id": "react-aria5685793215-_r_1_",
+        "role": null,
+        "label": "Collapse navigation",
+        "text": "",
+        "focusVisible": true
+      }
+    ],
+    "steps": [
+      {
+        "value": "fall",
+        "popover": 0,
+        "active": {
+          "tag": "INPUT",
+          "id": "react-aria5685793215-_r_7_",
+          "role": "combobox",
+          "label": "Jump to item",
+          "text": "",
+          "focusVisible": true
+        }
+      },
+      {
+        "value": "fall",
+        "popover": 0,
+        "active": {
+          "tag": "INPUT",
+          "id": "react-aria5685793215-_r_7_",
+          "role": "combobox",
+          "label": "Jump to item",
+          "text": "",
+          "focusVisible": true
+        }
+      },
+      {
+        "value": "fall",
+        "popover": 0,
+        "active": {
+          "tag": "INPUT",
+          "id": "react-aria5685793215-_r_7_",
+          "role": "combobox",
+          "label": "Jump to item",
+          "text": "",
+          "focusVisible": true
+        }
+      },
+      {
+        "value": "fall",
+        "popover": 0,
+        "active": {
+          "tag": "INPUT",
+          "id": "react-aria5685793215-_r_7_",
+          "role": "combobox",
+          "label": "Jump to item",
+          "text": "",
+          "focusVisible": true
+        }
+      },
+      {
+        "afterTab": {
+          "tag": "BUTTON",
+          "id": "react-aria5685793215-_r_f_",
+          "role": null,
+          "label": "Notifications",
+          "text": "",
+          "focusVisible": true
+        }
+      }
+    ]
+  },
+  "tabOutOpen": {
+    "active": {
+      "tag": "BUTTON",
+      "id": "react-aria5685793215-_r_f_",
+      "role": null,
+      "label": "Notifications",
+      "text": "",
+      "focusVisible": true
+    },
+    "value": "fall",
+    "popover": 0
+  },
+  "refocus": {
+    "value": "fall",
+    "selected": [
+      0,
+      4
+    ],
+    "popover": 0
+  },
+  "cmdKFromTextarea": {
+    "active": {
+      "tag": "INPUT",
+      "id": "react-aria3101280727-_r_7_",
+      "role": "combobox",
+      "label": "Jump to item",
+      "text": "",
+      "focusVisible": true
+    }
+  },
+  "cmdKInModal": {
+    "dialogOpen": 0,
+    "active": {
+      "tag": "INPUT",
+      "id": "react-aria3101280727-_r_7_",
+      "role": "combobox",
+      "label": "Jump to item",
+      "text": "",
+      "focusVisible": true
+    }
+  },
+  "mouseOpen": {
+    "url": "http://localhost:4394/items/1042?tab=comments&v=2&comment=311",
+    "active": {
+      "tag": "LI",
+      "id": "comment-311",
+      "role": null,
+      "label": null,
+      "text": "Sam Okafor 1h@Priya Natarajan can you confirm the APR range ",
+      "focusVisible": false
+    }
+  },
+  "afterTab": {
+    "active": {
+      "tag": "TIME",
+      "id": "",
+      "role": "img",
+      "label": "Oct 24, 2026, 1:05 PM",
+      "text": "1h",
+      "focusVisible": true
+    },
+    "linkedStyle": {
+      "boxShadow": "oklch(0.38 0.11 262) 2px 0px 0px 0px inset",
+      "bg": "oklab(0 0 0 / 0)",
+      "outline": "none",
+      "ariaCurrent": "true"
+    },
+    "focusToken": "oklch(38% .11 262)"
+  },
+  "tabSwitch": {
+    "url": "http://localhost:4394/items/1042?v=2&comment=311&tab=comments",
+    "active": {
+      "tag": "DIV",
+      "id": "react-aria7566782302-_r_1t_-tab-comments",
+      "role": "tab",
+      "label": null,
+      "text": "Comments",
+      "focusVisible": false
+    },
+    "anim": [
+      {
+        "name": "app-linked-fade",
+        "time": 399.9619999630601
+      }
+    ]
+  },
+  "tabSwitchKeyboard": {
+    "active": {
+      "tag": "LI",
+      "id": "comment-311",
+      "role": null,
+      "label": null,
+      "text": "Sam Okafor 1h@Priya Natarajan can you confirm the APR range ",
+      "focusVisible": true
+    }
+  },
+  "urlAfterTabs": "http://localhost:4394/items/1042?v=2&comment=311&tab=comments",
+  "geometry1280": {
+    "field": {
+      "x": 287.390625,
+      "w": 448
+    },
+    "popover": {
+      "x": 320.390625,
+      "w": 512
+    },
+    "titles": [
+      [
+        306,
+        306
+      ],
+      [
+        302,
+        302
+      ],
+      [
+        230,
+        278
+      ],
+      [
+        246,
+        246
+      ]
+    ]
+  }
+}

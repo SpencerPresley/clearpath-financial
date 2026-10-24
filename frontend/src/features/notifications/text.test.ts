@@ -113,13 +113,13 @@ describe('describeNotification', () => {
 });
 
 describe('notificationLink', () => {
-  it('opens the item, on the comment’s version for mentions', () => {
+  it('opens the item, on the comment and its version for mentions', () => {
     expect(notificationLink(notificationFixture({}))).toEqual({ itemId: '42', search: {} });
     expect(
       notificationLink(
         notificationFixture({ kind: 'mention', detail: { kind: 'mention', comment_id: 1, version_n: 2 } }),
       ),
-    ).toEqual({ itemId: '42', search: { tab: 'comments', v: 2 } });
+    ).toEqual({ itemId: '42', search: { tab: 'comments', v: 2, comment: 1 } });
     expect(notificationLink(notificationFixture({ kind: 'mention', actor: DANA, detail: null }))).toEqual({
       itemId: '42',
       search: { tab: 'comments' },

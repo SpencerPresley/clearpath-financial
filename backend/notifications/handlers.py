@@ -49,11 +49,16 @@ def _item(event: EventRecord) -> ReviewItem:
 def notify_assignee(event: EventRecord) -> None:
     """The new assignee; for a pool assignment, the active leads (decisions.md "Reviewer assignment" rule 3).
 
-    A resubmission or re-review records a sticky assignment back to the previous reviewer (rule 1), so this
-    is also how that reviewer hears the item is back. A manual unassign notifies nobody.
+    A resubmission records a sticky assignment back to the previous reviewer (rule 1), so this is how that reviewer
+    hears the item is back. A re-review's assignment (`reopen_event_id` set) is skipped when it names a reviewer:
+    one notification per action, and the re-review notice already reaches whoever the reopen assigned, with the
+    reason. Into the pool it still tells the leads, whom the re-review notice doesn't reach. A manual unassign
+    notifies nobody.
     """
     payload = event.payload
     assert isinstance(payload, ItemAssignedPayload)  # noqa: S101  # guaranteed by the registry
+    if payload.reopen_event_id is not None and payload.assignee_id is not None:
+        return
     if payload.assignee_id is None:
         if payload.mode is not AssignmentMode.POOL:
             return

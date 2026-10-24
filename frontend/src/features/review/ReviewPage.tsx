@@ -76,6 +76,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
   const viewer = useViewer();
   const isDecider = viewer.roles.some((role) => role === 'reviewer' || role === 'lead');
   const data = useReviewData(itemId, search.v);
+  const [shownLinks] = useState(() => new Set<number>()); // ?comment= links already brought into view here
   const item = data.item.data;
 
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -385,7 +386,13 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
             />
           </TabPanel>
           <TabPanel id="comments" className="app-tab-panel">
-            <CommentsTab itemId={item.id} versionN={shownN} canComment />
+            <CommentsTab
+              itemId={item.id}
+              versionN={shownN}
+              canComment
+              highlightId={search.comment}
+              shownLinks={shownLinks}
+            />
           </TabPanel>
           <TabPanel id="details" className="app-tab-panel">
             <DetailsTab item={item} />

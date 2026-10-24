@@ -1,0 +1,32 @@
+{
+  "retype": {
+    "asked": [
+      "fall",
+      "fal",
+      "fall"
+    ],
+    "stillError": 0,
+    "options": 4
+  },
+  "retypeEnter": {
+    "asked": [
+      "fall",
+      "fal",
+      "fall"
+    ],
+    "url": "http://localhost:4394/items/1042"
+  },
+  "hover": {
+    "bg": "rgba(0, 0, 0, 0)",
+    "focused": null,
+    "hovered": "true",
+    "focusVisible": null
+  },
+  "keyboardLast": {
+    "bg": "oklch(0.25 0.025 258 / 0.06)",
+    "focused": "true",
+    "hovered": null,
+    "focusVisible": "true"
+  },
+  "tabsBackToDraft": 21
+}

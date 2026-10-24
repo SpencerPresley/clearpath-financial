@@ -25,6 +25,8 @@ export interface ItemRowOut {
   is_legacy: boolean;
   key: string;
   latest_decision: DecisionSummaryOut | null;
+  /** The old tracker's Request ID (MCR-26-045) on imported items. */
+  legacy_ref?: string | null;
   llm_check_status: CheckStatus;
   markets: Market[];
   notes: string;

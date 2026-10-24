@@ -173,6 +173,30 @@ def test_filter_q_matches_title_case_insensitively_and_display_key(
 
 
 @pytest.mark.django_db
+def test_filter_q_matches_a_legacy_tracker_id(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    # The quick-jump box takes what people remember from the old tracker (samples/README.md "Request ID").
+    imported = make_item(None, title="Summer promo banner", is_legacy=True, legacy_ref="MCR-26-045", markets=[])
+    make_item(marketer, title="MCR-style card page")
+
+    def ids(q: str) -> set[int]:
+        return set(filter_items(viewer=reviewer, filters=ItemFilter(q=q), clock=clock).values_list("pk", flat=True))
+
+    assert ids("MCR-26-045") == {imported.pk}
+    assert ids("mcr-26-045") == {imported.pk}
+    assert ids("MCR-26") == {imported.pk}  # a prefix narrows, like the title
+    assert ids("summer promo") == {imported.pk}
+
+
+@pytest.mark.django_db
+def test_item_rows_carry_the_legacy_tracker_id(reviewer: User, clock: FixedClock) -> None:
+    make_item(None, title="Summer promo banner", is_legacy=True, legacy_ref="MCR-26-045", markets=[])
+
+    page = list_items(viewer=reviewer, filters=ItemFilter(q="MCR-26-045"), sort=ItemSort.UPDATED, clock=clock)
+
+    assert [row.legacy_ref for row in page.rows] == ["MCR-26-045"]
+
+
+@pytest.mark.django_db
 def test_filter_enums_tags_markets_and_findings(marketer: User, reviewer: User, clock: FixedClock) -> None:
     a = make_item(marketer, product=Product.CREDIT_CARD, channel=Channel.SMS, tags=["promo", "q4"], markets=[Market.CA])
     b = make_item(marketer, product=Product.PERSONAL_LOAN, tags=["promo"], open_findings_count=1)

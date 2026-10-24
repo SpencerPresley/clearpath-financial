@@ -18,7 +18,7 @@ import { Tooltip } from '../Tooltip';
 import { navGroupsFor } from './nav';
 import type { NavSection } from './nav';
 import { NavLink } from './NavLink';
-import { SearchField } from './SearchField';
+import { QuickJump } from '../../features/search/QuickJump';
 import { useMediaQuery } from './useMediaQuery';
 import { UserMenu } from './UserMenu';
 import { useViewer } from './Viewer';
@@ -151,7 +151,7 @@ export function AppShell() {
             Compliance Review
           </span>
         </Link>
-        <SearchField />
+        <QuickJump />
         <div className="app-topbar-end">
           <ApiStatusBadge />
           <NotificationBell />

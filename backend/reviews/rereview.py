@@ -70,7 +70,7 @@ def reopen_item(  # the event's fields
                 failed_snapshot_ids=list(failed_snapshot_ids) if failed_snapshot_ids is not None else None,
             ),
         )
-        auto_assign(item=item, actor=actor, clock=clock, sticky=True)
+        auto_assign(item=item, actor=actor, clock=clock, sticky=True, reopen_event_id=event.pk)
     return event.pk
 
 
