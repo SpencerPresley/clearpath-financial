@@ -3,8 +3,16 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from audit.payloads import ItemImportedPayload, LegacyTimeline, parse_payload
-from core.domain import DecisionOutcome, EventType
+from audit.payloads import (
+    EventPayload,
+    ItemImportedPayload,
+    LegacyTimeline,
+    UserActiveChangedPayload,
+    UserCreatedPayload,
+    UserRolesChangedPayload,
+    parse_payload,
+)
+from core.domain import DecisionOutcome, EventType, Role
 
 SUBMITTED = datetime(2025, 3, 3, 9, tzinfo=UTC)
 REVIEWED = datetime(2025, 3, 5, 14, tzinfo=UTC)
@@ -47,3 +55,19 @@ def test_legacy_timeline_fields_are_optional_because_the_tracker_is_messy() -> N
 def test_legacy_timeline_rejects_impossible_histories(fields: dict[str, object], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         LegacyTimeline.model_validate(fields)
+
+
+@pytest.mark.parametrize(
+    ("event_type", "payload"),
+    [
+        (EventType.USER_CREATED, UserCreatedPayload(user_id=7, email="new@clearpath.demo", roles=(Role.REVIEWER,))),
+        (
+            EventType.USER_ROLES_CHANGED,
+            UserRolesChangedPayload(user_id=7, before=(Role.REVIEWER,), after=(Role.REVIEWER, Role.LEAD)),
+        ),
+        (EventType.USER_ACTIVE_CHANGED, UserActiveChangedPayload(user_id=7, is_active=False)),
+    ],
+)
+def test_user_management_is_recorded_as_events(event_type: EventType, payload: EventPayload) -> None:
+    # Role grants and deactivations are part of the audit trail (spec anti-goals: no unrecorded changes).
+    assert parse_payload(event_type, payload.model_dump(mode="json")) == payload

@@ -21,6 +21,7 @@ from core.domain import (
     Product,
     ReopenReason,
     RiskTier,
+    Role,
     VersionOrigin,
 )
 
@@ -263,6 +264,23 @@ class UserAvailabilityChangedPayload(EventPayload):
     is_available: bool
 
 
+class UserCreatedPayload(EventPayload):
+    user_id: int
+    email: str
+    roles: tuple[Role, ...]
+
+
+class UserRolesChangedPayload(EventPayload):
+    user_id: int
+    before: tuple[Role, ...]
+    after: tuple[Role, ...]
+
+
+class UserActiveChangedPayload(EventPayload):
+    user_id: int
+    is_active: bool
+
+
 class ImportCommittedPayload(EventPayload):
     import_id: int
     created_count: int
@@ -316,6 +334,9 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.PARTNER_CREATED: PartnerCreatedPayload,
     EventType.PARTNER_UPDATED: PartnerUpdatedPayload,
     EventType.USER_AVAILABILITY_CHANGED: UserAvailabilityChangedPayload,
+    EventType.USER_CREATED: UserCreatedPayload,
+    EventType.USER_ROLES_CHANGED: UserRolesChangedPayload,
+    EventType.USER_ACTIVE_CHANGED: UserActiveChangedPayload,
     EventType.IMPORT_COMMITTED: ImportCommittedPayload,
     EventType.EXPORT_CREATED: ExportCreatedPayload,
     EventType.EMAIL_SENT: EmailSentPayload,

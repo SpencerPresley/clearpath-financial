@@ -262,6 +262,10 @@ class EventType(StrEnum):
     PARTNER_CREATED = "partner.created"
     PARTNER_UPDATED = "partner.updated"
     USER_AVAILABILITY_CHANGED = "user.availability_changed"
+    # Recorded by the admin user services (createUser, updateUser): role grants are part of the audit trail.
+    USER_CREATED = "user.created"
+    USER_ROLES_CHANGED = "user.roles_changed"
+    USER_ACTIVE_CHANGED = "user.active_changed"
     IMPORT_COMMITTED = "import.committed"
     EXPORT_CREATED = "export.created"
     EMAIL_SENT = "email.sent"

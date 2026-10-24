@@ -45,13 +45,13 @@ def list_users(
 
 @admin_router.post("/admin/users", response={201: UserOut, **STUB_ERRORS}, operation_id="createUser")
 def create_user(request: HttpRequest, body: UserCreateIn) -> Status[UserOut]:
-    """Admins provision accounts (no public signup). [admin user management]"""
+    """Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]"""
     raise NotImplementedYet("user management")
 
 
 @admin_router.patch("/admin/users/{int:user_id}", response={200: UserOut, **STUB_ERRORS}, operation_id="updateUser")
 def update_user(request: HttpRequest, user_id: int, body: UserUpdateIn) -> UserOut:
-    """[admin user management]"""
+    """Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]"""
     raise NotImplementedYet("user management")
 
 
