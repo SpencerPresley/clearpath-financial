@@ -5,8 +5,8 @@ Issue #13. Plan: `docs/plan/demo-seed.md`. Walkthrough for evaluators: `docs/dem
 ## What was built
 
 - **`backend/demo/` app.**
-  - `content/` is the catalog. It has 11 people, 8 partners with agreements, offer terms (personal loan v1→v3,
-    card v1→v2) and 42 item stories. Each story is copy versions plus timed steps.
+  - `content/` is the catalog. It has 11 people, 10 partners with agreements, offer terms (personal loan v1→v3,
+    card v1→v2) and 44 item stories. Each story is copy versions plus timed steps.
   - `story.py` is the step DSL.
   - `runner.py` merges every step into one timeline and plays it through the real service functions, using a
     `FixedClock` set to each step's backdated instant. It drains the outbox in-process after each step and
@@ -34,27 +34,28 @@ Issue #13. Plan: `docs/plan/demo-seed.md`. Walkthrough for evaluators: `docs/dem
 
 | | |
 |---|---|
-| Native items | 42: submitted 5, in review 9, changes requested 4, approved 12, rejected 3, needs re-review 4 (terms changed 2, approval expired 1, drift 1), expired 3, withdrawn 2 |
+| Native items | 44: submitted 5, in review 9, changes requested 4, approved 14, rejected 3, needs re-review 4 (terms changed 2, approval expired 1, drift 1), expired 3, withdrawn 2 |
 | Legacy items | 178 from `samples/` tracker, imported through `imports.services` the evening before; 33 matched to seeded partners |
 | Products / channels | personal loan, card, mortgage prequal; email, SMS, paid social, paid search, display, direct mail, landing page, affiliate page, call script; CA-only and national; prescreen |
 | Rule coverage | every code rule id fires at least once (asserted against `CODE_RULES`), plus ≥10 clean versions |
 | Triage | ≥40 accepted, ≥40 dismissed with reasons, carried-forward dismissals, system dismissals on fast-track |
-| AI | scripted findings on most versions; one item with the AI failed after 4 tries (529), so approval needs an override (CP-38); one pending (CP-220) |
+| AI | scripted findings on most versions; one item with the AI failed after 4 tries (529), so approval needs an override (CP-40); one pending (CP-222) |
 | History | events backdated over ~10 weeks, ~880 events; 5 fast-track approvals, 1 reaffirm (which found the 2026-07-21 Reg B rule as a new finding) |
-| People | Dana's queue holds 4; Rachel (lead) holds 3; Leah is out of office and her released queue left 2 unassigned |
+| Drift | CP-7, CP-23 and CP-32 run on the three partner pages ClearPath hosts (`drift.demo.PAGES`), placed via `drift.demo.seed_placement`; 4 checks recorded through `drift.services` on the pages' own HTML; LendCompare is left edited, so CP-7's re-review comes from a real *modified* check |
+| People | Dana's queue holds 5; Rachel (lead) holds 3; Leah is out of office and her released queue left 2 unassigned |
 
 Runtime is about 11 s on a laptop, from both the command and the UI button with a real worker.
 
 ## Verification
 
-- Backend, after rebasing on `78ed50f`:
-  - `pytest`: 1476 passed;
+- Backend, after rebasing on `da41224` (drift merged):
+  - `pytest`: 1653 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
   - the exported schema matches the committed one;
   - `make semgrep` reports 0 findings.
 - Frontend, after the rebase:
-  - `npm run test:run`: 567 passed;
+  - `npm run test:run`: 578 passed;
   - `typecheck`, `lint`, `format:check` and `build` are clean.
 - Demo tests (`backend/demo/tests/`, 37 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
@@ -72,7 +73,7 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
     `lead`, `marketer`, `admin`, `marketer-my-submissions`, `reviewer-fast-track-rereview`,
     `reviewer-ai-failed`, `lead-metrics`, `admin-reset-confirm`, `admin-reset-running`, `admin-reset-done`;
   - I clicked Reset demo as admin while a marketer was also signed in: the job finished in about 10 s, a toast
-    reported 42 items, and both sessions survived.
+    reported 42 items (44 since the drift stories), and both sessions survived.
 
 ## Fixed from the walk-through
 
@@ -96,20 +97,32 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 - **`draft` status is not seeded.** It's unreachable: intake has no drafts (E), and hand-inserting one would
   break the seed-through-services rule.
 - **Demo email domain stays `@clearpath.demo`.** `SignIn.tsx`'s demo-account picker and the e2e fixtures use it.
-- **Drift is simulated.** CP-7's drift uses `reopen_item(reason=drift_detected)`, which stands in for M's
-  snapshot-diff detector. When M lands, the story can switch to a real snapshot pair.
+- **Drift checks run on the pages' HTML without a fetch.**
+  - The seed records drift checks through `request_check` → `claim` → `complete`, with the page rendered in-process
+    by `drift.demo.render_page`. The view now uses that same function.
+  - A real fetch isn't possible at seed time: on a first deploy `deploy.sh` seeds before `up`, tests have no
+    server, and prod has no `/demo-partners/*` route until the deploy-wave apply.
+  - *Check now* after the seed does fetch for real, through the worker.
+- **The demo pages now quote the seeded offer.** M's `PAGES` copy said "7.49%" and "Issued by Lakeside Bank".
+  Seeding an approval of that would mean approving copy that the terms and issuer rules flag against the seeded
+  terms (PL floor 9.99%, Harborview Bank). The pages now carry the seeded items' approved copy, and the
+  LendCompare edit lowers the floor to 7.99% and restores "Guaranteed approval".
+  - The drift tests check outcomes per page generically, so they pass unchanged (175).
+  - `reset_demo_pages` gained `edited=` so Reset can leave LendCompare edited.
 - **The tracker import is seeded, at day −1.** That way the Library, Metrics and Import screens have legacy
   history on first login. It's a decision below.
-- **Item keys follow seed order.** Natives are CP-1…CP-41, legacy CP-42…CP-219, and the pending item is CP-220,
-  because it's submitted after the import in the timeline. `docs/demo.md` cites these keys, and they're stable
-  across resets (RESTART IDENTITY).
+- **Item keys follow seed order.** Natives are CP-1…CP-43, legacy CP-44…CP-221, and the pending item is CP-222,
+  because it's submitted after the import in the timeline.
+  - They're stable across resets (RESTART IDENTITY), but adding a story shifts every later key.
+  - `docs/demo.md` cites keys, so `test_the_keys_the_guide_cites_are_the_items_it_describes` pins each one to its
+    title.
 
 ## Risks and open questions
 
 - **Tracker history overlaps native history (open decision, below).** The sample tracker (a fixed fixture,
   Nov 3 2025 – Oct 23 2026) runs right up to yesterday, so Metrics shows Excel and the tool in use side by side
   for the native ten weeks.
-- **CP-220 only stays pending for ~10 minutes.** At 10 minutes the reconciler re-enqueues the run on the real
+- **CP-222 only stays pending for ~10 minutes.** At 10 minutes the reconciler re-enqueues the run on the real
   model. With an API key it gets a real review; without one it fails ("no Anthropic API key"). That's inherent
   to a pending check, and `docs/demo.md` says so.
 - **Orphaned files on reset.** TRUNCATE doesn't delete attachment, import and export files from storage (local

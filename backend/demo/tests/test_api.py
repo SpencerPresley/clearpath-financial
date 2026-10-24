@@ -42,8 +42,8 @@ def test_seed_demo_on_an_empty_database_seeds_once() -> None:
 
     call_command("seed_demo", stdout=out)
 
-    assert counts == (42, 178)
-    assert (ReviewItem.objects.filter(is_legacy=False).count(), ReviewItem.objects.count()) == (42, 220)
+    assert counts == (44, 178)
+    assert (ReviewItem.objects.filter(is_legacy=False).count(), ReviewItem.objects.count()) == (44, 222)
     assert "nothing seeded" in out.getvalue()
 
 
@@ -59,9 +59,9 @@ def test_admin_resets_the_demo_and_stays_signed_in(
     job = response.json()
     assert job["status"] == "queued"
     done = client.get(f"/api/admin/demo/resets/{job['id']}").json()
-    assert (done["status"], done["seeded_items"], done["error"]) == ("done", 42, "")
+    assert (done["status"], done["seeded_items"], done["error"]) == ("done", 44, "")
     assert client.get("/api/me").status_code == 200
-    assert ReviewItem.objects.filter(is_legacy=False).count() == 42
+    assert ReviewItem.objects.filter(is_legacy=False).count() == 44
 
 
 def test_a_second_request_while_one_is_queued_returns_it(

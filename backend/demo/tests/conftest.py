@@ -12,6 +12,7 @@ from checks.tasks import run_llm_prereview
 from demo.content import CATALOG
 from demo.models import DemoReset
 from demo.reset import SeedResult, _truncate, reset_demo
+from drift.tasks import run_check as run_drift_check
 from imports.tasks import commit_import_task
 from terms.tasks import fan_out_item_task
 
@@ -45,6 +46,7 @@ def seeded(django_db_setup: None, django_db_blocker: Any) -> Iterator[Seeded]:
         mock.patch.object(run_llm_prereview, "delay", recorder("checks.run_llm_prereview")),
         mock.patch.object(fan_out_item_task, "delay", recorder("terms.fan_out_item")),
         mock.patch.object(commit_import_task, "delay", recorder("imports.commit")),
+        mock.patch.object(run_drift_check, "delay", recorder("drift.run_check")),
     ):
         result = reset_demo(now=NOW)
     yield Seeded(result=result, enqueued=enqueued)

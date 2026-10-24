@@ -3,7 +3,7 @@
 from typing import Final
 
 from core.domain import AttachmentKind as K
-from core.domain import Channel, ItemStatus, Market, ReopenReason
+from core.domain import Channel, DriftResult, ItemStatus, Market, ReopenReason
 from core.domain import DecisionOutcome as O
 from core.domain import Product as P
 from demo.content.copy import (
@@ -26,8 +26,10 @@ from demo.story import (
     Comment,
     Decide,
     Dismiss,
-    Drift,
     FastTrack,
+    OnDemoPage,
+    PageCheck,
+    PartnerEdit,
     Place,
     Pull,
     Resubmit,
@@ -36,6 +38,15 @@ from demo.story import (
     ago,
     day,
 )
+from drift.demo import DemoPage, get_page
+
+
+def demo_page(slug: str) -> DemoPage:
+    page = get_page(slug)
+    if page is None:
+        raise LookupError(slug)
+    return page
+
 
 CA: Final = (Market.NATIONAL, Market.CA)
 
@@ -417,13 +428,8 @@ PL_STORIES: Final = (
             "credit or better.\n\n"
             "Why we like it: fast funding, no prepayment penalty, and a simple online application.\n\n"
             "See my rates",
-            "Advertiser Disclosure: LendCompare receives compensation from the lenders listed on this page, which "
-            "may affect where and how they appear.\n\n"
-            "Best Debt Consolidation Loans This Year\n\n"
-            "ClearPath Financial: Editor's Pick\n"
-            f"{pl_range('9.49')} Loans from $1,000 to $50,000. {SUBJECT_TO_APPROVAL}\n\n"
-            "Why we like it: fast funding, no prepayment penalty, and a simple online application.\n\n"
-            "See my rates",
+            # As approved in round 2, before the rate sheet: the fast-track to 9.99% makes it the demo page's copy.
+            demo_page("lendcompare").copy.replace("9.99%", "9.49%"),
         ),
         steps=(
             Submit(day(44, "09:00")),
@@ -442,22 +448,19 @@ PL_STORIES: Final = (
             Claim(day(40, "09:45")),
             Checklist(day(40, "09:55")),
             Decide(day(40, "10:00"), O.APPROVED, "Disclosure at the top, range and qualifier current, no guarantee."),
-            Place(
-                day(39, "12:00"),
-                "LendCompare: personal-loans/clearpath",
-                first_run=-39,
-                url="https://lendcompare.example/personal-loans/clearpath",
-                monitored=True,
-            ),
+            OnDemoPage(day(39, "12:00"), "lendcompare"),
             FastTrack(day(5, "11:40"), "Floor to 9.99%; LendCompare's feed picks it up tonight."),
-            Drift(day(2, "06:20")),
+            PageCheck(day(4, "06:20"), DriftResult.UNCHANGED),
+            PartnerEdit(day(2, "05:10")),
+            PageCheck(day(2, "06:20"), DriftResult.MODIFIED),
             Assign(
                 day(2, "08:50"), "dana", "Live partner page with drift; Dana is covering partner content this week."
             ),
             Comment(
                 day(2, "09:12"),
-                'This morning\'s capture shows LendCompare added "No hard credit check to see offers" under our '
-                "listing. That isn't in the approved copy. @Jordan Whitfield can you get them to pull it today?",
+                "This morning's check: LendCompare's listing now starts our APRs at 7.99% and says \"Guaranteed "
+                'approval for most applicants" instead of "Subject to credit approval." That\'s the guarantee we '
+                "took out in round 1. @Jordan Whitfield can you get them back to the approved copy today?",
                 mentions=("jordan",),
             ),
         ),
@@ -856,5 +859,30 @@ PL_STORIES: Final = (
             Pull(day(4, "10:40"), "Flight ends this week; pausing rather than re-cutting the super for 9.99%."),
         ),
         expect=ItemStatus.WITHDRAWN,
+    ),
+    Story(
+        key="pl-budgetbee-article",
+        owner="jordan",
+        title="BudgetBee: debt consolidation article",
+        product=P.PERSONAL_LOAN,
+        channel=Channel.AFFILIATE_PAGE,
+        partner="budgetbee",
+        tags=("affiliate", "sponsored", "debt-consolidation"),
+        first_run=-3,
+        versions=(demo_page("budgetbee").copy,),
+        steps=(
+            Submit(day(5, "10:20")),
+            Claim(day(4, "09:30")),
+            Checklist(day(4, "09:40")),
+            Decide(
+                day(4, "09:50"),
+                O.APPROVED,
+                "Sponsored label and fee disclosure up top, today's 9.99% floor and range, CFL line. BudgetBee runs "
+                "it word for word; their page is on the drift monitor.",
+            ),
+            OnDemoPage(day(3, "08:00"), "budgetbee"),
+            PageCheck(day(2, "06:20"), DriftResult.UNCHANGED),
+        ),
+        expect=ItemStatus.APPROVED,
     ),
 )

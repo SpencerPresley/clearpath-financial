@@ -8,9 +8,9 @@
   personas are upserted (password, roles, availability) instead of recreated.
 - **Nothing leaks to the worker.** While the seed's transaction is open, the beat dispatcher can't see its events
   (they're uncommitted) and the runner delivers them in-process, writing their receipts. The handlers that would
-  enqueue Celery work on commit (the AI check, the terms fan-out, the import commit) are pointed at no-ops for the
-  duration, including the commit, so no seeded version gets a live AI call. The one item left with a pending AI
-  check is picked up by the reconciler once it's older than its STUCK_AFTER (10 minutes).
+  enqueue Celery work on commit (the AI check, the terms fan-out, the import commit, the drift check) are pointed
+  at no-ops for the duration, including the commit, so no seeded version gets a live AI call. The one item left
+  with a pending AI check is picked up by the reconciler once it's older than its STUCK_AFTER (10 minutes).
 """
 
 from collections.abc import Iterator
@@ -34,6 +34,8 @@ from demo.content import CATALOG
 from demo.runner import run_catalog
 from demo.story import Catalog
 from demo.users import check_password_strength, demo_password, upsert_personas
+from drift import services as drift_services
+from drift.demo import reset_demo_pages
 from imports import services as import_services
 from notifications.models import Notification
 from notifications.services import mark_read
@@ -89,14 +91,27 @@ def _noop(*_args: object) -> None:
 @contextmanager
 def quiet_side_effects() -> Iterator[None]:
     """Point the on-commit task seams at no-ops (see the module docstring) and restore them afterwards."""
-    saved = (prereview.enqueue, terms_handlers.enqueue_fan_out, import_services._enqueue_commit, check_handlers.clock)  # noqa: SLF001
+    saved = (
+        prereview.enqueue,
+        terms_handlers.enqueue_fan_out,
+        import_services._enqueue_commit,  # noqa: SLF001
+        drift_services.enqueue,
+        check_handlers.clock,
+    )
     prereview.enqueue = _noop
     terms_handlers.enqueue_fan_out = _noop
     import_services._enqueue_commit = _noop  # noqa: SLF001
+    drift_services.enqueue = _noop
     try:
         yield
     finally:
-        prereview.enqueue, terms_handlers.enqueue_fan_out, import_services._enqueue_commit, check_handlers.clock = saved  # noqa: SLF001
+        (
+            prereview.enqueue,
+            terms_handlers.enqueue_fan_out,
+            import_services._enqueue_commit,  # noqa: SLF001
+            drift_services.enqueue,
+            check_handlers.clock,
+        ) = saved
 
 
 def _truncate() -> None:
@@ -129,6 +144,9 @@ def reset_demo(
         _truncate()
         users = upsert_personas(catalog.personas, password=password)
         run = run_catalog(catalog=catalog, now=at, users=users)
+        # The demo partner pages' state is in the cache, not the database. Set inside the transaction so a cache
+        # that can't be reached fails the whole reset instead of leaving the pages and the drift history disagreeing.
+        reset_demo_pages(edited=run.edited_pages)
         _mark_old_notifications_read(at)
         items = ReviewItem.objects.filter(is_legacy=False).count()
         record_event(

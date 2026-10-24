@@ -20,6 +20,7 @@ from core.domain import (
     Channel,
     CreditCardTerms,
     DecisionOutcome,
+    DriftResult,
     ItemStatus,
     Market,
     PartnerType,
@@ -261,10 +262,29 @@ class FastTrack:
 
 
 @dataclass(frozen=True)
-class Drift:
-    """The drift monitor found the live page changed (what workstream M's monitor records)."""
+class OnDemoPage:
+    """A monitored placement on one of the partner pages ClearPath hosts for the demo (`drift.demo.PAGES`), live
+    from this day. The story's approved copy is the page's copy."""
 
     at: When
+    slug: str
+    by: str | None = None
+
+
+@dataclass(frozen=True)
+class PartnerEdit:
+    """The partner publishes the demo page's edited variant (what "Simulate partner edit" does). The page stays
+    edited after the seed, so a check run later finds what the seeded check found."""
+
+    at: When
+
+
+@dataclass(frozen=True)
+class PageCheck:
+    """The drift monitor checks the story's demo page, through the drift services, on the HTML the page serves."""
+
+    at: When
+    expect: DriftResult
 
 
 @dataclass(frozen=True)
@@ -293,7 +313,9 @@ type Step = (
     | ConfirmTakedown
     | Reaffirm
     | FastTrack
-    | Drift
+    | OnDemoPage
+    | PartnerEdit
+    | PageCheck
     | Attach
 )
 

@@ -3,10 +3,11 @@
 from typing import Final
 
 from core.domain import AttachmentKind as K
-from core.domain import Channel, ItemStatus
+from core.domain import Channel, DriftResult, ItemStatus
 from core.domain import DecisionOutcome as O
 from core.domain import Product as P
 from demo.content.copy import EMAIL_FOOTER, ISSUER_LINE, card_terms
+from demo.content.personal_loans import demo_page
 from demo.story import (
     Accept,
     AiFinding,
@@ -21,6 +22,8 @@ from demo.story import (
     Dismiss,
     FastTrack,
     NewRound,
+    OnDemoPage,
+    PageCheck,
     Place,
     Pull,
     Resubmit,
@@ -526,6 +529,31 @@ CC_STORIES: Final = (
                 first_run=-6,
                 url="https://clearpath.example/card/everyday",
             ),
+        ),
+        expect=ItemStatus.APPROVED,
+    ),
+    Story(
+        key="cc-cardscout-review",
+        owner="jordan",
+        title="CardScout: ClearPath Card review",
+        product=P.CREDIT_CARD,
+        channel=Channel.AFFILIATE_PAGE,
+        partner="cardscout",
+        tags=("affiliate", "card-relaunch"),
+        first_run=-9,
+        versions=(demo_page("cardscout").copy,),
+        steps=(
+            Submit(day(13, "15:05")),
+            Claim(day(12, "10:10")),
+            Checklist(day(12, "10:20")),
+            Decide(
+                day(12, "10:30"),
+                O.APPROVED,
+                "Disclosure before the offer, the post-Prime 24.74%-33.74% range with the creditworthiness qualifier, "
+                "fee and issuer lines. Approved as their review-page block.",
+            ),
+            OnDemoPage(day(9, "09:00"), "cardscout"),
+            PageCheck(day(8, "06:20"), DriftResult.UNCHANGED),
         ),
         expect=ItemStatus.APPROVED,
     ),

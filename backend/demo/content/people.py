@@ -149,6 +149,29 @@ PARTNERS: Final = (
         notes="Onboarded 1/2026; sent the disclosure kit.",
         agreement=_agreement("Golden State Saver Media", "affiliate publisher (California)", "January 15, 2026"),
     ),
+    # The two partners whose pages ClearPath hosts for the drift demo (drift.demo.PAGES); LendCompare is the third.
+    PartnerSpec(
+        key="cardscout",
+        name="CardScout",
+        type=PartnerType.AFFILIATE,
+        website="https://cardscout.example",
+        contact_email="partners@cardscout.example",
+        agreement_signed_on=date(2026, 8, 3),
+        notes="Card review site. Signed for the Card relaunch; review page monitored daily.",
+        agreement=_agreement("CardScout Media, Inc.", "affiliate publisher (card reviews)", "August 3, 2026"),
+    ),
+    PartnerSpec(
+        key="budgetbee",
+        name="BudgetBee",
+        type=PartnerType.AFFILIATE,
+        website="https://budgetbee.example",
+        contact_email="sponsorships@budgetbee.example",
+        agreement_signed_on=date(2026, 9, 14),
+        notes="Personal finance blog. Sponsored articles only; copy must run as approved.",
+        agreement=_agreement(
+            "BudgetBee Publishing LLC", "affiliate publisher (sponsored articles)", "September 14, 2026"
+        ),
+    ),
 )
 
 

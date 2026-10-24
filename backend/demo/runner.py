@@ -32,6 +32,7 @@ from core.domain import (
     AttachmentKind,
     CheckStatus,
     DecisionOutcome,
+    DriftTrigger,
     FindingSource,
     FindingState,
     ItemStatus,
@@ -54,12 +55,14 @@ from demo.story import (
     ConfirmTakedown,
     Decide,
     Dismiss,
-    Drift,
     EditFields,
     FastTrack,
     GlobalStep,
     ImportTracker,
     NewRound,
+    OnDemoPage,
+    PageCheck,
+    PartnerEdit,
     PartnerSpec,
     Place,
     Pull,
@@ -72,6 +75,11 @@ from demo.story import (
     Submit,
     TermsSpec,
 )
+from drift.demo import get_page, render_page, seed_placement
+from drift.fetcher import FetchedPage
+from drift.services import claim as claim_drift_check
+from drift.services import complete as complete_drift_check
+from drift.services import request_check as request_drift_check
 from imports.services import commit_import, create_sample_import, request_commit
 from partners.services import NewPartner, create_partner
 from reviews.assignment import assign_item, claim_item
@@ -79,7 +87,7 @@ from reviews.decisions import DecisionInput, pull_item, reaffirm, record_decisio
 from reviews.errors import FindingsNeedTriage
 from reviews.models import QUEUE_STATUSES, Placement, ReviewItem
 from reviews.placements import PlacementInput, confirm_takedown, record_placement
-from reviews.rereview import reopen_item, run_expiry_sweep
+from reviews.rereview import run_expiry_sweep
 from reviews.services import (
     AttachmentOwner,
     ItemFieldChanges,
@@ -126,10 +134,13 @@ class _Entry:
 class RunResult:
     item_ids: dict[str, int]
     users: dict[str, User]
+    edited_pages: frozenset[str]  # demo partner pages the stories left edited
 
 
 class Runner:
     def __init__(self, *, catalog: Catalog, now: datetime, users: dict[str, User]) -> None:
+        self.demo_placements: dict[str, tuple[int, str]] = {}  # story key -> (placement id, demo page slug)
+        self.edited_pages: set[str] = set()
         self.catalog = catalog
         self.now = now
         self.today = now.astimezone(LOCAL_TZ).date()
@@ -180,7 +191,7 @@ class Runner:
             self._drain()
         self.clock.at = self.now
         self._check_endings()
-        return RunResult(item_ids=dict(self.item_ids), users=self.users)
+        return RunResult(item_ids=dict(self.item_ids), users=self.users, edited_pages=frozenset(self.edited_pages))
 
     def _open_summary(self, entry: _Entry) -> str:
         """The open findings on the failing story's current version: what a refused decision is usually about."""
@@ -436,8 +447,17 @@ class Runner:
                 reason=step.reason,
                 clock=clock,
             )
-        elif isinstance(step, Drift):
-            reopen_item(item_id=item_id, reason=ReopenReason.DRIFT_DETECTED, clock=clock)
+        elif isinstance(step, OnDemoPage):
+            if get_page(step.slug) is None:
+                raise SeedError(f"{story.key}: no demo page {step.slug!r}")
+            placement_id = seed_placement(
+                actor=self._marketer(story, step.by), item_id=item_id, slug=step.slug, clock=clock
+            )
+            self.demo_placements[story.key] = (placement_id, step.slug)
+        elif isinstance(step, PartnerEdit):
+            self.edited_pages.add(self._demo_placement(story)[1])
+        elif isinstance(step, PageCheck):
+            self._check_page(story, step, clock)
         elif isinstance(step, Attach):
             add_attachment(
                 actor=self._marketer(story, step.by),
@@ -446,6 +466,30 @@ class Runner:
                 file=_file(step.name, step.body),
                 clock=clock,
             )
+
+    def _demo_placement(self, story: Story) -> tuple[int, str]:
+        placed = self.demo_placements.get(story.key)
+        if placed is None:
+            raise SeedError(f"{story.key}: a page step before OnDemoPage")
+        return placed
+
+    def _check_page(self, story: Story, step: PageCheck, clock: FixedClock) -> None:
+        """One drift check, as the worker runs it (request, claim, complete), on the HTML the page serves now."""
+        placement_id, slug = self._demo_placement(story)
+        page = get_page(slug)
+        if page is None:
+            raise SeedError(f"{story.key}: no demo page {slug!r}")
+        snapshot_id = request_drift_check(
+            actor=None, placement_id=placement_id, trigger=DriftTrigger.SCHEDULED, clock=clock
+        )
+        claimed = claim_drift_check(snapshot_id=snapshot_id, clock=clock)
+        if claimed is None:
+            raise SeedError(f"{story.key}: drift check {snapshot_id} couldn't be claimed")
+        html = render_page(page, edited=slug in self.edited_pages, today=clock.today())
+        fetched = FetchedPage(url=claimed.url, final_url=claimed.url, status=200, content_type="text/html", text=html)
+        outcome = complete_drift_check(claim=claimed, page=fetched, clock=clock)
+        if outcome.result is not step.expect:
+            raise SeedError(f"{story.key}: the drift check found {outcome.result}, expected {step.expect}")
 
     def _submit(self, story: Story, step: Submit) -> None:
         result = submit_item(
