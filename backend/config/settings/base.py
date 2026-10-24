@@ -86,6 +86,8 @@ INSTALLED_APPS = [
     "allauth.mfa",
     "core",
     "accounts",
+    "partners",
+    "terms",
 ]
 
 MIDDLEWARE = [
