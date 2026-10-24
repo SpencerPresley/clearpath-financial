@@ -132,27 +132,38 @@ Nothing under `frontend/src/api/generated` or the OpenAPI was edited. What the U
 5. **History payloads carry `version_id` and user ids.** `describeEvent` maps them through
    `item.versions` and `GET /users`; a user id missing from `/users` reads as "a reviewer".
    Server-rendered actor names in the payload (as `actor` already is) would remove the join.
-6. **E's `DecisionIn` validator vs E's own contract (on `wsE/review-workflow`).** The decision service says:
-   after Approve with edits returns `409 findings_need_triage`, the reviewer triages v+1 and re-posts
-   `approved_with_edits` on v+1 *without* text. But `DecisionIn` rejects `approved_with_edits` without
-   `edited_content_text` (422). The UI sends `edited_content_text: null` on that re-approve, which will 422
-   until E relaxes the validator (allow null when the current version is the reviewer's own
-   `reviewer_edit`). Flagged to E via this report; the UI path is tested against the documented contract.
-7. **`POST /items/fetch-url`, `POST /items/{id}/versions`, `POST /items/{id}/new-round` return 501 on
-   `main`.** The UI is wired to the generated clients and shows the server's message on one line; behavior
-   tested with MSW only. (E's branch implements the latter two.)
-8. **`MeOut` has no user id.** The UI can't tell "assigned to me" from "assigned to someone else", so Claim
-   and the decision buttons are gated by role only; the server enforces assignee/lead, and its refusal shows as the
-   server's message under the decision form (Claim failures toast). Adding `id` to `MeOut` lets the bar say "Assigned to Dana Reyes" and hide
-   actions the server will refuse.
+6. **Resolved on `main` (#25): re-approving a reviewer edit without text.** On E's branch `DecisionIn`
+   rejected `approved_with_edits` without `edited_content_text`, contradicting the documented re-post after
+   `409 findings_need_triage`. Merged `main` allows it when the current version is the reviewer-edit
+   version still waiting from a refused edit (`reviews/decisions.py` `_edited_version`); the UI posts
+   `edited_content_text: null` in exactly that case (tested).
+7. **Still stubs on `main`: `POST /items/fetch-url` and `POST /items/bulk/fast-track-approve`** (501,
+   `NotImplementedYet`; F owns the latter). The UI is wired to the generated clients and shows the
+   server's message on one line; behavior tested with MSW. `POST /items/{id}/versions` and `/new-round` are
+   real now and match the UI's calls.
+8. **`MeOut.id` exists now, but the shell's `Viewer` is still `DEMO_VIEWER`** (foundation-owned, all
+   roles, no id). So Claim and the decision buttons are gated by role only; the server enforces
+   assignee/lead (`require_reviewer_of`), and its refusal shows as the server's message under the decision
+   form (Claim failures toast). When `ViewerProvider` serves `/me`, the bar can hide actions for items
+   assigned to someone else and say "Assigned to Dana Reyes".
 9. **Generated hooks type errors as `ErrorOut`, but the mutator throws `ApiError`** (with `.body: ErrorOut`).
    `apiErrorBody(error)` bridges it; `instanceof ApiError` detects 404s. An orval `override.mutator` error
    type, or a `TError = ApiError` default, would make the types honest.
 10. **Mockup = attachment of kind `creative`.** There's no dedicated mockup field; the review screen shows
     the newest `creative` image attachment under the copy.
 
+11. **Offer-terms versions for a re-review.** The `terms_changed` banner can't say "PL offer terms v12 →
+    v13": the item detail doesn't carry which terms versions the approval quoted vs the current ones.
+
 Not mine, noted: the shared `queryClient` has no global `onError` toast, so each mutation handles its own
 errors.
+
+## Open questions for the spec
+
+- **AI findings at blocking severity.** Severity comes from the rule, so an LLM rule marked `blocking`
+  would render a red Blocking pill (with "AI suggestion" beside it) and sort into the Blocking group. No LLM
+  rule has that severity today. Either cap LLM findings at warning, or confirm that the source tag beside the
+  pill is enough to keep it reading as a suggestion (spec §5.4, §7).
 
 ## Changes outside my ownership
 
@@ -160,7 +171,55 @@ errors.
   Playwright specs can import `src/test/fixtures` (which import generated types without `.js` extensions).
   No effect on the app build (`tsconfig.app.json`).
 - `frontend/src/ui/layout/nav.ts`: `to` added for My submissions and New submission.
+- `frontend/src/test/`: `fixtures/review.ts`, `fixtures/reviewHandlers.ts` (review fixtures and MSW
+  handlers) and `router.tsx` (memory-router render helper, shared by the submit and mine tests). Additive.
 - `frontend/src/theme/theme.css`: one new section ("Review, intake, My submissions (workstream I)"), placed
   before App shell, plus one keyframe at the end. No existing rule changed.
 
-(UI review, verification below.)
+## UI review
+
+Fresh reviewer subagent; full table in `docs/plan/reviews/ui-review.md`. 1 blocker, 11 should-fix, 7 nits;
+16 fixed, 3 declined with reasons. The ones that changed the design:
+
+- **Blocker:** at 1280 the "why can't I approve" note painted over the item's key/status line. It now sits on
+  its own line under the buttons, and names the way out when only accepted findings block ("2 accepted
+  findings need a change · Approve with edits or Request changes").
+- **Stacked findings:** the AI warning inside a blocking code span was invisible (one segment, one style).
+  The second finding now draws its own line 7px under the first.
+- **Accepted vs dismissed spans** were identical; accepted keeps its severity color. Triaged cards' severity
+  pills go outline-only, so a finished panel stops looking alarming.
+- **Keyboard:** ⌘/Ctrl+Enter submits the open decision from its fields or the Approve-with-edits editor.
+- **Re-review:** "Reaffirm v1", plus a warning under `terms_changed` that v1 quotes the old terms.
+- Declined: regrouping checklist items by severity (the order is the brief's), moving the decision panel into
+  a drawer (it would cover the copy the reason is about), a visible age header on My submissions.
+
+Follow-ups the review surfaced (not built): "use last dismissal reason"; "next item" after a decision (needs
+the queue's order, H2).
+
+## Verification
+
+On the branch after merging `origin/main` (`3e10eb4`), in `frontend/`:
+
+```
+npm run lint            clean
+npm run format:check    All matched files use Prettier code style!
+npm run typecheck       clean
+npm run test:run        Tests  273 passed (273)
+npm run test:browser    Tests  5 passed (5)
+npm run build           ✓ built
+npm run test:e2e        6 passed (13 skipped: screenshot captures, run with SCREENS=1)
+SCREENS=1 npx playwright test e2e/screens.spec.ts    13 passed (30 PNGs)
+```
+
+E2E (Chromium, production build, `page.route` stub):
+- `review.spec.ts`: keyboard triage (n, a, d + reason + Enter) with auto-advance, then Request changes
+  prefilled from the accepted findings and posted; typing "need a decision by friday" in the comment field fires no shortcut (no finding selected), then `?`
+  opens the shortcuts dialog.
+- `submit.spec.ts`: typing copy with an emoji highlights exactly `as low as` within 2 s, Submit shows
+  "1 open finding" before any POST, Submit anyway creates the item and lands on `/items/1077`.
+- Marketer flows are covered in unit tests (`SubmitPage.test.tsx`, `MinePage.test.tsx`,
+  `ResubmitPage.test.tsx`, `waitingOn.test.ts`, `submitForm.test.ts`): 422 `loc` → field, upload after create,
+  sections and why lines, resubmit vs new round.
+
+Not verified: against a live backend. The UI was built against the OpenAPI contract and E's documented
+semantics, and checked by reading `reviews/decisions.py` / `versions.py`; nothing here ran against Django.

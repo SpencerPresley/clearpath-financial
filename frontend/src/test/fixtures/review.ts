@@ -288,6 +288,7 @@ export const DECISION_CHANGES: DecisionOut = {
   approver: REVIEWER,
   reason: 'Add the California license line.\n- Rate claim needs the full APR range',
   ruleset_date: '2026-07-21',
+  engine_version: '2026.10.1',
   expires_at: null,
   llm_override_reason: null,
   ai_review_carried_from_n: null,

@@ -257,6 +257,7 @@ export async function stubApi(page: Page, options: StubOptions = {}): Promise<St
         approver: REVIEWER,
         reason: data.reason,
         ruleset_date: '2026-07-21',
+        engine_version: '2026.10.1',
         expires_at: data.outcome.startsWith('approved') ? '2027-04-24T00:00:00Z' : null,
         llm_override_reason: data.llm_override_reason ?? null,
         ai_review_carried_from_n: null,
