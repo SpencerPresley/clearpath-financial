@@ -22,6 +22,7 @@ TAGS = {
     "notifications",
     "assistant",
     "admin",
+    "users",
     "me",
 }
 

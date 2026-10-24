@@ -10,6 +10,7 @@ from core.schemas import ERRORS, STUB_ERRORS
 
 me_router = Router(tags=["me"])
 admin_router = Router(tags=["admin"])
+users_router = Router(tags=["users"])  # pickers: every signed-in role
 
 
 def current_user(request: HttpRequest) -> User:
@@ -34,7 +35,7 @@ def update_me(request: HttpRequest, body: MeUpdateIn) -> selectors.Me:
     return selectors.get_me(user)
 
 
-@admin_router.get("/users", response={200: list[UserOut], **ERRORS}, operation_id="listUsers")
+@users_router.get("/users", response={200: list[UserOut], **ERRORS}, operation_id="listUsers")
 def list_users(
     request: HttpRequest, role: Role | None = None, include_inactive: bool = False
 ) -> list[selectors.UserRow]:

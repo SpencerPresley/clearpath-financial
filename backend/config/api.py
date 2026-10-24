@@ -8,7 +8,7 @@ from ninja.errors import AuthenticationError, HttpError, ValidationError
 from ninja.security import django_auth
 
 from accounts.api import admin_router as accounts_admin_router
-from accounts.api import me_router
+from accounts.api import me_router, users_router
 from assistant.api import router as assistant_router
 from checks.api import router as findings_router
 from core.api import router as core_router
@@ -79,6 +79,7 @@ install_error_handlers(api)
 
 api.add_router("/", core_router)
 api.add_router("/", me_router)
+api.add_router("/", users_router)
 api.add_router("/", accounts_admin_router)
 api.add_router("/", items_router)
 api.add_router("/", decisions_router)
