@@ -10,7 +10,7 @@ from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import CheckStatus, DriftResult, DriftTrigger, Severity
 from core.errors import NotFound
 from drift import demo
-from drift.services import GONE_AFTER, CheckRow, gone_streak
+from drift.services import MISSING_AFTER, CheckRow, failure_streak
 from reviews.diff import DiffOp, DiffSegment
 from reviews.models import Placement, ReviewItem, Snapshot
 from reviews.selectors import PartyRef, live_placements_q
@@ -68,7 +68,7 @@ class PlacementDrift:
     monitored: bool
     is_live: bool
     latest: SnapshotView | None
-    gone_streak: int  # consecutive latest checks that found the page gone (HTTP 404/410), up to GONE_AFTER
+    failure_streak: int  # consecutive latest checks that couldn't fetch the page, up to MISSING_AFTER
     demo_page: DemoPageRef | None
 
 
@@ -144,9 +144,9 @@ def _demo_ref(url: str) -> DemoPageRef | None:
     )
 
 
-def _gone_streaks(placement_ids: list[int]) -> dict[int, int]:
-    """Per placement, how many of its latest finished checks in a row found the page gone, up to GONE_AFTER (the
-    point where it counts as missing copy). One query: the latest GONE_AFTER finished checks per placement."""
+def _failure_streaks(placement_ids: list[int]) -> dict[int, int]:
+    """Per placement, how many of its latest finished checks in a row couldn't fetch the page, up to MISSING_AFTER
+    (the point where it counts as missing copy). One query: the latest MISSING_AFTER finished checks per placement."""
     recent = (
         Snapshot.objects.filter(
             placement_id__in=placement_ids, status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)
@@ -156,16 +156,16 @@ def _gone_streaks(placement_ids: list[int]) -> dict[int, int]:
                 RowNumber(), partition_by=[F("placement_id")], order_by=[F("requested_at").desc(), F("pk").desc()]
             )
         )
-        .filter(rank__lte=GONE_AFTER)
+        .filter(rank__lte=MISSING_AFTER)
         .order_by("placement_id", "rank")
-        .values_list("pk", "placement_id", "status", "http_status")
+        .values_list("pk", "placement_id", "status", "error_code")
     )
     rows: dict[int, list[CheckRow]] = {}
-    for pk, placement_id, status, http_status in recent:
+    for pk, placement_id, status, error_code in recent:
         rows.setdefault(placement_id, []).append(
-            CheckRow(id=pk, status=CheckStatus(status), http_status=http_status, reopened=False)
+            CheckRow(id=pk, status=CheckStatus(status), error_code=error_code, reopened=False)
         )
-    return {placement_id: len(gone_streak(checks)) for placement_id, checks in rows.items()}
+    return {placement_id: len(failure_streak(checks)) for placement_id, checks in rows.items()}
 
 
 def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
@@ -183,7 +183,7 @@ def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
         .order_by("placement_id", "-requested_at", "-pk")
         .distinct("placement_id")
     }
-    streaks = _gone_streaks(ids)
+    streaks = _failure_streaks(ids)
     return ItemDrift(
         item_id=item_id,
         placements=tuple(
@@ -194,7 +194,7 @@ def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
                 monitored=p.monitored,
                 is_live=p.pk in live,
                 latest=snapshot_view(latest[p.pk]) if p.pk in latest else None,
-                gone_streak=streaks.get(p.pk, 0),
+                failure_streak=streaks.get(p.pk, 0),
                 demo_page=_demo_ref(p.url),
             )
             for p in placements

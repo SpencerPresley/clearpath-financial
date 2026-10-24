@@ -62,7 +62,7 @@ def test_a_failed_check_after_the_restore_refuses_again(
         reaffirm(actor=reviewer, item_id=drifted.pk, reason="Looks fine", clock=clock)
 
 
-def test_a_page_gone_three_times_is_not_restored(
+def test_a_page_unreachable_three_times_is_not_restored(
     placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
 ) -> None:
     for _ in range(3):

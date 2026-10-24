@@ -483,42 +483,49 @@ def test_drifted_copy_reopens_instead_of_flagging(placement: Placement, clock: F
     assert (outcome.reopened, outcome.flagged) == (True, False)
 
 
-# --- a page that's gone: missing after repeated 404/410 --------------------------------------------------------
+# --- a page that can't be fetched: missing after repeated failures --------------------------------------------
 
 
-def _row(pk: int, status: CheckStatus, http_status: int | None = None, *, reopened: bool = False) -> services.CheckRow:
-    return services.CheckRow(id=pk, status=status, http_status=http_status, reopened=reopened)
+def _row(pk: int, status: CheckStatus, error_code: str = "", *, reopened: bool = False) -> services.CheckRow:
+    return services.CheckRow(id=pk, status=status, error_code=error_code, reopened=reopened)
 
 
-def test_gone_streak_counts_consecutive_404_and_410_newest_first() -> None:
+def test_failure_streak_counts_consecutive_fetch_failures_newest_first() -> None:
     failed = CheckStatus.FAILED
 
-    assert services.gone_streak(
-        [_row(5, failed, 410), _row(4, failed, 404), _row(3, CheckStatus.SUCCEEDED), _row(2, failed, 404)]
+    assert services.failure_streak(
+        [
+            _row(5, failed, "http_error"),
+            _row(4, failed, "timeout"),
+            _row(3, CheckStatus.SUCCEEDED),
+            _row(2, failed, "http_error"),
+        ]
     ) == (5, 4)
-    assert services.gone_streak([_row(3, failed, 404), _row(2, failed, 503), _row(1, failed, 404)]) == (3,)
-    assert services.gone_streak([_row(2, failed, None), _row(1, failed, 404)]) == ()
+    # Failures on our side say nothing about the page: they end the streak.
+    for ours in ("stuck", "error", "no_approved_version"):
+        rows = [_row(3, failed, "http_error"), _row(2, failed, ours), _row(1, failed, "timeout")]
+        assert services.failure_streak(rows) == (3,)
     # A streak that already sent the item back is spent: the next one starts from zero.
-    assert services.gone_streak([_row(3, failed, 404), _row(2, failed, 404, reopened=True), _row(1, failed, 404)]) == (
-        3,
-    )
-    assert services.gone_streak([]) == ()
+    assert services.failure_streak(
+        [_row(3, failed, "http_error"), _row(2, failed, "http_error", reopened=True), _row(1, failed, "http_error")]
+    ) == (3,)
+    assert services.failure_streak([]) == ()
 
 
-def _fail_gone(placement: Placement, clock: FixedClock, http_status: int = 404) -> services.Claim:
+def _fail(placement: Placement, clock: FixedClock, error: FetchError | None = None) -> services.Claim:
     claim = check(placement, clock)
-    services.fail(claim=claim, error=FetchError(FetchFailure.HTTP_ERROR, http_status=http_status), clock=clock)
+    services.fail(claim=claim, error=error or FetchError(FetchFailure.HTTP_ERROR, http_status=404), clock=clock)
     return claim
 
 
-def test_three_gone_checks_in_a_row_reopen_the_live_item_as_missing(
+def test_three_failed_fetches_in_a_row_reopen_the_live_item_as_missing(
     placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
 ) -> None:
-    first = _fail_gone(placement, clock)
-    second = _fail_gone(placement, clock, http_status=410)
+    first = _fail(placement, clock)
+    second = _fail(placement, clock, FetchError(FetchFailure.TIMEOUT))
     assert item_of(placement).status == ItemStatus.APPROVED
 
-    third = _fail_gone(placement, clock)
+    third = _fail(placement, clock, FetchError(FetchFailure.HTTP_ERROR, http_status=410))
 
     item = item_of(placement)
     assert (item.status, item.reopen_reason, item.assignee) == (
@@ -539,26 +546,36 @@ def test_three_gone_checks_in_a_row_reopen_the_live_item_as_missing(
     }
 
 
-def test_a_success_resets_the_gone_streak(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
-    _fail_gone(placement, clock)
-    _fail_gone(placement, clock)
+def test_a_success_resets_the_failure_streak(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    _fail(placement, clock)
+    _fail(placement, clock)
     services.complete(claim=check(placement, clock), page=page_with(), clock=clock)
-    _fail_gone(placement, clock)
-    _fail_gone(placement, clock)
+    _fail(placement, clock)
+    _fail(placement, clock)
 
     assert item_of(placement).status == ItemStatus.APPROVED
 
 
-def test_other_failures_are_not_gone(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
-    for _ in range(3):
-        services.fail(claim=check(placement, clock), error=FetchError(FetchFailure.TIMEOUT), clock=clock)
-    _fail_gone(placement, clock)
-    _fail_gone(placement, clock)
+def test_a_failure_on_our_side_ends_the_streak(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    _fail(placement, clock)
+    _fail(placement, clock)
+    services.fail(claim=check(placement, clock), code="error", message="The check failed unexpectedly.", clock=clock)
+    _fail(placement, clock)
+    _fail(placement, clock)
 
     assert item_of(placement).status == ItemStatus.APPROVED
 
 
-def test_gone_checks_on_a_placement_that_is_not_live_move_nothing(
+def test_a_page_that_stays_unreachable_reopens_once(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    for _ in range(6):
+        _fail(placement, clock)  # after the third: already in re-review, recorded with no second transition
+
+    assert Event.objects.filter(type=EventType.ITEM_REOPENED).count() == 1
+
+
+def test_failed_fetches_on_a_placement_that_is_not_live_move_nothing(
     placement: Placement, marketer: User, clock: FixedClock, enqueued: list[int]
 ) -> None:
     update_placement(
@@ -566,7 +583,7 @@ def test_gone_checks_on_a_placement_that_is_not_live_move_nothing(
     )
     later = FixedClock(clock.now() + timedelta(days=2))
     for _ in range(3):
-        _fail_gone(placement, later)
+        _fail(placement, later)
 
     assert item_of(placement).status == ItemStatus.APPROVED
     assert not Event.objects.filter(type=EventType.ITEM_REOPENED).exists()
@@ -575,7 +592,7 @@ def test_gone_checks_on_a_placement_that_is_not_live_move_nothing(
 # --- what the review screen reads ------------------------------------------------------------------------------
 
 
-def test_the_read_counts_new_blocking_findings_and_the_gone_streak(
+def test_the_read_counts_new_blocking_findings_and_the_failure_streak(
     placement: Placement, clock: FixedClock, enqueued: list[int]
 ) -> None:
     from drift.selectors import item_drift
@@ -583,10 +600,10 @@ def test_the_read_counts_new_blocking_findings_and_the_gone_streak(
     services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
     flagged = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
     assert flagged.latest is not None
-    assert (flagged.latest.new_blocking_count, flagged.gone_streak) == (2, 0)
+    assert (flagged.latest.new_blocking_count, flagged.failure_streak) == (2, 0)
 
-    _fail_gone(placement, clock)
-    _fail_gone(placement, clock)
-    gone = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
-    assert gone.latest is not None
-    assert (gone.latest.new_blocking_count, gone.gone_streak) == (0, 2)
+    _fail(placement, clock)
+    _fail(placement, clock, FetchError(FetchFailure.TIMEOUT))
+    failing = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
+    assert failing.latest is not None
+    assert (failing.latest.new_blocking_count, failing.failure_streak) == (0, 2)

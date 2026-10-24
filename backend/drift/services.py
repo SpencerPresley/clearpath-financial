@@ -17,9 +17,11 @@ A check is a Snapshot moving pending -> running -> succeeded | failed:
   added beside intact copy), nothing transitions: PAGE_FINDINGS_FLAGGED is recorded (the assignee and the active
   leads are notified) when that set of rules wasn't already on the previous successful check, so a daily sweep
   doesn't repeat the same alert. The review screen shows the placement's attention state from the snapshot.
-- A fetch failure is never a result: it ends `failed` with an error code, which the review screen shows. But a page
-  that is gone (HTTP 404/410) on GONE_AFTER consecutive checks of a live placement counts as missing copy: the item
-  is reopened (drift_detected) with those failed checks linked. A success, or any other failure, ends the streak.
+- A fetch failure is never a result: it ends `failed` with an error code, which the review screen shows (one 404
+  or outage doesn't reopen anything). But MISSING_AFTER consecutive fetch failures of a live placement (any
+  `FetchFailure`, HTTP 404/410 included) count as missing copy: the item is reopened (drift_detected) with those
+  failed checks linked. A success ends the streak, and so does a failure on our side (`stuck`, `error`,
+  `no_approved_version`): those say nothing about the page.
 - `reconcile` (beat) fails checks stuck running and re-enqueues pending ones whose message was lost.
 """
 
@@ -54,7 +56,7 @@ from core.errors import Conflict, NotFound, NotPermitted
 from core.permissions import has_role
 from drift.compare import Comparison, compare
 from drift.extract import MAX_TEXT_CHARS, PageText, visible_text
-from drift.fetcher import FetchedPage, FetchError
+from drift.fetcher import FetchedPage, FetchError, FetchFailure
 from reviews.assignment import locked_item
 from reviews.models import APPROVED_OUTCOMES, Decision, Placement, ReviewItem, Snapshot, Version
 from reviews.rereview import reopen_item
@@ -67,8 +69,8 @@ MAX_SCHEDULED_ATTEMPTS: Final = 3
 STUCK_AFTER: Final = timedelta(minutes=10)
 LOST_AFTER: Final = timedelta(hours=1)  # pending this long: stop re-enqueueing, fail it
 _DRIFTED: Final = frozenset({DriftResult.MODIFIED, DriftResult.MISSING})
-GONE_HTTP_STATUSES: Final = frozenset({404, 410})
-GONE_AFTER: Final = 3  # consecutive gone checks of a live placement that count as missing copy
+MISSING_AFTER: Final = 3  # consecutive fetch failures of a live placement that count as missing copy
+FETCH_FAILURE_CODES: Final = frozenset(code.value for code in FetchFailure)  # the page couldn't be read
 
 
 def _enqueue(snapshot_id: int) -> None:
@@ -112,21 +114,21 @@ class ReconcileResult:
 
 @dataclass(frozen=True)
 class CheckRow:
-    """A finished check, as the gone streak reads it."""
+    """A finished check, as the failure streak reads it."""
 
     id: int
     status: CheckStatus
-    http_status: int | None
+    error_code: str
     reopened: bool  # this check sent the item to re-review
 
 
-def gone_streak(rows: Iterable[CheckRow]) -> tuple[int, ...]:
-    """The ids of the consecutive gone (failed with HTTP 404/410) checks at the head of `rows` (newest first). A
-    success or any other failure ends it, and so does a check that already reopened the item: that streak is spent,
-    so a page that stays gone doesn't send the item back again on the very next check."""
+def failure_streak(rows: Iterable[CheckRow]) -> tuple[int, ...]:
+    """The ids of the consecutive fetch failures at the head of `rows` (newest first). A success ends it, so does a
+    failure on our side (not a FetchFailure code), and so does a check that already reopened the item: that streak
+    is spent, so a page that stays unreachable doesn't send the item back again on the very next check."""
     streak: list[int] = []
     for row in rows:
-        if row.status is not CheckStatus.FAILED or row.http_status not in GONE_HTTP_STATUSES or row.reopened:
+        if row.status is not CheckStatus.FAILED or row.error_code not in FETCH_FAILURE_CODES or row.reopened:
             break
         streak.append(row.id)
     return tuple(streak)
@@ -411,35 +413,35 @@ def fail(
     *, claim: Claim, error: FetchError | None = None, code: str = "", message: str = "", clock: Clock = SYSTEM_CLOCK
 ) -> bool:
     """running -> failed, visibly: from a FetchError, or a code and message ("error" from the task boundary).
-    Returns whether the item was reopened: the page was gone on GONE_AFTER consecutive checks (module docstring)."""
+    Returns whether the item was reopened: MISSING_AFTER consecutive fetch failures (module docstring)."""
     with transaction.atomic():
         item = locked_item(claim.item_id)
         snapshot = _locked_running(claim)
         if snapshot is None:
             return False
-        http_status = error.http_status if error is not None else None
+        error_code = str(error.code) if error is not None else code
         _record_failure(
             snapshot,
             item,
-            code=str(error.code) if error is not None else code,
+            code=error_code,
             message=error.message if error is not None else message,
-            http_status=http_status,
+            http_status=error.http_status if error is not None else None,
             at=clock.now(),
         )
-        if http_status not in GONE_HTTP_STATUSES:
+        if error_code not in FETCH_FAILURE_CODES:
             return False
         recent = (
             Snapshot.objects.filter(
                 placement_id=claim.placement_id, status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)
             )
             .order_by("-requested_at", "-pk")
-            .values_list("pk", "status", "http_status", "reopen_event_id")[:GONE_AFTER]
+            .values_list("pk", "status", "error_code", "reopen_event_id")[:MISSING_AFTER]
         )
-        streak = gone_streak(
-            CheckRow(id=pk, status=CheckStatus(status), http_status=code_, reopened=event_id is not None)
+        streak = failure_streak(
+            CheckRow(id=pk, status=CheckStatus(status), error_code=code_, reopened=event_id is not None)
             for pk, status, code_, event_id in recent
         )
-        if len(streak) < GONE_AFTER or not _at_risk(item, claim.placement_id, clock):
+        if len(streak) < MISSING_AFTER or not _at_risk(item, claim.placement_id, clock):
             return False
         snapshot.reopen_event_id = reopen_item(  # pyrefly: ignore[missing-attribute]
             item_id=item.pk,

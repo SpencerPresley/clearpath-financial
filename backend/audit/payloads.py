@@ -90,7 +90,7 @@ class ItemReopenedPayload(EventPayload):
     # The drift check that found the change, for drift_detected. Left out when unset, so other reopen events keep
     # the shape they were recorded with.
     snapshot_id: int | None = Field(default=None, exclude_if=lambda v: v is None)
-    # When the page was gone (HTTP 404/410) on consecutive checks: those failed checks, newest first. Left out
+    # When the page couldn't be fetched on consecutive checks: those failed checks, newest first. Left out
     # when unset, like `snapshot_id`.
     failed_snapshot_ids: list[int] | None = Field(default=None, exclude_if=lambda v: v is None)
 

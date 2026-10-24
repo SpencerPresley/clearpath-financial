@@ -62,8 +62,8 @@ class PlacementDriftOut(Schema):
     monitored: bool
     is_live: bool
     latest: SnapshotOut | None
-    gone_streak: int = Field(
-        description="How many of the latest checks in a row found the page gone (HTTP 404/410), up to 3; at 3 on a "
+    failure_streak: int = Field(
+        description="How many of the latest checks in a row couldn't fetch the page (404, outage, ...), up to 3; at 3 on a "
         "live placement the approved copy counts as missing and the item is reopened."
     )
     demo_page: DemoPageRefOut | None = Field(description="Set when the URL is one of this site's demo pages.")

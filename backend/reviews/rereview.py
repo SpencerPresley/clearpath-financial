@@ -51,7 +51,7 @@ def reopen_item(  # the event's fields
     Returns the ITEM_REOPENED event id. Lock-order contract (see reviews.assignment): one item per transaction,
     because it takes the assignment lock after the item's row lock. A fan-out calls it once per item, each in its
     own transaction (optionally after locking only that same item to add its generated version). The drift monitor
-    passes the `snapshot_id` of the check that found the change, and for a page that was gone on consecutive
+    passes the `snapshot_id` of the check that found the change, and for a page that couldn't be fetched on consecutive
     checks, those checks (`failed_snapshot_ids`, newest first)."""
     with transaction.atomic():
         item = locked_item(item_id)
