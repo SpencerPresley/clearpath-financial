@@ -58,6 +58,15 @@ describe('BulkBar', () => {
     expect(screen.queryByRole('button', { name: 'Why fast-track is off' })).not.toBeInTheDocument();
   });
 
+  it('marks reviewers who are out of office in the assign menu', async () => {
+    server.use(getListUsersMockHandler(USERS.map((u) => (u.id === 3 ? { ...u, is_available: false } : u))));
+    setup(LEAD);
+    await userEvent.click(screen.getByRole('button', { name: 'Assign…' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Sam Okafor, out of office' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Dana Whitfield' })).toBeInTheDocument();
+  });
+
   it('assigns the selection to a reviewer and clears it', async () => {
     const bodies: BulkAssignIn[] = [];
     server.use(

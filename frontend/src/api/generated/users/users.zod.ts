@@ -28,3 +28,18 @@ export const ListUsersResponseItem = zod.object({
 }).describe('A person as shown in pickers (assignee, @mention) and the admin user list.')
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
+/**
+ * Open items and weighted load per reviewer, heaviest first: the load lowest-load assignment ranks by.
+ * Leads and admins.
+ * @summary Reviewer Workload
+ */
+export const GetReviewerWorkloadResponseItem = zod.object({
+  "auto_assigned": zod.boolean().describe('In lowest-load assignment\'s pool now: active, available, granted reviewer.'),
+  "is_available": zod.boolean(),
+  "name": zod.string(),
+  "open_items": zod.int().describe('Assigned items in a queue status.'),
+  "user_id": zod.int(),
+  "weighted_load": zod.int().describe('High 3, medium 2, low 1 per open item: what assignment compares.')
+}).describe('One reviewer\'s open load, as lowest-load assignment counts it.')
+export const GetReviewerWorkloadResponse = zod.array(GetReviewerWorkloadResponseItem)
+

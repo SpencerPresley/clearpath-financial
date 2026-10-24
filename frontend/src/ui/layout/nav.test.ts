@@ -18,8 +18,8 @@ describe('navSectionsFor', () => {
     expect(labels(['lead'])).toEqual(['Queue', 'Library', 'Offer terms', 'Partners', 'Metrics', 'Outbox']);
   });
 
-  it('shows an admin import and shared sections', () => {
-    expect(labels(['admin'])).toEqual(['Library', 'Import', 'Outbox']);
+  it('shows an admin metrics, import, users and shared sections', () => {
+    expect(labels(['admin'])).toEqual(['Library', 'Metrics', 'Import', 'Users', 'Outbox']);
   });
 
   it('unions roles in a stable order, without duplicates', () => {
@@ -28,7 +28,9 @@ describe('navSectionsFor', () => {
       'Library',
       'Offer terms',
       'Partners',
+      'Metrics',
       'Import',
+      'Users',
       'Outbox',
     ]);
     expect(labels(['reviewer', 'lead', 'reviewer'])).toEqual(labels(['lead']));

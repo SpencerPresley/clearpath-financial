@@ -35,7 +35,7 @@ Issue #13. Plan: `docs/plan/demo-seed.md`. Walkthrough for evaluators: `docs/dem
 | | |
 |---|---|
 | Native items | 44: submitted 5, in review 9, changes requested 4, approved 14, rejected 3, needs re-review 4 (terms changed 2, approval expired 1, drift 1), expired 3, withdrawn 2 |
-| Legacy items | 178 from the `samples/` tracker (2025-09-02 to 2026-08-14), imported through `imports.services` the evening before; 36 matched to seeded partners |
+| Legacy items | 178 from the `samples/` tracker (2025-09-02 to 2026-08-14), imported through `imports.services` (replayed the evening before so native items keep their CP keys, recorded at 08:30 on go-live, `TRACKER_IMPORTED`); 36 matched to seeded partners |
 | Products / channels | personal loan, card, mortgage prequal; email, SMS, paid social, paid search, display, direct mail, landing page, affiliate page, call script; CA-only and national; prescreen |
 | Rule coverage | every code rule id fires at least once (asserted against `CODE_RULES`), plus ≥10 clean versions |
 | Triage | ≥40 accepted, ≥40 dismissed with reasons, carried-forward dismissals, system dismissals on fast-track |

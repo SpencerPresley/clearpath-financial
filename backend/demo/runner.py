@@ -330,9 +330,10 @@ class Runner:
                 )
         elif isinstance(event, ImportTracker):
             admin = self.users[event.by]
-            job_id = create_sample_import(actor=admin, clock=self.clock)
-            request_commit(actor=admin, job_id=job_id, skip_blocked=True, clock=self.clock)
-            commit_import(job_id=job_id, clock=self.clock)  # what imports.commit (the Celery task) runs
+            clock = self.clock if event.dated is None else FixedClock(event.dated.resolve(self.now))
+            job_id = create_sample_import(actor=admin, clock=clock)
+            request_commit(actor=admin, job_id=job_id, skip_blocked=True, clock=clock)
+            commit_import(job_id=job_id, clock=clock)  # what imports.commit (the Celery task) runs
 
     # --- story steps -------------------------------------------------------------------------------------------
 

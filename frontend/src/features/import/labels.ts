@@ -3,11 +3,13 @@
  * messages use the same words); keyed by the generated enums so a new field fails typecheck here.
  */
 import type {
+  ImportProblemKind,
   ImportStatus,
   ImportTargetField,
   ImportValueField,
   ItemStatus,
   ProblemSeverity,
+  RowAction,
 } from '../../api/generated/model';
 import { Channel, Product, RiskTier } from '../../api/generated/model';
 import type { BadgeMeta } from '../../ui/badges';
@@ -64,6 +66,53 @@ export const SEVERITY_GROUPS: readonly { severity: ProblemSeverity; title: strin
   { severity: 'warning', title: 'Warnings' },
   { severity: 'info', title: 'Info' },
 ];
+
+/**
+ * What a problem did to a row that imports: the adjustment, in a few words. Keyed by every kind so a new one fails
+ * typecheck here. Kinds that only ever skip a row (errors, duplicates, notes) read from SKIP_OUTCOME instead.
+ */
+const IMPORTED_OUTCOME: Record<ImportProblemKind, string> = {
+  coerced_date: ', date read from text',
+  inferred_status: ', status inferred',
+  fuzzy_partner: ', partner matched',
+  derived_approval_date: ', date from last round',
+  missing_expiry: ', no expiry',
+  unknown_trigger_terms: ', trigger terms blank',
+  unresolved_approver: ', approver as typed',
+  reused_ref: ' under a new ID',
+  unparseable_date: ', date left blank',
+  unknown_value: ', value left blank',
+  unknown_partner: ' with a note',
+  unmapped_status: ' with a note',
+  missing_value: ' with a note',
+  missing_mapping: ' with a note',
+  inconsistent_dates: ' with a note',
+  duplicate_row: ' with a note',
+  already_imported: ' with a note',
+  not_data_row: ' with a note',
+};
+
+// A row's skip is the same sentence before and after commit: it's the row's state, not an action taken on it.
+const SKIP_OUTCOME: Record<Exclude<RowAction, 'create'>, string> = {
+  blocked: 'Skipped: errors',
+  skip_duplicate: 'Skipped: duplicate',
+  skip_already_imported: 'Already imported',
+  skip_not_data: 'Skipped: not a tracker row',
+};
+
+/**
+ * The Outcome cell for one problem: what its row's action does with it ("Imports, date from last round"), or did,
+ * once committed ("Imported, …"). A sheet-level problem has no row.
+ */
+export function problemOutcome(
+  kind: ImportProblemKind,
+  action: RowAction | undefined,
+  committed = false,
+): string {
+  if (action === undefined) return '—';
+  if (action !== 'create') return SKIP_OUTCOME[action];
+  return `${committed ? 'Imported' : 'Imports'}${IMPORTED_OUTCOME[kind]}`;
+}
 
 /** Statuses an imported row can take (backend IMPORTABLE_STATUSES). */
 const IMPORTABLE: readonly ItemStatus[] = [

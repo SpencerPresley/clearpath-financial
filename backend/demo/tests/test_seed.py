@@ -31,7 +31,7 @@ from core.domain import (
     VersionOrigin,
 )
 from demo.content import CATALOG
-from demo.content.calendar import GO_LIVE
+from demo.content.calendar import GO_LIVE, TRACKER_IMPORTED
 from demo.reset import domain_tables, reset_demo
 from demo.runner import SeedError
 from demo.tests.conftest import NOW, Seeded
@@ -39,6 +39,7 @@ from drift.compare import compare
 from drift.demo import PAGES, get_page, is_edited, page_url, render_page, reset_demo_pages, set_edited
 from drift.fetcher import FetchedPage
 from drift.services import claim, complete, request_check
+from imports.models import ImportJob
 from notifications.models import OutboxEmail
 from reviews.decisions import reaffirm
 from reviews.errors import DriftNotRestored
@@ -149,6 +150,22 @@ def test_native_history_starts_at_go_live_after_the_tracker_ends(seeded: Seeded)
     assert tracker_end < go_live
     assert Event.objects.aggregate(first=Min("at"))["first"] == go_live
     assert ReviewItem.objects.filter(is_legacy=False).aggregate(first=Min("submitted_at"))["first"] >= go_live
+
+
+def test_the_tracker_import_is_dated_at_go_live(seeded: Seeded) -> None:
+    """Import > Recent imports and each legacy item's history say the tracker came in on go-live morning, after the
+    partners were entered, though the import replays later (so the item keys docs/demo.md cites stay put)."""
+    del seeded
+    at = TRACKER_IMPORTED.resolve(NOW)
+    job = ImportJob.objects.get()
+    partners_entered = Event.objects.filter(type=EventType.PARTNER_CREATED.value).aggregate(first=Min("at"))["first"]
+    imported = Event.objects.filter(type__in=[EventType.ITEM_IMPORTED.value, EventType.IMPORT_COMMITTED.value])
+
+    assert at.date() == GO_LIVE.resolve(NOW).date()
+    assert at > partners_entered
+    assert (job.created_at, job.commit_requested_at, job.committed_at) == (at, at, at)
+    assert set(imported.values_list("at", flat=True)) == {at}
+    assert imported.count() == 179
 
 
 def test_the_seed_sends_no_email(seeded: Seeded) -> None:

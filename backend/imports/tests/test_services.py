@@ -153,6 +153,47 @@ def test_importing_the_same_file_again_creates_nothing(
     assert ReviewItem.objects.count() == 178
 
 
+def test_a_second_import_names_the_import_its_rows_came_from(
+    committed: int, admin_user: User, clock: FixedClock
+) -> None:
+    """After a seed, "178 rows already imported from this tracker" links to the import that brought them in."""
+    first = ImportJob.objects.get(pk=committed)
+    second = services.create_sample_import(actor=admin_user, clock=clock)
+
+    source = selectors.get_preview(viewer=admin_user, job_id=second).already_imported_from
+
+    assert source == selectors.ImportSource(job_id=committed, filename=first.filename, committed_at=first.committed_at)
+    assert selectors.get_preview(viewer=admin_user, job_id=committed).already_imported_from is None
+
+
+def test_a_fresh_import_has_no_earlier_source(admin_user: User, clock: FixedClock) -> None:
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+
+    assert selectors.get_preview(viewer=admin_user, job_id=job_id).already_imported_from is None
+
+
+def test_import_lists_every_distinct_value_with_what_it_imports_as(admin_user: User, clock: FixedClock) -> None:
+    """The Values step's inventory: the built-in reading, a partner matched under another spelling, and the
+    admin's mapping, with row counts."""
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+    services.set_mapping(
+        actor=admin_user,
+        job_id=job_id,
+        update=services.MappingUpdate(values=(ValueOverride(ImportValueField.PRODUCT, "PL", "credit_card"),)),
+        clock=clock,
+    )
+
+    values = {(v.field, v.source_value): v for v in selectors.get_import(viewer=admin_user, job_id=job_id).values}
+
+    assert (values[ImportValueField.PRODUCT, "PL"].value, values[ImportValueField.PRODUCT, "PL"].source) == (
+        "credit_card",
+        "mapped",
+    )
+    assert values[ImportValueField.PRODUCT, "PL"].rows > 0
+    assert values[ImportValueField.PARTNER, "LendCompare"].source == "default"
+    assert any(v.source == "matched" for (f, _), v in values.items() if f is ImportValueField.PARTNER)
+
+
 def test_committed_preview_shows_what_commit_did(committed: int, admin_user: User) -> None:
     preview = selectors.get_preview(viewer=admin_user, job_id=committed)
 

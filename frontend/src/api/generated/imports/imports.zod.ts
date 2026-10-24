@@ -79,7 +79,14 @@ export const UploadImportResponse = zod.object({
   "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
   "source_value": zod.string(),
   "value": zod.string()
-}))
+})),
+  "values": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'matched', 'mapped']),zod.null()]).describe('default: the built-in table; matched: a partner under another spelling; mapped: the admin\'s mapping; null: not recognized yet.'),
+  "source_value": zod.string(),
+  "value": zod.union([zod.string(),zod.null()]).describe('What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), or for trigger terms with source default, unknown and left blank.')
+})).describe('Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as.')
 })
 
 /**
@@ -123,7 +130,14 @@ export const LoadSampleImportResponse = zod.object({
   "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
   "source_value": zod.string(),
   "value": zod.string()
-}))
+})),
+  "values": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'matched', 'mapped']),zod.null()]).describe('default: the built-in table; matched: a partner under another spelling; mapped: the admin\'s mapping; null: not recognized yet.'),
+  "source_value": zod.string(),
+  "value": zod.union([zod.string(),zod.null()]).describe('What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), or for trigger terms with source default, unknown and left blank.')
+})).describe('Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as.')
 })
 
 /**
@@ -171,7 +185,14 @@ export const GetImportResponse = zod.object({
   "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
   "source_value": zod.string(),
   "value": zod.string()
-}))
+})),
+  "values": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'matched', 'mapped']),zod.null()]).describe('default: the built-in table; matched: a partner under another spelling; mapped: the admin\'s mapping; null: not recognized yet.'),
+  "source_value": zod.string(),
+  "value": zod.union([zod.string(),zod.null()]).describe('What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), or for trigger terms with source default, unknown and left blank.')
+})).describe('Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as.')
 })
 
 /**
@@ -225,7 +246,14 @@ export const CommitImportResponse = zod.object({
   "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
   "source_value": zod.string(),
   "value": zod.string()
-}))
+})),
+  "values": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'matched', 'mapped']),zod.null()]).describe('default: the built-in table; matched: a partner under another spelling; mapped: the admin\'s mapping; null: not recognized yet.'),
+  "source_value": zod.string(),
+  "value": zod.union([zod.string(),zod.null()]).describe('What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), or for trigger terms with source default, unknown and left blank.')
+})).describe('Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as.')
 })
 
 /**
@@ -262,6 +290,11 @@ export const SetImportMappingBody = zod.object({
 }).describe('`columns` are merged into the current mapping (headers left out keep theirs). `status_values` and\n`value_mappings` replace the saved lists when sent; leave them out (or null) to keep what\'s saved.')
 
 export const SetImportMappingResponse = zod.object({
+  "already_imported_from": zod.union([zod.object({
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "filename": zod.string(),
+  "job_id": zod.int()
+}),zod.null()]).describe('Before commit: the earlier import that created the rows counted as already imported, when it\'s a single one.'),
   "counts": zod.object({
   "already_imported": zod.int(),
   "blocked": zod.int().describe('Rows with an error-severity problem.'),
@@ -308,6 +341,11 @@ export const GetImportPreviewParams = zod.object({
 })
 
 export const GetImportPreviewResponse = zod.object({
+  "already_imported_from": zod.union([zod.object({
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "filename": zod.string(),
+  "job_id": zod.int()
+}),zod.null()]).describe('Before commit: the earlier import that created the rows counted as already imported, when it\'s a single one.'),
   "counts": zod.object({
   "already_imported": zod.int(),
   "blocked": zod.int().describe('Rows with an error-severity problem.'),

@@ -22,7 +22,8 @@ import type {
 import type {
   ErrorOut,
   ListUsersParams,
-  UserOut
+  UserOut,
+  WorkloadOut
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -144,6 +145,108 @@ export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListUsersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetReviewerWorkloadUrl = () => {
+
+
+
+
+  return `/api/users/workload`
+}
+
+/**
+ * Open items and weighted load per reviewer, heaviest first: the load lowest-load assignment ranks by.
+ * Leads and admins.
+ * @summary Reviewer Workload
+ */
+export const getReviewerWorkload = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkloadOut[]> => {
+
+  return customFetch<WorkloadOut[]>(getGetReviewerWorkloadUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReviewerWorkloadQueryKey = () => {
+    return [
+    `/api/users/workload`
+    ] as const;
+    }
+
+
+export const getGetReviewerWorkloadQueryOptions = <TData = Awaited<ReturnType<typeof getReviewerWorkload>>, TError = ErrorOut>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReviewerWorkloadQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReviewerWorkload>>> = ({ signal }) => getReviewerWorkload({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetReviewerWorkloadQueryResult = NonNullable<Awaited<ReturnType<typeof getReviewerWorkload>>>
+export type GetReviewerWorkloadQueryError = ErrorOut
+
+
+export function useGetReviewerWorkload<TData = Awaited<ReturnType<typeof getReviewerWorkload>>, TError = ErrorOut>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getReviewerWorkload>>,
+          TError,
+          Awaited<ReturnType<typeof getReviewerWorkload>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetReviewerWorkload<TData = Awaited<ReturnType<typeof getReviewerWorkload>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getReviewerWorkload>>,
+          TError,
+          Awaited<ReturnType<typeof getReviewerWorkload>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetReviewerWorkload<TData = Awaited<ReturnType<typeof getReviewerWorkload>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Reviewer Workload
+ */
+
+export function useGetReviewerWorkload<TData = Awaited<ReturnType<typeof getReviewerWorkload>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getReviewerWorkload>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetReviewerWorkloadQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

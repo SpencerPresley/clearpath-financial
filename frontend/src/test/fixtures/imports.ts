@@ -9,6 +9,7 @@ import type {
   ImportPreviewOut,
   ImportPreviewRowOut,
   ImportProblemOut,
+  ValueReadingOut,
 } from '../../api/generated/model';
 
 export const IMPORT_NOW = '2026-10-24T15:00:00Z';
@@ -51,6 +52,18 @@ export const SAMPLE_COLUMNS: ImportColumnOut[] = [
   field: field as ImportColumnOut['field'],
 }));
 
+/** What each distinct value imports as (ImportJobOut.values): built-in readings, a matched partner spelling. */
+export const SAMPLE_VALUES: ValueReadingOut[] = [
+  { field: 'product', source_value: 'Personal Loan', rows: 60, value: 'personal_loan', source: 'default' },
+  { field: 'product', source_value: 'PL', rows: 14, value: 'personal_loan', source: 'default' },
+  { field: 'product', source_value: 'Credit Card', rows: 50, value: 'credit_card', source: 'default' },
+  { field: 'channel', source_value: 'Direct Mail', rows: 30, value: 'direct_mail', source: 'default' },
+  { field: 'partner', source_value: 'LendCompare', rows: 20, value: 'LendCompare', source: 'default' },
+  { field: 'partner', source_value: 'CardPerks', rows: 2, value: 'CardPerks Weekly', source: 'matched' },
+  { field: 'trigger_terms', source_value: 'yes', rows: 4, value: 'yes', source: 'default' },
+  { field: 'trigger_terms', source_value: '?', rows: 3, value: null, source: 'default' },
+];
+
 export function importJob(overrides: Partial<ImportJobOut> = {}): ImportJobOut {
   return {
     id: 7,
@@ -79,6 +92,7 @@ export function importJob(overrides: Partial<ImportJobOut> = {}): ImportJobOut {
       { source_value: 'Rejected', rows: 9, status: 'rejected', outcome: 'rejected', source: 'default' },
     ],
     value_mappings: [],
+    values: SAMPLE_VALUES,
     ...overrides,
   };
 }
@@ -194,6 +208,32 @@ const ROWS: ImportPreviewRowOut[] = [
     outcome: 'changes_requested',
     submitted_on: '2025-11-20',
   }),
+  // The rows behind SAMPLE_PROBLEMS' warnings and info: imported, each with its note.
+  previewRow({
+    row_number: 23,
+    title: 'CardPerks Weekly - travel card review',
+    partner: 'CardPerks Weekly',
+    status: 'changes_requested',
+    outcome: 'changes_requested',
+    problem_count: 1,
+  }),
+  previewRow({
+    row_number: 33,
+    title: 'Winter PL email',
+    status: 'submitted',
+    outcome: null,
+    problem_count: 1,
+  }),
+  previewRow({ row_number: 41, title: 'Debt consolidation landing page', problem_count: 1 }),
+  previewRow({ row_number: 57, title: 'Balance transfer display banner', problem_count: 1 }),
+  previewRow({
+    row_number: 92,
+    legacy_ref: 'MCR-25-090-b',
+    title: 'Home refi postcard',
+    status: 'rejected',
+    outcome: 'rejected',
+    problem_count: 1,
+  }),
   previewRow({
     row_number: 19,
     legacy_ref: null,
@@ -215,8 +255,43 @@ export function importPreview(overrides: Partial<ImportPreviewOut> = {}): Import
     problems: SAMPLE_PROBLEMS,
     unmapped: [],
     rows: ROWS,
+    already_imported_from: null,
     ...overrides,
   };
+}
+
+/**
+ * The sample loaded again after a seed: every data row is already in the app, so the importer adds an
+ * already_imported warning to each, next to the row's own notes (row 41's derived date). Only the duplicate and
+ * the note row are this import's own outcomes.
+ */
+export function reimportPreview(): ImportPreviewOut {
+  const already = [2, 3, 41].map((n) => ({
+    ...previewRow({ row_number: n, problem_count: n === 41 ? 2 : 1 }),
+    action: 'skip_already_imported' as const,
+  }));
+  const notes = already.map((r) =>
+    problem({
+      row_number: r.row_number,
+      column: 'Request ID',
+      kind: 'already_imported',
+      severity: 'warning',
+      value: r.legacy_ref,
+      message: `${String(r.legacy_ref)} is already imported; skipped.`,
+    }),
+  );
+  return importPreview({
+    counts: { rows_total: 180, ready: 0, duplicates: 1, already_imported: 178, not_data: 1, blocked: 0 },
+    problems: [SAMPLE_PROBLEMS[0], SAMPLE_PROBLEMS[1], SAMPLE_PROBLEMS[4], ...notes].filter(
+      (p): p is ImportProblemOut => p !== undefined,
+    ),
+    rows: [...already, ...ROWS.filter((r) => r.action !== 'create')],
+    already_imported_from: {
+      job_id: 1,
+      filename: 'clearpath_review_tracker.xlsx',
+      committed_at: '2026-08-17T15:30:00Z',
+    },
+  });
 }
 
 /** After commit: each created row carries the item it became (ImportPreviewRowOut.item_id). */

@@ -39,6 +39,19 @@ class UserOut(Schema):
     is_active: bool
 
 
+class WorkloadOut(Schema):
+    """One reviewer's open load, as lowest-load assignment counts it."""
+
+    user_id: int
+    name: str
+    is_available: bool
+    auto_assigned: bool = Field(
+        description="In lowest-load assignment's pool now: active, available, granted reviewer."
+    )
+    open_items: int = Field(description="Assigned items in a queue status.")
+    weighted_load: int = Field(description="High 3, medium 2, low 1 per open item: what assignment compares.")
+
+
 class UserCreateIn(Schema):
     email: str = Field(pattern=EMAIL_PATTERN, max_length=254)
     display_name: str = Field(min_length=1, max_length=120)

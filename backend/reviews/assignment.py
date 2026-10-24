@@ -17,15 +17,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
-from django.db import connection, transaction
-from django.db.models import Case, IntegerField, Sum, Value, When
+from django.db import OperationalError, connection, transaction
+from django.db.models import Case, Count, IntegerField, QuerySet, Sum, Value, When
 
 from accounts.models import User
 from audit.payloads import ItemAssignedPayload
 from audit.services import record_event
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import AssignmentMode, EntityType, EventType, ItemStatus, RiskTier, Role
-from core.errors import DomainError, InvalidInput, InvalidTransition, NotFound, NotPermitted
+from core.errors import Conflict, DomainError, InvalidInput, InvalidTransition, NotFound, NotPermitted
 from core.permissions import REVIEW_ROLES, has_role, require_role
 from reviews.models import QUEUE_STATUSES, Decision, ReviewItem
 from reviews.transitions import start_review
@@ -100,20 +100,34 @@ def _set_assignee(  # the event's fields
     return Assignment(assignee_id=user.pk if user is not None else None, mode=mode, reason=reason)
 
 
-def _loads(user_ids: Iterable[int], *, excluding_item_id: int) -> dict[int, int]:
+@dataclass(frozen=True)
+class ReviewerLoad:
+    open_items: int  # assigned items in a queue status
+    weighted: int  # the load rule 2 ranks by: high 3, medium 2, low 1 per open item
+
+
+def weighted_loads(user_ids: Iterable[int], *, excluding_item_id: int | None = None) -> dict[int, ReviewerLoad]:
+    """Open load per reviewer, the number lowest-load assignment compares. Users with no open items are absent.
+    Also read by the lead's workload view (accounts.selectors.reviewer_workload), so the two can't disagree."""
     weight = Case(
         *(When(risk_tier=tier.value, then=Value(w)) for tier, w in TIER_WEIGHT.items()),
         default=Value(1),
         output_field=IntegerField(),
     )
-    rows = (
-        ReviewItem.objects.filter(assignee_id__in=list(user_ids), status__in=QUEUE_STATUSES)
-        .exclude(pk=excluding_item_id)
-        .values("assignee_id")
-        .annotate(load=Sum(weight))
-        .values_list("assignee_id", "load")
-    )
-    return {uid: int(load) for uid, load in rows}
+    items = ReviewItem.objects.filter(assignee_id__in=list(user_ids), status__in=QUEUE_STATUSES)
+    if excluding_item_id is not None:
+        items = items.exclude(pk=excluding_item_id)
+    rows = items.values("assignee_id").annotate(load=Sum(weight), n=Count("pk")).values_list("assignee_id", "load", "n")
+    return {uid: ReviewerLoad(open_items=int(n), weighted=int(load)) for uid, load, n in rows}
+
+
+def auto_assign_pool() -> QuerySet[User]:
+    """Who lowest-load assignment picks from (the item's owner aside): active, available, granted `reviewer`."""
+    return User.objects.filter(is_active=True, is_available=True, roles__contains=[Role.REVIEWER.value])
+
+
+def _loads(user_ids: Iterable[int], *, excluding_item_id: int) -> dict[int, int]:
+    return {uid: load.weighted for uid, load in weighted_loads(user_ids, excluding_item_id=excluding_item_id).items()}
 
 
 def _previous_reviewer(item: ReviewItem) -> User | None:
@@ -136,6 +150,7 @@ def auto_assign(
     clock: Clock = SYSTEM_CLOCK,
     sticky: bool = False,
     reopen_event_id: int | None = None,
+    because: str = "",
 ) -> Assignment:
     """Assign `item` (locked or freshly created by the caller) by the three rules, recording ITEM_ASSIGNED with
     the reason. `sticky` for resubmissions, new rounds, and re-reviews; a re-review also passes its ITEM_REOPENED
@@ -143,11 +158,12 @@ def auto_assign(
 
     The sticky reviewer must still be active, available, a reviewer (a lead who reviewed counts), and not the
     item's owner; otherwise the item falls through to lowest load. The lowest-load pool uses stored roles, so a
-    lead isn't auto-assigned new work unless also granted `reviewer` (Foundation, core.permissions).
+    lead isn't auto-assigned new work unless also granted `reviewer` (Foundation, core.permissions). `because`
+    leads the recorded reason ("Sam Okafor was deactivated. ").
     """
     _acquire_lock()
     now = clock.now()
-    unavailable = ""
+    unavailable = because
     if sticky:
         previous = _previous_reviewer(item)
         if previous is not None:
@@ -162,12 +178,8 @@ def auto_assign(
                     at=now,
                     reopen_event_id=reopen_event_id,
                 )
-            unavailable = f"{_name(previous)} is unavailable. "
-    pool = list(
-        User.objects.filter(is_active=True, is_available=True, roles__contains=[Role.REVIEWER.value]).exclude(
-            pk=item.owner_id  # pyrefly: ignore[missing-attribute]
-        )
-    )
+            unavailable = f"{because}{_name(previous)} is unavailable. "
+    pool = list(auto_assign_pool().exclude(pk=item.owner_id))  # pyrefly: ignore[missing-attribute]
     if not pool:
         return _set_assignee(
             item,
@@ -194,6 +206,34 @@ def auto_assign(
         at=now,
         reopen_event_id=reopen_event_id,
     )
+
+
+def lock_open_items_of(user_id: int) -> list[ReviewItem]:
+    """Lock a reviewer's open (queue) items and then the assignment lock, for `release_items` in the same
+    transaction, keeping the lock order: item rows first, then the advisory lock.
+
+    An assignment holding the advisory lock may still hand them an item. Once the lock is granted that one has
+    committed, so it's read again and locked NOWAIT: waiting here, after the advisory lock, could deadlock with a
+    transaction that holds the row and waits for the lock. If such a transaction holds it, the caller gets a
+    Conflict to retry instead.
+    """
+    open_items = ReviewItem.objects.filter(assignee_id=user_id, status__in=QUEUE_STATUSES).order_by("pk")
+    items = list(open_items.select_for_update())
+    _acquire_lock()
+    late = open_items.exclude(pk__in=[i.pk for i in items]).select_for_update(nowait=True)
+    try:
+        items += list(late)
+    except OperationalError as exc:  # the row is locked by someone mid-change: retrying is the caller's decision
+        raise Conflict("One of their items is being changed right now. Try again.") from exc
+    return sorted(items, key=lambda i: i.pk)
+
+
+def release_items(items: Iterable[ReviewItem], *, actor: User, because: str, clock: Clock = SYSTEM_CLOCK) -> None:
+    """Auto-assign each item (locked by `lock_open_items_of`) again, one ITEM_ASSIGNED each with `because` leading
+    the reason. Not sticky: the reviewer they're leaving is the one sticky would pick. Lowest load sees the loads
+    the previous item left; with nobody available, the pool, and the leads hear about it."""
+    for item in items:
+        auto_assign(item=item, actor=actor, clock=clock, because=because)
 
 
 # --- claim, manual, hand-off, bulk -----------------------------------------------------------------------------

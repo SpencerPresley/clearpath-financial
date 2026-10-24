@@ -105,39 +105,16 @@ def test_no_operation_returns_a_raw_dict() -> None:
     assert offenders == []
 
 
-STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
-    (
-        "post",
-        "/api/admin/users",
-        {"email": "new@clearpath.demo", "display_name": "New", "roles": ["reviewer"], "password": "x" * 12},
-    ),
-    ("patch", "/api/admin/users/1", {"is_active": False}),
-]
+def test_no_operation_is_a_stub() -> None:
+    """Every contract stub has landed: no operation documents a 501 any more."""
+    paths = api.get_openapi_schema()["paths"]
+    stubs = [op["operationId"] for ops in paths.values() for op in ops.values() if "501" in op.get("responses", {})]
+
+    assert stubs == []
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("method", "path", "body"), STUBS, ids=[f"{m} {p}" for m, p, _ in STUBS])
-def test_stub_endpoints_validate_then_return_501(
-    marketer: User, method: str, path: str, body: dict[str, Any] | None
-) -> None:
-    from reviews.tests.factories import make_item
-
-    client = Client()
-    client.force_login(marketer)
-    url = path.replace("{item}", str(make_item(marketer).pk))
-
-    response = (
-        getattr(client, method)(url, body, content_type="application/json")
-        if body is not None
-        else getattr(client, method)(url)
-    )
-
-    assert response.status_code == 501, response.content
-    assert response.json()["code"] == "not_implemented"
-
-
-@pytest.mark.django_db
-def test_stub_still_validates_input_first(marketer: User) -> None:
+def test_input_is_validated_before_permissions(marketer: User) -> None:
     client = Client()
     client.force_login(marketer)
 

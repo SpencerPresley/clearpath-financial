@@ -31,6 +31,7 @@ import {
 } from '../../api/generated/items/items';
 import type { BulkResultOut, ItemRowOut } from '../../api/generated/model';
 import { useListUsers } from '../../api/generated/users/users';
+import { PickerName, pickerText } from '../../ui/Availability';
 import { Button } from '../../ui/Button';
 import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
@@ -200,8 +201,13 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
                 Unassigned
               </MenuItem>
               {(reviewers.data ?? []).map((user) => (
-                <MenuItem key={user.id} id={String(user.id)} className="app-menu-item">
-                  {user.display_name}
+                <MenuItem
+                  key={user.id}
+                  id={String(user.id)}
+                  textValue={pickerText(user.display_name, user.is_available)}
+                  className="app-menu-item"
+                >
+                  <PickerName name={user.display_name} isAvailable={user.is_available} />
                 </MenuItem>
               ))}
             </Menu>

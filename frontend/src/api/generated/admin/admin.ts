@@ -239,7 +239,7 @@ export const getCreateUserUrl = () => {
 }
 
 /**
- * Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]
+ * Admins provision accounts (no public signup). Records USER_CREATED. 422 on `body.email` if it's taken.
  * @summary Create User
  */
 export const createUser = async (userCreateIn: UserCreateIn, options?: Parameters<typeof customFetch>[1]): Promise<UserOut> => {
@@ -327,7 +327,8 @@ export const useCreateUser = <TError = ErrorOut,
 }
 
 /**
- * Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]
+ * Change roles, active, availability, or name. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED /
+ * USER_AVAILABILITY_CHANGED. 409 if it would leave no active admin, or an admin deactivates themselves.
  * @summary Update User
  */
 export const updateUser = async (userId: number,

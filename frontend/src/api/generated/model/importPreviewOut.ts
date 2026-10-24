@@ -7,10 +7,13 @@
 import type { ImportCountsOut } from './importCountsOut';
 import type { ImportPreviewRowOut } from './importPreviewRowOut';
 import type { ImportProblemOut } from './importProblemOut';
+import type { ImportSourceOut } from './importSourceOut';
 import type { ImportStatus } from './importStatus';
 import type { UnmappedValueOut } from './unmappedValueOut';
 
 export interface ImportPreviewOut {
+  /** Before commit: the earlier import that created the rows counted as already imported, when it's a single one. */
+  already_imported_from: ImportSourceOut | null;
   counts: ImportCountsOut;
   job_id: number;
   problems: ImportProblemOut[];

@@ -2,6 +2,7 @@ import { Button as AriaButton, Menu, MenuItem, MenuTrigger, Popover } from 'reac
 
 import type { ItemRowOut } from '../../api/generated/model';
 import { useListUsers } from '../../api/generated/users/users';
+import { PickerName, pickerText } from '../../ui/Availability';
 import { Icon } from '../../ui/Icon';
 import { useQueueCell } from './cellContext';
 import { stopRowClick } from './stopRowClick';
@@ -38,8 +39,13 @@ function AssignMenu({ row }: { row: ItemRowOut }) {
         </MenuItem>
       )}
       {others.map((user) => (
-        <MenuItem key={user.id} id={String(user.id)} className="app-menu-item">
-          {user.display_name}
+        <MenuItem
+          key={user.id}
+          id={String(user.id)}
+          textValue={pickerText(user.display_name, user.is_available)}
+          className="app-menu-item"
+        >
+          <PickerName name={user.display_name} isAvailable={user.is_available} />
         </MenuItem>
       ))}
     </Menu>

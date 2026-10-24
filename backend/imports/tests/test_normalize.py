@@ -22,6 +22,7 @@ from imports.normalize import (
     parse_date,
     resolve_person,
     split_asset,
+    value_inventory,
 )
 from imports.tests import oracle
 from imports.workbook import RawCell, RawWorkbook
@@ -610,3 +611,106 @@ def test_approvers_resolve_from_the_reviewer_column_without_a_lists_sheet(sample
 
     assert not [p for p in out.all_problems if p.kind is K.UNRESOLVED_APPROVER]
     assert _by_row(out)[2].approver == "Leah Brandt"
+
+
+# --- the Values step's inventory ---------------------------------------------------------------------------------
+
+_VALUE_COLUMNS = {
+    ImportValueField.PRODUCT: "Product",
+    ImportValueField.CHANNEL: "Channel",
+    ImportValueField.PARTNER: "Affiliate / Partner",
+    ImportValueField.TRIGGER_TERMS: "Trigger Terms Present (Y/N)",
+    ImportValueField.RISK_TIER: "Risk Tier",
+}
+
+
+def _row_value(row: ParsedRow, field: ImportValueField) -> str | None:
+    match field:
+        case ImportValueField.PRODUCT:
+            return row.product.value if row.product else None
+        case ImportValueField.CHANNEL:
+            return row.channel.value if row.channel else None
+        case ImportValueField.RISK_TIER:
+            return row.risk_tier.value if row.risk_tier else None
+        case ImportValueField.PARTNER:
+            return row.partner_name
+        case ImportValueField.TRIGGER_TERMS:
+            return None if row.trigger_terms is None else ("yes" if row.trigger_terms else "no")
+
+
+def test_value_inventory_reads_each_raw_value_the_way_its_rows_were_read(
+    sample_workbook: RawWorkbook, result: NormalizedImport
+) -> None:
+    """The Values step shows what each distinct value imports as. It can't disagree with the rows: every data
+    row's parsed value is the inventory's value for that row's raw cell."""
+    mapping = ImportMapping(columns=guess_column_mapping(sample_workbook.tracker.headers))
+    inventory = {
+        (v.field, v.source_value): v for v in value_inventory(sample_workbook, mapping, _directory(sample_workbook))
+    }
+    headers = sample_workbook.tracker.headers
+    rows = _by_row(result)
+
+    checked = 0
+    for raw_row in sample_workbook.tracker.rows:
+        parsed = rows[raw_row.row_number]
+        if parsed.action is RowAction.SKIP_NOT_DATA:
+            continue
+        for field, header in _VALUE_COLUMNS.items():
+            raw = raw_row.cells[headers.index(header)].display
+            if raw is None:
+                continue
+            assert inventory[field, raw].value == _row_value(parsed, field), (raw_row.row_number, header, raw)
+            checked += 1
+    assert checked > 500
+
+
+def test_value_inventory_counts_and_sources(sample_workbook: RawWorkbook) -> None:
+    mapping = ImportMapping(columns=guess_column_mapping(sample_workbook.tracker.headers))
+    inventory = value_inventory(sample_workbook, mapping, _directory(sample_workbook))
+    by_field = Counter(v.field for v in inventory)
+    partners = {v.source_value: v for v in inventory if v.field is ImportValueField.PARTNER}
+    products = {v.source_value: v for v in inventory if v.field is ImportValueField.PRODUCT}
+    product_i = sample_workbook.tracker.headers.index("Product")
+
+    # README "Every raw value, mapped", distinct after the strip on read.
+    assert by_field[ImportValueField.PRODUCT] == len(
+        {(v.raw or "").strip() for v in oracle.raw_values("Product values")}
+    )
+    assert by_field[ImportValueField.PARTNER] == len(
+        {v.raw.strip() for v in oracle.raw_values("Partner values") if v.raw}
+    )
+    assert (products["PL"].value, products["PL"].source) == ("personal_loan", "default")
+    assert sum(v.rows for v in inventory if v.field is ImportValueField.PRODUCT) == sum(
+        1 for r in sample_workbook.tracker.rows if r.cells[product_i].display
+    )
+    assert partners["LendCompare"].source == "default"
+    for mess in oracle.mess("Partner typed differently from the Partners sheet"):
+        assert mess.raw is not None
+        assert partners[mess.raw.strip()].source == "matched"
+
+
+def test_value_inventory_shows_the_admins_mapping_and_what_is_unmapped(sample_workbook: RawWorkbook) -> None:
+    wb = _with_cell(sample_workbook, 5, "Product", RawCell(text="Auto"))
+    columns = guess_column_mapping(wb.tracker.headers)
+    override = ValueOverride(ImportValueField.PRODUCT, "auto", "personal_loan")
+    plain = {(v.field, v.source_value): v for v in value_inventory(wb, ImportMapping(columns=columns), _directory(wb))}
+    mapped = {
+        (v.field, v.source_value): v
+        for v in value_inventory(wb, ImportMapping(columns=columns, values=(override,)), _directory(wb))
+    }
+
+    assert (plain[ImportValueField.PRODUCT, "Auto"].value, plain[ImportValueField.PRODUCT, "Auto"].source) == (
+        None,
+        None,
+    )
+    assert (mapped[ImportValueField.PRODUCT, "Auto"].value, mapped[ImportValueField.PRODUCT, "Auto"].source) == (
+        "personal_loan",
+        "mapped",
+    )
+
+
+def test_value_inventory_skips_unmapped_columns(sample_workbook: RawWorkbook) -> None:
+    columns = {**guess_column_mapping(sample_workbook.tracker.headers), "Risk Tier": T.IGNORE}
+    inventory = value_inventory(sample_workbook, ImportMapping(columns=columns), _directory(sample_workbook))
+
+    assert not [v for v in inventory if v.field is ImportValueField.RISK_TIER]

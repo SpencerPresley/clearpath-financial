@@ -294,7 +294,7 @@ const shots: Shot[] = [
       }),
     },
     ready: async (page) => {
-      await expect(page.getByRole('table', { name: 'Values to map' })).toBeVisible();
+      await expect(page.getByRole('table', { name: 'Value mapping' })).toBeVisible();
     },
   },
   {
