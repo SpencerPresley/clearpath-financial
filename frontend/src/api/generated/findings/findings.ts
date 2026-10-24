@@ -65,7 +65,7 @@ export const getPreviewChecksUrl = () => {
 }
 
 /**
- * Run the code rules on unsaved text; nothing is stored. [workstream C]
+ * Run the code rules on unsaved text, as the marketer types; nothing is stored.
  * @summary Preview
  */
 export const previewChecks = async (checkPreviewIn: CheckPreviewIn, options?: Parameters<typeof customFetch>[1]): Promise<CheckPreviewOut> => {
@@ -153,7 +153,7 @@ export const usePreviewChecks = <TError = ErrorOut,
 }
 
 /**
- * Accepted findings become required changes in the request-changes message. [workstream E]
+ * The problem is real: it becomes a required change. Assignee or lead; current version only.
  * @summary Accept
  */
 export const acceptFinding = async (findingId: number,
@@ -242,7 +242,7 @@ export const useAcceptFinding = <TError = ErrorOut,
 }
 
 /**
- * [workstream E]
+ * Not a problem here, with the reason. Assignee or lead; current version only.
  * @summary Dismiss
  */
 export const dismissFinding = async (findingId: number,
@@ -331,7 +331,6 @@ export const useDismissFinding = <TError = ErrorOut,
 }
 
 /**
- * [workstream E]
  * @summary Reopen
  */
 export const reopenFinding = async (findingId: number, options?: Parameters<typeof customFetch>[1]): Promise<FindingOut> => {

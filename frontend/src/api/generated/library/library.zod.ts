@@ -8,7 +8,8 @@ import * as zod from 'zod';
 
 
 /**
- * The approved archive, including legacy items. `status` is ignored: always approved.
+ * The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:
+ * every item that ever received an approval, whatever its status now (precedent doesn't lapse).
  * @summary List Library
  */
 export const listLibraryQueryQOneMax = 200;
@@ -20,6 +21,7 @@ export const listLibraryQueryWaitingMoreThanDaysOneMin = 0;
 
 export const listLibraryQueryApprovedWithinDaysOneMin = 0;
 
+export const listLibraryQueryScopeDefault = `approved_to_run`;
 export const listLibraryQuerySortDefault = `updated`;
 export const listLibraryQueryLimitDefault = 50;
 export const listLibraryQueryLimitMax = 200;
@@ -51,6 +53,7 @@ export const ListLibraryQueryParams = zod.object({
   "approved_within_days": zod.union([zod.int().min(listLibraryQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
   "run_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or before this date.'),
+  "scope": zod.enum(['approved_to_run', 'ever_approved']).describe('The library\'s two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn\'t lapse; run-permission does).').default(listLibraryQueryScopeDefault),
   "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title']).default(listLibraryQuerySortDefault),
   "cursor": zod.union([zod.string(),zod.null()]).optional(),
   "limit": zod.int().min(1).max(listLibraryQueryLimitMax).default(listLibraryQueryLimitDefault)

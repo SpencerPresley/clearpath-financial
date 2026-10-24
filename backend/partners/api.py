@@ -33,13 +33,13 @@ def create_partner(request: HttpRequest, body: PartnerIn) -> Status[selectors.Pa
             notes=body.notes,
         ),
     )
-    return Status(201, selectors.get_partner_detail(partner_id=partner_id))
+    return Status(201, selectors.get_partner_detail(partner_id=partner_id, viewer=current_user(request)))
 
 
 @router.get("/partners/{int:partner_id}", response={200: PartnerDetailOut, **ERRORS}, operation_id="getPartner")
 def get_partner(request: HttpRequest, partner_id: int) -> selectors.PartnerDetail:
     """Agreement and evidence, counts, and repeat issues. Items: `GET /items?partner_id=`."""
-    return selectors.get_partner_detail(partner_id=partner_id)
+    return selectors.get_partner_detail(partner_id=partner_id, viewer=current_user(request))
 
 
 @router.patch("/partners/{int:partner_id}", response={200: PartnerDetailOut, **ERRORS}, operation_id="updatePartner")
@@ -49,7 +49,7 @@ def update_partner(request: HttpRequest, partner_id: int, body: PartnerUpdateIn)
         partner_id=partner_id,
         changes=services.PartnerChanges(**body.model_dump(exclude_unset=True)),
     )
-    return selectors.get_partner_detail(partner_id=partner_id)
+    return selectors.get_partner_detail(partner_id=partner_id, viewer=current_user(request))
 
 
 @router.get(
@@ -58,8 +58,8 @@ def update_partner(request: HttpRequest, partner_id: int, body: PartnerUpdateIn)
     operation_id="listPartnerAttachments",
 )
 def list_attachments(request: HttpRequest, partner_id: int) -> list[records.AttachmentRow]:
-    selectors.get_partner_detail(partner_id=partner_id)  # 404 for an unknown partner
-    return list(records.list_partner_attachments(partner_id=partner_id))
+    selectors.get_partner_detail(partner_id=partner_id, viewer=current_user(request))  # 404 for an unknown partner
+    return list(records.list_partner_attachments(partner_id=partner_id, viewer=current_user(request)))
 
 
 @router.post(
@@ -71,10 +71,12 @@ def upload_attachment(
     request: HttpRequest, partner_id: int, kind: Form[AttachmentKind], file: File[UploadedFile]
 ) -> Status[records.AttachmentRow]:
     """Agreements and partner evidence. Leads only."""
+    viewer = current_user(request)
     ref = review_services.add_attachment(
-        actor=current_user(request),
+        actor=viewer,
         owner=review_services.AttachmentOwner(kind="partner", id=partner_id),
         kind=kind,
         file=file,
     )
-    return Status(201, next(a for a in records.list_partner_attachments(partner_id=partner_id) if a.id == ref.id))
+    rows = records.list_partner_attachments(partner_id=partner_id, viewer=viewer)
+    return Status(201, next(a for a in rows if a.id == ref.id))

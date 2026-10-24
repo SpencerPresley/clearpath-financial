@@ -253,8 +253,11 @@ export const getRecordDecisionUrl = (itemId: number,) => {
 }
 
 /**
- * Approve, approve with edits, request changes, or reject. Approve needs every finding triaged
- * (409 open_findings_block_decision) and the AI check finished (409 ai_check_pending). [workstream E]
+ * Approve, approve with edits, request changes, or reject the current version. Every decision needs a
+ * reason. Approvals also need every finding triaged (409 open_findings_block_decision; plain Approve also
+ * 409 accepted_findings_block_approval), the AI check finished (409 ai_check_pending; failed needs
+ * llm_override_reason), and current offer terms (409 stale_offer_terms). Approve with edits may answer 409
+ * findings_need_triage with v+1's new findings (v+1 is kept). A newer version is 409 stale_version.
  * @summary Record Decision
  */
 export const recordDecision = async (itemId: number,
@@ -343,7 +346,7 @@ export const useRecordDecision = <TError = ErrorOut,
 }
 
 /**
- * Request takedown of live content; the item goes to withdrawn (ruling 6). [workstream E]
+ * Request takedown of live content; the item goes to withdrawn (ruling 6).
  * @summary Pull Item
  */
 export const pullItem = async (itemId: number,
@@ -432,7 +435,8 @@ export const usePullItem = <TError = ErrorOut,
 }
 
 /**
- * needs_rereview -> approved on the same version. [workstream E]
+ * needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new
+ * findings come back as 409 findings_need_triage.
  * @summary Reaffirm
  */
 export const reaffirmApproval = async (itemId: number,

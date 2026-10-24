@@ -169,6 +169,21 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+# Django admin signs in through the SPA (allauth headless: rate limits, MFA), not its own password form:
+# config/urls.py wraps admin.site.login with allauth's secure_admin_login, which redirects here with ?next=.
+# HEADLESS_ONLY removes allauth's server-rendered login page, so Django's default /accounts/login/ would 404.
+LOGIN_URL = f"{env.frontend_base_url}/login"
+
+# Shared across uvicorn workers and deploys, so allauth's rate-limit counters hold (issue #18). Django's
+# built-in Redis backend; the client library comes with celery[redis]. Same Redis as the broker, keys prefixed.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env.redis_url,
+        "KEY_PREFIX": "clearpath",
+    }
+}
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True

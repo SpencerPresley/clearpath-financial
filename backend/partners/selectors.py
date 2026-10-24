@@ -3,11 +3,12 @@ from datetime import date, datetime
 
 from django.db.models import Count, Max, Q, Sum
 
+from accounts.models import User
 from checks.models import Finding
 from core.domain import FindingState, ItemStatus, PartnerStatus, PartnerType
 from core.errors import NotFound
 from partners.models import Partner
-from reviews.records import AttachmentRow, list_partner_attachments
+from reviews.records import AttachmentRow, can_read_partner_attachments, list_partner_attachments
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,8 @@ def repeat_issues(*, partner_id: int, limit: int = 10) -> tuple[RepeatIssue, ...
     )
 
 
-def get_partner_detail(*, partner_id: int) -> PartnerDetail:
+def get_partner_detail(*, partner_id: int, viewer: User) -> PartnerDetail:
+    """Attachments are empty for viewers who may not read them (marketers; ledger ruling)."""
     partner = _with_counts().filter(pk=partner_id).first()
     if partner is None:
         raise NotFound.entity("partner", partner_id)
@@ -115,6 +117,8 @@ def get_partner_detail(*, partner_id: int) -> PartnerDetail:
         agreement_signed_on=partner.agreement_signed_on,
         notes=partner.notes,
         created_at=partner.created_at,
-        attachments=list_partner_attachments(partner_id=partner_id),
+        attachments=list_partner_attachments(partner_id=partner_id, viewer=viewer)
+        if can_read_partner_attachments(viewer)
+        else (),
         repeat_issues=repeat_issues(partner_id=partner_id),
     )

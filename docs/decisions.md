@@ -265,7 +265,11 @@ Search returns ranked candidates, so a semantic channel can be fused in later wi
   - a rate-based rule on login
 - **Server security:**
   - no port 22; shell and deploys go through SSM
-  - IMDSv2 required
+  - IMDSv2 required, with a hop limit of 2. **Tradeoff:** the containers sit one Docker-bridge hop from the
+    instance, and they need the instance role (SSM parameters, the documents bucket), so the hop limit can't
+    be 1. That means an SSRF in Django could reach the role's credentials. IMDSv2's PUT-for-token step blunts
+    the common GET-only SSRF. The alternative, handing credentials only to the web and worker containers,
+    costs extra secret plumbing for one demo server.
   - secrets in SSM Parameter Store
   - documents bucket encrypted and versioned, downloads only via presigned URLs issued after Django's permission check
 - **Deploy:**

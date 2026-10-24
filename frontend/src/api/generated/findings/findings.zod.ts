@@ -8,7 +8,7 @@ import * as zod from 'zod';
 
 
 /**
- * Run the code rules on unsaved text; nothing is stored. [workstream C]
+ * Run the code rules on unsaved text, as the marketer types; nothing is stored.
  * @summary Preview
  */
 export const previewChecksBodyContentTextMax = 100000;
@@ -53,7 +53,7 @@ export const PreviewChecksResponse = zod.object({
 })
 
 /**
- * Accepted findings become required changes in the request-changes message. [workstream E]
+ * The problem is real: it becomes a required change. Assignee or lead; current version only.
  * @summary Accept
  */
 export const AcceptFindingParams = zod.object({
@@ -95,7 +95,7 @@ export const AcceptFindingResponse = zod.object({
 })
 
 /**
- * [workstream E]
+ * Not a problem here, with the reason. Assignee or lead; current version only.
  * @summary Dismiss
  */
 export const DismissFindingParams = zod.object({
@@ -136,7 +136,6 @@ export const DismissFindingResponse = zod.object({
 })
 
 /**
- * [workstream E]
  * @summary Reopen
  */
 export const ReopenFindingParams = zod.object({

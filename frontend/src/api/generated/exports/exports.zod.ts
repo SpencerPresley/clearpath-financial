@@ -148,6 +148,7 @@ export const GetEvidencePackResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),

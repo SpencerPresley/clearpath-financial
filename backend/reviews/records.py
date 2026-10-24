@@ -21,11 +21,13 @@ from core.domain import (
     EventType,
     ItemStatus,
     Product,
+    Role,
     TakedownState,
     TermsField,
     VersionOrigin,
 )
-from core.errors import NotFound
+from core.errors import NotFound, NotPermitted
+from core.permissions import has_role
 from reviews.diff import DiffSegment, diff_texts
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, Decision, Placement, ReviewItem, SavedView, Version
@@ -189,6 +191,7 @@ class DecisionRow:
     approver: PartyRef
     reason: str
     ruleset_date: date
+    engine_version: str
     expires_at: datetime | None
     llm_override_reason: str | None
     ai_review_carried_from_n: int | None
@@ -221,6 +224,7 @@ def _decision_row(d: Decision) -> DecisionRow:
         approver=_person(d.approver),
         reason=d.reason,
         ruleset_date=d.ruleset_date,
+        engine_version=d.engine_version,
         expires_at=d.expires_at,
         llm_override_reason=d.llm_override_reason or None,
         ai_review_carried_from_n=d.ai_review_carried_from.n if d.ai_review_carried_from else None,
@@ -243,6 +247,14 @@ def _decision_row(d: Decision) -> DecisionRow:
 def list_decisions(*, item_id: int) -> tuple[DecisionRow, ...]:
     _item_or_404(item_id)
     return tuple(_decision_row(d) for d in _decisions(item_id))
+
+
+def get_decision(*, decision_id: int) -> DecisionRow:
+    item_id = Decision.objects.filter(pk=decision_id).values_list("item_id", flat=True).first()
+    decision = _decisions(item_id).filter(pk=decision_id).first() if item_id is not None else None
+    if decision is None:
+        raise NotFound.entity("decision", decision_id)
+    return _decision_row(decision)
 
 
 # --- item detail -----------------------------------------------------------------------------------------------
@@ -421,16 +433,30 @@ def list_item_attachments(*, item_id: int) -> tuple[AttachmentRow, ...]:
     return tuple(_attachment_row(a) for a in qs.order_by("-uploaded_at", "-pk"))
 
 
-def list_partner_attachments(*, partner_id: int) -> tuple[AttachmentRow, ...]:
+def can_read_partner_attachments(viewer: User) -> bool:
+    """Ledger ruling: partner attachments (agreements) are for reviewers, leads, and admins, not marketers.
+    Item, version, and decision evidence is readable by anyone who can read the item (every signed-in user)."""
+    return has_role(viewer, Role.REVIEWER, Role.ADMIN)
+
+
+def _require_partner_reader(viewer: User) -> None:
+    if not can_read_partner_attachments(viewer):
+        raise NotPermitted("Partner agreements and evidence are for reviewers and leads.")
+
+
+def list_partner_attachments(*, partner_id: int, viewer: User) -> tuple[AttachmentRow, ...]:
+    _require_partner_reader(viewer)
     qs = Attachment.objects.filter(partner_id=partner_id).select_related("uploaded_by")
     return tuple(_attachment_row(a) for a in qs.order_by("-uploaded_at", "-pk"))
 
 
-def get_attachment(*, attachment_id: int) -> Attachment:
+def get_attachment(*, attachment_id: int, viewer: User) -> Attachment:
     """For the download view only: returns the model so the view can stream the file."""
     attachment = Attachment.objects.filter(pk=attachment_id).first()
     if attachment is None:
         raise NotFound.entity("attachment", attachment_id)
+    if attachment.partner_id is not None:  # pyrefly: ignore[missing-attribute]
+        _require_partner_reader(viewer)
     return attachment
 
 
@@ -482,6 +508,18 @@ def list_placements(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> tuple[Place
         )
         for p in qs
     )
+
+
+def get_placement(*, placement_id: int, clock: Clock = SYSTEM_CLOCK) -> PlacementRow:
+    item_id = Placement.objects.filter(pk=placement_id).values_list("item_id", flat=True).first()
+    row = (
+        next((p for p in list_placements(item_id=item_id, clock=clock) if p.id == placement_id), None)
+        if item_id
+        else None
+    )
+    if row is None:
+        raise NotFound.entity("placement", placement_id)
+    return row
 
 
 # --- saved views -----------------------------------------------------------------------------------------------

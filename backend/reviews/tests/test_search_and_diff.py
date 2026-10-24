@@ -99,11 +99,11 @@ def test_hit_outcome_is_the_matched_versions_decision_not_the_items_latest(
 @pytest.mark.django_db
 def test_search_text_uses_websearch_syntax_and_ranks(marketer: User, reviewer: User, clock: FixedClock) -> None:
     strong = make_item(marketer, title="Strong")
-    make_version(strong, "No credit check. Credit check free. Checking credit is soft.")
+    _approved(strong, make_version(strong, "No credit check. Credit check free. Checking credit is soft."), reviewer)
     weak = make_item(marketer, title="Weak")
-    make_version(weak, "A credit card with a long check-out flow.")
+    _approved(weak, make_version(weak, "A credit card with a long check-out flow."), reviewer)
     excluded = make_item(marketer, title="Excluded")
-    make_version(excluded, "No credit check, guaranteed approval.")
+    _approved(excluded, make_version(excluded, "No credit check, guaranteed approval."), reviewer)
 
     hits = search_text(viewer=reviewer, query='"credit check" -guaranteed', filters=ItemFilter(), clock=clock)
 
@@ -116,13 +116,39 @@ def test_search_text_uses_websearch_syntax_and_ranks(marketer: User, reviewer: U
 @pytest.mark.django_db
 def test_search_respects_item_filter_and_dedupes_by_item(marketer: User, reviewer: User, clock: FixedClock) -> None:
     card = make_item(marketer, product=Product.CREDIT_CARD)
-    make_version(card, "No annual fee.", n=1)
-    make_version(card, "No annual fee, ever.", n=2)
+    _approved(card, make_version(card, "No annual fee.", n=1), reviewer)
+    _approved(card, make_version(card, "No annual fee, ever.", n=2), reviewer)
     loan = make_item(marketer, product=Product.PERSONAL_LOAN)
-    make_version(loan, "No annual fee on loans.")
+    _approved(loan, make_version(loan, "No annual fee on loans."), reviewer)
 
     hits = search_text(
         viewer=reviewer, query="annual fee", filters=ItemFilter(product=[Product.CREDIT_CARD]), clock=clock
     )
 
     assert [(h.item_id, h.version_n) for h in hits] == [(card.pk, 2)]
+
+
+def _approved(item: object, version: object, reviewer: User) -> None:
+    _decide((item, version), reviewer, DecisionOutcome.APPROVED, hour=9)
+
+
+@pytest.mark.django_db
+def test_precedent_is_ever_approved_wording_with_its_current_status(
+    marketer: User, reviewer: User, clock: FixedClock
+) -> None:
+    lapsed = make_item(marketer, status=ItemStatus.EXPIRED, reopen_reason="approval_expired")
+    _approved(lapsed, make_version(lapsed, "Check your rate with no hard credit pull."), reviewer)
+    pending = make_item(marketer, status=ItemStatus.IN_REVIEW)
+    make_version(pending, "Check your rate with no hard credit pull today.")
+    reworded = make_item(marketer, status=ItemStatus.SUBMITTED)
+    _approved(reworded, make_version(reworded, "No hard credit pull to check.", n=1), reviewer)
+    make_version(reworded, "No hard credit pull to check, ever.", n=2)
+
+    for hits in (
+        find_phrase(viewer=reviewer, phrase="no hard credit pull", filters=ItemFilter(), clock=clock),
+        search_text(viewer=reviewer, query="hard credit pull", filters=ItemFilter(), clock=clock),
+    ):
+        assert sorted((h.item_id, h.version_n, h.status) for h in hits) == [
+            (lapsed.pk, 1, ItemStatus.EXPIRED),
+            (reworded.pk, 1, ItemStatus.SUBMITTED),
+        ]

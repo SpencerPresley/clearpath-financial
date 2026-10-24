@@ -8,6 +8,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from enum import StrEnum
 from typing import Any, Final
 
 from django.db.models import BooleanField, Count, Exists, F, OuterRef, Q, QuerySet
@@ -27,7 +28,7 @@ from core.domain import (
 )
 from core.errors import InvalidInput, NotFound
 from reviews.filters import ItemFilter, ItemSort
-from reviews.models import QUEUE_STATUSES, Placement, ReviewItem
+from reviews.models import APPROVED_OUTCOMES, QUEUE_STATUSES, Decision, Placement, ReviewItem
 
 _KEY = re.compile(r"^\s*CP-(\d+)\s*$", re.IGNORECASE)
 
@@ -270,11 +271,17 @@ def list_items(
     queue leaves out legacy imports unless `is_legacy` is set: an imported open tracker row has no version to
     review (spec §4.2 ruling 7), and `queue_stats` doesn't count them either.
     """
-    descending, keys = _SORTS[sort]
     if sort is ItemSort.QUEUE and not filters.status:
         queue = {"status": [ItemStatus(s) for s in QUEUE_STATUSES]}
         filters = filters.model_copy(update=queue if filters.is_legacy is not None else {**queue, "is_legacy": False})
-    qs = row_queryset(filter_items(viewer=viewer, filters=filters, clock=clock))
+    return _page(
+        filter_items(viewer=viewer, filters=filters, clock=clock), sort=sort, cursor=cursor, limit=limit, clock=clock
+    )
+
+
+def _page(qs: QuerySet[ReviewItem], *, sort: ItemSort, cursor: str | None, limit: int, clock: Clock) -> ItemPage:
+    descending, keys = _SORTS[sort]
+    qs = row_queryset(qs)
     if cursor is not None:
         values = _decode_cursor(sort, cursor)
         columns = ", ".join(f'"{_TABLE}"."{column}"' for column, _ in keys)
@@ -290,6 +297,37 @@ def list_items(
         rows=tuple(item_row(item, now=now) for item in items),
         next_cursor=_encode_cursor(sort, items[-1]) if has_more and items else None,
     )
+
+
+# --- library ---------------------------------------------------------------------------------------------------
+
+
+class LibraryScope(StrEnum):
+    """The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value
+    doesn't lapse; run-permission does)."""
+
+    APPROVED_TO_RUN = "approved_to_run"  # current status approved, legacy included
+    EVER_APPROVED = "ever_approved"  # any approving decision, or an imported item the tracker had as approved
+
+
+def library_items(  # list_items' arguments plus the scope
+    *,
+    viewer: User,
+    filters: ItemFilter,
+    scope: LibraryScope = LibraryScope.APPROVED_TO_RUN,
+    sort: ItemSort = ItemSort.UPDATED,
+    cursor: str | None = None,
+    limit: int = 50,
+    clock: Clock = SYSTEM_CLOCK,
+) -> ItemPage:
+    """The approved archive. `filters.status` narrows within the scope (e.g. ever-approved items now expired)."""
+    qs = filter_items(viewer=viewer, filters=filters, clock=clock)
+    if scope is LibraryScope.APPROVED_TO_RUN:
+        qs = qs.filter(status=ItemStatus.APPROVED.value)
+    else:
+        approvals = Decision.objects.filter(item=OuterRef("pk"), outcome__in=APPROVED_OUTCOMES)
+        qs = qs.filter(Exists(approvals) | Q(is_legacy=True, status=ItemStatus.APPROVED.value))
+    return _page(qs, sort=sort, cursor=cursor, limit=limit, clock=clock)
 
 
 # --- stats strip -----------------------------------------------------------------------------------------------

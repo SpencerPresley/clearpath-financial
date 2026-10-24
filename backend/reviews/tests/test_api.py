@@ -260,16 +260,35 @@ def test_saved_views_round_trip(reviewer: User) -> None:
 
 @pytest.mark.django_db
 def test_library_lists_approved_and_searches(marketer: User, reviewer: User) -> None:
+    from reviews.models import Decision
+
     approved = make_item(marketer, status="approved")
-    make_version(approved, "Checking your rate won't affect your credit score.")
-    make_version(make_item(marketer), "Checking your rate won't affect your credit score.")
+    lapsed = make_item(marketer, status="expired", reopen_reason="approval_expired")
+    for item in (approved, lapsed):
+        version = make_version(item, "Checking your rate won't affect your credit score.")
+        Decision.objects.create(
+            item=item,
+            version=version,
+            outcome="approved",
+            approver=reviewer,
+            reason="ok",
+            ruleset_date=AT.date(),
+            expires_at=AT,
+            decided_at=AT,
+        )
+    make_version(make_item(marketer), "Checking your rate won't affect your credit score.")  # never approved
     client = _client(reviewer)
 
     library = client.get("/api/library").json()
+    ever = client.get("/api/library?scope=ever_approved").json()
     phrase = client.get("/api/library/search?mode=phrase&query=affect your credit&status=approved").json()
     text = client.get("/api/library/search?query=credit%20score").json()
 
     assert [r["id"] for r in library["rows"]] == [approved.pk]
+    assert sorted(r["id"] for r in ever["rows"]) == [approved.pk, lapsed.pk]
     assert [h["item_id"] for h in phrase["hits"]] == [approved.pk]
-    assert len(text["hits"]) == 2
-    assert ReviewItem.objects.count() == 2
+    assert sorted((h["item_id"], h["status"]) for h in text["hits"]) == [
+        (approved.pk, "approved"),
+        (lapsed.pk, "expired"),
+    ]
+    assert ReviewItem.objects.count() == 3
