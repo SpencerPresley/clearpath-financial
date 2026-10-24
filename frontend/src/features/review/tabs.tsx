@@ -1,6 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useQueries } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { useListDecisions } from '../../api/generated/decisions/decisions';
+import { getListFindingsQueryKey, listFindings } from '../../api/generated/findings/findings';
 
 import {
   getGetItemHistoryQueryKey,
@@ -11,7 +15,15 @@ import {
   useListComments,
   useUploadItemAttachment,
 } from '../../api/generated/items/items';
-import type { AttachmentKind, AttachmentOut, ItemDetailOut, TermsRefOut } from '../../api/generated/model';
+import type {
+  AttachmentKind,
+  AttachmentOut,
+  DecisionOut,
+  FindingOut,
+  ItemDetailOut,
+  TermsField,
+  TermsRefOut,
+} from '../../api/generated/model';
 import { useListUsers } from '../../api/generated/users/users';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
@@ -22,11 +34,14 @@ import {
   CHANNEL_LABELS,
   MARKET_LABELS,
   PRODUCT_LABELS,
+  RISK_TIER_LABELS,
+  TERMS_FIELD_LABELS,
   formatBytes,
   formatDate,
 } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
+import { DecisionRecord } from './DecisionRecord';
 import { describeEvent } from './historyText';
 import { PlacementsSection } from './Placements';
 
@@ -171,19 +186,27 @@ export function CommentsTab({
 
 // ---- Details -------------------------------------------------------------------------------------
 
-/** "Personal loan v12" → its quoted fields, so the reviewer sees which offer terms the copy depends on. */
+/**
+ * "Personal loan offer terms v12" → one line per quoted field, in the Offer terms screen's words ("APR min:
+ * 9.99%", "Loan terms (months): 24, 60"). A value quoted twice is listed once.
+ */
 export function groupTermsRefs(refs: readonly TermsRefOut[]): { label: string; quotes: string[] }[] {
-  const groups = new Map<number, { label: string; quotes: string[] }>();
+  const groups = new Map<number, { label: string; fields: Map<TermsField, string[]> }>();
   for (const ref of refs) {
     const key = ref.offer_terms.id;
     const group = groups.get(key) ?? {
       label: `${PRODUCT_LABELS[ref.offer_terms.product]} offer terms v${String(ref.offer_terms.version)}`,
-      quotes: [],
+      fields: new Map<TermsField, string[]>(),
     };
-    group.quotes.push(`${ref.field.replaceAll('_', ' ')}: ${ref.quote}`);
+    const values = group.fields.get(ref.field) ?? [];
+    if (!values.includes(ref.quote)) values.push(ref.quote);
+    group.fields.set(ref.field, values);
     groups.set(key, group);
   }
-  return [...groups.values()];
+  return [...groups.values()].map(({ label, fields }) => ({
+    label,
+    quotes: [...fields].map(([field, values]) => `${TERMS_FIELD_LABELS[field]}: ${values.join(', ')}`),
+  }));
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -195,7 +218,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function DetailsTab({ item }: { item: ItemDetailOut }) {
+export function DetailsTab({
+  item,
+  onShowLiveDiff,
+}: {
+  item: ItemDetailOut;
+  /** A drift re-review: the placement's "Live page vs approved vN" opens in the center pane. */
+  onShowLiveDiff?: (placementId: number) => void;
+}) {
   const terms = groupTermsRefs(item.current_version?.terms_refs ?? []);
   const run =
     item.planned_first_run === null
@@ -224,7 +254,7 @@ export function DetailsTab({ item }: { item: ItemDetailOut }) {
         <Row label="Planned run">{run}</Row>
         <Row label="Prescreened offer">{item.is_prescreen ? 'Yes' : 'No'}</Row>
         <Row label="Risk tier">
-          <span className="capitalize">{item.risk_tier}</span>
+          {RISK_TIER_LABELS[item.risk_tier]}
           {item.risk_tier_overridden ? ' (overridden)' : ' (derived at intake)'}
         </Row>
         <Row label="Submitted by">{item.owner?.name ?? item.legacy_submitter}</Row>
@@ -243,8 +273,22 @@ export function DetailsTab({ item }: { item: ItemDetailOut }) {
         {item.notes !== '' && <Row label="Notes">{item.notes}</Row>}
         {item.is_legacy && <Row label="Legacy ref">{item.legacy_ref ?? '—'}</Row>}
       </dl>
+      {item.latest_decision !== null && (
+        <section aria-labelledby="decision-record-title">
+          <h3 id="decision-record-title" className="app-panel-heading">
+            Decision record
+          </h3>
+          <DecisionRecord decision={item.latest_decision} />
+        </section>
+      )}
       {/* Placements exist only once an approval has been recorded. */}
-      {item.approved_at !== null && <PlacementsSection itemId={item.id} ownerId={item.owner?.id ?? null} />}
+      {item.approved_at !== null && (
+        <PlacementsSection
+          itemId={item.id}
+          ownerId={item.owner?.id ?? null}
+          onShowLiveDiff={onShowLiveDiff}
+        />
+      )}
       <section aria-labelledby="terms-title">
         <h3 id="terms-title" className="app-panel-heading">
           Offer terms quoted
@@ -372,15 +416,54 @@ export function EvidenceTab({
 
 // ---- History -------------------------------------------------------------------------------------
 
+/**
+ * Finding events carry the finding's id and rule id; the sentence uses the finding's message instead (spec §5.4).
+ * Findings are listed per version, so this reads every version the history's finding events point at.
+ */
+function useFindingMessages(itemId: number, versionNs: readonly number[]): ReadonlyMap<number, string> {
+  return useQueries({
+    queries: versionNs.map((n) => ({
+      queryKey: getListFindingsQueryKey(itemId, { version_n: n }),
+      queryFn: ({ signal }: { signal: AbortSignal }) => listFindings(itemId, { version_n: n }, { signal }),
+    })),
+    combine: findingMessages,
+  });
+}
+
+/** Stable, so useQueries only recombines when a result changes. */
+function findingMessages(results: readonly { data?: readonly FindingOut[] }[]): ReadonlyMap<number, string> {
+  return new Map(results.flatMap((r) => (r.data ?? []).map((f) => [f.id, f.message] as const)));
+}
+
+const FINDING_EVENTS = new Set(['finding.accepted', 'finding.dismissed', 'finding.reopened']);
+
 export function HistoryTab({ item }: { item: ItemDetailOut }) {
   const history = useGetItemHistory(item.id);
   const users = useListUsers();
+  const decisions = useListDecisions(item.id);
+  const versionIds = useMemo(() => new Map(item.versions.map((v) => [v.id, v.n])), [item.versions]);
+  const findingVersions = useMemo(() => {
+    const ns = new Set<number>();
+    for (const entry of history.data?.entries ?? []) {
+      if (FINDING_EVENTS.has(entry.type) && 'version_id' in entry.payload) {
+        const n = versionIds.get(entry.payload.version_id);
+        if (n !== undefined) ns.add(n);
+      }
+    }
+    return [...ns].sort((a, b) => a - b);
+  }, [history.data, versionIds]);
+  const findings = useFindingMessages(item.id, findingVersions);
+  const records = useMemo(
+    () => new Map<number, DecisionOut>((decisions.data ?? []).map((d) => [d.id, d])),
+    [decisions.data],
+  );
   const lookups = useMemo(
     () => ({
-      versions: new Map(item.versions.map((v) => [v.id, v.n])),
+      versions: versionIds,
       users: new Map((users.data ?? []).map((u) => [u.id, u.display_name || u.email])),
+      findings,
     }),
-    [item.versions, users.data],
+    [versionIds, users.data, findings],
   );
 
   if (history.isPending) {
@@ -392,15 +475,25 @@ export function HistoryTab({ item }: { item: ItemDetailOut }) {
   const entries = [...history.data.entries].sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id);
   return (
     <ol className="app-timeline" aria-label="Event history, newest first">
-      {entries.map((entry) => (
-        <li key={entry.id} className="app-timeline-entry">
-          <p className="app-timeline-text">{describeEvent(entry, lookups)}</p>
-          <p className="app-timeline-meta">
-            <span className="app-timeline-actor">{entry.actor?.name ?? 'System'}</span>{' '}
-            <RelativeAge at={entry.at} />
-          </p>
-        </li>
-      ))}
+      {entries.map((entry) => {
+        const record =
+          entry.type === 'decision.recorded' ? records.get(entry.payload.decision_id) : undefined;
+        return (
+          <li key={entry.id} className="app-timeline-entry">
+            <p className="app-timeline-text">{describeEvent(entry, lookups)}</p>
+            <p className="app-timeline-meta">
+              <span className="app-timeline-actor">{entry.actor?.name ?? 'System'}</span>{' '}
+              <RelativeAge at={entry.at} />
+            </p>
+            {record !== undefined && (
+              <details className="app-record-toggle">
+                <summary>Decision record</summary>
+                <DecisionRecord decision={record} />
+              </details>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }

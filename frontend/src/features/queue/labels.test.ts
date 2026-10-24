@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Channel, DecisionOutcome, Product, ReopenReason } from '../../api/generated/model';
+import { REOPEN_REASON_LABELS } from '../../ui/labels';
 import { CHANNEL_LABEL, OUTCOME_LABEL, PRODUCT_LABEL, REOPEN_REASON_LABEL, roundLabel } from './labels';
 
 describe('labels', () => {
@@ -12,7 +13,10 @@ describe('labels', () => {
   });
 
   it('uses glossary wording', () => {
-    expect(REOPEN_REASON_LABEL.terms_changed).toBe('Terms changed');
+    // One map for every screen (spec §5.4): the queue doesn't keep its own reopen-reason wording.
+    expect(REOPEN_REASON_LABEL).toBe(REOPEN_REASON_LABELS);
+    expect(REOPEN_REASON_LABEL.terms_changed).toBe('Offer terms changed');
+    expect(REOPEN_REASON_LABEL.drift_detected).toBe('Live copy changed');
     expect(OUTCOME_LABEL.approved_with_edits).toBe('Approved with edits');
     expect(OUTCOME_LABEL.changes_requested).toBe('Changes requested');
     expect(PRODUCT_LABEL.mortgage_prequal).toBe('Mortgage prequal');

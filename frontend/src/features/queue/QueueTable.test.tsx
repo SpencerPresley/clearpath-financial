@@ -192,6 +192,6 @@ describe('QueueTable', () => {
 
   it('marks re-reviews with their reason when the column is shown', () => {
     render(<Harness visibility={{ ...DEFAULT_COLUMN_VISIBILITY, reopen_reason: true }} />);
-    expect(screen.getByText('Terms changed')).toBeInTheDocument();
+    expect(screen.getByText('Offer terms changed')).toBeInTheDocument();
   });
 });

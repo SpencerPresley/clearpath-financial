@@ -84,7 +84,7 @@ const MODES: Record<DecisionMode, ModeCopy> = {
     icon: 'action.approve',
     variant: 'primary',
     reasonLabel: 'Reason',
-    placeholder: 'e.g. Only the offer-terms numbers changed',
+    placeholder: 'Why the generated version can run',
     done: 'Fast-track approved',
   },
   reaffirm: {
@@ -172,8 +172,16 @@ export function DecisionPanel({
   const currentN = item.current_version_n ?? 0;
   const approvedN = item.latest_decision?.version_n ?? currentN;
 
+  // Request changes starts from the accepted findings; fast-track from the reason it's for in nearly every case,
+  // so the step is one click (the reviewer can still edit it).
   const [reason, setReason] = useState(() =>
-    mode === 'changes_requested' ? changesRequestedDraft(findings) : '',
+    mode === 'changes_requested'
+      ? changesRequestedDraft(findings)
+      : mode === 'fast_track'
+        ? item.numbers_change === false
+          ? 'Numbers unchanged; confirmed against the new terms.'
+          : 'Only the offer-terms numbers changed.'
+        : '',
   );
   const [override, setOverride] = useState('');
   const [evidence, setEvidence] = useState<number[]>(() => attachments.map((a) => a.id));
@@ -353,11 +361,7 @@ export function DecisionPanel({
               setReason(value);
               setErrors((e) => ({ ...e, reason: undefined }));
             }}
-            placeholder={
-              mode === 'fast_track' && item.numbers_change === false
-                ? 'e.g. Numbers unchanged; confirmed against the new terms'
-                : copy.placeholder
-            }
+            placeholder={copy.placeholder}
             errorMessage={errors.reason}
             rows={mode === 'changes_requested' ? 4 : 2}
             autoFocus={mode !== 'approved_with_edits'}

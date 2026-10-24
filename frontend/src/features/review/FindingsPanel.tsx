@@ -15,6 +15,9 @@ export interface FindingsPanelProps {
   shownN: number;
   viewingCurrent: boolean;
   canTriage: boolean;
+  /** Reviewer or lead: gets the copy about approving. */
+  isDecider: boolean;
+  isMarketer: boolean;
   activeId: number | null;
   dismissingId: number | null;
   pendingId: number | undefined;
@@ -51,6 +54,8 @@ export function FindingsPanel(props: FindingsPanelProps) {
       item={item}
       aiCount={(findings.data ?? []).filter((f) => f.source === 'llm').length}
       canRetry={canTriage}
+      isDecider={props.isDecider}
+      isMarketer={props.isMarketer}
     />
   ) : null;
 
@@ -88,8 +93,8 @@ export function FindingsPanel(props: FindingsPanelProps) {
       {groups.length === 0 ? (
         <EmptyState icon="entity.finding" title={`No findings on v${String(shownN)}`}>
           Code checks found nothing to flag
-          {item.llm_check_status === 'succeeded' ? ' and the AI check had no suggestions' : ''}. Review the
-          copy and decide.
+          {item.llm_check_status === 'succeeded' ? ' and the AI check had no suggestions' : ''}.
+          {props.isDecider ? ' Review the copy and decide.' : ''}
         </EmptyState>
       ) : (
         <div className="app-findings">

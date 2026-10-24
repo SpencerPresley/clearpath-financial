@@ -1,7 +1,10 @@
-import { Link } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
+import { useGetItemDrift } from '../../api/generated/drift/drift';
+import { getListItemsQueryKey, listItems } from '../../api/generated/items/items';
 import type { CheckPreviewIn, FindingOut, ItemDetailOut } from '../../api/generated/model';
 import { ApiError } from '../../api/mutator';
 import { Button } from '../../ui/Button';
@@ -10,12 +13,15 @@ import { EmptyState } from '../../ui/EmptyState';
 import { flattenGroups, groupFindings } from '../../ui/findings/groupFindings';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { useViewer } from '../../ui/layout/Viewer';
+import { nextInQueue, readQueueTrail, rememberQueueTrail } from '../../ui/queueTrail';
 import { SkeletonBadge, SkeletonText } from '../../ui/Skeleton';
 import { showToast } from '../../ui/toast';
 import { useHotkeys } from '../../ui/useHotkeys';
 import { CopyPane } from './CopyPane';
-import { DecisionBar } from './DecisionBar';
+import type { LiveDiff } from './CopyPane';
+import { DecisionBar, NEXT_ITEM_ID, REVIEW_TITLE_ID } from './DecisionBar';
 import { DecisionPanel } from './DecisionPanel';
+import { rereviewActions } from './decisionModes';
 import type { DecisionMode } from './decisionModes';
 import { findingCardId } from './FindingCard';
 import { FindingsPanel } from './FindingsPanel';
@@ -72,9 +78,15 @@ function scrollToFinding(id: number) {
   }
 }
 
+/** How many rows of the reviewer's view "Next item" reads to find its place (the queue pages by 50). */
+const NEXT_ITEM_WINDOW = 200;
+
 export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) {
   const viewer = useViewer();
   const isDecider = viewer.roles.some((role) => role === 'reviewer' || role === 'lead');
+  const isMarketer = !isDecider && viewer.roles.includes('marketer');
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const data = useReviewData(itemId, search.v);
   const [shownLinks] = useState(() => new Set<number>()); // ?comment= links already brought into view here
   const item = data.item.data;
@@ -86,6 +98,9 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
   const [editText, setEditText] = useState('');
   const [showEditDiff, setShowEditDiff] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [nextPending, setNextPending] = useState(false);
+  /** The status a decision was recorded from: once the refetched item has moved on, focus goes to Next item. */
+  const [decidedFrom, setDecidedFrom] = useState<ItemDetailOut['status'] | null>(null);
 
   const tab: ReviewTab = search.tab ?? 'findings';
   const findings: FindingOut[] = useMemo(() => data.findings.data ?? [], [data.findings.data]);
@@ -119,6 +134,63 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
         }
       : null;
   const live = useLiveChecks(liveInput);
+
+  // A drift re-review: the partner page's text against the approved version, readable in the center (the side
+  // panel keeps the check's metadata).
+  const driftRereview = item?.status === 'needs_rereview' && item.reopen_reason === 'drift_detected';
+  const drift = useGetItemDrift(itemId, { query: { enabled: driftRereview } });
+  const driftPlacements = drift.data?.placements ?? [];
+  const livePlacement =
+    driftPlacements.find((p) => p.placement_id === item?.drift_rereview?.placement_id) ??
+    driftPlacements.find((p) => p.latest?.result === 'modified');
+  const liveCheck = livePlacement?.latest;
+  const liveDiff: LiveDiff | undefined =
+    driftRereview && livePlacement !== undefined && liveCheck?.result === 'modified'
+      ? {
+          approvedN: liveCheck.compared_version_n,
+          location: livePlacement.location,
+          checkedAt: liveCheck.finished_at ?? liveCheck.requested_at,
+          segments: liveCheck.diff,
+        }
+      : undefined;
+
+  // After a decision the bar trades its buttons for Next item: put focus there once the item has reloaded, so
+  // the keyboard loop goes on instead of dropping to <body>.
+  const status = item?.status;
+  useEffect(() => {
+    if (decidedFrom === null || status === undefined || status === decidedFrom) return;
+    setDecidedFrom(null);
+    const target = document.getElementById(NEXT_ITEM_ID) ?? document.getElementById(REVIEW_TITLE_ID);
+    target?.focus();
+  }, [decidedFrom, status]);
+
+  /** The next row of the view the reviewer came from (ui/queueTrail.ts), or back to that view when it's done. */
+  const openNext = async () => {
+    if (nextPending) return;
+    const trail = readQueueTrail();
+    const params = { ...trail.params, cursor: undefined, limit: NEXT_ITEM_WINDOW };
+    setNextPending(true);
+    try {
+      const page = await queryClient.fetchQuery({
+        queryKey: getListItemsQueryKey(params),
+        queryFn: ({ signal }) => listItems(params, { signal }),
+        staleTime: 0,
+      });
+      const fresh = page.rows.map((row) => row.id);
+      const next = nextInQueue(itemId, fresh, trail.ids);
+      rememberQueueTrail({ ...trail, ids: fresh });
+      if (next === null) {
+        showToast({ title: 'Nothing else in this view', description: 'Back to the queue.' });
+        void navigate({ href: trail.href });
+      } else {
+        void navigate({ to: '/items/$itemId', params: { itemId: String(next) } });
+      }
+    } catch (error) {
+      showToast({ title: 'Couldn’t open the next item', description: apiErrorMessage(error), tone: 'error' });
+    } finally {
+      setNextPending(false);
+    }
+  };
 
   useEffect(() => {
     if (activeId !== null && focusRequest > 0) {
@@ -159,8 +231,25 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
     setMode((current) => (current === next ? null : next));
   };
 
+  const rereview = item !== undefined && isDecider ? rereviewActions(item) : [];
+  const deciding = isDecider && gate.canDecide;
+  // Decision shortcuts open the form with its reason field focused; they never record anything themselves.
   useHotkeys(
     {
+      A: (event) => {
+        if (!event.shiftKey) return;
+        if (deciding && gate.approve.enabled && mode !== 'approved') openMode('approved');
+        else if (!deciding && rereview.includes('fast_track') && mode !== 'fast_track') openMode('fast_track');
+      },
+      R: (event) => {
+        if (event.shiftKey && deciding && mode !== 'changes_requested') openMode('changes_requested');
+      },
+      X: (event) => {
+        if (event.shiftKey && deciding && mode !== 'rejected') openMode('rejected');
+      },
+      j: () => {
+        if (isDecider && mode === null) void openNext();
+      },
       n: () => {
         step(1);
       },
@@ -246,6 +335,10 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
           onCheckQueued={() => {
             onSearchChange({ tab: 'details' });
           }}
+          onNextItem={() => {
+            void openNext();
+          }}
+          nextPending={nextPending}
         />
         {mode !== null && (
           <DecisionPanel
@@ -260,8 +353,9 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
               setMode(null);
             }}
             onDone={() => {
+              setDecidedFrom(item.status);
               setMode(null);
-              onSearchChange({ v: undefined, compare: undefined });
+              onSearchChange({ v: undefined, compare: undefined, live: undefined });
             }}
             onNeedsTriage={(message) => {
               setMode(null);
@@ -297,11 +391,16 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
             attachments={data.attachments.data ?? []}
             onActivate={activate}
             onVersionChange={(n) => {
-              onSearchChange({ v: n === data.currentN ? undefined : n, compare: undefined });
+              onSearchChange({ v: n === data.currentN ? undefined : n, compare: undefined, live: undefined });
               setActiveId(null);
             }}
             onCompareChange={(n) => {
-              onSearchChange({ compare: n });
+              onSearchChange({ compare: n, live: undefined });
+            }}
+            liveDiff={liveDiff}
+            showLive={search.live === true}
+            onShowLiveChange={(show) => {
+              onSearchChange({ live: show ? true : undefined, compare: undefined, v: undefined });
             }}
             edit={
               editing
@@ -357,6 +456,8 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
               shownN={shownN}
               viewingCurrent={data.viewingCurrent}
               canTriage={canTriage}
+              isDecider={isDecider}
+              isMarketer={isMarketer}
               activeId={activeId}
               dismissingId={dismissingId}
               pendingId={triage.pendingId}
@@ -395,7 +496,16 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
             />
           </TabPanel>
           <TabPanel id="details" className="app-tab-panel">
-            <DetailsTab item={item} />
+            <DetailsTab
+              item={item}
+              onShowLiveDiff={
+                liveDiff === undefined
+                  ? undefined
+                  : () => {
+                      onSearchChange({ live: true, compare: undefined, v: undefined });
+                    }
+              }
+            />
           </TabPanel>
           <TabPanel id="evidence" className="app-tab-panel">
             <EvidenceTab

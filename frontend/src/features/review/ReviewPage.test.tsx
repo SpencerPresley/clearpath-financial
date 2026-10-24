@@ -13,12 +13,18 @@ import type {
   FastTrackIn,
   FindingOut,
   ItemDetailOut,
+  ItemDriftOut,
+  VersionSummaryOut,
 } from '../../api/generated/model';
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
 import {
   COMMENTS,
   DECISION_APPROVED,
+  DECISION_CHANGES,
+  HISTORY,
+  MARKETER,
+  itemRowFixture,
   FINDINGS_OPEN,
   dismissedAll,
   FINDING_CREDIT,
@@ -305,15 +311,16 @@ describe('ReviewPage', () => {
       item: itemFixture({
         llm_check_status: 'failed',
         llm_check_failure_code: 'provider_unavailable',
-        llm_check_failure_reason:
-          "The AI service didn't answer after 4 tries. Couldn't reach the model provider.",
+        llm_check_failure_reason: "The AI service didn't answer after 4 tries. The model provider returned 529.",
       }),
       findings: dismissedAll(FINDINGS_OPEN),
     });
     const status = (await screen.findByText(/AI check failed:/)).closest('.app-llm-status');
+    // Plain words from the failure code; the provider's status code means nothing to a reviewer.
     expect(status).toHaveTextContent(
-      "AI check failed: The AI service didn't answer after 4 tries. Couldn't reach the model provider.",
+      'AI check failed: The AI service was overloaded and didn’t answer after several tries.',
     );
+    expect(status).not.toHaveTextContent('529');
     expect(within(status as HTMLElement).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
@@ -531,6 +538,7 @@ describe('ReviewPage', () => {
     expect(screen.queryByRole('button', { name: /Reaffirm/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Fast-track approve v2' }));
+    await userEvent.clear(screen.getByLabelText(/^Reason/));
     await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');
     await userEvent.click(nthButton('Fast-track approve', -1));
     await waitFor(() => {
@@ -573,6 +581,7 @@ describe('ReviewPage', () => {
       }),
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Fast-track approve v2' }));
+    await userEvent.clear(screen.getByLabelText(/^Reason/));
     await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');
     await userEvent.click(nthButton('Fast-track approve', -1));
     expect(
@@ -731,5 +740,312 @@ describe('ReviewPage', () => {
   it('says when the item does not exist', async () => {
     renderReview({ path: '/items/9', notFound: true });
     expect(await screen.findByText('CP-9 not found')).toBeInTheDocument();
+  });
+});
+
+function summary(n: number, overrides: Partial<VersionSummaryOut> = {}): VersionSummaryOut {
+  return {
+    id: 500 + n,
+    n,
+    origin: 'submission',
+    author: MARKETER,
+    created_at: '2026-10-20T14:00:00Z',
+    based_on_n: n === 1 ? null : n - 1,
+    ...overrides,
+  };
+}
+
+describe('ReviewPage after the walkthrough', () => {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('names the version the AI actually read after a fast-track approval (B4)', async () => {
+    renderReview({
+      item: itemFixture({
+        status: 'approved',
+        llm_check_status: 'skipped',
+        current_version_n: 4,
+        current_version: versionFixture(2, { id: 504, n: 4, origin: 'fast_track', based_on_n: 3 }),
+        versions: [summary(1), summary(2), summary(3), summary(4, { origin: 'fast_track' })],
+        latest_decision: { ...DECISION_APPROVED, version_n: 4, lane: 'fast_track', ai_review_carried_from_n: 3 },
+      }),
+      findings: [],
+    });
+    expect(await screen.findByText('AI review carried from v3')).toBeInTheDocument();
+    expect(screen.queryByText('AI review carried from v4')).not.toBeInTheDocument();
+  });
+
+  it('says the AI check was skipped when nothing was carried', async () => {
+    renderReview({ item: itemFixture({ llm_check_status: 'skipped' }), findings: [] });
+    const line = await screen.findByText('AI check skipped for this version');
+    expect(line.closest('.app-llm-status')).not.toHaveTextContent('offer-terms');
+  });
+
+  it('shows the decision record in Details, with the override reason and evidence hash (S3)', async () => {
+    renderReview({
+      path: '/items/1042?tab=details',
+      item: itemFixture({
+        status: 'approved',
+        latest_decision: { ...DECISION_APPROVED, llm_override_reason: 'Provider outage; read by hand' },
+      }),
+      findings: [],
+    });
+    const section = (await screen.findByRole('heading', { name: 'Decision record' })).closest('section');
+    const record = within(section as HTMLElement);
+    expect(record.getByText('Approved v2')).toBeInTheDocument();
+    expect(record.getByText('Overridden: Provider outage; read by hand')).toBeInTheDocument();
+    expect(record.getByText('Personal loan v12')).toBeInTheDocument();
+    expect(record.getByText('sha256 4f9c2a1be07d…')).toBeInTheDocument();
+  });
+
+  it('expands a decision in History into the same record (S3)', async () => {
+    renderReview({ path: '/items/1042?tab=history', decisions: [DECISION_CHANGES] });
+    const toggle = await screen.findByText('Decision record');
+    await userEvent.click(toggle);
+    const details = toggle.closest('details');
+    expect(details).toHaveAttribute('open');
+    expect(within(details as HTMLElement).getByText('Changes requested on v1')).toBeInTheDocument();
+  });
+
+  it('writes History in words: findings by their message, never rule ids (S9)', async () => {
+    renderReview({
+      path: '/items/1042?tab=history',
+      history: {
+        entries: [
+          ...HISTORY.entries,
+          {
+            id: 9,
+            type: 'finding.dismissed',
+            actor: REVIEWER,
+            at: '2026-10-24T12:00:00Z',
+            entity: 'finding',
+            entity_id: 9001,
+            from_status: null,
+            to_status: null,
+            payload: {
+              finding_id: 9001,
+              rule_id: 'pricing.as_low_as_range',
+              reason: 'Range is in the footer',
+              version_id: 502,
+            },
+          },
+        ],
+      },
+    });
+    expect(
+      await screen.findByText('Dismissed “Rate claim needs the full APR range” on v2: Range is in the footer'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/pricing\.as_low_as_range/)).not.toBeInTheDocument();
+  });
+
+  it('lists the offer terms quoted once per field, in the Offer terms screen’s words (S9)', async () => {
+    const base = versionFixture(2);
+    const ref = base.terms_refs[0];
+    if (ref === undefined) throw new Error('fixture has a terms ref');
+    renderReview({
+      path: '/items/1042?tab=details',
+      item: itemFixture({
+        risk_tier: 'high',
+        current_version: {
+          ...base,
+          terms_refs: [
+            ref,
+            { ...ref, span: { start: 0, end: 1 } },
+            { ...ref, field: 'term_months', quote: '24', quoted_value: '24' },
+            { ...ref, field: 'term_months', quote: '60', quoted_value: '60' },
+          ],
+        },
+      }),
+    });
+    expect(await screen.findByText('APR min: 5.99%')).toBeInTheDocument();
+    expect(screen.getAllByText('APR min: 5.99%')).toHaveLength(1);
+    expect(screen.getByText('Loan terms (months): 24, 60')).toBeInTheDocument();
+    expect(screen.getByText('High (derived at intake)')).toBeInTheDocument();
+  });
+
+  it('tells a marketer the AI check state in neutral words, with nothing to act on (S6)', async () => {
+    renderReview({
+      roles: ['marketer'],
+      item: itemFixture({
+        llm_check_status: 'failed',
+        llm_check_failure_code: 'not_configured',
+        llm_check_failure_reason: "The AI check didn't run: no Anthropic API key is configured here.",
+      }),
+    });
+    const line = await screen.findByText('AI pre-review didn’t run; your reviewer will check this by hand.');
+    const status = line.closest('.app-llm-status');
+    expect(status).toHaveAttribute('data-state', 'neutral');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(screen.queryByText(/override reason/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('tells a marketer a queued AI check goes to their reviewer, not that approving waits (S6)', async () => {
+    renderReview({ roles: ['marketer'], item: itemFixture({ llm_check_status: 'pending' }) });
+    expect(await screen.findByText(/AI pre-review queued\./)).toBeInTheDocument();
+    expect(screen.getByText(/Its suggestions go to your reviewer\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Approving waits/)).not.toBeInTheDocument();
+  });
+
+  it('shows the last round’s decision as history once the item has moved on (S17)', async () => {
+    renderReview({
+      roles: ['marketer'],
+      item: itemFixture({ status: 'submitted', round: 2, latest_decision: DECISION_CHANGES }),
+    });
+    expect(await screen.findByText(/Last round: changes requested on v1 by Dana Reyes/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Changes requested v1/)).not.toBeInTheDocument();
+  });
+
+  it('opens the decision forms from the keyboard without recording anything (S8)', async () => {
+    const { posted } = renderReview({ findings: dismissedAll(FINDINGS_OPEN) });
+    await screen.findByRole('heading', { name: /Fall personal loan/ });
+    await waitFor(() => {
+      expect(approveButton()).toBeEnabled();
+    });
+
+    await userEvent.keyboard('{Shift>}A{/Shift}');
+    expect(await screen.findByRole('heading', { name: 'Approve v2' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Reason/)).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.keyboard('{Shift>}R{/Shift}');
+    expect(await screen.findByRole('heading', { name: 'Request changes on v2' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.keyboard('{Shift>}X{/Shift}');
+    expect(await screen.findByRole('heading', { name: 'Reject v2' })).toBeInTheDocument();
+    expect(posted).toEqual([]);
+  });
+
+  it('after a decision, focuses Next item, which opens the next row of the reviewer’s view (S8)', async () => {
+    sessionStorage.setItem(
+      'clearpath.queueTrail',
+      JSON.stringify({ params: { mine: true, sort: 'queue' }, ids: [1041, 1042, 1043], href: '/queue?view=mine' }),
+    );
+    const shown = itemFixture();
+    let decided = false;
+    const listed: string[] = [];
+    const { router } = renderReview({ item: shown, findings: dismissedAll(FINDINGS_OPEN) });
+    server.use(
+      http.get('*/api/items/:id', () =>
+        HttpResponse.json(decided ? { ...shown, status: 'approved', latest_decision: DECISION_APPROVED } : shown),
+      ),
+      http.post('*/api/items/:id/decisions', () => {
+        decided = true;
+        return HttpResponse.json(DECISION_APPROVED, { status: 201 });
+      }),
+      http.get('*/api/items', ({ request }) => {
+        listed.push(new URL(request.url).search);
+        // CP-1042 left My queue once approved; CP-1043 came after it.
+        return HttpResponse.json({
+          rows: [itemRowFixture({ id: 1041, key: 'CP-1041' }), itemRowFixture({ id: 1043, key: 'CP-1043' })],
+          next_cursor: null,
+          total: 2,
+        });
+      }),
+    );
+    await waitFor(() => {
+      expect(approveButton()).toBeEnabled();
+    });
+    await userEvent.click(approveButton());
+    await userEvent.type(screen.getByLabelText(/^Reason/), 'Range and license line present.');
+    await userEvent.click(nthButton('Approve', 1));
+
+    const next = await screen.findByRole('button', { name: 'Next item' });
+    await waitFor(() => {
+      expect(next).toHaveFocus();
+    });
+    await userEvent.keyboard('j');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/items/1043');
+    });
+    expect(listed[0]).toContain('mine=true');
+  });
+
+  it('reads a drift re-review’s live page against the approved version in the center (S14)', async () => {
+    const drift: ItemDriftOut = {
+      item_id: 1042,
+      placements: [
+        {
+          placement_id: 3,
+          location: 'LendCompare: best personal loans',
+          url: 'https://lendcompare.example/best-loans',
+          monitored: true,
+          is_live: true,
+          failure_streak: 0,
+          demo_page: null,
+          latest: {
+            id: 7,
+            placement_id: 3,
+            status: 'succeeded',
+            trigger: 'scheduled',
+            requested_by: null,
+            requested_at: '2026-10-22T07:00:00Z',
+            finished_at: '2026-10-22T07:00:05Z',
+            url: 'https://lendcompare.example/best-loans',
+            final_url: 'https://lendcompare.example/best-loans',
+            http_status: 200,
+            title: 'Best loans',
+            compared_version_n: 2,
+            result: 'modified',
+            score: 88,
+            diff: [
+              { op: 'equal', text: 'Rates from ' },
+              { op: 'delete', text: '9.99%' },
+              { op: 'insert', text: '7.99%' },
+              { op: 'equal', text: ' APR. ' },
+              { op: 'insert', text: 'Guaranteed approval for most applicants.' },
+            ],
+            findings: [],
+            new_blocking_count: 0,
+            error_code: null,
+            error_message: null,
+            reopened_item: true,
+          },
+        },
+      ],
+    };
+    const { router } = renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'drift_detected',
+        latest_decision: DECISION_APPROVED,
+        approved_at: '2026-10-01T10:00:00Z',
+        drift_rereview: { placement_id: 3, restored: false },
+      }),
+      findings: [],
+    });
+    server.use(http.get('*/api/items/:id/drift', () => HttpResponse.json(drift)));
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Live page vs approved v2' }));
+    expect(
+      await screen.findByText(/Live page vs approved v2 · LendCompare: best personal loans/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Guaranteed approval for most applicants.').closest('ins')).not.toBeNull();
+    expect(router.state.location.search).toMatchObject({ live: true });
+
+    // The side panel keeps the check's metadata and points back to the center.
+    await userEvent.click(screen.getByRole('radio', { name: 'Copy' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Show live page vs approved v2' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ live: true });
+    });
+  });
+
+  it('prefills the fast-track reason so the step is one click (nit 4)', async () => {
+    renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'terms_changed',
+        llm_check_status: 'skipped',
+        latest_decision: { ...DECISION_APPROVED, version_n: 1 },
+        current_version: versionFixture(2, { origin: 'fast_track' }),
+      }),
+      findings: [],
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Fast-track approve v2' }));
+    expect(screen.getByLabelText(/^Reason/)).toHaveValue('Only the offer-terms numbers changed.');
   });
 });

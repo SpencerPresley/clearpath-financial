@@ -13,7 +13,10 @@ function ReviewRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
+    // Keyed by item: Next item (j) and quick-jump move between items without carrying one item's selection,
+    // open form or draft into the next.
     <ReviewPage
+      key={itemId}
       itemId={Number(itemId)}
       search={search}
       onSearchChange={(next) => {

@@ -4,6 +4,7 @@ import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 import { useGetVersionDiff } from '../../api/generated/items/items';
 import type {
   AttachmentOut,
+  DiffSegmentOut,
   FindingDraftOut,
   FindingOut,
   ItemDetailOut,
@@ -20,6 +21,7 @@ import { SelectField } from '../../ui/forms/fields';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
 import { ORIGIN_LABELS, plural } from '../../ui/labels';
+import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
 import { findingMessageId } from './FindingCard';
 
@@ -32,6 +34,14 @@ export interface EditState {
   checking: boolean;
   showDiff: boolean;
   onShowDiffChange: (show: boolean) => void;
+}
+
+/** A drift re-review's latest check: the approved version against what the partner page shows now. */
+export interface LiveDiff {
+  approvedN: number | null;
+  location: string;
+  checkedAt: string;
+  segments: readonly DiffSegmentOut[];
 }
 
 export interface CopyPaneProps {
@@ -48,6 +58,10 @@ export interface CopyPaneProps {
   onCompareChange: (n: number | undefined) => void;
   /** Present while the reviewer is writing their edited version (Approve with edits). */
   edit?: EditState;
+  /** Present while the item is a drift re-review whose page changed: offers "Live page vs approved vN". */
+  liveDiff?: LiveDiff;
+  showLive?: boolean;
+  onShowLiveChange?: (show: boolean) => void;
 }
 
 function CopySkeleton() {
@@ -92,6 +106,22 @@ function CompareView({ itemId, fromN, toN }: { itemId: number; fromN: number; to
   );
 }
 
+const liveLabel = (diff: LiveDiff) =>
+  diff.approvedN === null ? 'Live page vs approved copy' : `Live page vs approved v${String(diff.approvedN)}`;
+
+function LiveDiffView({ diff }: { diff: LiveDiff }) {
+  const changes = countChanges(diff.segments);
+  return (
+    <div className="app-copy-sheet">
+      <p className="app-copy-caption">
+        {liveLabel(diff)} · {diff.location} · checked <RelativeAge at={diff.checkedAt} />:{' '}
+        {changes === 0 ? 'no changes' : plural(changes, 'change')}
+      </p>
+      <DiffText segments={diff.segments} />
+    </div>
+  );
+}
+
 function Mockup({ attachments }: { attachments: readonly AttachmentOut[] }) {
   const image = attachments.find((a) => a.kind === 'creative' && a.content_type.startsWith('image/'));
   if (image === undefined) {
@@ -124,7 +154,11 @@ export function CopyPane({
   onVersionChange,
   onCompareChange,
   edit,
+  liveDiff,
+  showLive = false,
+  onShowLiveChange,
 }: CopyPaneProps) {
+  const live = showLive && liveDiff !== undefined && edit === undefined;
   const text = version?.content_text ?? '';
   const marks = useMemo(() => marksFromFindings(text, findings), [text, findings]);
   const versionOptions = [...item.versions]
@@ -209,6 +243,8 @@ export function CopyPane({
         )}
       </div>
     );
+  } else if (live) {
+    body = <LiveDiffView diff={liveDiff} />;
   } else if (versionLoading || version === undefined) {
     body = <CopySkeleton />;
   } else if (compareN !== undefined) {
@@ -236,6 +272,25 @@ export function CopyPane({
     <section className="app-review-center" aria-label="Copy">
       {edit === undefined && (
         <div className="app-copy-toolbar">
+          {liveDiff !== undefined && onShowLiveChange !== undefined && (
+            <ToggleButtonGroup
+              aria-label="Show"
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={[live ? 'live' : 'copy']}
+              onSelectionChange={(keys) => {
+                onShowLiveChange([...keys][0] === 'live');
+              }}
+              className="app-segmented"
+            >
+              <ToggleButton id="copy" className="app-segment">
+                Copy
+              </ToggleButton>
+              <ToggleButton id="live" className="app-segment">
+                {liveLabel(liveDiff)}
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
           <SelectField
             label="Version"
             hideLabel
@@ -260,7 +315,7 @@ export function CopyPane({
               options={compareOptions}
             />
           )}
-          {compareN === undefined && marks.length > 0 && (
+          {compareN === undefined && !live && marks.length > 0 && (
             <span className="app-copy-legend" aria-hidden="true">
               <span className="app-mark" data-severity="blocking" data-source="code">
                 Blocking
