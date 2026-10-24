@@ -21,8 +21,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 merged `9f4d228` | done; logins + guided paths in docs/demo.md |
 | Walkthrough review 1 | fresh reviewer | PR #45 merged | done: 4 blockers, 18 should-fix, 17 nits; no permission leaks | docs/plan/reviews/walkthrough-1.md |
-| Fixes: correctness | agent (worktree) | PR #50 | final: S20 relink, Board/drawer age | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
-| Fixes: review screen | agent (worktree `fix/walkthrough-review-screen`) | — | in progress | B3, B4, S3 decision record, S5 drift naming, S6, S8 keyboard loop, S9, S11 Apply, S14, S17, nits |
+| Fixes: correctness | agent (worktree) | PR #50 | final: S20 relink, Board/drawer age, explicit fix_kind/replacement_text for Apply, fast_track_eligible flag | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
+| Fixes: review screen | agent (worktree) | PR #51 merged | done | B3, B4, S3 decision record, S5 drift naming, S6, S8 keyboard loop, S9, S11 Apply, S14, S17, nits |
 | Fixes: shell/global | agent (worktree `fix/walkthrough-shell`) | — | in progress | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
 | Fixes: import + users | agent (worktree `fix/walkthrough-import-users`) | — | in progress | S15 import demo, S16 users screen + availability + workload |
 | Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
@@ -148,6 +148,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- Polish queue (from #51's UI review, outside its scope): destructive actions (Reject, Pull) must be red per §5.2; one name for "AI check" vs "AI review"; Pull/Pulled/Withdrawn naming; decision forms pushing the page down; red AI-failure card for reviewers and navy progress bar; word-diff insertions underlined like code-check marks. Also watch audit/tests/test_outbox.py::test_cursor_does_not_skip_late_committing_event (flaky locally on shared Postgres; passes in CI so far).
 
 - Order after L + drift follow-ups merge: (1) deploy-prep agent (prod settings: required ANTHROPIC key, CONN_MAX_AGE/pool under ASGI, S3 storage for DOCUMENTS_BUCKET, FRONTEND_BASE_URL, CloudFront-Viewer-Address client IP, seed on start) then terraform apply + deploy; (2) full walkthrough per role on the hosted app (fresh UI reviewer); (3) N docs with screenshots from the hosted app.
 
