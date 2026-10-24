@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import anthropic
 import httpx2
+from langchain_core.messages import AIMessage
 
 from checks.engine import run_code_checks
 from checks.llm.eval.__main__ import demo_terms, main
@@ -89,6 +90,18 @@ def test_runner_with_scripted_model_renders_report():
     assert "clean cases with any LLM finding: 1/1" in text
     assert "cost: $" in text
     assert "overall: precision   50%, recall  100%" in text
+
+
+def test_invalid_outputs_are_not_scored():
+    clean = next(c for c in CASES if c.name == "pl_display_clean")
+    positive = next(c for c in CASES if c.name == "pl_paid_social_free_money")
+    prose = AIMessage(content="Looks fine.", response_metadata={"stop_reason": "end_turn"})
+    runs = run_eval([clean, positive], model=fake(prose, prose), terms=demo_terms)
+    text = render(runs)
+    assert "scored: 0" in text
+    assert "invalid outputs (not scored): 2" in text
+    assert "clean cases with any LLM finding: 0/0" in text  # not booked as a true negative
+    assert "llm.net_impression                   0   0   0" in text  # not booked as a miss
 
 
 def test_runner_records_provider_errors_and_continues():

@@ -84,8 +84,11 @@ def render(runs: Sequence[CaseRun]) -> str:
             f"{len(r.dropped):4} {r.latency_ms:5} {'yes' if r.output_valid else 'NO'}"
         )
 
-    completed = [run for run in runs if run.result is not None]
-    results = [run.result for run in completed if run.result is not None]
+    results = [run.result for run in runs if run.result is not None]
+    # Only valid outputs are scored. An invalid one (prose, truncated) has no findings, and counting it would book a
+    # clean case as a true negative and a positive case as a miss; it's reported on its own line instead.
+    completed = [run for run in runs if run.result is not None and run.result.output_valid]
+    invalid = [run.case.name for run in runs if run.result is not None and not run.result.output_valid]
     scores = score(((run.case.expected, run.predicted) for run in completed), (r.spec.id for r in LLM_RULES))
     lines += ["", f"{'rule':34} {'tp':>3} {'fp':>3} {'fn':>3} precision recall"]
     for rule_id, s in scores.items():
@@ -101,8 +104,8 @@ def render(runs: Sequence[CaseRun]) -> str:
     lines += [
         "",
         (
-            f"runs: {len(runs)}  provider errors: {len(runs) - len(completed)}  "
-            f"invalid outputs: {sum(not r.output_valid for r in results)}"
+            f"runs: {len(runs)}  scored: {len(completed)}  provider errors: {len(runs) - len(results)}  "
+            f"invalid outputs (not scored): {len(invalid)} {invalid or ''}"
         ),
         f"clean cases with any LLM finding: {len(clean_with_findings)}/{len(clean)} {clean_with_findings or ''}",
         f"dropped: {dict(sorted(drops.items())) or 'none'}",
@@ -111,7 +114,7 @@ def render(runs: Sequence[CaseRun]) -> str:
             f"tokens: input {usage.input_tokens} (cache read {usage.cache_read_tokens}, cache write "
             f"{usage.cache_creation_tokens}), output {usage.output_tokens}"
         ),
-        f"cost: ${cost:.4f} total, ${cost / max(len(results), 1):.5f} per review (Haiku 5.5 rates)",
+        f"cost: ${cost:.4f} total, ${cost / max(len(results), 1):.5f} per review (Haiku 5.5 rates for any model)",
     ]
     if latencies:
         lines.append(f"latency: median {statistics.median(latencies):.0f} ms, max {max(latencies)} ms")

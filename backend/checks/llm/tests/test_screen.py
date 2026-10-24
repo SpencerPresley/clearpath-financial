@@ -1,3 +1,5 @@
+import pytest
+
 from checks.engine import FindingDraft, Span, run_code_checks
 from checks.engine.tests.conftest import make_ctx
 from checks.llm.rules import LLM_RULES_BY_ID, applicable_rules
@@ -197,3 +199,49 @@ def test_mortgage_rule_kept_on_mortgage_item():
     ctx = make_ctx(text, product=Product.MORTGAGE_PREQUAL, terms=None)
     (kept,) = _screen(text, finding(text, "llm.mortgage_comparison", "save $300 a month"), ctx=ctx).findings
     assert kept.rule_id == "llm.mortgage_comparison"
+
+
+NB_HYPHEN = chr(0x2011)
+EN_DASH = chr(0x2013)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Non-compliance risk here.",
+        "This looks like noncompliance.",
+        "Not compliant with Reg Z.",
+        f"Non{NB_HYPHEN}compliant rate claim.",
+        f"Non{EN_DASH}compliant rate claim.",
+        "This violates UDAAP.",
+        "Unlawful claim.",
+    ],
+)
+def test_banned_wording_variants_are_reworded(message):
+    (kept,) = _screen(TEXT, finding(TEXT, "llm.net_impression", "no hidden fees", message=message)).findings
+    assert kept.message == LLM_RULES_BY_ID["llm.net_impression"].default_message
+
+
+def test_compliance_word_alone_is_not_banned():
+    message = "Compliance may want the fee range stated next to this claim."
+    (kept,) = _screen(TEXT, finding(TEXT, "llm.net_impression", "no hidden fees", message=message)).findings
+    assert kept.message == message
+
+
+def test_banned_wording_in_suggested_fix_removes_the_fix():
+    item = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix="Remove this illegal claim.")
+    result = _screen(TEXT, item)
+    (kept,) = result.findings
+    assert kept.suggested_fix is None
+    assert [(a.kind, a.detail) for a in result.adjustments] == [("fix_removed", "Remove this illegal claim.")]
+
+
+def test_overlapping_same_rule_finding_is_a_duplicate():
+    text = "Get free money in minutes with ClearPath!"
+    result = _screen(
+        text,
+        finding(text, "llm.net_impression", "free money in minutes"),
+        finding(text, "llm.net_impression", "free money"),
+    )
+    assert [f.quote for f in result.findings] == ["free money in minutes"]
+    assert [d.reason for d in result.dropped] == [DropReason.DUPLICATE]

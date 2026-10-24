@@ -77,12 +77,13 @@ CREDITWORTHINESS = LlmRule(
         effective_from=REGZ_1026_16,
     ),
     guidance=(
-        'Flag a lowest-rate claim ("as low as", "starting at", "rates from", "low rates") when the copy does not '
-        "tell the reader, in substance, that the rate depends on credit and that the lowest rate goes only to the "
-        'most creditworthy applicants. Wording that does the job: "rates depend on your creditworthiness", "the '
-        'lowest rates are for applicants with excellent credit". Wording that does not: "rates may vary", '
-        '"terms apply", "subject to change", or a qualifier that is attached to a different claim. Quote the '
-        "lowest-rate claim. Do not flag a plain rate range with no lowest-rate emphasis."
+        'Flag a claim that emphasizes the lowest rate ("as low as 7.49%", "starting at 7.49%", "rates from 7.49%" '
+        "with no upper end) when the copy does not tell the reader, in substance, that the rate they get depends on "
+        'their credit. Wording that does the job: "based on your credit", "rates depend on your creditworthiness", '
+        '"the lowest rates are for applicants with excellent credit". Wording that does not: "rates may vary", '
+        '"terms apply", "subject to change", or a qualifier the copy itself contradicts ("excellent credit not '
+        'required"). A full range ("APRs from 7.49% to 35.99%") is a range, not a lowest-rate claim; do not flag '
+        "it under this rule. Quote the lowest-rate claim."
     ),
     default_message="This lowest-rate claim may need to say that rates depend on creditworthiness.",
     code_counterparts=frozenset({"pricing.creditworthiness_qualifier"}),
@@ -91,20 +92,21 @@ CREDITWORTHINESS = LlmRule(
 CREDIT_INQUIRY_SCOPE = LlmRule(
     spec=_spec(
         "llm.credit_inquiry_scope",
-        title="Soft-pull claims stay on the soft-pull step",
+        title="Credit-check claims match the actual inquiry",
         citation="CFPB Supervisory Highlights Issue 24 §2.8.2; 12 U.S.C. 5536",
         url=URL_SH24,
         effective_from=UNVERSIONED,
     ),
     guidance=(
         "Checking a rate uses a soft inquiry that does not affect credit scores; applying for or accepting the "
-        'credit involves a hard inquiry that can. Flag a credit-impact claim ("won\'t affect your credit", "no '
-        'credit check", "zero impact on your score", or any paraphrase) that is worded to cover applying, '
-        'approval or the whole process: "Apply with no impact to your credit", "Get approved without a credit '
-        'check". Do not flag a claim explicitly limited to checking a rate or prequalifying ("Checking your rate '
-        "won't affect your credit score\"). Quote the claim."
+        "credit involves a hard inquiry that can. Flag two kinds of claim. First, a claim that there is no credit "
+        'check at all ("no credit check", "without checking your credit"), even one limited to seeing a rate: a '
+        'soft inquiry is still a credit check. Second, a score-impact claim ("won\'t affect your credit score", '
+        '"zero impact on your score", or any paraphrase) worded to cover applying, approval or the whole process: '
+        '"Apply with no impact to your credit". Do not flag a score-impact claim explicitly limited to checking a '
+        'rate or prequalifying ("Checking your rate won\'t affect your credit score"). Quote the claim.'
     ),
-    default_message="This credit-impact claim may reach past the soft-pull step; limit it to checking a rate.",
+    default_message="This credit-check claim may not match the inquiry made; limit it to checking a rate.",
     code_counterparts=frozenset({"claims.credit_impact"}),
 )
 
@@ -117,14 +119,13 @@ MATERIAL_CONNECTION = LlmRule(
         effective_from=FTC_255_5,
     ),
     guidance=(
-        "This content is published by a partner (affiliate, lead generator, marketplace or influencer) that is "
-        "paid by ClearPath. Flag when that paid relationship is not disclosed clearly and before or beside the "
-        'endorsement: a vague disclosure ("we work with partners", "#sp", "#collab", "thanks ClearPath"), one '
-        'placed only after the endorsement or behind a link, or a claim that contradicts it ("unbiased", '
-        '"independent review", "not sponsored"). Influencer posts need wording like "#ad" or "Paid partnership '
-        'with ClearPath" near the start. Do not flag a clear disclosure placed before or beside the endorsement. '
-        "Quote the inadequate disclosure or the contradicting claim; if there is no disclosure at all, quote the "
-        "main endorsing claim."
+        "Applies only to content published by a partner that ClearPath pays (affiliate, lead generator, "
+        "marketplace or influencer). Flag a disclosure of that paid relationship that is unclear or out of place: "
+        'vague ("we work with partners", "#sp", "#collab", "thanks ClearPath"), placed only after the endorsement '
+        'or behind a link, or contradicted by a claim like "unbiased", "independent review" or "not sponsored". '
+        'Influencer posts need wording like "#ad" or "Paid partnership with ClearPath" near the start. Do not flag '
+        "a clear disclosure placed before or beside the endorsement. If the code findings already report a missing "
+        "disclosure, skip this rule. Quote the inadequate disclosure or the contradicting claim."
     ),
     default_message="The paid relationship may need a clearer disclosure next to the endorsement.",
     code_counterparts=frozenset({"endorsement.material_connection"}),
@@ -168,7 +169,8 @@ NET_IMPRESSION = LlmRule(
         'approval regardless of credit; "lowest rates anywhere" or "#1 lender" with no stated basis; "wipe out '
         'your debt" or "be debt-free" for a loan that only moves the debt; fine print that takes back the headline. '
         'Do not flag ordinary puffery ("simple", "fast application", "friendly support"), accurate claims, or '
-        "numbers that differ from the offer terms (code checks those). Quote the claim."
+        "numbers that differ from the offer terms (code checks those). Use this rule only when no more specific "
+        "rule covers the claim. Quote the claim."
     ),
     default_message="This claim may give a misleading impression of the offer.",
     code_counterparts=frozenset({"claims.guaranteed", "claims.preapproved"}),

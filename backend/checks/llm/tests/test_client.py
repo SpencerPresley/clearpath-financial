@@ -12,6 +12,7 @@ from checks.llm.client import (
     DEFAULT_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
+    MAX_TOKENS_WITH_THINKING,
     TIMEOUT_SECONDS,
     forces_tool_choice,
     get_review_model,
@@ -42,6 +43,11 @@ def test_defaults():
 
 def test_model_name_is_a_parameter():
     assert get_review_model("claude-sonnet-5", api_key="k").model == "claude-sonnet-5"
+
+
+def test_models_that_think_before_the_tool_get_a_larger_cap():
+    assert get_review_model("claude-opus-5-5", api_key="k").max_tokens == MAX_TOKENS_WITH_THINKING
+    assert get_review_model("claude-haiku-5-5", api_key="k").max_tokens == MAX_TOKENS
 
 
 def test_payload_has_no_sampling_parameters():

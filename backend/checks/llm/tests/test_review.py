@@ -15,7 +15,7 @@ from checks.llm.prompt import PROMPT_VERSION, copy_tag
 from checks.llm.rules import LLM_RULESET_VERSION
 from checks.llm.schema import REPORT_TOOL_NAME, DropReason, report_tool
 from checks.llm.tests.fakes import RaisingModel, fake, finding, report
-from core.domain import FindingSource, Product
+from core.domain import Channel, FindingSource, PartnerType, Product
 
 TEXT = "ClearPath personal loans: free money in minutes! Act now before rates go up. Rates as low as 7.49% APR."
 STATUS_LIKE = ("status", "approv", "decision", "outcome", "verdict")
@@ -76,11 +76,30 @@ def test_request_shape():
 @pytest.mark.parametrize(
     "model_name", ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-mythos-5-1"]
 )
-def test_models_without_forced_tool_choice_get_auto(model_name):
+def test_models_without_forced_tool_choice_get_auto_and_strict(model_name):
     model = fake(report())
     model.model = model_name
     _review(model)
     assert model.bound_kwargs == {"tool_choice": "auto"}
+    assert model.bound_tools == [report_tool(strict=True)]
+    assert model.bound_tools[0]["strict"] is True
+
+
+def test_forced_path_is_not_strict():
+    model = fake(report())
+    _review(model)
+    assert "strict" not in model.bound_tools[0]
+
+
+def test_system_prefix_and_tools_identical_across_items():
+    # The cached prefix (tools + system) must not depend on the item.
+    first, second = fake(report()), fake(report())
+    _review(first, _ctx())
+    other = make_ctx("Card ad.", product=Product.CREDIT_CARD, channel=Channel.EMAIL, partner_type=PartnerType.AFFILIATE)
+    review_copy(other, code_findings=run_code_checks(other).findings, model=second)
+    assert first.bound_tools == second.bound_tools
+    assert first.requests[0][0] == second.requests[0][0]
+    assert first.requests[0][1] != second.requests[0][1]
 
 
 def test_malformed_output_is_dropped_and_counted_not_raised():

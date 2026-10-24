@@ -159,3 +159,17 @@ def test_prose_reply_is_invalid_output():
     assert not parsed.output_valid
     assert parsed.items == ()
     assert [d.reason for d in parsed.dropped] == [DropReason.NO_REPORT]
+
+
+def test_report_with_every_item_malformed_is_invalid_output():
+    encoded = '{"rule_id": "llm.net_impression", "quote": "free money", "start": 0, "end": 10}'
+    parsed = parse_report(_report(encoded, encoded))  # type: ignore[arg-type]
+    assert not parsed.output_valid
+    assert parsed.items == ()
+    assert [d.reason for d in parsed.dropped] == [DropReason.MALFORMED, DropReason.MALFORMED]
+
+
+def test_report_with_some_items_malformed_is_still_valid():
+    parsed = parse_report(_report(_item(), "garbage"))  # type: ignore[arg-type]
+    assert parsed.output_valid
+    assert len(parsed.items) == 1

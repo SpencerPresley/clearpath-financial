@@ -1,10 +1,12 @@
 import hashlib
+import json
 
-from checks.engine import run_code_checks
+from checks.engine import FindingDraft, Span, run_code_checks
 from checks.engine.tests.conftest import make_ctx
 from checks.llm.prompt import PROMPT_VERSION, copy_tag, item_message, system_message
 from checks.llm.rules import LLM_RULES, applicable_rules
-from core.domain import AttachmentKind, Channel, Market, PartnerType, Product
+from checks.llm.schema import report_tool
+from core.domain import AttachmentKind, Channel, FindingSource, Market, PartnerType, Product, Severity
 
 AFFILIATE_TEXT = (
     "Top Personal Loans of 2026\n\nClearPath loans start as low as 5.99% APR. "
@@ -35,16 +37,34 @@ def _system_text() -> str:
     return "".join(block["text"] for block in content if isinstance(block, dict))
 
 
-def test_prompt_version_is_set():
-    assert PROMPT_VERSION
+# PROMPT_VERSION -> fingerprint of everything the model sees that isn't the item's own data. Changing the system
+# text, a rule's guidance, the tool schema or the item-message layout changes the fingerprint. The test then fails
+# until PROMPT_VERSION is bumped and the new pair is added here, so cached LLM results can't silently outlive a
+# prompt change. (The cross-item identity of the cached prefix is tested in test_review.py.)
+PROMPT_FINGERPRINTS = {
+    "2026-10-24.1": "9b9df12f77dde8ce0cf71253bb1f4b7c5dcaf81df9582fb27e639c2333b88ee5",
+}
 
 
-def test_system_block_is_identical_across_items():
-    # The cached prefix must not vary by item: same tools + same system text for every review.
-    first = system_message()
-    make_ctx("Card ad", product=Product.CREDIT_CARD, channel=Channel.EMAIL)
-    second = system_message()
-    assert first.content == second.content
+def _fingerprint() -> str:
+    ctx = make_ctx("Example ad copy.", channel=Channel.AFFILIATE_PAGE, partner_type=PartnerType.AFFILIATE)
+    code = (
+        FindingDraft("claims.guaranteed", FindingSource.CODE, Severity.BLOCKING, "m", "c", None, Span(0, 7), "Example"),
+        FindingDraft("ca.license_disclosure", FindingSource.CODE, Severity.BLOCKING, "m", "c", None, None, None),
+    )
+    parts = [
+        _system_text(),
+        json.dumps(report_tool(), sort_keys=True),
+        json.dumps(report_tool(strict=True), sort_keys=True),
+        str(item_message(ctx, applicable_rules(ctx), code).content),
+    ]
+    return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
+
+
+def test_prompt_changes_bump_prompt_version():
+    assert PROMPT_FINGERPRINTS.get(PROMPT_VERSION) == _fingerprint(), (
+        "The prompt changed: bump PROMPT_VERSION and record the new fingerprint"
+    )
 
 
 def test_system_block_has_cache_control_on_last_block():

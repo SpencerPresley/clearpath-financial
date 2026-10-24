@@ -46,7 +46,7 @@ CASES: tuple[EvalCase, ...] = (
         name="pl_landing_qualifier_reversed",
         text=(
             "Debt consolidation, simplified.\n\n"
-            "Excellent credit? Not required. Every ClearPath borrower can lock in rates as low as 7.49% APR "
+            "Excellent credit? Not required for our best rate. Lock in rates as low as 7.49% APR "
             "(APRs range from 7.49% to 35.99%).\n\n"
             "One fixed monthly payment, no prepayment penalty. Check your rate in minutes."
         ),
@@ -59,7 +59,7 @@ CASES: tuple[EvalCase, ...] = (
         text=(
             "Subject: Your personal loan options are ready\n\n"
             "Hi Jordan,\n\n"
-            "Apply today with zero impact to your credit score and get a decision in minutes. APRs from 7.49% to "
+            "Apply today with zero impact to your credit score. APRs from 7.49% to "
             "35.99%, based on your credit.\n\n"
             f"{_UNSUBSCRIBE}\n{_ADDRESS}\nThis is an advertisement."
         ),

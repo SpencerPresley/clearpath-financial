@@ -29,7 +29,7 @@ class DropReason(StrEnum):
     EMPTY_QUOTE = "empty_quote"
     QUOTE_NOT_FOUND = "quote_not_found"
     AMBIGUOUS_QUOTE = "ambiguous_quote"
-    DUPLICATE = "duplicate"  # same rule and span as an earlier LLM finding
+    DUPLICATE = "duplicate"  # same rule as an earlier LLM finding on an overlapping span
     DUPLICATES_CODE = "duplicates_code"  # overlaps a code finding that reports the same problem
 
 
@@ -66,8 +66,11 @@ class ParsedOutput:
 _STRING = "string"
 
 
-def report_tool() -> dict[str, Any]:
-    """Anthropic-format tool definition (passed through `bind_tools` unchanged)."""
+def report_tool(*, strict: bool = False) -> dict[str, Any]:
+    """Anthropic-format tool definition (passed through `bind_tools` unchanged).
+
+    `strict` turns on grammar-constrained tool input. It's used only on the `auto` tool-choice path (see
+    `client.py`); on Haiku 5.5 with a forced choice it's off, since that combination is unverified live."""
     item = {
         "type": "object",
         "properties": {
@@ -95,7 +98,7 @@ def report_tool() -> dict[str, Any]:
         "required": ["rule_id", "quote", "start", "end", "message", "suggested_fix"],
         "additionalProperties": False,
     }
-    return {
+    tool: dict[str, Any] = {
         "name": REPORT_TOOL_NAME,
         "description": "Report the findings for this ad copy, once. An empty list means no findings.",
         "input_schema": {
@@ -111,6 +114,9 @@ def report_tool() -> dict[str, Any]:
             "additionalProperties": False,
         },
     }
+    if strict:
+        tool["strict"] = True
+    return tool
 
 
 def _str_or_none(item: object, key: str) -> str | None:
@@ -159,10 +165,14 @@ def parse_report(message: AIMessage) -> ParsedOutput:
             broken = True
             dropped.append(DroppedFinding(DropReason.MALFORMED, None, None, "findings is not a list"))
             continue
-        reported = True
         call_items, call_dropped = _parse_items(findings)
         items.extend(call_items)
         dropped.extend(call_dropped)
+        # A report whose every item is malformed (e.g. items JSON-encoded as strings) carries nothing usable.
+        if findings and not call_items:
+            broken = True
+        else:
+            reported = True
     for invalid in message.invalid_tool_calls:
         broken = True
         detail = f"unparsable call to {invalid.get('name')}: {invalid.get('error')}"

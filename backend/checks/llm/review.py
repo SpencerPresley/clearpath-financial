@@ -96,8 +96,8 @@ def _configured_name(model: BaseChatModel) -> str:
 
 
 def _invoke(model: BaseChatModel, messages: list[BaseMessage]) -> AIMessage:
-    tool_choice = REPORT_TOOL_NAME if forces_tool_choice(_configured_name(model)) else "auto"
-    bound = model.bind_tools([report_tool()], tool_choice=tool_choice)
+    forced = forces_tool_choice(_configured_name(model))
+    bound = model.bind_tools([report_tool(strict=not forced)], tool_choice=REPORT_TOOL_NAME if forced else "auto")
     try:
         return bound.invoke(messages)
     except anthropic.APIConnectionError as error:  # includes timeouts
