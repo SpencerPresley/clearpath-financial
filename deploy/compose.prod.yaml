@@ -3,6 +3,9 @@
 # Postgres is RDS; Redis is local and disposable (the event log is the
 # outbox, so nothing is lost if Redis restarts empty).
 #
+# deploy.sh runs `migrate` and then `seed_demo` (a no-op once items exist) as
+# one-off containers before `up`, so no service here migrates or seeds on start.
+#
 # .env next to this file is written by render-env.sh from SSM Parameter Store.
 # Compose reads it twice: for ${...} interpolation here (BACKEND_IMAGE,
 # FORWARDED_ALLOW_IPS) and as each backend container's environment.

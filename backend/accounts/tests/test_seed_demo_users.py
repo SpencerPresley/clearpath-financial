@@ -1,6 +1,9 @@
+import importlib
+
 import pytest
 from django.core.management import CommandError, call_command
 from pydantic import SecretStr
+from pytest_django import Settings
 
 from accounts.models import User
 from core.domain import Role
@@ -61,3 +64,32 @@ def test_without_a_password_the_documented_one_is_used(monkeypatch: pytest.Monke
     call_command("seed_demo_users")
 
     assert User.objects.get(email="lead@clearpath.demo").check_password(DOCUMENTED_PASSWORD)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("configured", [None, SecretStr(""), SecretStr(DOCUMENTED_PASSWORD)])
+def test_where_the_default_isnt_allowed_the_published_password_is_refused(
+    monkeypatch: pytest.MonkeyPatch, settings: Settings, configured: SecretStr | None
+) -> None:
+    """Production: the documented password is in a public repo, so it can't be the hosted demo's."""
+    settings.DEMO_PASSWORD_DEFAULT_ALLOWED = False
+    monkeypatch.setattr("demo.users.env.demo_user_password", configured)
+
+    with pytest.raises(CommandError, match="DEMO_USER_PASSWORD"):
+        call_command("seed_demo_users")
+
+    assert not User.objects.exists()
+
+
+@pytest.mark.django_db
+def test_where_the_default_isnt_allowed_a_configured_password_is_used(demo_password: str, settings: Settings) -> None:
+    settings.DEMO_PASSWORD_DEFAULT_ALLOWED = False
+
+    call_command("seed_demo_users")
+
+    assert User.objects.get(email="admin@clearpath.demo").check_password(demo_password)
+
+
+def test_production_settings_refuse_the_default_and_base_settings_allow_it() -> None:
+    assert importlib.import_module("config.settings.base").DEMO_PASSWORD_DEFAULT_ALLOWED is True
+    assert importlib.import_module("config.settings.prod").DEMO_PASSWORD_DEFAULT_ALLOWED is False

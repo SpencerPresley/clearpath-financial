@@ -6,6 +6,7 @@ import time
 
 from celery import shared_task
 
+from core.errors import InvalidInput
 from demo import services
 from demo.reset import reset_demo
 
@@ -24,6 +25,11 @@ def run_demo_reset(reset_id: int) -> str:
     logger.info("demo reset start reset_id=%d", reset_id)
     try:
         result = reset_demo(requested_by=job.requested_by)
+    except InvalidInput as exc:
+        # Configuration the admin can act on (the demo password); checked before anything is touched.
+        logger.warning("demo reset refused reset_id=%d: %s", reset_id, exc.message)
+        services.fail_reset(reset_id=reset_id, error=exc.message)
+        outcome = "failed"
     except Exception:
         logger.exception("demo reset failed reset_id=%d", reset_id)
         services.fail_reset(reset_id=reset_id, error=FAILED_MESSAGE)

@@ -85,6 +85,23 @@ unset KEY
 It takes effect on the next deploy (render-env.sh re-reads SSM). To apply it without a code change,
 run the Deploy workflow manually from main (`gh workflow run deploy.yaml --ref main`).
 
+## Demo logins
+
+Terraform generates the hosted demo's password into `/clearpath/prod/DEMO_USER_PASSWORD` (a SecureString;
+like the other generated secrets it's also in Terraform state). Every demo account in `docs/demo.md` uses it.
+The app refuses the password published in the repo in production, and `render-env.sh` refuses to deploy without
+this parameter. Read it to hand to evaluators:
+
+```sh
+aws ssm get-parameter --profile clearpath --region us-east-1 \
+  --name /clearpath/prod/DEMO_USER_PASSWORD --with-decryption --query Parameter.Value --output text
+```
+
+`deploy.sh` runs `seed_demo` after migrating; it seeds only when the database has no items, so the first deploy
+creates the demo and later deploys leave it alone. To rotate the password, `put-parameter --overwrite` a new
+value (12+ characters, not common) and redeploy, then press **Reset demo** (or run `seed_demo --reset`): the
+seed sets each demo account's password.
+
 ## Rollback
 
 `deploy.sh` stops with the new containers in place if `up --wait` or the health check fails, so prod
@@ -102,7 +119,7 @@ expand-only (backward-compatible with the previous release).
 ## Runtime configuration
 
 Every direct child of `/clearpath/prod/` becomes a line in `/srv/clearpath/.env` on each deploy:
-secrets (`DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`, `ANTHROPIC_API_KEY`) and plain config Terraform
+secrets (`DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`, `DEMO_USER_PASSWORD`, `ANTHROPIC_API_KEY`) and plain config Terraform
 derives (`POSTGRES_HOST`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `FRONTEND_BASE_URL`,
 `DOCUMENTS_BUCKET`, ...). To add a setting, add it to `local.app_config` in `main/config.tf` (or
 `put-parameter` by hand for secrets) and redeploy.

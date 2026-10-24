@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from django.core.management import call_command
 from django.test import Client
+from pytest_django import Settings
 
 from accounts.models import User
 from core.clock import FixedClock
@@ -97,6 +98,25 @@ def test_a_failed_reset_is_reported_on_the_job(
     failed = client.get(f"/api/admin/demo/resets/{job['id']}").json()
     assert failed["status"] == "failed"
     assert failed["error"] == tasks.FAILED_MESSAGE
+
+
+def test_a_reset_refused_for_the_published_password_says_why(
+    personas: dict[str, User],
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Settings,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    settings.DEMO_PASSWORD_DEFAULT_ALLOWED = False
+    monkeypatch.setattr("demo.users.env.demo_user_password", None)
+    client = _signed_in("admin@clearpath.demo")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        job = client.post("/api/admin/demo/reset").json()
+
+    failed = client.get(f"/api/admin/demo/resets/{job['id']}").json()
+    assert failed["status"] == "failed"
+    assert "DEMO_USER_PASSWORD isn't set" in failed["error"]
+    assert not ReviewItem.objects.exists()
 
 
 def test_a_reset_whose_worker_vanished_reads_as_failed_and_a_new_request_starts_fresh(

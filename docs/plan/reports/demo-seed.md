@@ -47,14 +47,14 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Verification
 
-- Backend, after rebasing on `64c7fb6`:
-  - `pytest`: 1459 passed;
+- Backend, after rebasing on `78ed50f`:
+  - `pytest`: 1476 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
   - the exported schema matches the committed one;
   - `make semgrep` reports 0 findings.
 - Frontend, after the rebase:
-  - `npm run test:run`: 460 passed;
+  - `npm run test:run`: 567 passed;
   - `typecheck`, `lint`, `format:check` and `build` are clean.
 - Demo tests (`backend/demo/tests/`, 37 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
@@ -106,10 +106,9 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Risks and open questions
 
-- **Tracker history overlaps native history.** The sample tracker (a fixed fixture, Nov 3 2025 – Oct 23 2026)
-  runs right up to yesterday, so Metrics shows Excel and the tool in use side by side for the native ten weeks.
-  It reads as a pilot period, which is defensible. If not, the fix is in `scripts/generate_sample_tracker.py`
-  (end its dates ~10 weeks back), not in L.
+- **Tracker history overlaps native history (open decision, below).** The sample tracker (a fixed fixture,
+  Nov 3 2025 – Oct 23 2026) runs right up to yesterday, so Metrics shows Excel and the tool in use side by side
+  for the native ten weeks.
 - **CP-220 only stays pending for ~10 minutes.** At 10 minutes the reconciler re-enqueues the run on the real
   model. With an API key it gets a real review; without one it fails ("no Anthropic API key"). That's inherent
   to a pending check, and `docs/demo.md` says so.
@@ -119,29 +118,85 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 - **Only Django-model tables are wiped.** `domain_tables()` comes from `apps.get_models()`. If K's LangGraph
   checkpointer keeps its own non-model tables, a reset leaves old assistant threads behind; those would need
   adding to the TRUNCATE list.
-- **Finding for J: marketer and admin land on a page that isn't in their nav.** The index route sends every
-  role to the Queue (`/?view=mine&status=…`). Queue isn't in the marketer's or admin's nav, so their first
-  screen is an empty queue they can't get back to (`marketer.png`, `admin.png`). The marketer should land on
-  **My submissions**. `docs/demo.md` describes what happens today; I didn't change the route because it isn't
-  L's file.
 - **The reset holds an advisory lock and truncates every domain table for ~10 s.** Requests in that window wait
   on the lock. Fine for a demo, and the reason it's admin-only.
 
-## Decisions needed
+## Settled with the orchestrator, and built
 
-1. **The documented default password `ClearPath-demo-2026` is in code** (`demo/users.py`) and used when
-   `DEMO_USER_PASSWORD` is unset. On the hosted demo that means anyone who reads the repo can sign in as admin
-   and press Reset. The alternative is to set `DEMO_USER_PASSWORD` in the deploy's secrets and publish it
-   alongside the URL. That costs one more secret, and `docs/demo.md` already reads "or the deployment's".
-   Recommendation: set it on the hosted deploy. The admin can wipe everything there, and a published password
-   in a public repo is effectively public.
-2. **Seeding the tracker import vs leaving it for the admin.** It's seeded now, so Metrics and the Library have
-   history from the first click. The cost: the admin's Import screen shows a finished import instead of an
-   empty state to try the flow. They can still upload `samples/` again, which skips rows already imported (by tracker ID).
-3. **`seed_demo` on deploy.** Nothing in `infra/` runs it today, so a fresh deploy has no demo until someone
-   runs the command or clicks Reset. Options:
-   - (a) a one-off `seed_demo` step in the deploy runbook, which is idempotent and does nothing if data exists;
-   - (b) run it in the container entrypoint after migrate. This is also safe, because it's a no-op when items
-     exist, but it adds ~11 s to the first boot.
+1. **Hosted password.**
+   - Terraform generates `/clearpath/prod/DEMO_USER_PASSWORD`: a `random_password`, SecureString, 20 letters and
+     digits. It follows the pattern of `DJANGO_SECRET_KEY`.
+   - It isn't write-only, because evaluators have to be given it. `infra/README.md` ("Demo logins") shows how to
+     read it.
+   - `render-env.sh` refuses to deploy if it, `DJANGO_SECRET_KEY` or `POSTGRES_PASSWORD` is missing. I checked
+     this with stubbed `aws` and `curl`.
+   - Prod settings set `DEMO_PASSWORD_DEFAULT_ALLOWED = False`, and `demo_password()` then refuses an unset value
+     or the published one. The check is where the password is used, not at settings import, because
+     `deploy.yaml` runs `collectstatic` on prod settings with no app secrets.
+   - A refused Reset demo shows the reason on the job.
+2. **The tracker import stays seeded.**
+3. **Seeding on start.**
+   - `compose.yaml`'s web service runs `migrate && seed_demo && uvicorn`.
+   - Prod doesn't migrate on container start: `deploy.sh` runs `migrate` as a one-off before `up`, and nothing else
+     starts the stack (`user_data` only installs Docker). So `seed_demo` runs right after that step in
+     `deploy.sh`, not in `compose.prod.yaml`.
+   - Two reasons. A failed seed stops the deploy while the old containers still serve. And the first seed
+     against RDS doesn't eat into the web healthcheck window (start 20 s + 6 × 10 s).
+   - `compose.prod.yaml`'s header says where it happens.
+5. **Landing route by role.**
+   - The queue moved from `/` to `/queue`. `/` renders a `<Navigate replace>` to `landingFor(roles)`:
+     - reviewer or lead → `/queue`;
+     - marketer → `/mine`;
+     - admin → `/import`;
+     - no roles → `/library`.
+   - With several roles, work comes first: a lead who is also an admin lands on the queue.
+   - It's a component, not `beforeLoad`, because the viewer comes from `SessionGate`, so there's no sign-in race.
+   - Updated: the nav, the Metrics "waiting" links, `QueuePage`'s route ID, and the unit, browser and e2e tests.
+   - Separately, `e2e/shell.spec.ts` still asserted that reviewers don't see Offer terms. #36 changed that and CI
+     doesn't run e2e, so it was already failing on main. It now asserts against Metrics, which is lead-only.
 
-   Recommendation: (b), since it is the no-op path on every boot after the first.
+## Decision needed: the tracker's dates (item 4)
+
+**The ask.**
+- End the sample tracker the day before the tool's go-live, about 10 weeks before the seed clock.
+- Totals unchanged.
+- Go-live is a shared value relative to the seed clock, so a reset months later keeps the split.
+
+**Why it can't be built as stated.** The generator (`scripts/generate_sample_tracker.py`) simulates on a fixed
+calendar, and its random path depends on calendar dates:
+- `submission_dates` buckets by calendar month (`MONTHLY_VOLUME`).
+- `pick_theme` filters seasonal themes by `submitted.month` (line 1159): "Holiday Expenses" in months 11–12,
+  "Back to School" in 7–8, "Tax Season" in 1–4.
+- The holidays and the freeze window decide which days are workdays.
+- Request IDs carry a per-year counter (`MCR-YY-nnn`, line 1145), and year-less dates are inferred from that
+  prefix.
+
+The three ways to satisfy part of the ask:
+
+- **(a) Re-anchor the simulation to a go-live argument, and run it at reset time.**
+  - The generator moves into the backend so the seed can call it. `scripts/` becomes a thin wrapper, because the
+    image's build context is `backend/`.
+  - The window becomes [go-live − ~50 weeks, go-live − 1 day], with seasons following real months.
+  - Cost:
+    - The row count can stay 178, but the status, issue and problem-row mix changes, so the README oracle and G's
+      oracle tests change.
+    - Those numbers also differ for every go-live date, so the seed's tests would assert ranges instead of exact
+      counts.
+    - It's the largest change, and it lands in G's oracle.
+- **(b) Simulate as today, and shift only the rendered dates by whole weeks.**
+  - Every total stays identical, and it also works at reset time.
+  - Cost:
+    - Seasonal campaigns render out of season (a 10-week shift puts "Holiday Expenses" in September).
+    - Request IDs either collide across the shifted year boundary or carry the wrong year, which breaks the
+      importer's year inference.
+    - The "2026" note row lands in the wrong place.
+- **(c) Re-anchor once, statically.**
+  - Regenerate the committed tracker so it ends 2026-08-14, the day before a go-live 10 weeks back, with the seed
+    importing it as today.
+  - Exact split for a reset now. A reset N weeks later shows an N-week gap between the tracker's end and the
+    tool's start, but never an overlap.
+  - Cost: the README oracle and G's oracle tests change once, apart from the row count.
+
+**Recommendation: (c).** The hosted demo's life is weeks, so a growing gap is tolerable, while (b) produces visibly
+wrong content and (a) puts a moving target under G's oracle tests. If a reset months out really matters, (a) is
+the only correct option.

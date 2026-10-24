@@ -67,6 +67,20 @@ resource "aws_ssm_parameter" "postgres_password" {
   value = random_password.db.result
 }
 
+# Every demo login's password (docs/demo.md). Generated like the other app secrets, not write-only: it has to be
+# readable so it can be given to evaluators (infra/README.md, "Demo logins"). Production refuses the password
+# published in the repo, so the app won't seed without this. Letters and digits only: people type it.
+resource "random_password" "demo_user" {
+  length  = 20
+  special = false
+}
+
+resource "aws_ssm_parameter" "demo_user_password" {
+  name  = "${local.ssm_prefix}/DEMO_USER_PASSWORD"
+  type  = "SecureString"
+  value = random_password.demo_user.result
+}
+
 # The real key is set by hand with put-parameter (infra/README.md). value_wo is
 # write-only: Terraform sends the placeholder once and never stores or reads
 # back the value, so refresh can't copy the real key into state (a plain

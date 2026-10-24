@@ -208,6 +208,11 @@ ANTHROPIC_API_KEY: str | None = (
 ) or None
 ANTHROPIC_MODEL = env.anthropic_model
 
+# --- Demo (demo.users) ---
+# Without DEMO_USER_PASSWORD, demo logins use the password published in docs/demo.md. Production turns this off:
+# that password is public, and an admin login can wipe the demo.
+DEMO_PASSWORD_DEFAULT_ALLOWED = True
+
 # --- Celery ---
 CELERY_BROKER_URL = env.redis_url
 CELERY_RESULT_BACKEND = None

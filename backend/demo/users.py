@@ -8,6 +8,7 @@ of these accounts can reach django-admin.
 from collections.abc import Iterable
 from typing import Final
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -21,9 +22,20 @@ DOCUMENTED_PASSWORD: Final = "ClearPath-demo-2026"  # noqa: S105  # public by de
 
 
 def demo_password() -> str:
+    """DEMO_USER_PASSWORD, else the documented one where that's allowed (not in production: it's public)."""
     secret = env.demo_user_password
     value = secret.get_secret_value() if secret is not None else ""
-    return value or DOCUMENTED_PASSWORD
+    if settings.DEMO_PASSWORD_DEFAULT_ALLOWED:
+        return value or DOCUMENTED_PASSWORD
+    if not value:
+        raise InvalidInput.for_field(
+            "password", "DEMO_USER_PASSWORD isn't set. This environment needs its own demo password."
+        )
+    if value == DOCUMENTED_PASSWORD:
+        raise InvalidInput.for_field(
+            "password", "DEMO_USER_PASSWORD is the published demo password. This environment needs its own."
+        )
+    return value
 
 
 def check_password_strength(password: str) -> None:

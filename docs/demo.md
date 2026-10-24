@@ -7,7 +7,8 @@ comments, notifications and metrics are what the product itself would have recor
 
 ## Logins
 
-Password for every account: `ClearPath-demo-2026` (or the deployment's `DEMO_USER_PASSWORD`).
+Password for every account: on the hosted demo, the password you were given with the link (it's generated per deployment;
+the published one below is refused there). Locally, `ClearPath-demo-2026` unless `DEMO_USER_PASSWORD` is set.
 
 | Role | Email | Who |
 |---|---|---|
@@ -56,11 +57,9 @@ she can also:
   influencer), each with its agreement attached;
 - check **Metrics**: ten weeks of submissions, findings and decisions behind them.
 
-(Screens marked "Soon" in the nav haven't shipped in this build; their data is already seeded.)
-
 ### Marketer (Priya)
 
-Sign-in opens the shared queue view; open **My submissions** in the nav.
+You land on **My submissions**.
 
 - **Waiting on you**: **CP-22** came back with changes requested. Samuel's note asks for the card issuer line,
   so **Resubmit** with it added. **CP-10** and **CP-11** expired, one after the rate change and one past its
@@ -70,7 +69,7 @@ Sign-in opens the shared queue view; open **My submissions** in the nav.
 
 ### Admin (Avery)
 
-Sign-in opens the shared queue view (Avery reviews nothing, so it's empty).
+You land on **Import**.
 
 - **Import** shows the Excel tracker import that brought in the 178 legacy rows (matched to partners where the
   tracker named one). They're in the **Library** with `legacy=only`.
@@ -95,6 +94,7 @@ uv run python manage.py seed_demo          # no-op if items exist
 uv run python manage.py seed_demo --reset  # wipe and reseed
 ```
 
-`seed_demo` keeps user accounts and sessions; it wipes items, partners, offer terms, imports, findings, events
+Containers seed on start: `compose.yaml`'s web service and `deploy/deploy.sh` run `seed_demo` after
+`migrate`, which does nothing once items exist. `seed_demo` keeps user accounts and sessions; it wipes items, partners, offer terms, imports, findings, events
 and notifications. People are upserted from `backend/demo/content/people.py`, and the password changes only if it
 differs, so existing sessions survive.
