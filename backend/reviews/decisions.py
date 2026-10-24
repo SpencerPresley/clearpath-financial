@@ -272,6 +272,10 @@ def _write(  # noqa: PLR0913  # the decision's columns
         item.approved_at = at
         item.approval_expires_at = approval.expires_at
         item.save(update_fields=["approved_at", "approval_expires_at"])
+    if action is Action.REJECT:
+        # Rejecting content that's still running (a re-review taken to full review) must take it down too.
+        live = Placement.objects.select_for_update().filter(live_placements_q(timezone.localdate(at)), item=item)
+        _request_takedowns(item, list(live), reason=reason, actor=actor, at=at)
     return decision
 
 
@@ -437,6 +441,31 @@ def reaffirm(*, actor: User, item_id: int, reason: str, clock: Clock = SYSTEM_CL
     return result
 
 
+def _request_takedowns(
+    item: ReviewItem, placements: Sequence[Placement], *, reason: str, actor: User, at: datetime
+) -> list[int]:
+    """Mark each placement's takedown requested (TAKEDOWN_REQUESTED each); returns their ids. Placements already
+    requested are included but not re-recorded."""
+    requested: list[int] = []
+    for placement in placements:
+        requested.append(placement.pk)
+        if placement.takedown_state is not None:
+            continue
+        placement.takedown_state = TakedownState.REQUESTED
+        placement.takedown_requested_at = at
+        placement.save(update_fields=["takedown_state", "takedown_requested_at"])
+        record_event(
+            type=EventType.TAKEDOWN_REQUESTED,
+            entity=EntityType.PLACEMENT,
+            entity_id=placement.pk,
+            item_id=item.pk,
+            payload=TakedownRequestedPayload(placement_id=placement.pk, reason=reason),
+            actor=actor,
+            at=at,
+        )
+    return requested
+
+
 def pull_item(
     *, actor: User, item_id: int, reason: str, placement_ids: Sequence[int] = (), clock: Clock = SYSTEM_CLOCK
 ) -> None:
@@ -457,23 +486,7 @@ def pull_item(
                 raise InvalidInput.for_field("placement_ids", "Pick live placements of this item.")
         else:
             placements = list(Placement.objects.select_for_update().filter(live_placements_q(clock.today()), item=item))
-        requested: list[int] = []
-        for placement in placements:
-            requested.append(placement.pk)
-            if placement.takedown_state is not None:
-                continue  # already requested
-            placement.takedown_state = TakedownState.REQUESTED
-            placement.takedown_requested_at = now
-            placement.save(update_fields=["takedown_state", "takedown_requested_at"])
-            record_event(
-                type=EventType.TAKEDOWN_REQUESTED,
-                entity=EntityType.PLACEMENT,
-                entity_id=placement.pk,
-                item_id=item.pk,
-                payload=TakedownRequestedPayload(placement_id=placement.pk, reason=reason),
-                actor=actor,
-                at=now,
-            )
+        requested = _request_takedowns(item, placements, reason=reason, actor=actor, at=now)
         apply_transition(
             item,
             Action.PULL,

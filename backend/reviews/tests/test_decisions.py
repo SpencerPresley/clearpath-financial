@@ -502,6 +502,21 @@ def test_pull_requests_takedown_of_live_placements_and_withdraws(
 
 
 @pytest.mark.django_db
+def test_rejecting_live_content_after_rereview_requests_its_takedown(
+    rereview: ReviewItem, reviewer: User, marketer: User, clock: FixedClock
+) -> None:
+    live = _placement(rereview, marketer)
+    from reviews.assignment import claim_item
+
+    claim_item(actor=reviewer, item_id=rereview.pk, clock=clock)
+    _decide(reviewer, rereview.pk, clock, outcome=DecisionOutcome.REJECTED, reason="Misleading now")
+
+    live.refresh_from_db()
+    assert (live.takedown_state, live.takedown_requested_at) == (TakedownState.REQUESTED, clock.now())
+    assert Event.objects.get(type=EventType.TAKEDOWN_REQUESTED).payload["reason"] == "Misleading now"
+
+
+@pytest.mark.django_db
 def test_pull_refuses_placements_of_another_item(
     rereview: ReviewItem, ready: ReviewItem, reviewer: User, marketer: User, submit: Submit, clock: FixedClock
 ) -> None:
