@@ -51,6 +51,6 @@ class PartnerUpdateIn(Schema):
     type: PartnerType | None = None
     status: PartnerStatus | None = None
     website: str | None = Field(default=None, max_length=200)
-    contact_email: str | None = Field(default=None, max_length=254)
+    contact_email: str | None = Field(default=None, max_length=254, pattern=rf"^$|{EMAIL_PATTERN}")
     agreement_signed_on: date | None = None
     notes: str | None = Field(default=None, max_length=10_000)

@@ -148,13 +148,17 @@ def test_attachment_requires_exactly_one_owner(marketer: User, settings: Setting
 
 
 @pytest.mark.django_db
-def test_attachment_rejects_update(marketer: User, settings: Settings, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "sql",
+    ["UPDATE reviews_attachment SET kind = 'other' WHERE id = %s", "DELETE FROM reviews_attachment WHERE id = %s"],
+)
+def test_attachment_rejects_update_and_delete(marketer: User, settings: Settings, tmp_path: Path, sql: str) -> None:
     settings.MEDIA_ROOT = tmp_path
     attachment = _attachment(uploaded_by=marketer, item=make_item(marketer))
     attachment.save()
 
     with pytest.raises(IntegrityError, match="immutable"), transaction.atomic():
-        _raw("UPDATE reviews_attachment SET kind = 'other' WHERE id = %s", [attachment.pk])
+        _raw(sql, [attachment.pk])
 
 
 @pytest.mark.django_db

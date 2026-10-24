@@ -29,6 +29,19 @@ def test_lead_creates_and_updates_a_partner(lead: User) -> None:
 
 
 @pytest.mark.django_db
+def test_partner_update_validates_contact_email_like_create(lead: User) -> None:
+    client = _client(lead)
+    partner = make_partner()
+
+    bad = client.patch(
+        f"/api/partners/{partner.pk}", {"contact_email": "not-an-email"}, content_type="application/json"
+    )
+    cleared = client.patch(f"/api/partners/{partner.pk}", {"contact_email": ""}, content_type="application/json")
+
+    assert (bad.status_code, cleared.status_code) == (422, 200)
+
+
+@pytest.mark.django_db
 def test_partner_names_are_unique_ignoring_case(lead: User) -> None:
     make_partner("LendStack")
 
