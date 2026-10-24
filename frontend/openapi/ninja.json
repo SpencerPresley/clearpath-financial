@@ -4007,6 +4007,43 @@
       "ItemFilter": {
         "description": "Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means \"no constraint\". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike \"My queue\" works for whoever opens it.",
         "properties": {
+          "approved_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved After"
+          },
+          "approved_before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Before"
+          },
+          "approved_within_days": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Approved in the last N days.",
+            "title": "Approved Within Days"
+          },
           "assignee_id": {
             "items": {
               "type": "integer"
@@ -4235,7 +4272,10 @@
                   "placement.takedown_requested": "#/components/schemas/TakedownRequestedEventOut",
                   "placement.updated": "#/components/schemas/PlacementUpdatedEventOut",
                   "terms.published": "#/components/schemas/TermsPublishedEventOut",
+                  "user.active_changed": "#/components/schemas/UserActiveChangedEventOut",
                   "user.availability_changed": "#/components/schemas/UserAvailabilityChangedEventOut",
+                  "user.created": "#/components/schemas/UserCreatedEventOut",
+                  "user.roles_changed": "#/components/schemas/UserRolesChangedEventOut",
                   "version.created": "#/components/schemas/VersionCreatedEventOut"
                 },
                 "propertyName": "type"
@@ -4330,6 +4370,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/UserAvailabilityChangedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/UserCreatedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/UserRolesChangedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/UserActiveChangedEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/ImportCommittedEventOut"
@@ -4441,6 +4490,20 @@
           "row_number": {
             "title": "Row Number",
             "type": "integer"
+          },
+          "timeline": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LegacyTimeline"
+              }
+            ],
+            "default": {
+              "decided_at": null,
+              "first_reviewed_at": null,
+              "outcome": null,
+              "rounds": null,
+              "submitted_at": null
+            }
           }
         },
         "required": [
@@ -5297,6 +5360,8 @@
             "anyOf": [
               {
                 "items": {
+                  "maxLength": 50,
+                  "minLength": 1,
                   "type": "string"
                 },
                 "maxItems": 20,
@@ -5407,6 +5472,72 @@
         "type": "object"
       },
       "JsonValue": {},
+      "LegacyTimeline": {
+        "additionalProperties": false,
+        "description": "The tracker's own dates for an imported row. The event's `occurred_at` is the import time, so metrics\n(time to first review, rounds per item) read these instead. Every field is optional: the tracker is messy,\nand a missing date is recorded as missing rather than guessed.",
+        "properties": {
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "first_reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Reviewed At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          }
+        },
+        "title": "LegacyTimeline",
+        "type": "object"
+      },
       "LlmCheckFailedEventOut": {
         "properties": {
           "actor": {
@@ -6651,6 +6782,7 @@
             "anyOf": [
               {
                 "maxLength": 254,
+                "pattern": "^$|^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
                 "type": "string"
               },
               {
@@ -7577,28 +7709,6 @@
             "title": "Key",
             "type": "string"
           },
-          "latest_decided_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Decided At"
-          },
-          "latest_outcome": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DecisionOutcome"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "partner_name": {
             "anyOf": [
               {
@@ -7632,6 +7742,18 @@
             "title": "Title",
             "type": "string"
           },
+          "version_decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Decided At"
+          },
           "version_id": {
             "title": "Version Id",
             "type": "integer"
@@ -7639,6 +7761,17 @@
           "version_n": {
             "title": "Version N",
             "type": "integer"
+          },
+          "version_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest decision on the matched version (not the item's latest), or null if undecided."
           }
         },
         "required": [
@@ -7653,8 +7786,8 @@
           "version_n",
           "snippet",
           "score",
-          "latest_outcome",
-          "latest_decided_at"
+          "version_outcome",
+          "version_decided_at"
         ],
         "title": "SearchHitOut",
         "type": "object"
@@ -7880,6 +8013,8 @@
           },
           "tags": {
             "items": {
+              "maxLength": 50,
+              "minLength": 1,
               "type": "string"
             },
             "maxItems": 20,
@@ -8366,6 +8501,97 @@
         "title": "ToolResultEventOut",
         "type": "object"
       },
+      "UserActiveChangedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/UserActiveChangedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "user.active_changed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "UserActiveChangedEventOut",
+        "type": "object"
+      },
+      "UserActiveChangedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "is_active"
+        ],
+        "title": "UserActiveChangedPayload",
+        "type": "object"
+      },
       "UserAvailabilityChangedEventOut": {
         "properties": {
           "actor": {
@@ -8494,6 +8720,105 @@
         "title": "UserCreateIn",
         "type": "object"
       },
+      "UserCreatedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/UserCreatedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "user.created",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "UserCreatedEventOut",
+        "type": "object"
+      },
+      "UserCreatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "roles"
+        ],
+        "title": "UserCreatedPayload",
+        "type": "object"
+      },
       "UserOut": {
         "description": "A person as shown in pickers (assignee, @mention) and the admin user list.",
         "properties": {
@@ -8534,6 +8859,108 @@
           "is_active"
         ],
         "title": "UserOut",
+        "type": "object"
+      },
+      "UserRolesChangedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/UserRolesChangedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "user.roles_changed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "UserRolesChangedEventOut",
+        "type": "object"
+      },
+      "UserRolesChangedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "After",
+            "type": "array"
+          },
+          "before": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Before",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "before",
+          "after"
+        ],
+        "title": "UserRolesChangedPayload",
         "type": "object"
       },
       "UserUpdateIn": {
@@ -8957,7 +9384,7 @@
     },
     "/api/admin/users": {
       "post": {
-        "description": "Admins provision accounts (no public signup). [admin user management]",
+        "description": "Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]",
         "operationId": "createUser",
         "parameters": [],
         "requestBody": {
@@ -9065,7 +9492,7 @@
     },
     "/api/admin/users/{user_id}": {
       "patch": {
-        "description": "[admin user management]",
+        "description": "Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]",
         "operationId": "updateUser",
         "parameters": [
           {
@@ -11153,7 +11580,7 @@
     },
     "/api/items": {
       "get": {
-        "description": "The queue and every filtered list of items, in `sort` order, one keyset page at a time.",
+        "description": "The queue and every filtered list of items, in `sort` order, one keyset page at a time.\n\n`sort=queue` (the default) with no `status` filter returns only the review queue: submitted, in_review,\nand needs_rereview. Pass `status` to sort other items in queue order.",
         "operationId": "listItems",
         "parameters": [
           {
@@ -11463,6 +11890,59 @@
               ],
               "description": "Submitted more than N days ago.",
               "title": "Waiting More Than Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved Before"
+            }
+          },
+          {
+            "description": "Approved in the last N days.",
+            "in": "query",
+            "name": "approved_within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Approved in the last N days.",
+              "title": "Approved Within Days"
             }
           },
           {
@@ -14999,6 +15479,59 @@
             }
           },
           {
+            "in": "query",
+            "name": "approved_after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved Before"
+            }
+          },
+          {
+            "description": "Approved in the last N days.",
+            "in": "query",
+            "name": "approved_within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Approved in the last N days.",
+              "title": "Approved Within Days"
+            }
+          },
+          {
             "description": "Has a placement running on or after this date.",
             "in": "query",
             "name": "run_from",
@@ -15481,6 +16014,59 @@
               ],
               "description": "Submitted more than N days ago.",
               "title": "Waiting More Than Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approved Before"
+            }
+          },
+          {
+            "description": "Approved in the last N days.",
+            "in": "query",
+            "name": "approved_within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Approved in the last N days.",
+              "title": "Approved Within Days"
             }
           },
           {
@@ -18221,7 +18807,7 @@
         ],
         "summary": "List Users",
         "tags": [
-          "admin"
+          "users"
         ]
       }
     },

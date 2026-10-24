@@ -5,28 +5,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
-  useMutation,
-  useQuery
+  useMutation
 } from '@tanstack/react-query';
 import type {
-  DataTag,
-  DefinedInitialDataOptions,
-  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
-  QueryFunction,
-  QueryKey,
-  UndefinedInitialDataOptions,
   UseMutationOptions,
-  UseMutationResult,
-  UseQueryOptions,
-  UseQueryResult
+  UseMutationResult
 } from '@tanstack/react-query';
 
 import type {
   DemoResetOut,
   ErrorOut,
-  ListUsersParams,
   UserCreateIn,
   UserOut,
   UserUpdateIn
@@ -38,21 +28,6 @@ import { customFetch } from '../../mutator';
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
-  const result = { queryKey } as T & { queryKey: K };
-  for (const key of Object.keys(query)) {
-    // The explicit queryKey always wins, matching the previous
-    // `{ ...query, queryKey }` spread where it was set last.
-    if (key === 'queryKey') continue;
-    Object.defineProperty(result, key, {
-      enumerable: true,
-      configurable: true,
-      get: () => (query as Record<string, unknown>)[key],
-    });
-  }
-  return result;
-};
 
 export const getResetDemoUrl = () => {
 
@@ -137,7 +112,7 @@ export const useResetDemo = <TError = ErrorOut,
 }
 
 /**
- * Admins provision accounts (no public signup). [admin user management]
+ * Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]
  * @summary Create User
  */
 export const createUser = async (userCreateIn: UserCreateIn, options?: Parameters<typeof customFetch>[1]): Promise<UserOut> => {
@@ -225,7 +200,7 @@ export const useCreateUser = <TError = ErrorOut,
 }
 
 /**
- * [admin user management]
+ * Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]
  * @summary Update User
  */
 export const updateUser = async (userId: number,
@@ -305,111 +280,3 @@ export const useUpdateUser = <TError = ErrorOut,
       > => {
       return useMutation(getUpdateUserMutationOptions(options), queryClient);
     }
-    export const getListUsersUrl = (params?: ListUsersParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/users?${stringifiedParams}` : `/api/users`
-}
-
-/**
- * People for pickers (assignee, @mention) and the admin user list.
- * @summary List Users
- */
-export const listUsers = async (params?: ListUsersParams, options?: Parameters<typeof customFetch>[1]): Promise<UserOut[]> => {
-
-  return customFetch<UserOut[]>(getListUsersUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListUsersQueryKey = (params?: ListUsersParams,) => {
-    return [
-    `/api/users`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListUsersQueryOptions = <TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorOut>(params?: ListUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListUsersQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUsers>>> = ({ signal }) => listUsers(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listUsers>>>
-export type ListUsersQueryError = ErrorOut
-
-
-export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorOut>(
- params: undefined |  ListUsersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listUsers>>,
-          TError,
-          Awaited<ReturnType<typeof listUsers>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorOut>(
- params?: ListUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listUsers>>,
-          TError,
-          Awaited<ReturnType<typeof listUsers>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorOut>(
- params?: ListUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List Users
- */
-
-export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorOut>(
- params?: ListUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListUsersQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-

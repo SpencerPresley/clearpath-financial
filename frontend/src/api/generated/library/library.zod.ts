@@ -18,6 +18,8 @@ export const listLibraryQuerySubmittedByMeDefault = false;
 export const listLibraryQueryUnassignedDefault = false;
 export const listLibraryQueryWaitingMoreThanDaysOneMin = 0;
 
+export const listLibraryQueryApprovedWithinDaysOneMin = 0;
+
 export const listLibraryQuerySortDefault = `updated`;
 export const listLibraryQueryLimitDefault = 50;
 export const listLibraryQueryLimitMax = 200;
@@ -44,6 +46,9 @@ export const ListLibraryQueryParams = zod.object({
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "waiting_more_than_days": zod.union([zod.int().min(listLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.'),
+  "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_within_days": zod.union([zod.int().min(listLibraryQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
   "run_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or before this date.'),
   "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title']).default(listLibraryQuerySortDefault),
@@ -101,6 +106,8 @@ export const searchLibraryQuerySubmittedByMeDefault = false;
 export const searchLibraryQueryUnassignedDefault = false;
 export const searchLibraryQueryWaitingMoreThanDaysOneMin = 0;
 
+export const searchLibraryQueryApprovedWithinDaysOneMin = 0;
+
 export const searchLibraryQueryQueryMax = 500;
 
 export const searchLibraryQueryModeDefault = `text`;
@@ -129,6 +136,9 @@ export const SearchLibraryQueryParams = zod.object({
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "waiting_more_than_days": zod.union([zod.int().min(searchLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.'),
+  "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_within_days": zod.union([zod.int().min(searchLibraryQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
   "run_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or before this date.'),
   "query": zod.string().min(1).max(searchLibraryQueryQueryMax),
@@ -141,8 +151,6 @@ export const SearchLibraryResponse = zod.object({
   "channel": zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script']),
   "item_id": zod.int(),
   "key": zod.string(),
-  "latest_decided_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
-  "latest_outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
   "partner_name": zod.union([zod.string(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
   "score": zod.number(),
@@ -152,8 +160,10 @@ export const SearchLibraryResponse = zod.object({
 })).describe('Plain-text parts; render highlighted parts with <mark>.'),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
   "title": zod.string(),
+  "version_decided_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "version_id": zod.int(),
-  "version_n": zod.int()
+  "version_n": zod.int(),
+  "version_outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).describe('The latest decision on the matched version (not the item\'s latest), or null if undecided.')
 })),
   "mode": zod.enum(['phrase', 'text']),
   "query": zod.string()

@@ -145,6 +145,8 @@ export const UpdatePartnerParams = zod.object({
 
 export const updatePartnerBodyContactEmailOneMax = 254;
 
+
+export const updatePartnerBodyContactEmailOneRegExp = new RegExp('^$|^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
 export const updatePartnerBodyNameOneMax = 200;
 
 export const updatePartnerBodyNotesOneMax = 10000;
@@ -155,7 +157,7 @@ export const updatePartnerBodyWebsiteOneMax = 200;
 
 export const UpdatePartnerBody = zod.object({
   "agreement_signed_on": zod.union([zod.iso.date(),zod.null()]).optional(),
-  "contact_email": zod.union([zod.string().max(updatePartnerBodyContactEmailOneMax),zod.null()]).optional(),
+  "contact_email": zod.union([zod.string().max(updatePartnerBodyContactEmailOneMax).regex(updatePartnerBodyContactEmailOneRegExp),zod.null()]).optional(),
   "name": zod.union([zod.string().min(1).max(updatePartnerBodyNameOneMax),zod.null()]).optional(),
   "notes": zod.union([zod.string().max(updatePartnerBodyNotesOneMax),zod.null()]).optional(),
   "status": zod.union([zod.enum(['active', 'paused', 'terminated']),zod.null()]).optional(),

@@ -203,6 +203,9 @@ export const getListItemsUrl = (params?: ListItemsParams,) => {
 
 /**
  * The queue and every filtered list of items, in `sort` order, one keyset page at a time.
+ *
+ * `sort=queue` (the default) with no `status` filter returns only the review queue: submitted, in_review,
+ * and needs_rereview. Pass `status` to sort other items in queue order.
  * @summary List Items
  */
 export const listItems = async (params?: ListItemsParams, options?: Parameters<typeof customFetch>[1]): Promise<ItemPageOut> => {

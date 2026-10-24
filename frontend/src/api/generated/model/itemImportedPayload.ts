@@ -4,9 +4,11 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { LegacyTimeline } from './legacyTimeline';
 
 export interface ItemImportedPayload {
   import_id: number;
   legacy_ref: string;
   row_number: number;
+  timeline?: LegacyTimeline;
 }

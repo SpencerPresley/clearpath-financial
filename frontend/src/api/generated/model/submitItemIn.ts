@@ -26,7 +26,11 @@ export interface SubmitItemIn {
   product: Product;
   /** Where the copy was fetched from. */
   source_url?: string | null;
-  /** @maxItems 20 */
+  /**
+     * @maxItems 20
+     * @items.minLength 1
+     * @items.maxLength 50
+     */
   tags?: string[];
   /**
      * @minLength 1

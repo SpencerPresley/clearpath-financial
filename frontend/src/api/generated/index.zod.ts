@@ -12,3 +12,4 @@ export * from './metrics/metrics.zod';
 export * from './notifications/notifications.zod';
 export * from './partners/partners.zod';
 export * from './terms/terms.zod';
+export * from './users/users.zod';

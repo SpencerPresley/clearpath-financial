@@ -12,3 +12,4 @@ export * from './metrics/metrics';
 export * from './notifications/notifications';
 export * from './partners/partners';
 export * from './terms/terms';
+export * from './users/users';

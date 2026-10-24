@@ -46,6 +46,12 @@ submitted_before?: string | null;
  * Submitted more than N days ago.
  */
 waiting_more_than_days?: number | null;
+approved_after?: string | null;
+approved_before?: string | null;
+/**
+ * Approved in the last N days.
+ */
+approved_within_days?: number | null;
 /**
  * Has a placement running on or after this date.
  */

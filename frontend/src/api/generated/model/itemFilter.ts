@@ -17,6 +17,10 @@ import type { RiskTier } from './riskTier';
  * like "My queue" works for whoever opens it.
  */
 export interface ItemFilter {
+  approved_after?: string | null;
+  approved_before?: string | null;
+  /** Approved in the last N days. */
+  approved_within_days?: number | null;
   assignee_id?: number[];
   channel?: Channel[];
   has_open_findings?: boolean | null;

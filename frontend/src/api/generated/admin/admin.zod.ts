@@ -17,7 +17,7 @@ export const ResetDemoResponse = zod.object({
 })
 
 /**
- * Admins provision accounts (no public signup). [admin user management]
+ * Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]
  * @summary Create User
  */
 export const createUserBodyDisplayNameMax = 120;
@@ -48,7 +48,7 @@ export const CreateUserResponse = zod.object({
 }).describe('A person as shown in pickers (assignee, @mention) and the admin user list.')
 
 /**
- * [admin user management]
+ * Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]
  * @summary Update User
  */
 export const UpdateUserParams = zod.object({
@@ -75,25 +75,4 @@ export const UpdateUserResponse = zod.object({
   "is_available": zod.boolean(),
   "roles": zod.array(zod.enum(['marketer', 'reviewer', 'lead', 'admin']))
 }).describe('A person as shown in pickers (assignee, @mention) and the admin user list.')
-
-/**
- * People for pickers (assignee, @mention) and the admin user list.
- * @summary List Users
- */
-export const listUsersQueryIncludeInactiveDefault = false;
-
-export const ListUsersQueryParams = zod.object({
-  "role": zod.union([zod.enum(['marketer', 'reviewer', 'lead', 'admin']),zod.null()]).optional(),
-  "include_inactive": zod.boolean().default(listUsersQueryIncludeInactiveDefault)
-})
-
-export const ListUsersResponseItem = zod.object({
-  "display_name": zod.string(),
-  "email": zod.string(),
-  "id": zod.int(),
-  "is_active": zod.boolean(),
-  "is_available": zod.boolean(),
-  "roles": zod.array(zod.enum(['marketer', 'reviewer', 'lead', 'admin']))
-}).describe('A person as shown in pickers (assignee, @mention) and the admin user list.')
-export const ListUsersResponse = zod.array(ListUsersResponseItem)
 

@@ -14,8 +14,6 @@ export interface SearchHitOut {
   channel: Channel;
   item_id: number;
   key: string;
-  latest_decided_at: string | null;
-  latest_outcome: DecisionOutcome | null;
   partner_name: string | null;
   product: Product;
   score: number;
@@ -23,6 +21,9 @@ export interface SearchHitOut {
   snippet: SnippetPartOut[];
   status: ItemStatus;
   title: string;
+  version_decided_at: string | null;
   version_id: number;
   version_n: number;
+  /** The latest decision on the matched version (not the item's latest), or null if undecided. */
+  version_outcome: DecisionOutcome | null;
 }

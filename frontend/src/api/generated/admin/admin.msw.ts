@@ -31,8 +31,6 @@ export const getCreateUserResponseMock = (overrideResponse: Partial<Extract<User
 
 export const getUpdateUserResponseMock = (overrideResponse: Partial<Extract<UserOut, object>> = {}): UserOut => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_active: faker.datatype.boolean(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
 
-export const getListUsersResponseMock = (): UserOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_active: faker.datatype.boolean(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role))})))
-
 
 export const getResetDemoMockHandler = (overrideResponse?: DemoResetOut | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<DemoResetOut> | DemoResetOut), options?: RequestHandlerOptions) => {
   return http.post('*/api/admin/demo/reset', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
@@ -69,21 +67,8 @@ export const getUpdateUserMockHandler = (overrideResponse?: UserOut | ((info: Pa
       })
   }, options)
 }
-
-export const getListUsersMockHandler = (overrideResponse?: UserOut[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<UserOut[]> | UserOut[]), options?: RequestHandlerOptions) => {
-  return http.get('*/api/users', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-
-
-    return HttpResponse.json(overrideResponse !== undefined
-    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
-    : getListUsersResponseMock(),
-      { status: 200
-      })
-  }, options)
-}
 export const getAdminMock = () => [
   getResetDemoMockHandler(),
   getCreateUserMockHandler(),
-  getUpdateUserMockHandler(),
-  getListUsersMockHandler()
+  getUpdateUserMockHandler()
 ]

@@ -11,6 +11,8 @@ import * as zod from 'zod';
  * Build an xlsx of the filtered items in the background; poll `getExport`. [workstream G]
  * @summary Create Export
  */
+export const createExportBodyFiltersApprovedWithinDaysOneMin = 0;
+
 export const createExportBodyFiltersMineDefault = false;
 export const createExportBodyFiltersQOneMax = 200;
 
@@ -22,6 +24,9 @@ export const createExportBodyIncludeEvidencePacksDefault = false;
 
 export const CreateExportBody = zod.object({
   "filters": zod.object({
+  "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
+  "approved_within_days": zod.union([zod.int().min(createExportBodyFiltersApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
   "assignee_id": zod.array(zod.int()).optional(),
   "channel": zod.array(zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script'])).optional(),
   "has_open_findings": zod.union([zod.boolean(),zod.null()]).optional(),
