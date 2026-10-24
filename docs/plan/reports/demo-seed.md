@@ -48,14 +48,14 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Verification
 
-- Backend, after rebasing on `c3fea39` (#40 drift follow-ups merged):
-  - `pytest`: 1794 passed;
+- Backend, after rebasing on `cdc026f` (#41 and #42 notifications inbox merged):
+  - `pytest`: 1803 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
   - the exported schema matches the committed one;
   - `make semgrep` reports 0 findings.
 - Frontend, after the rebase:
-  - `npm run test:run`: 645 passed;
+  - `npm run test:run`: 673 passed;
   - `typecheck`, `lint`, `format:check` and `build` are clean.
 - Demo tests (`backend/demo/tests/`, 45 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
@@ -84,6 +84,16 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
     (imported bars end the week of Aug 10; native starts Aug 17), `lead-partners`, and the new
     `reviewer-drift-cp7-restored` (as Rachel; the page buttons are lead/admin). That last one is the guide's path run live: Restore original page, Check now
     through the real worker (*unchanged*), and **Reaffirm v3** appears;
+  - #42's inbox on a fresh seed, opened for each login:
+    - every notification carries its event's backdated time;
+    - none is self-sent, and none is about a legacy item;
+    - anything older than two days is marked read by the reset (`UNREAD_WINDOW`);
+    - the unread ones are current: Dana 1 (CP-24 back for review), Sam 1, Nikhil 3 (new assignments);
+    - Rachel has 2 old mentions, Priya 19 decisions and re-reviews, admin none.
+
+    One product quirk shows here but isn't the seed's: a re-review gives the assignee two rows at the same instant,
+    "needs re-review · offer terms changed" (`notify_rereview`) and "is back for your review" (the sticky
+    re-assignment, `notify_assignee`);
   - I clicked Reset demo as admin while a marketer was also signed in: the job finished in about 10 s, a toast
     reported 42 items (44 since the drift stories), and both sessions survived.
 
