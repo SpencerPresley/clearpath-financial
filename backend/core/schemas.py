@@ -1,7 +1,10 @@
-from typing import Final, Literal
+from typing import Annotated, Final, Literal
 
-from ninja import Schema
+from ninja import Query, Schema
 from pydantic import Field, JsonValue
+
+# Page size for list endpoints: `limit: PageLimit = 50`.
+PageLimit = Annotated[int, Query(ge=1, le=200)]
 
 
 class HealthOut(Schema):

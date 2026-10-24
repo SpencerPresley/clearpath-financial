@@ -1,3 +1,5 @@
+from typing import Literal
+
 from ninja import Schema
 from pydantic import Field
 
@@ -43,3 +45,8 @@ class UserUpdateIn(Schema):
     roles: list[Role] | None = Field(default=None, min_length=1)
     is_active: bool | None = None
     is_available: bool | None = None
+
+
+class DemoResetOut(Schema):
+    status: Literal["started", "done"]
+    seeded_items: int

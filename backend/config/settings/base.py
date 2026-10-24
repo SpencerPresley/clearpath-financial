@@ -92,6 +92,10 @@ INSTALLED_APPS = [
     "checks",
     "audit",
     "notifications",
+    "imports",
+    "exports",
+    "metrics",
+    "assistant",
 ]
 
 MIDDLEWARE = [

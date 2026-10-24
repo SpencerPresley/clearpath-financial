@@ -10,6 +10,7 @@ HTML: version text is untrusted affiliate copy, and `ts_headline` doesn't escape
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Final
 
 from django.contrib.postgres.search import SearchHeadline, SearchQuery, SearchRank, TrigramWordSimilarity
@@ -21,6 +22,12 @@ from core.domain import Channel, DecisionOutcome, ItemStatus, Product
 from reviews.filters import ItemFilter
 from reviews.models import Decision, ReviewItem, Version
 from reviews.selectors import filter_items
+
+
+class SearchMode(StrEnum):
+    PHRASE = "phrase"
+    TEXT = "text"
+
 
 _START, _STOP = "\x02", "\x03"  # highlight markers: control characters ordinary copy never contains
 _CONTEXT: Final = 80

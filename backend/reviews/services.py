@@ -41,7 +41,8 @@ from core.domain import (
 from core.errors import InvalidInput, NotFound, NotPermitted
 from core.permissions import REVIEW_ROLES, has_role, require_role
 from partners.models import Partner
-from reviews.models import Attachment, Comment, ReviewItem, Version
+from reviews.filters import ItemFilter, ItemSort
+from reviews.models import Attachment, Comment, ReviewItem, SavedView, Version
 from reviews.risk import derive_risk_tier
 
 # --- submit ----------------------------------------------------------------------------------------------------
@@ -369,3 +370,34 @@ def add_attachment(
             at=now,
         )
     return AttachmentRef(id=attachment.pk, sha256=sha256)
+
+
+# --- saved views (personal UI preferences: no event) -----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NewSavedView:
+    name: str
+    filters: ItemFilter
+    sort: ItemSort
+    columns: tuple[str, ...] = ()
+
+
+def create_saved_view(*, actor: User, data: NewSavedView, clock: Clock = SYSTEM_CLOCK) -> int:
+    if SavedView.objects.filter(owner=actor, name=data.name).exists():
+        raise InvalidInput.for_field("name", "You already have a view with this name.")
+    view = SavedView.objects.create(
+        owner=actor,
+        name=data.name,
+        filters=data.filters.model_dump(mode="json"),
+        sort=data.sort.value,
+        columns=list(data.columns),
+        created_at=clock.now(),
+    )
+    return view.pk
+
+
+def delete_saved_view(*, actor: User, view_id: int) -> None:
+    deleted, _ = SavedView.objects.filter(owner=actor, pk=view_id).delete()
+    if not deleted:
+        raise NotFound.entity("saved view", view_id)

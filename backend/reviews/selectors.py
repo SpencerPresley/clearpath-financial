@@ -4,7 +4,6 @@ which other selectors (export, assistant tools, search) compose with."""
 from __future__ import annotations
 
 import base64
-import binascii
 import json
 import re
 from dataclasses import dataclass
@@ -26,7 +25,7 @@ from core.domain import (
     RiskTier,
     TakedownState,
 )
-from core.errors import InvalidInput
+from core.errors import InvalidInput, NotFound
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import QUEUE_STATUSES, Placement, ReviewItem
 
@@ -185,6 +184,13 @@ def row_queryset(qs: QuerySet[ReviewItem]) -> QuerySet[ReviewItem]:
     return qs.select_related("partner", "owner", "assignee").annotate(current_version_n=F("current_version__n"))
 
 
+def get_item_row(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemRow:
+    item = row_queryset(ReviewItem.objects.filter(pk=item_id)).first()
+    if item is None:
+        raise NotFound.entity("item", item_id)
+    return item_row(item, now=clock.now())
+
+
 # Sort keys: (column, kind). Every sort ends in id so the order is total, and each sort runs one direction,
 # so a page boundary is a single row-value comparison the indexes can seek to.
 _SORTS: Final[dict[ItemSort, tuple[bool, tuple[tuple[str, str], ...]]]] = {
@@ -228,7 +234,7 @@ def _decode_cursor(sort: ItemSort, cursor: str) -> list[Any]:
             datetime.fromisoformat(v) if kind == "datetime" else int(v) if kind == "int" else str(v)
             for v, (_, kind) in zip(values, keys, strict=True)
         ]
-    except (ValueError, KeyError, TypeError, binascii.Error) as exc:
+    except (ValueError, KeyError, TypeError) as exc:  # binascii.Error is a ValueError
         raise _bad_cursor() from exc
 
 

@@ -62,10 +62,10 @@ max-args = 8
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "PLR2004", "ANN", "ARG", "PLC0415", "SLF001", "FBT001"]
 "config/settings/*.py" = ["F405", "F403"]
-"**/api.py" = ["ARG001"]  # ninja passes request to every operation
+"**/api.py" = ["ARG001", "FBT001", "FBT002"]  # ninja passes request to every operation; bool query params
 "core/errors.py" = ["N818"]  # domain error names are fixed by the spec (InvalidTransition, NotPermitted, ...)
 
 [tool.pyrefly]
-project-includes = ["config", "core", "checks", "accounts", "conftest.py", "partners", "terms", "reviews", "audit", "notifications"]
+project-includes = ["config", "core", "checks", "accounts", "conftest.py", "partners", "terms", "reviews", "audit", "notifications", "imports", "exports", "metrics", "assistant"]
 project-excludes = ["**/migrations/**", "**/.venv/**", "**/__pycache__/**"]
 python-version = "3.13"

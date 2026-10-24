@@ -9,9 +9,18 @@ from ninja.security import django_auth
 
 from accounts.api import admin_router as accounts_admin_router
 from accounts.api import me_router
+from assistant.api import router as assistant_router
+from checks.api import router as findings_router
 from core.api import router as core_router
 from core.errors import DomainError
 from core.schemas import ErrorOut, FieldErrorOut
+from exports.api import router as exports_router
+from imports.api import router as imports_router
+from metrics.api import router as metrics_router
+from notifications.api import router as notifications_router
+from partners.api import router as partners_router
+from reviews.api import decisions_router, items_router, library_router
+from terms.api import router as terms_router
 
 
 def _respond(api: NinjaAPI, request: HttpRequest, body: ErrorOut, status: int) -> HttpResponse:
@@ -71,3 +80,14 @@ install_error_handlers(api)
 api.add_router("/", core_router)
 api.add_router("/", me_router)
 api.add_router("/", accounts_admin_router)
+api.add_router("/", items_router)
+api.add_router("/", decisions_router)
+api.add_router("/", library_router)
+api.add_router("/", findings_router)
+api.add_router("/", terms_router)
+api.add_router("/", partners_router)
+api.add_router("/", notifications_router)
+api.add_router("/", imports_router)
+api.add_router("/", exports_router)
+api.add_router("/", metrics_router)
+api.add_router("/", assistant_router)

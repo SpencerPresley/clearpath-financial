@@ -43,6 +43,37 @@ def test_headless_login_rejects_wrong_password(user_factory: UserFactory) -> Non
 
 
 @pytest.mark.django_db
+def test_update_me_availability_records_an_event(user_factory: UserFactory) -> None:
+    from audit.models import Event
+
+    user = user_factory(roles=[Role.REVIEWER])
+    client = Client()
+    client.force_login(user)
+
+    response = client.patch("/api/me", {"is_available": False}, content_type="application/json")
+    again = client.patch("/api/me", {"is_available": False}, content_type="application/json")
+
+    assert response.status_code == 200
+    assert response.json()["is_available"] is False
+    assert again.status_code == 200
+    assert list(Event.objects.values_list("type", "payload")) == [
+        ("user.availability_changed", {"user_id": user.pk, "is_available": False})
+    ]
+
+
+@pytest.mark.django_db
+def test_users_list_filters_by_role(user_factory: UserFactory) -> None:
+    reviewer = user_factory(roles=[Role.REVIEWER], display_name="Dana")
+    user_factory(roles=[Role.MARKETER])
+    client = Client()
+    client.force_login(reviewer)
+
+    users = client.get("/api/users?role=reviewer").json()
+
+    assert [u["id"] for u in users] == [reviewer.pk]
+
+
+@pytest.mark.django_db
 def test_me_requires_a_session() -> None:
     response = Client().get("/api/me")
 
