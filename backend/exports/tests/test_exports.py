@@ -131,13 +131,13 @@ def test_imported_legacy_items_export_with_tracker_people(
         )
 
     rows = {r[17]: r for r in _sheet(_file(job_id))[1:]}
-    assert len(rows) == 145
-    r13 = rows["MCR-25-012"]
-    assert (r13[2], r13[3], r13[11], r13[12]) == (
+    assert len(rows) == 139
+    r5 = rows["MCR-25-004"]
+    assert (r5[2], r5[3], r5[11], r5[12]) == (
         "Approved",
-        "Mortgage prequal",
-        "Elena Ruiz / Mortgage Marketing",
-        "Leah Brandt",
+        "Personal loan",
+        "Jordan Whitfield / Partnerships & Affiliates",
+        "Samuel Ortega",
     )
 
 

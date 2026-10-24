@@ -74,6 +74,7 @@ from demo.story import (
     Story,
     Submit,
     TermsSpec,
+    When,
 )
 from drift.demo import get_page, render_page, seed_placement
 from drift.fetcher import FetchedPage
@@ -161,9 +162,12 @@ class Runner:
     def run(self) -> RunResult:  # noqa: C901  # builds the timeline from five sources, then plays it
         catalog = self.catalog
         check_handlers.clock = self.clock  # the AI-request handler reads its clock from this seam
-        setup = catalog.partners_set_up.resolve(self.now)
+        go_live = catalog.go_live.resolve(self.now)
         for n, partner in enumerate(catalog.partners):
-            self._add(setup + timedelta(minutes=n), f"partner {partner.key}", lambda p=partner: self._partner(p))
+            # Entered at go-live, or the morning its agreement was signed if that came later.
+            signed = When(on=partner.agreement_signed_on, hhmm="09:00").resolve(self.now)
+            at = max(go_live, signed) + timedelta(minutes=n)
+            self._add(at, f"partner {partner.key}", lambda p=partner: self._partner(p))
         for spec in catalog.terms:
             self._add(spec.at.resolve(self.now), f"terms {spec.product}", lambda s=spec: self._publish(s))
         for event in catalog.events:

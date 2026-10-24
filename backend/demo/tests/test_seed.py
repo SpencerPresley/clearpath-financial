@@ -3,19 +3,25 @@
 import json
 from collections import Counter
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 
 import pytest
 from django.core.management import call_command
+from django.db import transaction
+from django.db.models import Max, Min
 
+from accounts.models import User
 from audit.models import Event, ProcessedEvent
 from audit.outbox import REGISTRY
 from checks.engine.registry import CODE_RULES
 from checks.models import CheckRun, Finding
+from core.clock import FixedClock
 from core.domain import (
     CheckStatus,
     DecisionLane,
     DriftResult,
+    DriftTrigger,
     EventType,
     FindingSource,
     FindingState,
@@ -25,11 +31,17 @@ from core.domain import (
     VersionOrigin,
 )
 from demo.content import CATALOG
+from demo.content.calendar import GO_LIVE
 from demo.reset import domain_tables, reset_demo
 from demo.runner import SeedError
 from demo.tests.conftest import NOW, Seeded
 from drift.compare import compare
-from drift.demo import PAGES, is_edited, page_url
+from drift.demo import PAGES, get_page, is_edited, page_url, render_page, reset_demo_pages, set_edited
+from drift.fetcher import FetchedPage
+from drift.services import claim, complete, request_check
+from notifications.models import OutboxEmail
+from reviews.decisions import reaffirm
+from reviews.errors import DriftNotRestored
 from reviews.models import Decision, Placement, ReviewItem, Snapshot, Version
 from terms.models import OfferTerms
 
@@ -99,22 +111,17 @@ def test_ai_results_are_persisted_and_scripted(seeded: Seeded) -> None:
 def test_legacy_import_matches_the_tracker_readme(seeded: Seeded) -> None:
     assert seeded.result.legacy_items == 178
     legacy = ReviewItem.objects.filter(is_legacy=True)
-    assert legacy.filter(partner__isnull=False).count() == 33  # joined to the seeded partners, not duplicates
+    assert legacy.filter(partner__isnull=False).count() == 36  # joined to the seeded partners, not duplicates
     assert Event.objects.filter(type=EventType.ITEM_IMPORTED.value).count() == 178
 
 
 def test_offer_terms_history_and_fast_track(seeded: Seeded) -> None:
     assert list(
         OfferTerms.objects.filter(product=Product.PERSONAL_LOAN).order_by("version").values_list("version")
-    ) == [
-        (1,),
-        (2,),
-        (3,),
-    ]
+    ) == [(1,), (2,)]
     assert OfferTerms.objects.filter(product=Product.CREDIT_CARD).count() == 2
     assert Version.objects.filter(origin=VersionOrigin.FAST_TRACK.value).count() >= 8
     assert Decision.objects.filter(lane=DecisionLane.FAST_TRACK.value).count() == 5
-    assert Decision.objects.filter(lane=DecisionLane.REAFFIRM.value).count() == 1
 
 
 def test_every_seeded_event_was_delivered_in_process(seeded: Seeded) -> None:
@@ -127,6 +134,26 @@ def test_every_seeded_event_was_delivered_in_process(seeded: Seeded) -> None:
 def test_the_seed_starts_no_background_work(seeded: Seeded) -> None:
     """No seeded version gets a live AI call, and the fan-out and import were done in-process, not enqueued."""
     assert seeded.enqueued == []
+
+
+def test_native_history_starts_at_go_live_after_the_tracker_ends(seeded: Seeded) -> None:
+    """The two histories meet without overlapping: every row the tracker brings in is dated before go-live, and
+    every event the seed writes (the import itself included) is at or after it. Moving GO_LIVE earlier, or a story
+    step before it, fails here."""
+    go_live = GO_LIVE.resolve(NOW)
+    legacy = ReviewItem.objects.filter(is_legacy=True)
+    dates = legacy.aggregate(submitted=Max("submitted_at"), approved=Max("approved_at"))
+    tracker_end = max(dates["submitted"], dates["approved"])
+    # The importer stores the tracker's day-only dates as UTC midnight.
+    assert tracker_end == datetime(2026, 8, 14, tzinfo=UTC)  # samples/README.md: the last tracker date
+    assert tracker_end < go_live
+    assert Event.objects.aggregate(first=Min("at"))["first"] == go_live
+    assert ReviewItem.objects.filter(is_legacy=False).aggregate(first=Min("submitted_at"))["first"] >= go_live
+
+
+def test_the_seed_sends_no_email(seeded: Seeded) -> None:
+    """Notifications (assignment, decisions, mentions, drift attention) are in-app; any email would land here."""
+    assert not OutboxEmail.objects.exists()
 
 
 def test_a_failing_reset_changes_nothing(seeded: Seeded) -> None:
@@ -166,6 +193,44 @@ def test_the_drift_rereview_comes_from_a_real_check(seeded: Seeded) -> None:
     ]
     assert reopened.payload["snapshot_id"] == modified.pk
     assert "7.99" in json.dumps(modified.diff)
+
+
+def test_the_guide_closes_cp7_by_restoring_the_page_then_reaffirming(seeded: Seeded) -> None:
+    """docs/demo.md, reviewer step 3: Reaffirm is refused while the page differs; Restore original page, Check
+    now (unchanged), then Reaffirm approves it. Rolled back afterwards, and the page put back to edited."""
+    item = ReviewItem.objects.get(title="LendCompare: best debt consolidation loans listing")
+    users = {p.key: User.objects.get(email=p.email) for p in CATALOG.personas}
+    clock = FixedClock(NOW + timedelta(minutes=5))
+    page = get_page("lendcompare")
+    assert page is not None
+    try:
+        with transaction.atomic():
+            with pytest.raises(DriftNotRestored):
+                reaffirm(actor=users["dana"], item_id=item.pk, reason="Partner fixed it.", clock=clock)
+
+            set_edited(actor=users["rachel"], slug="lendcompare", edited=False)
+            placement_id = Snapshot.objects.get(placement__item=item, result=DriftResult.MODIFIED.value).placement_id
+            snapshot_id = request_check(
+                actor=users["dana"], placement_id=placement_id, trigger=DriftTrigger.MANUAL, clock=clock
+            )
+            claimed = claim(snapshot_id=snapshot_id, clock=clock)
+            assert claimed is not None
+            html = render_page(page, edited=is_edited("lendcompare"), today=clock.today())
+            fetched = FetchedPage(
+                url=claimed.url, final_url=claimed.url, status=200, content_type="text/html", text=html
+            )
+            assert complete(claim=claimed, page=fetched, clock=clock).result is DriftResult.UNCHANGED
+
+            reaffirm(
+                actor=users["dana"], item_id=item.pk, reason="LendCompare restored the approved copy.", clock=clock
+            )
+            item.refresh_from_db()
+            assert item.status == ItemStatus.APPROVED.value
+            transaction.set_rollback(True)
+    finally:
+        reset_demo_pages(edited=frozenset({"lendcompare"}))
+    item.refresh_from_db()
+    assert item.status == ItemStatus.NEEDS_REREVIEW.value
 
 
 # docs/demo.md walks evaluators through these items by key.

@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Final
 
 from core.domain import CreditCardTerms, PartnerType, PersonalLoanTerms, Product, Role
-from demo.story import PartnerSpec, Persona, TermsSpec, day, on
+from demo.story import PartnerSpec, Persona, TermsSpec, day
 
 PERSONAS: Final = (
     # The four documented logins, one per role.
@@ -192,29 +192,24 @@ _CC_BASE: Final = {
     "issuing_bank": "Harborview Bank, N.A.",
 }
 
-# The PL floor history matches the tracker (8.99% until 6/1/26, then 9.49%); the demo adds a third change six days
-# before the seed so a terms-change re-review with fast-track versions is waiting in the queue.
+# The terms in force at go-live are entered that morning: the PL floor is 9.49%, where the tracker's 6/1/26 rate
+# sheet left it (the 8.99% era lives in the imported tracker). The demo adds a change six days before the seed so a
+# terms-change re-review with fast-track versions is waiting in the queue.
 PL_FLOOR_NOW: Final = Decimal("9.99")
 TERMS: Final = (
     TermsSpec(
         Product.PERSONAL_LOAN,
-        on(date(2025, 11, 3), "08:30"),
-        PersonalLoanTerms.model_validate({**_PL_BASE, "apr_min": Decimal("8.99")}),
-        "Rate sheet 2025-Q4, carried over from the tracker era.",
+        day(68, "08:30"),
+        PersonalLoanTerms.model_validate({**_PL_BASE, "apr_min": Decimal("9.49")}),
+        "Rate sheet of 6/1/26 (APR floor 9.49%), carried over from the tracker at go-live.",
     ),
     TermsSpec(
         Product.CREDIT_CARD,
-        on(date(2025, 11, 3), "08:40"),
+        day(68, "08:40"),
         CreditCardTerms.model_validate(
             {**_CC_BASE, "purchase_apr_min": Decimal("24.99"), "purchase_apr_max": Decimal("33.99")}
         ),
-        "Harborview program terms, 2025-Q4.",
-    ),
-    TermsSpec(
-        Product.PERSONAL_LOAN,
-        on(date(2026, 6, 1), "08:15"),
-        PersonalLoanTerms.model_validate({**_PL_BASE, "apr_min": Decimal("9.49")}),
-        "Rate sheet 6/1/26: APR floor 8.99% to 9.49% after the funding cost review.",
+        "Harborview program terms, carried over from the tracker at go-live.",
     ),
     TermsSpec(
         Product.CREDIT_CARD,

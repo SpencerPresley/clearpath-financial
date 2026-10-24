@@ -2,6 +2,7 @@
 
 from typing import Final
 
+from demo.content.calendar import GO_LIVE
 from demo.content.cards import CC_STORIES
 from demo.content.mortgages import MTG_STORIES
 from demo.content.people import PARTNERS, PERSONAS, TERMS
@@ -24,5 +25,5 @@ CATALOG: Final = Catalog(
         ),
         ImportTracker(day(1, "17:30")),
     ),
-    partners_set_up=day(200, "09:00"),
+    go_live=GO_LIVE,
 )

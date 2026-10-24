@@ -1,7 +1,8 @@
 # ClearPath demo
 
-The demo is ten weeks of a compliance team's work at a consumer lender: 44 items across personal loans, the
-ClearPath Card and mortgages, in every status, plus the 178 rows imported from the old Excel tracker. Every row
+The demo is a compliance team's first ten weeks on ClearPath at a consumer lender: 44 items across personal loans,
+the ClearPath Card and mortgages, in every status, plus the 178 rows imported from the Excel tracker they used
+until go-live (September 2025 to Friday 2026-08-14; the app's history starts the Monday after). Every row
 was made by the real services on a backdated clock (`backend/demo/`), so history, findings, decisions,
 comments, notifications and metrics are what the product itself would have recorded.
 
@@ -39,6 +40,9 @@ You land on **My queue**: five items, ordered by what to do first.
    approval" for "Guaranteed approval for most applicants", the guarantee taken out in round 1. **Details** →
    *Where it runs* shows the check and its diff; Dana's comment asks Jordan to get the approved copy back. The page
    is one ClearPath hosts for the demo (`/demo-partners/lendcompare/`), so you can open it and see the edit.
+   The decision bar offers **Check now** and **Pull**, not Reaffirm: the page still differs. Play the partner
+   fixing it: *Where it runs* → **Restore original page**, then **Check now**. The check comes back *unchanged*
+   and **Reaffirm** appears; reaffirming returns CP-7 to approved.
 4. **CP-26, Money with Maya: card payoff reel**. An influencer's second round: the "#ad" disclosure is fixed, and
    the AI flags a new urgency line ("Rates this low won't last") with a suggested rewrite.
 
@@ -53,9 +57,9 @@ she can also:
 
 - reassign anything (open any item, **Details**, assignee), and see **Unassigned** and **Waiting >3 days** across
   the team;
-- review **Offer terms**: personal loan v1, v2 and v3 (today's floor of 9.99%), and card v1 and v2 (the Prime
-  move). Each publish fanned out to the approvals that quoted it, which is where the four needs-re-review items
-  come from;
+- review **Offer terms**: personal loan v1 (the 9.49% floor carried over from the tracker at go-live) and v2
+  (today's 9.99%), and card v1 and v2 (the Prime move). Each publish fanned out to the approvals that quoted it,
+  which is where the terms re-reviews come from;
 - review **Partners**: ten partners (affiliate review sites and blogs, lead-gen shops, marketplaces, an
   influencer), each with its agreement attached;
 - run the drift monitor live: open **CP-23, CardScout: ClearPath Card review** (approved, live on CardScout's

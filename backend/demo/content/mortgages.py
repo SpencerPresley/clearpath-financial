@@ -18,7 +18,6 @@ from demo.story import (
     Dismiss,
     EditFields,
     Place,
-    Reaffirm,
     Resubmit,
     Story,
     Submit,
@@ -279,27 +278,28 @@ MTG_STORIES: Final = (
         product=P.MORTGAGE_PREQUAL,
         channel=Channel.PAID_SOCIAL,
         tags=("purchase", "meta", "evergreen"),
-        first_run=-184,
+        first_run=-66,
         versions=(
             "Shop with a number in mind.\n\n"
             "Get prequalified with ClearPath Home Lending in about 10 minutes, then tour homes knowing your budget. "
             f"{NOT_AN_APPROVAL}",
         ),
         steps=(
-            Submit(day(188, "10:00")),
-            Claim(day(187, "09:30")),
-            Checklist(day(187, "09:40")),
-            Decide(day(187, "09:45"), O.APPROVED, "No terms quoted; prequal described accurately."),
-            Place(day(186, "09:00"), "Meta: mortgage evergreen prospecting", first_run=-184),
-            EditFields(day(186, "09:30"), notes="Evergreen; Elena refreshes creative quarterly."),
-            Reaffirm(day(1, "10:05"), "Six-month review: copy unchanged and still running.", finds_new=True),
-            Dismiss(
-                day(1, "10:12"),
-                "human.reg_b_discouragement",
-                "New since the April approval: the Reg B 1002.4(b) rewrite took effect 7/21. Re-checked the current "
-                "creative and Meta audience settings; broad targeting, no exclusions.",
+            Submit(day(68, "10:00")),
+            Claim(day(67, "09:30")),
+            Checklist(
+                day(67, "09:40"),
+                notes=(
+                    (
+                        "human.reg_b_discouragement",
+                        "First review under the Reg B 1002.4(b) text effective 7/21: checked the creative and the "
+                        "Meta audience settings; broad targeting, no exclusions.",
+                    ),
+                ),
             ),
-            Reaffirm(day(1, "10:15"), "Six-month review: copy unchanged, still accurate under the current rules."),
+            Decide(day(67, "09:45"), O.APPROVED, "No terms quoted; prequal described accurately."),
+            Place(day(66, "09:00"), "Meta: mortgage evergreen prospecting", first_run=-66),
+            EditFields(day(66, "09:30"), notes="Evergreen; Elena refreshes creative quarterly."),
         ),
         expect=ItemStatus.APPROVED,
     ),

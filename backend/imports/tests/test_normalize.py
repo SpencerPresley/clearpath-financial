@@ -112,8 +112,8 @@ def test_expected_import_totals(result: NormalizedImport) -> None:
     assert result.counts.ready == 178
     assert len({r.source_ref for r in created}) == 177
     assert len({r.legacy_ref for r in created}) == 178
-    assert min(r.submitted_on for r in created if r.submitted_on) == date(2025, 11, 3)
-    assert max(r.submitted_on for r in created if r.submitted_on) == date(2026, 10, 20)
+    assert min(r.submitted_on for r in created if r.submitted_on) == date(2025, 9, 2)
+    assert max(r.submitted_on for r in created if r.submitted_on) == date(2026, 8, 12)
     assert result.unmapped == ()
     assert not [p for p in result.all_problems if p.severity is S.ERROR]
 
@@ -123,15 +123,15 @@ def test_expected_status_totals(result: NormalizedImport) -> None:
     totals = Counter((r.status, r.outcome) for r in created)
 
     assert totals == {
-        (ItemStatus.APPROVED, DecisionOutcome.APPROVED): 132,
-        (ItemStatus.APPROVED, DecisionOutcome.APPROVED_WITH_EDITS): 13,
-        (ItemStatus.CHANGES_REQUESTED, DecisionOutcome.CHANGES_REQUESTED): 11,
-        (ItemStatus.IN_REVIEW, None): 8,
-        (ItemStatus.REJECTED, DecisionOutcome.REJECTED): 6,
+        (ItemStatus.APPROVED, DecisionOutcome.APPROVED): 125,
+        (ItemStatus.APPROVED, DecisionOutcome.APPROVED_WITH_EDITS): 14,
+        (ItemStatus.CHANGES_REQUESTED, DecisionOutcome.CHANGES_REQUESTED): 10,
+        (ItemStatus.IN_REVIEW, None): 12,
+        (ItemStatus.REJECTED, DecisionOutcome.REJECTED): 9,
         (ItemStatus.SUBMITTED, None): 8,
     }
     open_rows = [r for r in created if r.status in {ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW}]
-    assert len(open_rows) == 16
+    assert len(open_rows) == 20
     assert sum(1 for r in open_rows if r.reviewer is None) == 8
 
 
@@ -139,8 +139,8 @@ def test_readme_totals_are_the_ones_asserted_here() -> None:
     # If the generator changes the sample, the hard-coded totals above must change with it.
     text = oracle.readme()
     assert "**Items after import: 178**, with 177 distinct Request IDs" in text
-    assert "Open (submitted or in review) on 2026-10-23: 16; unassigned: 8." in text
-    assert "| approved (decision: approved) | 132 |" in text
+    assert "Open (submitted or in review) on 2026-08-14: 20; unassigned: 8." in text
+    assert "| approved (decision: approved) | 125 |" in text
 
 
 # --- intended messiness, table by table ------------------------------------------------------------------------
@@ -223,7 +223,7 @@ def test_reused_request_id_is_two_items_with_a_disambiguated_ref(result: Normali
 
     assert (first.action, second.action) == (RowAction.CREATE, RowAction.CREATE)
     assert (first.legacy_ref, second.legacy_ref) == (mess.request_id, f"{mess.request_id}-b")
-    assert (first.submitted_on, second.submitted_on) == (date(2026, 7, 30), date(2026, 8, 4))
+    assert (first.submitted_on, second.submitted_on) == (date(2026, 5, 26), date(2026, 5, 27))
     assert (K.REUSED_REF, S.WARNING) in _kinds(second)
     assert (K.REUSED_REF, S.WARNING) not in _kinds(first)
 
@@ -296,7 +296,7 @@ def test_asset_links_from_hyperlinks_text_or_nothing(result: NormalizedImport, s
     text_url = oracle.link_rows("Asset Name / File Link", "Text containing a URL")
     no_link = oracle.link_rows("Asset Name / File Link", "Asset name only")
 
-    assert (len(hyperlinked), len(text_url), len(no_link)) == (112, 45, 22)
+    assert (len(hyperlinked), len(text_url), len(no_link)) == (96, 58, 25)
     for n in hyperlinked:
         assert rows[n].asset_url == raw[n].hyperlink
         assert rows[n].title == raw[n].text
@@ -319,7 +319,7 @@ def test_placement_links_from_hyperlinks_and_text(result: NormalizedImport, samp
     labelled = oracle.link_rows("Live URL / Placement & Screenshot Link", "Display text differs")
     text_url = oracle.link_rows("Live URL / Placement & Screenshot Link", "Text containing a URL")
 
-    assert (len(hyperlinked), len(text_url)) == (23, 72)
+    assert (len(hyperlinked), len(text_url)) == (7, 87)
     for n in hyperlinked:
         assert rows[n].placement_urls[0] == raw[n].hyperlink
     for n in labelled:
@@ -334,7 +334,7 @@ def test_placement_links_from_hyperlinks_and_text(result: NormalizedImport, samp
 
 def _raw_counts(sample_workbook: RawWorkbook, column: str) -> list[tuple[int, str | None]]:
     i = sample_workbook.tracker.headers.index(column)
-    return [(r.row_number, r.cells[i].text) for r in sample_workbook.tracker.rows if r.row_number != 19]
+    return [(r.row_number, r.cells[i].text) for r in sample_workbook.tracker.rows if r.row_number != 43]
 
 
 def _canonical_status(text: str) -> tuple[ItemStatus, DecisionOutcome | None]:
@@ -408,18 +408,13 @@ def test_comments_that_cross_new_year_roll_the_year(result: NormalizedImport) ->
         submitted = rows[n].submitted_on
         assert submitted is not None
         assert submitted.year == 2025
-    assert [s.on for s in rows[13].segments] == [
-        date(2025, 12, 17),
-        date(2025, 12, 19),
-        date(2026, 1, 9),
-        date(2026, 1, 15),
-    ]
+    assert [s.on for s in rows[37].segments] == [date(2025, 12, 11), date(2025, 12, 17), date(2026, 1, 5)]
 
 
 def test_approval_date_equals_the_last_round_on_every_approved_row(result: NormalizedImport) -> None:
     approved = [r for r in result.rows if r.action is RowAction.CREATE and r.status is ItemStatus.APPROVED]
 
-    assert len(approved) == 145
+    assert len(approved) == 139
     for row in approved:
         assert row.segments, row.legacy_ref
         assert row.approved_on == row.segments[-1].on, row.legacy_ref
@@ -510,7 +505,7 @@ def test_missing_required_mapping_is_a_sheet_problem(sample_workbook: RawWorkboo
 
 
 def test_refs_already_in_the_app_are_skipped(sample_workbook: RawWorkbook) -> None:
-    out = _run(sample_workbook, existing_refs=frozenset({"MCR-25-001", "MCR-26-101-b"}))
+    out = _run(sample_workbook, existing_refs=frozenset({"MCR-25-001", "MCR-26-077-b"}))
     rows = _by_row(out)
 
     assert rows[2].action is RowAction.SKIP_ALREADY_IMPORTED
@@ -522,7 +517,7 @@ def test_refs_already_in_the_app_are_skipped(sample_workbook: RawWorkbook) -> No
 
 def test_approval_dated_before_submission_blocks_the_row(sample_workbook: RawWorkbook) -> None:
     # Round dates roll forward from the submission year, so only an explicit approval date can precede it.
-    wb = _with_cell(sample_workbook, 2, "Approval Date & Approver", RawCell(text="10/1/25 - L. Brandt"))
+    wb = _with_cell(sample_workbook, 2, "Approval Date & Approver", RawCell(text="8/1/25 - L. Brandt"))
 
     row = _by_row(_run(wb))[2]
 
@@ -605,13 +600,13 @@ def test_only_web_links_are_kept() -> None:
 
 
 def test_a_ref_shaped_cell_on_an_otherwise_blank_row_is_not_data(sample_workbook: RawWorkbook) -> None:
-    wb = _with_cell(sample_workbook, 19, "Request ID", RawCell(text="179"))
+    wb = _with_cell(sample_workbook, 43, "Request ID", RawCell(text="179"))
 
-    assert _by_row(_run(wb))[19].action is RowAction.SKIP_NOT_DATA
+    assert _by_row(_run(wb))[43].action is RowAction.SKIP_NOT_DATA
 
 
 def test_approvers_resolve_from_the_reviewer_column_without_a_lists_sheet(sample_workbook: RawWorkbook) -> None:
     out = _run(sample_workbook.model_copy(update={"reviewers": ()}))
 
     assert not [p for p in out.all_problems if p.kind is K.UNRESOLVED_APPROVER]
-    assert _by_row(out)[13].approver == "Leah Brandt"
+    assert _by_row(out)[2].approver == "Leah Brandt"

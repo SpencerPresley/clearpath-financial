@@ -379,6 +379,6 @@ class Catalog:
     terms: tuple[TermsSpec, ...]
     stories: tuple[Story, ...]
     events: tuple[GlobalStep, ...]
-    partners_set_up: When  # when the lead entered the partners (before the first native item)
+    go_live: When  # the switch from the tracker: nothing native predates it (partners and terms are entered then)
     lead: str = "rachel"
     admin: str = "admin"
