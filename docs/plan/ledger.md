@@ -21,7 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 merged `9f4d228` | done; logins + guided paths in docs/demo.md |
 | Walkthrough review 1 | fresh reviewer | PR #45 merged | done: 4 blockers, 18 should-fix, 17 nits; no permission leaks | docs/plan/reviews/walkthrough-1.md |
-| Fixes: correctness | agent (worktree `fix/walkthrough-correctness`) | — | in progress | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
+| Fixes: correctness | agent (worktree) | PR #50 | final: S20 relink, Board/drawer age | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
 | Fixes: review screen | agent (worktree `fix/walkthrough-review-screen`) | — | in progress | B3, B4, S3 decision record, S5 drift naming, S6, S8 keyboard loop, S9, S11 Apply, S14, S17, nits |
 | Fixes: shell/global | agent (worktree `fix/walkthrough-shell`) | — | in progress | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
 | Fixes: import + users | agent (worktree `fix/walkthrough-import-users`) | — | in progress | S15 import demo, S16 users screen + availability + workload |
@@ -44,6 +44,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: on a terms publish, in-flight items whose quoted values all hold under the new version are re-linked to it (event recorded); approved items are never re-linked (decision records immutable).
 
 - Ruling: fast-track never approves an item with unresolved drift (backend-enforced, single + bulk) — found by the walkthrough as B1; a terms change must not launder a drift re-review.
 - Ruling: build the spec §1 lead/admin needs (users screen, availability toggle, workload view) rather than descoping them.
@@ -122,6 +124,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 - **UI work:** make-interfaces-feel-better skill; Playwright MCP or CLI for screenshots.
 
 ## Lessons
+
+- Parallel agents running Celery workers must each use their own Redis DB number (two agents shared redis db 7 and executed each other's jobs against the wrong database). Assign REDIS_URL db numbers in briefs.
 
 - First boot raced the NAT route: dnf works via the S3 gateway endpoint even without NAT, so a NAT-dependent download failed silently in cloud-init. Instance now depends_on the NAT route; downloads retry.
 - verify-client-ip.sh locks the operator's IP out of login for several minutes; run it last.
