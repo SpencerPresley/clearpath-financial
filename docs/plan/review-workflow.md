@@ -137,14 +137,15 @@ reopen_item(*, item_id, reason: ReopenReason, clock, actor=None, offer_terms_id=
 expire_item(*, item_id, reason: ReopenReason, clock, actor=None, offer_terms_id=None,
             generated_version_id=None) -> int  # approved -> expired
 send_back(*, item_id, reason, clock, ...) -> int   # live ? reopen_item : expire_item  (F's fan-out entry)
-run_expiry_sweep(*, clock) -> SweepResult(reopened, expired, warned)   # Celery: reviews.expiry_sweep (daily)
+run_expiry_sweep(*, clock) -> SweepResult(reopened, expired, warned, skipped)   # Celery: reviews.expiry_sweep
 
 # reviews.placements
 record_placement(*, actor, item_id, data: PlacementInput, clock) -> int
 update_placement(*, actor, placement_id, changes: PlacementChanges, clock) -> None
 confirm_takedown(*, actor, placement_id, clock) -> None
 # reviews.selectors
-is_item_live(*, item_id, today) -> bool;  library scope: LibraryScope.APPROVED_TO_RUN | EVER_APPROVED
+is_item_live(*, item_id, today) -> bool
+library_items(*, viewer, filters, scope: LibraryScope = APPROVED_TO_RUN | EVER_APPROVED, sort, cursor, limit, clock) -> ItemPage
 
 # checks.services — the only writer of Finding/TermsRef/CheckRun and of item.open_findings_count
 run_code_checks(*, version, clock) -> PersistedChecks(result, open_findings_count)
