@@ -48,7 +48,7 @@ function summary(rows: readonly WorkloadOut[]): string {
 function PoolCell({ row }: { row: WorkloadOut }) {
   if (!row.is_available) return <AwayMark />;
   if (!row.auto_assigned) return <span className="text-muted">Not auto-assigned</span>;
-  return <span className="text-muted">Auto-assigned</span>;
+  return <span className="text-muted">Gets new work</span>;
 }
 
 export function WorkloadPanel({ onPick }: { onPick: (search: QueueSearch) => void }) {
@@ -104,13 +104,8 @@ export function WorkloadPanel({ onPick }: { onPick: (search: QueueSearch) => voi
                   <th scope="col" className="app-workload-num">
                     Open
                   </th>
-                  <th
-                    scope="col"
-                    title="High 3, medium 2, low 1 per open item: what auto-assignment compares"
-                  >
-                    Load
-                  </th>
-                  <th scope="col">Assignment</th>
+                  <th scope="col">Load</th>
+                  <th scope="col">New work</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,6 +142,12 @@ export function WorkloadPanel({ onPick }: { onPick: (search: QueueSearch) => voi
                 ))}
               </tbody>
             </table>
+          )}
+          {workload.data !== undefined && rows.length > 0 && (
+            <p className="app-workload-key">
+              Load counts each open item by risk: high 3, medium 2, low 1. New items go to the lowest load
+              among reviewers who get new work.
+            </p>
           )}
         </div>
       )}

@@ -19,6 +19,7 @@ import type {
   ImportProblemOut,
 } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
+import { ButtonLink } from '../../ui/ButtonLink';
 import { Icon } from '../../ui/Icon';
 import type { IconKey } from '../../ui/icons';
 import { formatDate, plural } from '../../ui/labels';
@@ -52,10 +53,13 @@ export function ProblemTable({
   label,
   problems,
   rows,
+  committed = false,
 }: {
   label: string;
   problems: readonly ImportProblemOut[];
   rows: readonly ImportPreviewRowOut[];
+  /** Past tense: what commit did. */
+  committed?: boolean;
 }) {
   const actions = new Map(rows.map((r) => [r.row_number, r.action]));
   return (
@@ -69,7 +73,7 @@ export function ProblemTable({
       </colgroup>
       <thead>
         <tr>
-          {['Row', 'Column', 'Value', 'Outcome', 'What happens'].map((h) => (
+          {['Row', 'Column', 'Value', 'Outcome', committed ? 'What happened' : 'What happens'].map((h) => (
             <th key={h} className="app-th" scope="col">
               <span className="app-th-label">{h}</span>
             </th>
@@ -79,7 +83,7 @@ export function ProblemTable({
       <tbody>
         {problems.map((p, i) => {
           const action = p.row_number === null ? undefined : actions.get(p.row_number);
-          const result = problemOutcome(p.kind, action);
+          const result = problemOutcome(p.kind, action, committed);
           return (
             <tr key={`${String(p.row_number)}-${p.kind}-${String(i)}`} className="app-tr">
               <td className="app-td app-figure">{p.row_number ?? 'Sheet'}</td>
@@ -126,10 +130,12 @@ export function ProblemGroups({
   problems,
   rows,
   expandFirst = true,
+  committed = false,
 }: {
   problems: readonly ImportProblemOut[];
   rows: readonly ImportPreviewRowOut[];
   expandFirst?: boolean;
+  committed?: boolean;
 }) {
   const groups = SEVERITY_GROUPS.map((g) => ({
     ...g,
@@ -163,7 +169,7 @@ export function ProblemGroups({
             </AriaButton>
           </Heading>
           <DisclosurePanel className="app-import-group-panel">
-            <ProblemTable label={g.title} problems={g.problems} rows={rows} />
+            <ProblemTable label={g.title} problems={g.problems} rows={rows} committed={committed} />
           </DisclosurePanel>
         </Disclosure>
       ))}
@@ -172,7 +178,7 @@ export function ProblemGroups({
 }
 
 /** "178 rows already imported from this tracker", with the import they came from when there's one. */
-function AlreadyImported({ preview }: { preview: ImportPreviewOut }) {
+function AlreadyImported({ preview, withLink }: { preview: ImportPreviewOut; withLink: boolean }) {
   const n = preview.counts.already_imported;
   const source = preview.already_imported_from;
   return (
@@ -180,16 +186,16 @@ function AlreadyImported({ preview }: { preview: ImportPreviewOut }) {
       <Icon name="feedback.info" size={16} className="app-import-info-icon" />
       <span>
         {plural(n, 'row')} already imported from this tracker
+        {source?.committed_at != null && ` on ${formatDate(source.committed_at)}`}
         {source !== null && (
           <>
             {' '}
-            by <span className="app-import-file">{source.filename}</span>
-            {source.committed_at !== null && ` on ${formatDate(source.committed_at)}`}
+            (<span className="app-import-file">{source.filename}</span>)
           </>
         )}
         . {n === 1 ? 'It isn’t' : 'They aren’t'} imported again.
       </span>
-      {source !== null && (
+      {withLink && source !== null && (
         <Link
           to="/import"
           search={{ job: source.job_id, step: 'preview' }}
@@ -226,6 +232,11 @@ export function PreviewStep({
     preview.rows.filter((r) => r.action === 'skip_already_imported').map((r) => r.row_number),
   );
   const problems = preview.problems.filter((p) => p.row_number === null || !already.has(p.row_number));
+  // Everything is already in (the sample after a seed): no disabled Import button, the next step is the import
+  // that brought the rows in.
+  const source = preview.already_imported_from;
+  const nothingNew =
+    counts.ready === 0 && counts.already_imported > 0 && counts.blocked === 0 && unmapped === 0 && !failed;
   return (
     <div className="app-import-step">
       <header className="app-import-step-head">
@@ -243,9 +254,21 @@ export function PreviewStep({
         </p>
       )}
       <Counts items={previewCounts(counts, committed)} />
-      {counts.already_imported > 0 && !committed && <AlreadyImported preview={preview} />}
-      <ProblemGroups problems={problems} rows={preview.rows} />
-      {!committed && (
+      {counts.already_imported > 0 && !committed && (
+        <AlreadyImported preview={preview} withLink={!nothingNew} />
+      )}
+      <ProblemGroups problems={problems} rows={preview.rows} committed={committed} />
+      {!committed && nothingNew && (
+        <footer className="app-import-actions">
+          {source !== null && (
+            <ButtonLink to="/import" search={{ job: source.job_id, step: 'preview' }} variant="primary">
+              See how each row was imported
+            </ButtonLink>
+          )}
+          <p className="app-import-note">Nothing new to import.</p>
+        </footer>
+      )}
+      {!committed && !nothingNew && (
         <footer className="app-import-actions">
           <Button variant="primary" isDisabled={committing || counts.ready === 0} onPress={onCommit}>
             {committing
@@ -261,11 +284,7 @@ export function PreviewStep({
               {commitError}
             </p>
           ) : counts.ready === 0 ? (
-            <p className="app-import-note">
-              {counts.already_imported > 0 && counts.blocked === 0 && unmapped === 0
-                ? 'Nothing new to import.'
-                : 'Nothing to import: fix the mapping or the sheet first.'}
-            </p>
+            <p className="app-import-note">Nothing to import: fix the mapping or the sheet first.</p>
           ) : (
             counts.blocked > 0 && (
               <p className="app-import-note">

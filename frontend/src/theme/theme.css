@@ -3052,7 +3052,7 @@
     @apply text-ui text-base-content;
   }
   .app-import-info-link {
-    @apply ml-auto text-ui;
+    @apply ml-auto text-ui font-medium text-primary underline underline-offset-2;
   }
   .app-import-fixed {
     @apply block truncate px-2 text-ui text-base-content;
@@ -4160,8 +4160,32 @@
     transition-duration: 120ms;
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   }
+  /* 24px tall in a dense row; the pseudo-element takes the hit area to 40px vertically without overlap. */
+  .app-users-role::after {
+    content: '';
+    @apply absolute inset-x-0 -inset-y-2;
+  }
+  .app-users-role {
+    @apply relative;
+  }
   .app-users-role[data-hovered] {
     @apply border-base-content/30 text-base-content;
+  }
+  .app-users-role[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-users-you {
+    @apply text-meta font-normal text-muted;
+  }
+  .app-btn.app-users-deactivate {
+    @apply text-muted;
+  }
+  .app-btn.app-users-deactivate[data-hovered] {
+    @apply text-status-error;
+  }
+  .app-btn.app-users-deactivate[data-disabled] {
+    @apply opacity-50;
   }
   .app-users-role[data-pressed] {
     scale: 0.96;
@@ -4233,7 +4257,14 @@
     @apply w-16 text-right;
   }
   .app-workload-link {
-    @apply relative cursor-default rounded-xs px-1 font-medium text-primary underline-offset-2 outline-none;
+    @apply relative cursor-default rounded-xs px-1 font-medium text-primary underline underline-offset-2 outline-none;
+  }
+  .app-workload-link[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-workload-key {
+    @apply mt-1.5 text-meta text-muted;
   }
   /* A 40px-tall hit area around a one-digit link, without moving the row. */
   .app-workload-link::after {
@@ -4241,7 +4272,7 @@
     @apply absolute -inset-x-2 -inset-y-2;
   }
   .app-workload-link[data-hovered] {
-    @apply underline;
+    text-decoration-thickness: 2px;
   }
   .app-workload-load {
     @apply inline-flex w-40 items-center gap-2;

@@ -26,7 +26,7 @@ test('import: load the sample, keep the column guesses, preview, commit, and ope
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Warnings · 4/ })).toBeVisible();
   await expect(
-    page.getByRole('table', { name: 'Warnings' }).getByRole('row', { name: /^92 .*Imported under a new ID/ }),
+    page.getByRole('table', { name: 'Warnings' }).getByRole('row', { name: /^92 .*Imports under a new ID/ }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Import 178 items' }).click();
@@ -58,6 +58,6 @@ test('import: after a seed, the sample says its rows are already imported and op
     'href',
     '/import?job=1&step=preview',
   );
-  await expect(page.getByRole('button', { name: 'Import 0 items' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Import 0 items' })).toHaveCount(0);
   await expect(page.getByText('Nothing new to import.')).toBeVisible();
 });

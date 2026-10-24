@@ -362,8 +362,8 @@ describe('Import: steps', () => {
     renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
 
     const warnings = await screen.findByRole('table', { name: 'Warnings' });
-    expect(within(warnings).getByRole('row', { name: /^41 .*Imported, date from last round/ })).toBeVisible();
-    expect(within(warnings).getByRole('row', { name: /^23 .*Imported, partner matched/ })).toBeVisible();
+    expect(within(warnings).getByRole('row', { name: /^41 .*Imports, date from last round/ })).toBeVisible();
+    expect(within(warnings).getByRole('row', { name: /^23 .*Imports, partner matched/ })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: /^Info · / }));
     const info = screen.getByRole('table', { name: 'Info' });
     expect(within(info).getByRole('row', { name: /^19 .*Skipped: not a tracker row/ })).toBeVisible();
@@ -386,7 +386,8 @@ describe('Import: steps', () => {
     expect(screen.queryByText(/is already imported; skipped/)).toBeNull();
     expect(screen.getByRole('button', { name: /^Info · 2$/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('table', { name: 'Info' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Import 0 items' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Import 0 items' })).toBeNull();
+    expect(screen.getByText('Nothing new to import.')).toBeVisible();
   });
 
   it('keeps a finished import’s steps viewable, read-only, with what each row became', async () => {

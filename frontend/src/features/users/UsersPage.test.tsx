@@ -115,9 +115,9 @@ describe('Users', () => {
     expect(within(me).getByRole('button', { name: 'Deactivate Morgan Admin' })).toBeDisabled();
     expect(within(me).getByText('You')).toBeInTheDocument();
     await userEvent.click(within(me).getByRole('button', { name: 'Admin' }));
-    expect(
-      await screen.findByText('Morgan Admin is the only admin. Make someone else an admin first.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't change Morgan Admin: Morgan Admin is the only admin. Make someone else an admin first.",
+    );
     expect(within(await row(/Morgan Admin/)).getByRole('button', { name: 'Admin' })).toHaveAttribute(
       'aria-pressed',
       'true',

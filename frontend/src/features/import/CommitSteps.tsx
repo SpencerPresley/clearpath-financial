@@ -203,7 +203,7 @@ export function ImportSummary({
           )}
           {warnings.length > 0 && (
             <SummarySection title="Warnings" count={warnings.length} icon="severity.warning">
-              <ProblemTable label="Warnings" problems={warnings} rows={rows} />
+              <ProblemTable label="Warnings" problems={warnings} rows={rows} committed />
             </SummarySection>
           )}
         </div>

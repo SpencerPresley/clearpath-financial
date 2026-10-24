@@ -72,26 +72,27 @@ export const SEVERITY_GROUPS: readonly { severity: ProblemSeverity; title: strin
  * typecheck here. Kinds that only ever skip a row (errors, duplicates, notes) read from SKIP_OUTCOME instead.
  */
 const IMPORTED_OUTCOME: Record<ImportProblemKind, string> = {
-  coerced_date: 'Imported, date read from text',
-  inferred_status: 'Imported, status inferred',
-  fuzzy_partner: 'Imported, partner matched',
-  derived_approval_date: 'Imported, date from last round',
-  missing_expiry: 'Imported, no expiry',
-  unknown_trigger_terms: 'Imported, trigger terms blank',
-  unresolved_approver: 'Imported, approver as typed',
-  reused_ref: 'Imported under a new ID',
-  unparseable_date: 'Imported, date left blank',
-  unknown_value: 'Imported, value left blank',
-  unknown_partner: 'Imported with a note',
-  unmapped_status: 'Imported with a note',
-  missing_value: 'Imported with a note',
-  missing_mapping: 'Imported with a note',
-  inconsistent_dates: 'Imported with a note',
-  duplicate_row: 'Imported with a note',
-  already_imported: 'Imported with a note',
-  not_data_row: 'Imported with a note',
+  coerced_date: ', date read from text',
+  inferred_status: ', status inferred',
+  fuzzy_partner: ', partner matched',
+  derived_approval_date: ', date from last round',
+  missing_expiry: ', no expiry',
+  unknown_trigger_terms: ', trigger terms blank',
+  unresolved_approver: ', approver as typed',
+  reused_ref: ' under a new ID',
+  unparseable_date: ', date left blank',
+  unknown_value: ', value left blank',
+  unknown_partner: ' with a note',
+  unmapped_status: ' with a note',
+  missing_value: ' with a note',
+  missing_mapping: ' with a note',
+  inconsistent_dates: ' with a note',
+  duplicate_row: ' with a note',
+  already_imported: ' with a note',
+  not_data_row: ' with a note',
 };
 
+// A row's skip is the same sentence before and after commit: it's the row's state, not an action taken on it.
 const SKIP_OUTCOME: Record<Exclude<RowAction, 'create'>, string> = {
   blocked: 'Skipped: errors',
   skip_duplicate: 'Skipped: duplicate',
@@ -99,10 +100,18 @@ const SKIP_OUTCOME: Record<Exclude<RowAction, 'create'>, string> = {
   skip_not_data: 'Skipped: not a tracker row',
 };
 
-/** The Outcome cell for one problem: what its row's action did with it. A sheet-level problem has no row. */
-export function problemOutcome(kind: ImportProblemKind, action: RowAction | undefined): string {
+/**
+ * The Outcome cell for one problem: what its row's action does with it ("Imports, date from last round"), or did,
+ * once committed ("Imported, …"). A sheet-level problem has no row.
+ */
+export function problemOutcome(
+  kind: ImportProblemKind,
+  action: RowAction | undefined,
+  committed = false,
+): string {
   if (action === undefined) return '—';
-  return action === 'create' ? IMPORTED_OUTCOME[kind] : SKIP_OUTCOME[action];
+  if (action !== 'create') return SKIP_OUTCOME[action];
+  return `${committed ? 'Imported' : 'Imports'}${IMPORTED_OUTCOME[kind]}`;
 }
 
 /** Statuses an imported row can take (backend IMPORTABLE_STATUSES). */

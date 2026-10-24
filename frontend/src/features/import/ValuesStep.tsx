@@ -209,7 +209,7 @@ export function ValuesStep({
             </colgroup>
             <thead>
               <tr>
-                {['Value in the sheet', 'Rows', 'Imports as', 'From'].map((h) => (
+                {['Value in the sheet', 'Rows', readOnly ? 'Imported as' : 'Imports as', 'From'].map((h) => (
                   <th key={h} className="app-th" scope="col">
                     <span className="app-th-label">{h}</span>
                   </th>

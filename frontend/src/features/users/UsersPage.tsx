@@ -55,7 +55,7 @@ function UserRow({
       <th scope="row" className="app-td app-users-person">
         <span className="app-users-name">
           {name}
-          {isYou && <span className="app-badge app-badge-outline">You</span>}
+          {isYou && <span className="app-users-you">You</span>}
         </span>
         <span className="app-users-email">{user.email}</span>
       </th>
@@ -88,16 +88,16 @@ function UserRow({
       </td>
       <td className="app-td">
         {doesReviewWork(user.roles) && user.is_active ? (
-          <span className="app-users-availability">
-            <Switch
-              aria-label={`${name} available`}
-              isSelected={user.is_available}
-              onChange={(is_available) => {
-                onUpdate({ is_available });
-              }}
-            />
+          // The status text sits inside the switch, so the whole label is the hit area.
+          <Switch
+            aria-label={`${name} available`}
+            isSelected={user.is_available}
+            onChange={(is_available) => {
+              onUpdate({ is_available });
+            }}
+          >
             {user.is_available ? <span>Available</span> : <AwayMark />}
-          </span>
+          </Switch>
         ) : (
           <span className="text-muted">—</span>
         )}
@@ -105,17 +105,26 @@ function UserRow({
       <td className="app-td">
         <span className="app-users-active">
           {user.is_active ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              isDisabled={isYou}
-              aria-label={`Deactivate ${name}`}
-              onPress={() => {
-                onUpdate({ is_active: false });
-              }}
-            >
-              Deactivate
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="app-users-deactivate"
+                isDisabled={isYou}
+                aria-label={`Deactivate ${name}`}
+                aria-describedby={isYou ? 'users-self-note' : undefined}
+                onPress={() => {
+                  onUpdate({ is_active: false });
+                }}
+              >
+                Deactivate
+              </Button>
+              {isYou && (
+                <span id="users-self-note" className="sr-only">
+                  You can&apos;t deactivate your own account.
+                </span>
+              )}
+            </>
           ) : (
             <>
               <span className="app-users-deactivated">Deactivated</span>
@@ -259,6 +268,8 @@ export function UsersPage() {
       {update.error !== null && (
         <p className="app-import-banner" role="alert">
           <Icon name="feedback.error" size={16} />
+          Couldn&apos;t change{' '}
+          {users.data?.find((u) => u.id === update.error?.userId)?.display_name ?? 'that account'}:{' '}
           {update.error.message}
         </p>
       )}

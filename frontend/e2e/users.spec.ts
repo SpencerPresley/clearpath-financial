@@ -35,7 +35,7 @@ test('admin: Users and Metrics are in the nav; mark a reviewer back in office an
     .getByRole('button', { name: 'Admin', exact: true })
     .click();
   await expect(page.getByRole('alert')).toHaveText(
-    'Morgan Admin is the only admin. Make someone else an admin first.',
+    "Couldn't change Morgan Admin: Morgan Admin is the only admin. Make someone else an admin first.",
   );
 
   expect(api.posted.map((p) => `${p.method} ${p.path} ${JSON.stringify(p.body)}`)).toEqual([
