@@ -30,6 +30,7 @@ def make_item(owner: User | None, **overrides: Any) -> ReviewItem:
         "updated_at": AT,
     }
     fields.update(overrides)
+    fields.setdefault("queue_entered_at", fields["submitted_at"])
     return ReviewItem.objects.create(**fields)
 
 

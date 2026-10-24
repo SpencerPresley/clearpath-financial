@@ -47,7 +47,7 @@ export const ListLibraryQueryParams = zod.object({
   "reopen_reason": zod.array(zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')).optional(),
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "waiting_more_than_days": zod.union([zod.int().min(listLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.'),
+  "waiting_more_than_days": zod.union([zod.int().min(listLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).'),
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_within_days": zod.union([zod.int().min(listLibraryQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
@@ -62,7 +62,7 @@ export const ListLibraryQueryParams = zod.object({
 export const ListLibraryResponse = zod.object({
   "next_cursor": zod.union([zod.string(),zod.null()]).describe('Pass as `cursor` for the next page; null on the last page.'),
   "rows": zod.array(zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -98,11 +98,12 @@ export const ListLibraryResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -151,7 +152,7 @@ export const SearchLibraryQueryParams = zod.object({
   "reopen_reason": zod.array(zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')).optional(),
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "waiting_more_than_days": zod.union([zod.int().min(searchLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.'),
+  "waiting_more_than_days": zod.union([zod.int().min(searchLibraryQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).'),
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_within_days": zod.union([zod.int().min(searchLibraryQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),

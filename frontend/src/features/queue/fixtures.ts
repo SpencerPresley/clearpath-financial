@@ -128,6 +128,7 @@ export function makeRow(overrides: Partial<ItemRowOut> = {}, now: Date = new Dat
     approval_expires_at: null,
     latest_decision: null,
     submitted_at: ago(3 * DAY + 2 * HOUR, now),
+    queue_entered_at: overrides.submitted_at ?? ago(3 * DAY + 2 * HOUR, now),
     updated_at: ago(5 * HOUR, now),
     ...overrides,
   };
@@ -136,7 +137,15 @@ export function makeRow(overrides: Partial<ItemRowOut> = {}, now: Date = new Dat
 /** A realistic first page of a reviewer's queue, already in queue order (re-reviews, then risk, then age). */
 export function queueRows(now: Date = new Date()): ItemRowOut[] {
   const r = (o: Partial<ItemRowOut>, days: number) =>
-    makeRow({ ...o, age_days: days, submitted_at: ago(days * DAY + 3 * HOUR, now) }, now);
+    makeRow(
+      {
+        ...o,
+        age_days: days,
+        submitted_at: ago(days * DAY + 3 * HOUR, now),
+        queue_entered_at: ago(days * DAY + 3 * HOUR, now),
+      },
+      now,
+    );
   return [
     r(
       {

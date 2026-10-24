@@ -148,6 +148,20 @@ export function formatMonth(value: DateValue): string {
   return format(MONTH_FORMAT, value);
 }
 
+/** "Oct 22, 2026, 2:40 PM": a moment, as tooltips and records show it (the same format as `formatDate` plus time). */
+export function formatDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+}
+
 /** "12.4 KB". */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;

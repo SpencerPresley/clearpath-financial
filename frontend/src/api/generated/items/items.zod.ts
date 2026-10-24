@@ -57,7 +57,7 @@ export const ListItemsQueryParams = zod.object({
   "reopen_reason": zod.array(zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')).optional(),
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "waiting_more_than_days": zod.union([zod.int().min(listItemsQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.'),
+  "waiting_more_than_days": zod.union([zod.int().min(listItemsQueryWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).'),
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_within_days": zod.union([zod.int().min(listItemsQueryApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
@@ -71,7 +71,7 @@ export const ListItemsQueryParams = zod.object({
 export const ListItemsResponse = zod.object({
   "next_cursor": zod.union([zod.string(),zod.null()]).describe('Pass as `cursor` for the next page; null on the last page.'),
   "rows": zod.array(zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -107,11 +107,12 @@ export const ListItemsResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -150,7 +151,7 @@ export const SubmitItemBody = zod.object({
 })
 
 export const SubmitItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "approved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "assignee": zod.union([zod.object({
@@ -189,7 +190,7 @@ export const SubmitItemResponse = zod.object({
   "drift_rereview": zod.union([zod.object({
   "placement_id": zod.int(),
   "restored": zod.boolean().describe('The placement\'s latest finished check found the approved copy unchanged.')
-}),zod.null()]).describe('needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has.'),
+}),zod.null()]).describe('needs_rereview only, for any reopen reason: the live placement whose page differs from the approved copy (latest check modified or missing), else the placement whose check sent the item back for drift, and whether its latest check found the approved copy again. Reaffirm and Fast-track are refused (409 drift_not_restored) while restored is false. Null when no check found the page changed.'),
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "is_prescreen": zod.boolean(),
@@ -245,6 +246,7 @@ export const SubmitItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "retention_until": zod.union([zod.iso.date(),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
@@ -252,7 +254,7 @@ export const SubmitItemResponse = zod.object({
   "round": zod.int(),
   "source_url": zod.union([zod.string(),zod.null()]),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true}),
@@ -404,7 +406,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseByStatusItemFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseByStatusItemFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseByStatusItemFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseByStatusItemFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('The view this is the total of.'),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
 })).describe('Non-legacy items in each status.'),
@@ -433,7 +435,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseFiltersMineSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseFiltersMineUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersMineWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersMineWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "needs_rereview": zod.object({
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
@@ -459,7 +461,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseFiltersNeedsRereviewSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseFiltersNeedsRereviewUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersNeedsRereviewWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersNeedsRereviewWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "open": zod.object({
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
@@ -485,7 +487,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseFiltersOpenSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseFiltersOpenUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersOpenWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersOpenWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "unassigned": zod.object({
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
@@ -511,7 +513,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseFiltersUnassignedSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseFiltersUnassignedUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersUnassignedWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersUnassignedWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "waiting_over_3_days": zod.object({
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
@@ -537,7 +539,7 @@ export const GetQueueStatsResponse = zod.object({
   "submitted_by_me": zod.boolean().default(getQueueStatsResponseFiltersWaitingOver3DaysSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(getQueueStatsResponseFiltersWaitingOver3DaysUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersWaitingOver3DaysWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(getQueueStatsResponseFiltersWaitingOver3DaysWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.')
 }).describe('Each stat as the view that lists exactly what it counts: `GET /items` with these filters (any sort)\nreturns `total` equal to the stat.'),
   "mine": zod.int(),
@@ -555,7 +557,7 @@ export const GetItemParams = zod.object({
 })
 
 export const GetItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "approved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "assignee": zod.union([zod.object({
@@ -594,7 +596,7 @@ export const GetItemResponse = zod.object({
   "drift_rereview": zod.union([zod.object({
   "placement_id": zod.int(),
   "restored": zod.boolean().describe('The placement\'s latest finished check found the approved copy unchanged.')
-}),zod.null()]).describe('needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has.'),
+}),zod.null()]).describe('needs_rereview only, for any reopen reason: the live placement whose page differs from the approved copy (latest check modified or missing), else the placement whose check sent the item back for drift, and whether its latest check found the approved copy again. Reaffirm and Fast-track are refused (409 drift_not_restored) while restored is false. Null when no check found the page changed.'),
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "is_prescreen": zod.boolean(),
@@ -650,6 +652,7 @@ export const GetItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "retention_until": zod.union([zod.iso.date(),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
@@ -657,7 +660,7 @@ export const GetItemResponse = zod.object({
   "round": zod.int(),
   "source_url": zod.union([zod.string(),zod.null()]),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true}),
@@ -697,7 +700,7 @@ export const UpdateItemBody = zod.object({
 }).describe('Inline edits. Omitted fields are left as they are.')
 
 export const UpdateItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -733,11 +736,12 @@ export const UpdateItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -762,7 +766,7 @@ export const AssignItemBody = zod.object({
 })
 
 export const AssignItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -798,11 +802,12 @@ export const AssignItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -868,7 +873,7 @@ export const ClaimItemParams = zod.object({
 })
 
 export const ClaimItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -904,11 +909,12 @@ export const ClaimItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -2162,7 +2168,7 @@ export const ListSavedViewsResponseItem = zod.object({
   "submitted_by_me": zod.boolean().default(listSavedViewsResponseFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(listSavedViewsResponseFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(listSavedViewsResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(listSavedViewsResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "id": zod.int(),
   "name": zod.string().min(1).max(listSavedViewsResponseNameMax),
@@ -2214,7 +2220,7 @@ export const CreateSavedViewBody = zod.object({
   "submitted_by_me": zod.boolean().default(createSavedViewBodyFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(createSavedViewBodyFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(createSavedViewBodyFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(createSavedViewBodyFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "name": zod.string().min(1).max(createSavedViewBodyNameMax),
   "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title', 'title_desc', 'status', 'status_desc', 'risk_tier', 'risk_tier_desc', 'assignee', 'assignee_desc', 'partner', 'partner_desc', 'open_findings', 'open_findings_desc', 'round', 'round_desc']).describe('One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.').default(createSavedViewBodySortDefault)
@@ -2262,7 +2268,7 @@ export const CreateSavedViewResponse = zod.object({
   "submitted_by_me": zod.boolean().default(createSavedViewResponseFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(createSavedViewResponseFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(createSavedViewResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(createSavedViewResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "id": zod.int(),
   "name": zod.string().min(1).max(createSavedViewResponseNameMax),
@@ -2327,7 +2333,7 @@ export const UpdateSavedViewBody = zod.object({
   "submitted_by_me": zod.boolean().default(updateSavedViewBodyFiltersOneSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(updateSavedViewBodyFiltersOneUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(updateSavedViewBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(updateSavedViewBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),zod.null()]).optional(),
   "name": zod.union([zod.string().min(1).max(updateSavedViewBodyNameOneMax),zod.null()]).optional(),
   "sort": zod.union([zod.enum(['queue', 'oldest', 'newest', 'updated', 'title', 'title_desc', 'status', 'status_desc', 'risk_tier', 'risk_tier_desc', 'assignee', 'assignee_desc', 'partner', 'partner_desc', 'open_findings', 'open_findings_desc', 'round', 'round_desc']).describe('One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.'),zod.null()]).optional()
@@ -2375,7 +2381,7 @@ export const UpdateSavedViewResponse = zod.object({
   "submitted_by_me": zod.boolean().default(updateSavedViewResponseFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(updateSavedViewResponseFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(updateSavedViewResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(updateSavedViewResponseFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
   "id": zod.int(),
   "name": zod.string().min(1).max(updateSavedViewResponseNameMax),

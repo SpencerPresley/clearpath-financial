@@ -47,6 +47,6 @@ export interface ItemFilter {
   /** Items carrying all of these tags. */
   tag?: string[];
   unassigned?: boolean;
-  /** Submitted more than N days ago. */
+  /** Entered the queue more than N days ago (last submission, resubmission, new round or reopen). */
   waiting_more_than_days?: number | null;
 }

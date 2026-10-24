@@ -64,6 +64,7 @@ export function libraryRow(overrides: Partial<ItemRowOut> & { id: number }): Ite
     open_findings_count: 0,
     submitted_at: '2026-09-02T14:00:00Z',
     updated_at: '2026-10-20T16:30:00Z',
+    queue_entered_at: '2026-09-02T14:00:00Z',
     age_days: 52,
     planned_first_run: '2026-11-01',
     planned_last_run: '2026-12-31',

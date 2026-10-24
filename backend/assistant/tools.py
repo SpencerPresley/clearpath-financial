@@ -87,7 +87,7 @@ class ItemSummary:
     owner: str | None
     open_findings: int
     submitted_at: date
-    age_days: int
+    age_days: int  # days since it last entered the queue (submission, resubmission or reopen)
 
 
 @dataclass(frozen=True)
@@ -274,7 +274,8 @@ class _ItemFilterArgs(BaseModel):
 
 _SORT_DESCRIPTION = (
     "queue: review priority (re-reviews first, then risk, then oldest); with no status filter it covers only the "
-    "open review queue (submitted, in_review, needs_rereview). oldest / newest: by submission date, any status."
+    "open review queue (submitted, in_review, needs_rereview). oldest / newest: by when the item last entered the "
+    "queue (submission, resubmission or reopen), any status."
 )
 
 

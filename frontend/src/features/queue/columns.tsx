@@ -18,6 +18,7 @@ import type { ColumnSizingState, ColumnVisibilityState, RowSelectionState } from
 import type { ItemRowOut, ItemSort } from '../../api/generated/model';
 import { StatusBadge } from '../../ui/badges';
 import { ItemKey } from '../../ui/ItemKey';
+import { formatDateTime } from '../../ui/labels';
 import { formatAge } from '../../ui/RelativeAge';
 import { useQueueCell } from './cellContext';
 import { AssigneeCell } from './AssigneeCell';
@@ -96,7 +97,8 @@ type Direction = 'ascending' | 'descending';
 
 /**
  * The column and direction each server order sorts by (backend reviews.filters.ItemSort). Status ascends in
- * board order, risk from low to high, names A to Z with blanks last. Oldest first is Age descending. Queue
+ * board order, risk from low to high, names A to Z with blanks last. Oldest first (longest in the queue) is Age
+ * descending. Queue
  * order and Updated aren't a column's order.
  */
 const SORT_COLUMN: Record<ItemSort, readonly [ColumnId, Direction] | null> = {
@@ -152,12 +154,32 @@ function Muted({ children }: { children: string }) {
   return <span className="text-muted">{children}</span>;
 }
 
-function AgeCell({ at }: { at: string }) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Time in the queue, compact. Under a week it keeps one decimal, rounded up, so an item listed under "Waiting
+ * >3 days" never reads "3d" (walkthrough nit 1): 3 days and 2 hours is "3.1d". Otherwise as `formatAge`.
+ */
+export function formatQueueAge(at: Date, now: Date): string {
+  const days = (now.getTime() - at.getTime()) / DAY_MS;
+  if (days < 1 || days >= 7) return formatAge(at, now);
+  return `${(Math.ceil(days * 10) / 10).toFixed(1)}d`;
+}
+
+/** The Age tooltip: when the item entered the queue, and its last submission when that was earlier (a reopen). */
+export function ageTitle(row: Pick<ItemRowOut, 'queue_entered_at' | 'submitted_at'>): string {
+  const since = `In the queue since ${formatDateTime(row.queue_entered_at)}`;
+  return new Date(row.submitted_at).getTime() < new Date(row.queue_entered_at).getTime()
+    ? `${since} · last submitted ${formatDateTime(row.submitted_at)}`
+    : since;
+}
+
+function AgeCell({ row }: { row: ItemRowOut }) {
   const { now } = useQueueCell();
-  const date = new Date(at);
+  const date = new Date(row.queue_entered_at);
   return (
-    <time className="app-age" dateTime={date.toISOString()} title={date.toLocaleString('en-US')}>
-      {formatAge(date, now ?? new Date())}
+    <time className="app-age" dateTime={date.toISOString()} title={ageTitle(row)}>
+      {formatQueueAge(date, now ?? new Date())}
     </time>
   );
 }
@@ -271,12 +293,12 @@ export const queueColumns = helper.columns([
     minSize: 64,
     cell: ({ row }) => <FindingsCount count={row.original.open_findings_count} />,
   }),
-  helper.accessor('submitted_at', {
+  helper.accessor('queue_entered_at', {
     id: 'age',
     header: COLUMN_LABELS.age,
     size: 56,
     minSize: 56,
-    cell: ({ row }) => <AgeCell at={row.original.submitted_at} />,
+    cell: ({ row }) => <AgeCell row={row.original} />,
   }),
   helper.accessor('round', {
     id: 'round',

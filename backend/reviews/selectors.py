@@ -74,19 +74,52 @@ def is_item_live(*, item_id: int, today: date) -> bool:
 
 @dataclass(frozen=True)
 class DriftRereview:
-    """For a drift_detected re-review: the placement whose check sent the item back, and whether its latest
-    finished check found the approved copy again (`unchanged`). Reaffirm is allowed only then: re-approving copy the
-    partner still shows changed (or a page that's gone) would approve something that isn't what's live."""
+    """For a re-review whose live page differs (or differed) from the approved copy: the placement, and whether its
+    latest finished check found the approved copy again (`unchanged`). While `restored` is false, neither Reaffirm
+    nor Fast-track is allowed: re-approving copy the partner still shows changed (or a page that's gone) would
+    approve something that isn't what's live (walkthrough B1)."""
 
     placement_id: int
     restored: bool
 
 
-def drift_rereview(*, item_id: int) -> DriftRereview | None:
-    """The drift state of the item's current reopen; None unless it's needs_rereview(drift_detected) and a check
-    sent it back. Two queries."""
+_DRIFTED_RESULTS: Final = (DriftResult.MODIFIED.value, DriftResult.MISSING.value)
+
+
+def _drifted_live_placement(item_id: int, today: date) -> int | None:
+    """A live placement of the item whose latest successful check found the copy modified or missing. Covers a
+    re-review for another reason (terms changed) whose page changed afterwards: the item was already in re-review,
+    so the check didn't send it back again. One query."""
+    latest = (
+        Snapshot.objects.filter(placement_id=OuterRef("pk"), status=CheckStatus.SUCCEEDED.value)
+        .order_by("-requested_at", "-pk")
+        .values("result")[:1]
+    )
+    return (
+        Placement.objects.filter(live_placements_q(today), item_id=item_id)
+        .annotate(latest_result=Subquery(latest))
+        .filter(latest_result__in=_DRIFTED_RESULTS)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+        .first()
+    )
+
+
+def drift_rereview(*, item_id: int, today: date) -> DriftRereview | None:
+    """The drift state of a needs_rereview item; None if it isn't in re-review or no check found its page changed.
+
+    Unresolved (`restored=False`) when either a live placement's latest successful check found the copy modified or
+    missing, whatever the reopen reason; or the item reopened for drift and the reopening placement's latest
+    finished check isn't `unchanged` (this is what catches a page unreachable on consecutive checks: those checks
+    failed, with no result). Restored when it reopened for drift and that check is `unchanged`. Up to four queries.
+    """
     item = ReviewItem.objects.filter(pk=item_id).values_list("status", "reopen_reason").first()
-    if item != (ItemStatus.NEEDS_REREVIEW.value, ReopenReason.DRIFT_DETECTED.value):
+    if item is None or item[0] != ItemStatus.NEEDS_REREVIEW.value:
+        return None
+    drifted = _drifted_live_placement(item_id, today)
+    if drifted is not None:
+        return DriftRereview(placement_id=drifted, restored=False)
+    if item[1] != ReopenReason.DRIFT_DETECTED.value:
         return None
     reopening = (
         Snapshot.objects.filter(placement__item_id=item_id, reopen_event__isnull=False)
@@ -164,7 +197,7 @@ def filter_items(*, viewer: User, filters: ItemFilter, clock: Clock = SYSTEM_CLO
         qs = qs.filter(reopen_reason__in=f.reopen_reason)
     qs = _in_range(qs, "submitted_at", f.submitted_after, f.submitted_before)
     if f.waiting_more_than_days is not None:
-        qs = qs.filter(submitted_at__lt=clock.now() - timedelta(days=f.waiting_more_than_days))
+        qs = qs.filter(queue_entered_at__lt=clock.now() - timedelta(days=f.waiting_more_than_days))
     qs = _in_range(qs, "approved_at", f.approved_after, f.approved_before)
     if f.approved_within_days is not None:
         qs = qs.filter(approved_at__gte=clock.now() - timedelta(days=f.approved_within_days))
@@ -219,7 +252,8 @@ class ItemRow:
     open_findings_count: int
     submitted_at: datetime
     updated_at: datetime
-    age_days: int
+    queue_entered_at: datetime  # when it last entered the queue (submission, resubmission, new round, reopen)
+    age_days: int  # whole days since queue_entered_at
     planned_first_run: date | None
     planned_last_run: date | None
     current_version_n: int | None
@@ -280,7 +314,8 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
         open_findings_count=item.open_findings_count,
         submitted_at=item.submitted_at,
         updated_at=item.updated_at,
-        age_days=max((now - item.submitted_at).days, 0),
+        queue_entered_at=item.queue_entered_at,
+        age_days=max((now - item.queue_entered_at).days, 0),
         planned_first_run=item.planned_first_run,
         planned_last_run=item.planned_last_run,
         current_version_n=getattr(item, "current_version_n", None),
@@ -370,7 +405,7 @@ STATUS_ORDER: Final = (
 RISK_ORDER: Final = (RiskTier.LOW, RiskTier.MEDIUM, RiskTier.HIGH)
 
 _ID: Final = _Key("id", "int")
-_SUBMITTED: Final = _Key("submitted_at", "datetime")
+_IN_QUEUE: Final = _Key("queue_entered_at", "datetime")  # Age: time since the item last entered the queue
 _COLUMN_SORTS: Final[dict[tuple[ItemSort, ItemSort], tuple[_Key, ...]]] = {
     (ItemSort.TITLE, ItemSort.TITLE_DESC): (_Key("title", "str"), _ID),
     (ItemSort.STATUS, ItemSort.STATUS_DESC): (_Key("sort_status", "int", _rank("status", STATUS_ORDER)), _ID),
@@ -384,9 +419,9 @@ _COLUMN_SORTS: Final[dict[tuple[ItemSort, ItemSort], tuple[_Key, ...]]] = {
 # (descending, keys). Every sort ends in id so the order is total, and each runs one direction (every key the
 # same way), so a page boundary is a single row-value comparison; for the queue, one the index can seek to.
 _SORTS: Final[dict[ItemSort, tuple[bool, tuple[_Key, ...]]]] = {
-    ItemSort.QUEUE: (False, (_Key("queue_priority", "int"), _SUBMITTED, _ID)),
-    ItemSort.OLDEST: (False, (_SUBMITTED, _ID)),
-    ItemSort.NEWEST: (True, (_SUBMITTED, _ID)),
+    ItemSort.QUEUE: (False, (_Key("queue_priority", "int"), _IN_QUEUE, _ID)),
+    ItemSort.OLDEST: (False, (_IN_QUEUE, _ID)),
+    ItemSort.NEWEST: (True, (_IN_QUEUE, _ID)),
     ItemSort.UPDATED: (True, (_Key("updated_at", "datetime"), _ID)),
     **{asc: (False, keys) for (asc, _), keys in _COLUMN_SORTS.items()},
     **{desc: (True, keys) for (_, desc), keys in _COLUMN_SORTS.items()},

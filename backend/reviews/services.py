@@ -121,6 +121,7 @@ def submit_item(*, actor: User, data: SubmitItemInput, clock: Clock = SYSTEM_CLO
             planned_last_run=data.planned_last_run,
             source_url=data.source_url or "",
             submitted_at=now,
+            queue_entered_at=now,
             created_at=now,
             updated_at=now,
         )

@@ -48,7 +48,7 @@ export const CreateExportBody = zod.object({
   "submitted_by_me": zod.boolean().default(createExportBodyFiltersOneSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
   "unassigned": zod.boolean().default(createExportBodyFiltersOneUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(createExportBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+  "waiting_more_than_days": zod.union([zod.int().min(createExportBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Entered the queue more than N days ago (last submission, resubmission, new round or reopen).')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.').optional(),
   "include_evidence_packs": zod.boolean().default(createExportBodyIncludeEvidencePacksDefault).describe('Return a zip: the xlsx plus an evidence pack for every item in the view with an approval (at most 200).'),
   "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title', 'title_desc', 'status', 'status_desc', 'risk_tier', 'risk_tier_desc', 'assignee', 'assignee_desc', 'partner', 'partner_desc', 'open_findings', 'open_findings_desc', 'round', 'round_desc']).describe('One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.').default(createExportBodySortDefault)
@@ -201,7 +201,7 @@ export const GetEvidencePackResponse = zod.object({
 })),
   "generated_at": zod.iso.datetime({"offset":true}),
   "item": zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -237,11 +237,12 @@ export const GetEvidencePackResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})

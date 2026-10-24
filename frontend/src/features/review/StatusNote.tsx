@@ -3,7 +3,7 @@ import type { ItemDetailOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { REOPEN_REASON_LABELS, formatDate, plural } from '../../ui/labels';
-import { fastTrackAvailable } from './decisionModes';
+import { fastTrackAvailable, liveCopyDiffers } from './decisionModes';
 
 /**
  * One line above the copy when the item's state changes what the reviewer should do: re-review of live
@@ -51,7 +51,15 @@ export function StatusNote({
           {item.live_placements_count > 0
             ? `Live in ${plural(item.live_placements_count, 'placement')}.`
             : 'No live placements.'}{' '}
-          {numbersUnchanged ? (
+          {liveCopyDiffers(item) ? (
+            // First while a live page differs, even if terms also changed: nothing re-approves it until the
+            // partner restores the approved copy (walkthrough B1).
+            `The partner page doesn’t show approved v${String(approvedN ?? '')}. Check it again once the partner restores it, or pull it.${
+              item.current_version?.origin === 'fast_track' && item.current_version_n !== approvedN
+                ? ` v${String(item.current_version_n)} has the new offer-terms numbers; fast-track it once the page is restored.`
+                : ''
+            }`
+          ) : numbersUnchanged ? (
             <>
               <strong>Numbers unchanged.</strong>{' '}
               {`v${String(item.current_version_n)} matches approved v${String(approvedN)}; fast-track confirms it against the new terms.`}

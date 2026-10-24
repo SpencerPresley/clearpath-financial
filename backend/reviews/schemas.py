@@ -80,9 +80,13 @@ class ItemRowOut(Schema):
     tags: list[str]
     notes: str
     open_findings_count: int
-    submitted_at: datetime
+    submitted_at: datetime = Field(description="The latest (re)submission by the marketer.")
     updated_at: datetime
-    age_days: int
+    queue_entered_at: datetime = Field(
+        description="When the item last entered the review queue (submission, resubmission, new round or reopen). "
+        "Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it."
+    )
+    age_days: int = Field(description="Whole days since `queue_entered_at`.")
     planned_first_run: date | None
     planned_last_run: date | None
     current_version_n: int | None
@@ -245,8 +249,10 @@ class ItemDetailOut(ItemRowOut):
         description="The failure as a plain sentence; null unless llm_check_status is failed."
     )
     drift_rereview: DriftRereviewOut | None = Field(
-        description="needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether "
-        "its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has."
+        description="needs_rereview only, for any reopen reason: the live placement whose page differs from the "
+        "approved copy (latest check modified or missing), else the placement whose check sent the item back for "
+        "drift, and whether its latest check found the approved copy again. Reaffirm and Fast-track are refused "
+        "(409 drift_not_restored) while restored is false. Null when no check found the page changed."
     )
 
 

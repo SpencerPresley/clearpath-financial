@@ -23,7 +23,6 @@ from core.domain import (
     ItemStatus,
     LlmFailureCode,
     Product,
-    ReopenReason,
     Role,
     TakedownState,
     TermsField,
@@ -350,7 +349,7 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
         numbers_change=_numbers_change(item_id, current),
         llm_check_failure_code=failure_code,
         llm_check_failure_reason=failure_reason,
-        drift_rereview=drift_rereview(item_id=item_id) if row.reopen_reason is ReopenReason.DRIFT_DETECTED else None,
+        drift_rereview=drift_rereview(item_id=item_id, today=today),
     )
 
 

@@ -15,6 +15,7 @@ import type { ReopenReason } from './reopenReason';
 import type { RiskTier } from './riskTier';
 
 export interface ItemRowOut {
+  /** Whole days since `queue_entered_at`. */
   age_days: number;
   /** When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved. */
   approval_expires_at: string | null;
@@ -36,10 +37,13 @@ export interface ItemRowOut {
   planned_first_run: string | null;
   planned_last_run: string | null;
   product: Product;
+  /** When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it. */
+  queue_entered_at: string;
   reopen_reason: ReopenReason | null;
   risk_tier: RiskTier;
   round: number;
   status: ItemStatus;
+  /** The latest (re)submission by the marketer. */
   submitted_at: string;
   tags: string[];
   title: string;

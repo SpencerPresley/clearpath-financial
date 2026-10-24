@@ -42,6 +42,29 @@ describe('rereviewActions', () => {
     expect(rereviewActions(rereview('drift_detected'))).toEqual(['reaffirm', 'pull']);
   });
 
+  it('never offers fast-track while the live page differs from the approved copy', () => {
+    // A terms change generated v2 on a drift re-review, but the partner page still shows changed copy (B1).
+    const pageDiffers = { placement_id: 3, restored: false };
+    expect(rereviewActions({ ...rereview('drift_detected', true), drift_rereview: pageDiffers })).toEqual([
+      'check_now',
+      'pull',
+    ]);
+    // Re-review for terms; a later daily check found the page changed.
+    expect(rereviewActions({ ...rereview('terms_changed', true), drift_rereview: pageDiffers })).toEqual([
+      'check_now',
+      'pull',
+    ]);
+  });
+
+  it('offers fast-track, not a reaffirm that would be refused, once the drift is restored', () => {
+    // After Restore + Check now: approved v1, generated v2 current. Reaffirm re-approves v1, which isn't current.
+    const restored = {
+      ...rereview('drift_detected', true),
+      drift_rereview: { placement_id: 3, restored: true },
+    };
+    expect(rereviewActions(restored)).toEqual(['fast_track', 'pull']);
+  });
+
   it('offers nothing outside re-review', () => {
     expect(rereviewActions(itemFixture())).toEqual([]);
   });
@@ -65,6 +88,17 @@ describe('fastTrackAvailable', () => {
       status: 'needs_rereview',
       reopen_reason: 'approval_expired',
       latest_decision: DECISION_APPROVED,
+    });
+    expect(fastTrackAvailable(item)).toBe(false);
+  });
+
+  it('is not available while the live page differs from the approved copy', () => {
+    const item = itemFixture({
+      status: 'needs_rereview',
+      reopen_reason: 'drift_detected',
+      current_version: generated,
+      latest_decision: { ...DECISION_APPROVED, version_n: 1 },
+      drift_rereview: { placement_id: 3, restored: false },
     });
     expect(fastTrackAvailable(item)).toBe(false);
   });

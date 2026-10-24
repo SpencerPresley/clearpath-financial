@@ -204,7 +204,7 @@ export const PullItemBody = zod.object({
 })
 
 export const PullItemResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -240,11 +240,12 @@ export const PullItemResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
