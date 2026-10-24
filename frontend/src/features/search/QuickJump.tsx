@@ -128,7 +128,9 @@ export function QuickJump() {
   // Enter before the answer to what's typed came back: ask for it now (no debounce; an identical request in
   // flight is shared) and open its top row, unless the text changed meanwhile. A failure shows in the list.
   const openTopOf = (q: string) => {
-    queryClient.query(getListItemsQueryOptions({ q, sort: 'updated', limit: RESULT_LIMIT })).then(
+    // Same key as the hook's query, so the same no-retry policy: a failure shows at once, not after ~7 s.
+    const options = getListItemsQueryOptions({ q, sort: 'updated', limit: RESULT_LIMIT });
+    queryClient.query({ ...options, retry: false }).then(
       (page) => {
         const top = page.rows[0];
         if (top !== undefined && inputRef.current?.value.trim() === q) open(top);

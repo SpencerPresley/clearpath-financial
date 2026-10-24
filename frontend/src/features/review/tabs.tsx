@@ -77,12 +77,17 @@ export function CommentsTab({
 }) {
   const queryClient = useQueryClient();
   const comments = useListComments(itemId, { version_n: versionN });
-  const [fresh] = useState(() => highlightId !== undefined && !(shownLinks?.has(highlightId) ?? false));
+  // Per link, not per mount: a second mention opened while Comments is showing must still be brought into view.
+  // `shownLinks` is stable, so this recomputes only when the link changes (or the panel remounts).
+  const fresh = useMemo(
+    () => highlightId !== undefined && !(shownLinks?.has(highlightId) ?? false),
+    [highlightId, shownLinks],
+  );
   const loaded = comments.data?.some((c) => c.id === highlightId) === true;
-  const done = useRef(false);
+  const done = useRef<number | null>(null);
   useEffect(() => {
-    if (!fresh || !loaded || done.current || highlightId === undefined) return;
-    done.current = true;
+    if (!fresh || !loaded || highlightId === undefined || done.current === highlightId) return;
+    done.current = highlightId;
     shownLinks?.add(highlightId);
     const node = document.getElementById(commentDomId(highlightId));
     node?.scrollIntoView({ block: 'center' });
