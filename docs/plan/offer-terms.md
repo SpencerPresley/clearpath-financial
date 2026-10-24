@@ -58,6 +58,10 @@ the same render against the proposed values.
    change before the first was fast-tracked) get a fresh generated version, status unchanged. Without it they can
    be neither reaffirmed (E's `stale_offer_terms` gate) nor fast-tracked.
 
+8. **After review** (`docs/plan/reviews/offer-terms.md`, Resolutions, supersedes the tasks below where they differ):
+   publish requires `based_on_terms_id` (409 `conflict` when stale); bulk takes optional `seen_versions`; the
+   reconcile beat covers approved items only.
+
 ## Review Focus
 
 1. A redelivered TERMS_PUBLISHED (or a re-run task) must not create a second v+1 or a second ITEM_REOPENED —

@@ -62,6 +62,10 @@ def bulk_fast_track_approve(
     return run_bulk(
         item_ids,
         lambda item_id: fast_track_approve(
-            actor=actor, item_id=item_id, version_n=seen.get(item_id) or _current_n(item_id), reason=reason, clock=clock
+            actor=actor,
+            item_id=item_id,
+            version_n=seen[item_id] if item_id in seen else _current_n(item_id),
+            reason=reason,
+            clock=clock,
         ),
     )
