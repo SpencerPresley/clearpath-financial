@@ -127,6 +127,8 @@ def test_fix_live_runs_from_reopen_to_confirmed_takedown(
     fixed = selectors.summary(viewer=lead, flt=window(clock), clock=clock)
 
     assert (open_now.time_to_fix_live.count, open_now.open_fix_live.count) == (0, 1)
+    # Pulled, takedown not yet confirmed: still open, but not a re-review in the queue (nit 10).
+    assert (open_now.open_fix_live.in_rereview, open_now.open_fix_live.awaiting_takedown) == (0, 1)
     assert open_now.open_fix_live.oldest_hours == 2
     assert (fixed.time_to_fix_live.count, fixed.time_to_fix_live.median_hours) == (1, 6)
     assert fixed.open_fix_live.count == 0

@@ -55,7 +55,7 @@ export const SUMMARY: MetricsSummaryOut = {
     native_median_hours: 26,
     imported_median_hours: null,
   },
-  open_fix_live: { count: 2, oldest_hours: 75 },
+  open_fix_live: { count: 2, in_rereview: 1, awaiting_takedown: 1, oldest_hours: 75 },
   throughput: { count: 64, native_count: 57, imported_count: 7, per_week: 4.92 },
   waiting: [
     { more_than_days: 3, count: 9 },
@@ -105,7 +105,7 @@ export const EMPTY_SUMMARY: MetricsSummaryOut = {
     native_median_hours: null,
     imported_median_hours: null,
   },
-  open_fix_live: { count: 0, oldest_hours: null },
+  open_fix_live: { count: 0, in_rereview: 0, awaiting_takedown: 0, oldest_hours: null },
   throughput: { count: 0, native_count: 0, imported_count: 0, per_week: 0 },
   waiting: SUMMARY.waiting.map((w) => ({ ...w, count: 0 })),
 };

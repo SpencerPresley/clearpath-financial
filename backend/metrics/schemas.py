@@ -47,7 +47,16 @@ class ThroughputOut(Schema):
 
 
 class OpenFixLiveOut(Schema):
-    count: int = Field(description="Live content sent back for re-review and not yet fixed, now.")
+    count: int = Field(
+        description="Live fixes open now: live content sent back for re-review and not yet fixed (approved again, or "
+        "every requested takedown confirmed). Equals in_rereview + awaiting_takedown."
+    )
+    in_rereview: int = Field(
+        description="Of those, not pulled: still being re-reviewed (needs re-review, in review, or a changes round)."
+    )
+    awaiting_takedown: int = Field(
+        description="Of those, pulled (withdrawn or rejected) with a takedown not yet confirmed; not in the queue."
+    )
     oldest_hours: float | None
 
 

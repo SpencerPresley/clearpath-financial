@@ -60,10 +60,12 @@ class Measurement:
 
 @dataclass(frozen=True)
 class OpenClock:
-    """Live content sent back for re-review and not yet fixed (approved again or taken down)."""
+    """Live content sent back for re-review and not yet fixed (approved again or taken down). `awaiting_takedown`:
+    pulled (withdrawn or rejected), so out of the review queue, but a requested takedown isn't confirmed yet."""
 
     item_id: int
     start: datetime
+    awaiting_takedown: bool = False
 
 
 def _hours(start: datetime, end: datetime) -> float:
@@ -152,7 +154,9 @@ def _item_measurements(facts: Sequence[Fact]) -> tuple[list[Measurement], list[O
     for episode in episodes:
         end = episode.end()
         if end is None:
-            still_open.append(OpenClock(item_id=item_id, start=episode.start))
+            still_open.append(
+                OpenClock(item_id=item_id, start=episode.start, awaiting_takedown=episode.pulled_at is not None)
+            )
         else:
             add(MetricName.TIME_TO_FIX_LIVE, episode.start, end, _hours(episode.start, end))
     return out, still_open

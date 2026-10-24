@@ -68,6 +68,7 @@ function row(o: Partial<Row> & { id: number }, days: number): Row {
     planned_first_run: '2026-11-01',
     planned_last_run: null,
     submitted_at: ago(days * DAY + 3 * HOUR),
+    queue_entered_at: ago(days * DAY + 3 * HOUR),
     updated_at: ago(5 * HOUR),
     ...o,
   };

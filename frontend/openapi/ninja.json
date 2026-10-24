@@ -8526,9 +8526,19 @@
       },
       "OpenFixLiveOut": {
         "properties": {
+          "awaiting_takedown": {
+            "description": "Of those, pulled (withdrawn or rejected) with a takedown not yet confirmed; not in the queue.",
+            "title": "Awaiting Takedown",
+            "type": "integer"
+          },
           "count": {
-            "description": "Live content sent back for re-review and not yet fixed, now.",
+            "description": "Live fixes open now: live content sent back for re-review and not yet fixed (approved again, or every requested takedown confirmed). Equals in_rereview + awaiting_takedown.",
             "title": "Count",
+            "type": "integer"
+          },
+          "in_rereview": {
+            "description": "Of those, not pulled: still being re-reviewed (needs re-review, in review, or a changes round).",
+            "title": "In Rereview",
             "type": "integer"
           },
           "oldest_hours": {
@@ -8545,6 +8555,8 @@
         },
         "required": [
           "count",
+          "in_rereview",
+          "awaiting_takedown",
           "oldest_hours"
         ],
         "title": "OpenFixLiveOut",
@@ -19230,7 +19242,7 @@
     },
     "/api/library": {
       "get": {
-        "description": "The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:\nevery item that ever received an approval, whatever its status now (precedent doesn't lapse).",
+        "description": "The approved archive, legacy included. `approved_to_run` (default): currently approved and not past the\napproval's expiry (legacy approvals included, which the expiry sweep never moves). `ever_approved`:\nevery item that ever received an approval, whatever its status now (precedent doesn't lapse).",
         "operationId": "listLibrary",
         "parameters": [
           {

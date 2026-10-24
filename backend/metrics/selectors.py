@@ -164,7 +164,13 @@ class ThroughputStat:
 
 @dataclass(frozen=True)
 class OpenFixLive:
+    """Live fixes still open: every fix-live clock still running (ruling 6: it stops at the approval or at the last
+    confirmed takedown). `count` = `in_rereview` + `awaiting_takedown`. Only `in_rereview` is a re-review in the
+    queue; pulled items whose takedown isn't confirmed are out of the queue but still unfixed (walkthrough nit 10)."""
+
     count: int
+    in_rereview: int
+    awaiting_takedown: int
     oldest_hours: float | None
 
 
@@ -226,6 +232,8 @@ def summary(*, viewer: User, flt: MetricsFilter, clock: Clock = SYSTEM_CLOCK) ->
         time_to_fix_live=duration_stat(_of(measured, MetricName.TIME_TO_FIX_LIVE, flt)),
         open_fix_live=OpenFixLive(
             count=len(measured.open_clocks),
+            in_rereview=sum(1 for c in measured.open_clocks if not c.awaiting_takedown),
+            awaiting_takedown=sum(1 for c in measured.open_clocks if c.awaiting_takedown),
             oldest_hours=max((_hours_since(c.start, now) for c in measured.open_clocks), default=None),
         ),
         throughput=ThroughputStat(

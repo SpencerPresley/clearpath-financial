@@ -87,7 +87,9 @@ describe('MetricsPage', () => {
 
   it('opens the still-open fix-live clocks from the alert', async () => {
     const { router } = table();
-    await userEvent.click(await screen.findByRole('button', { name: '2 re-reviews open · oldest 3.1 d' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: '2 live fixes open · oldest 3.1 d · 1 awaiting takedown' }),
+    );
 
     await waitFor(() => {
       expect(router.state.location.search).toMatchObject({ drill: 'time_to_fix_live', open: true });
