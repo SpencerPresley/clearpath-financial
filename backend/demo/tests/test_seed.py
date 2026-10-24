@@ -152,8 +152,10 @@ def test_native_history_starts_at_go_live_after_the_tracker_ends(seeded: Seeded)
 
 
 def test_the_seed_sends_no_email(seeded: Seeded) -> None:
-    """Notifications (assignment, decisions, mentions, drift attention) are in-app; any email would land here."""
+    """Notifications (assignment, decisions, mentions, drift attention) are in-app; any email would land here. No
+    seeded check raises a drift attention alert (#40) either: every seeded check is unchanged or modified."""
     assert not OutboxEmail.objects.exists()
+    assert not Event.objects.filter(type=EventType.PAGE_FINDINGS_FLAGGED.value).exists()
 
 
 def test_a_failing_reset_changes_nothing(seeded: Seeded) -> None:

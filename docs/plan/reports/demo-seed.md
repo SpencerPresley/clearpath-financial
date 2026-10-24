@@ -5,8 +5,8 @@ Issue #13. Plan: `docs/plan/demo-seed.md`. Walkthrough for evaluators: `docs/dem
 ## What was built
 
 - **`backend/demo/` app.**
-  - `content/` is the catalog. It has 11 people, 10 partners with agreements, offer terms (personal loan v1→v3,
-    card v1→v2) and 44 item stories. Each story is copy versions plus timed steps.
+  - `content/` is the catalog. It has 11 people, 10 partners with agreements, offer terms (personal loan v1→v2,
+    card v1→v2, both entered at go-live) and 44 item stories. Each story is copy versions plus timed steps.
   - `story.py` is the step DSL.
   - `runner.py` merges every step into one timeline and plays it through the real service functions, using a
     `FixedClock` set to each step's backdated instant. It drains the outbox in-process after each step and
@@ -35,12 +35,12 @@ Issue #13. Plan: `docs/plan/demo-seed.md`. Walkthrough for evaluators: `docs/dem
 | | |
 |---|---|
 | Native items | 44: submitted 5, in review 9, changes requested 4, approved 14, rejected 3, needs re-review 4 (terms changed 2, approval expired 1, drift 1), expired 3, withdrawn 2 |
-| Legacy items | 178 from `samples/` tracker, imported through `imports.services` the evening before; 33 matched to seeded partners |
+| Legacy items | 178 from the `samples/` tracker (2025-09-02 to 2026-08-14), imported through `imports.services` the evening before; 36 matched to seeded partners |
 | Products / channels | personal loan, card, mortgage prequal; email, SMS, paid social, paid search, display, direct mail, landing page, affiliate page, call script; CA-only and national; prescreen |
 | Rule coverage | every code rule id fires at least once (asserted against `CODE_RULES`), plus ≥10 clean versions |
 | Triage | ≥40 accepted, ≥40 dismissed with reasons, carried-forward dismissals, system dismissals on fast-track |
 | AI | scripted findings on most versions; one item with the AI failed after 4 tries (529), so approval needs an override (CP-40); one pending (CP-222) |
-| History | events backdated over ~10 weeks, ~880 events; 5 fast-track approvals, 1 reaffirm (which found the 2026-07-21 Reg B rule as a new finding) |
+| History | 905 events, all from go-live (2026-08-17) on; 5 fast-track approvals; no seeded reaffirm (the guide's CP-7 path makes one) |
 | Drift | CP-7, CP-23 and CP-32 run on the three partner pages ClearPath hosts (`drift.demo.PAGES`), placed via `drift.demo.seed_placement`; 4 checks recorded through `drift.services` on the pages' own HTML; LendCompare is left edited, so CP-7's re-review comes from a real *modified* check |
 | People | Dana's queue holds 5; Rachel (lead) holds 3; Leah is out of office and her released queue left 2 unassigned |
 
@@ -48,21 +48,27 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Verification
 
-- Backend, after rebasing on `2f91e1d` (drift and assistant merged):
-  - `pytest`: 1765 passed;
+- Backend, after rebasing on `c3fea39` (#40 drift follow-ups merged):
+  - `pytest`: 1794 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
   - the exported schema matches the committed one;
   - `make semgrep` reports 0 findings.
 - Frontend, after the rebase:
-  - `npm run test:run`: 636 passed;
+  - `npm run test:run`: 645 passed;
   - `typecheck`, `lint`, `format:check` and `build` are clean.
-- Demo tests (`backend/demo/tests/`, 37 in all):
+- Demo tests (`backend/demo/tests/`, 45 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
   - the seed runs on one committed DB per module and checks: status counts, an event per item, every rule
     persisted, triage states, AI run statuses, legacy counts, terms versions, every handler's receipts present
     and nothing enqueued to the real worker;
   - a failing reset changes nothing, and reset restores the same `{title: (pk, status)}` snapshot;
+  - native history starts at go-live, after the tracker ends (item 4);
+  - the seed sends no email: no `OutboxEmail` rows. #40's attention notifications (`PAGE_FINDINGS_FLAGGED`) are
+    in-app `Notification` rows written by an outbox handler, delivered in-process like the rest, and the seed
+    has no unchanged-copy-with-new-findings check that would raise one;
+  - the guide's CP-7 path: Reaffirm is refused (`DriftNotRestored`) while the page differs, then Restore,
+    a manual check (*unchanged*), and Reaffirm approves it. The test rolls back and re-edits the page;
   - API: two `seed_demo` runs on an empty DB, an admin reset after which the admin is still signed in, the
     in-flight job is returned to a second request, non-admins get 403, failed and stale jobs are reported,
     and a job that started late is judged by its start.
@@ -72,6 +78,12 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
   - I signed in as each role and took screenshots at 1440×900 into `docs/plan/reviews/ui/demo/`: `reviewer`,
     `lead`, `marketer`, `admin`, `marketer-my-submissions`, `reviewer-fast-track-rereview`,
     `reviewer-ai-failed`, `lead-metrics`, `admin-reset-confirm`, `admin-reset-running`, `admin-reset-done`;
+  - after the re-anchor and #40, the data- and drift-dependent shots were retaken by a Playwright script on a
+    fresh seed: `reviewer`, `lead`, `marketer`, `admin`, `reviewer-fast-track-rereview`, `reviewer-ai-failed`,
+    `reviewer-drift-cp7` (now **Check now** / **Pull**), `lead-offer-terms` (v1→v2 from go-live), `lead-metrics`
+    (imported bars end the week of Aug 10; native starts Aug 17), `lead-partners`, and the new
+    `reviewer-drift-cp7-restored`. That last one is the guide's path run live: Restore original page, Check now
+    through the real worker (*unchanged*), and **Reaffirm v3** appears;
   - I clicked Reset demo as admin while a marketer was also signed in: the job finished in about 10 s, a toast
     reported 42 items (44 since the drift stories), and both sessions survived.
 
@@ -119,9 +131,8 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Risks and open questions
 
-- **Tracker history overlaps native history (open decision, below).** The sample tracker (a fixed fixture,
-  Nov 3 2025 – Oct 23 2026) runs right up to yesterday, so Metrics shows Excel and the tool in use side by side
-  for the native ten weeks.
+- **Tracker and native history no longer overlap** (item 4 below). A reset weeks from now opens a gap between
+  the tracker's end and go-live; a test fails if they ever overlap.
 - **CP-222 only stays pending for ~10 minutes.** At 10 minutes the reconciler re-enqueues the run on the real
   model. With an API key it gets a real review; without one it fails ("no Anthropic API key"). That's inherent
   to a pending check, and `docs/demo.md` says so.
@@ -178,48 +189,65 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
    - Separately, `e2e/shell.spec.ts` still asserted that reviewers don't see Offer terms. #36 changed that and CI
      doesn't run e2e, so it was already failing on main. It now asserts against Metrics, which is lead-only.
 
-## Decision needed: the tracker's dates (item 4)
+4. **The tracker ends the Friday before go-live (option (c): re-anchored once, statically).**
+   - **Go-live is `demo/content/calendar.py` `GO_LIVE`: Monday 2026-08-17 08:00, `day(68)` from the seed clock.**
+     The tracker's last date is Friday 2026-08-14. The orchestrator's "2026-08-14" assumed native history started
+     10 weeks back. It didn't, and three things had to move to make that true:
+     - **`mtg-social-spring`** was submitted 2026-04-19, because its paid-social approval needed six months to
+       lapse into the seed's only Reaffirm. Expiry is `decided_at` + 6 months (`reviews/decisions.py`
+       `approval_expiry`), and legacy items never re-review (`rereview.py` skips `is_legacy`), so the six-month
+       story can't exist inside a ten-week window. It's now the first item through the app (CP-1, approved 8/18,
+       running on Meta), and the Reg B 7/21 note moved to its first checklist. **Cost: the seed has no Reaffirm
+       decision.** The Reaffirm lane is still demonstrated live: the guide's CP-7 path ends in one.
+     - **Offer terms** were published 2025-11-03 (PL 8.99%, card) and 2026-06-01 (PL 9.49%). The go-live terms are
+       now entered that morning: PL v1 at 9.49%, the floor the tracker's 6/1 rate sheet left, then v2 at 9.99% on
+       day 6; card v1, then v2 on day 20. **PL history is v1→v2, not v1→v3**; the 8.99% era lives in the imported
+       tracker, whose comments quote it.
+     - **Partners** were entered 2026-04-07. They're now entered at go-live, or at 09:00 on their agreement date
+       if that's later (BudgetBee signed 2026-09-14, so it's added then).
+   - **Generator** (`scripts/generate_sample_tracker.py`):
+     - AS_OF 2026-08-14;
+     - submissions 2025-09-02 to 2026-08-12;
+     - `MONTHLY_VOLUME` Sep 2025 to Aug 2026, still 178;
+     - Labor Day 2025 added to the holidays;
+     - the re-review window ends 8/12;
+     - file created 2025-08-28.
+     - Seasons, the freeze, the 6/1 rate change and the 7/21 Reg B rewrite are unchanged. The layout is unchanged
+       too (note row r43, duplicate r64/r68, reused ID r121/r122).
+     - `SEED` is now 20250908. With the old seed the new calendar produced no five-round item and no clean
+       "Not Started" status, so `mapping.py`'s `"not started"` entry would have lost its only exercise. I picked the
+       first of twelve candidate seeds that kept both and every README bullet non-empty.
+   - **New totals** (`samples/README.md`):
 
-**The ask.**
-- End the sample tracker the day before the tool's go-live, about 10 weeks before the seed clock.
-- Totals unchanged.
-- Go-live is a shared value relative to the seed clock, so a reset months later keeps the split.
+     | | Before | Now |
+     |---|---|---|
+     | Items / distinct IDs / rows | 178 / 177 / 180 | same |
+     | Submitted range | 2025-11-03 to 2026-10-20 | 2025-09-02 to 2026-08-12 |
+     | Last updated | 2026-10-23 | 2026-08-14 |
+     | approved / approved_with_edits | 132 / 13 | 125 / 14 |
+     | changes_requested / in_review / submitted / rejected | 11 / 8 / 8 / 6 | 10 / 12 / 8 / 9 |
+     | Open / unassigned | 16 / 8 | 20 / 8 |
+     | Rows with a partner, after import | 33 | 36 |
+     | Asset links: hyperlink / text URL / none | 112 / 45 / 22 | 96 / 58 / 25 |
+     | Placement links: hyperlink / text URL | 23 / 72 | 7 / 87 |
 
-**Why it can't be built as stated.** The generator (`scripts/generate_sample_tracker.py`) simulates on a fixed
-calendar, and its random path depends on calendar dates:
-- `submission_dates` buckets by calendar month (`MONTHLY_VOLUME`).
-- `pick_theme` filters seasonal themes by `submitted.month` (line 1159): "Holiday Expenses" in months 11–12,
-  "Back to School" in 7–8, "Tax Season" in 1–4.
-- The holidays and the freeze window decide which days are workdays.
-- Request IDs carry a per-year counter (`MCR-YY-nnn`, line 1145), and year-less dates are inferred from that
-  prefix.
+   - **G's oracle tests**: `imports/tests/test_normalize.py`, `test_services.py`, `test_api.py`, `test_workbook.py`
+     and `exports/tests/test_exports.py`.
+     - The numeric totals above changed.
+     - Hard-coded rows were re-pointed at rows that have the same property: the note row 19 → 43, the reused ref
+       `MCR-26-101-b` → `MCR-26-077-b`, the "Pending" row, the "Lend Compare" rows, the year-crossing row, and the
+       approval-before-submission date (10/1/25 → 8/1/25, since row 2 is now submitted 2025-09-02).
+     - `test_legacy_item_fields` used one row (MCR-25-012) that was both approver-only and blank-expiry. No row is
+       both now, so it checks one row per property: approver-only, blank expiry, blank status, text expiry,
+       "CardPerks".
+     - No assertion was removed. `docs/plan/import-export.md` and `reports/sample-tracker.md` still quote the old
+       numbers as history.
+   - **Overlap guard.** `test_native_history_starts_at_go_live_after_the_tracker_ends` asserts:
+     - the latest legacy `submitted_at` / `approved_at` is 2026-08-14 and before `GO_LIVE`;
+     - the first event in the database is exactly at `GO_LIVE`;
+     - no native item is submitted before it.
 
-The three ways to satisfy part of the ask:
-
-- **(a) Re-anchor the simulation to a go-live argument, and run it at reset time.**
-  - The generator moves into the backend so the seed can call it. `scripts/` becomes a thin wrapper, because the
-    image's build context is `backend/`.
-  - The window becomes [go-live − ~50 weeks, go-live − 1 day], with seasons following real months.
-  - Cost:
-    - The row count can stay 178, but the status, issue and problem-row mix changes, so the README oracle and G's
-      oracle tests change.
-    - Those numbers also differ for every go-live date, so the seed's tests would assert ranges instead of exact
-      counts.
-    - It's the largest change, and it lands in G's oracle.
-- **(b) Simulate as today, and shift only the rendered dates by whole weeks.**
-  - Every total stays identical, and it also works at reset time.
-  - Cost:
-    - Seasonal campaigns render out of season (a 10-week shift puts "Holiday Expenses" in September).
-    - Request IDs either collide across the shifted year boundary or carry the wrong year, which breaks the
-      importer's year inference.
-    - The "2026" note row lands in the wrong place.
-- **(c) Re-anchor once, statically.**
-  - Regenerate the committed tracker so it ends 2026-08-14, the day before a go-live 10 weeks back, with the seed
-    importing it as today.
-  - Exact split for a reset now. A reset N weeks later shows an N-week gap between the tracker's end and the
-    tool's start, but never an overlap.
-  - Cost: the README oracle and G's oracle tests change once, apart from the row count.
-
-**Recommendation: (c).** The hosted demo's life is weeks, so a growing gap is tolerable, while (b) produces visibly
-wrong content and (a) puts a moving target under G's oracle tests. If a reset months out really matters, (a) is
-the only correct option.
+     I checked it fails: with `GO_LIVE` moved to `day(80)` it fails with `2026-08-14 < 2026-08-05`. A story step
+     placed before go-live fails the first-event assertion.
+   - **Seeded later?** A reset N weeks after 2026-10-24 shows an N-week gap between the tracker and go-live, never
+     an overlap.
