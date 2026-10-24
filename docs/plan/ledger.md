@@ -24,7 +24,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | Fixes: correctness | agent (worktree) | PR #50 | final: S20 relink, Board/drawer age, explicit fix_kind/replacement_text for Apply, fast_track_eligible flag | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
 | Fixes: review screen | agent (worktree) | PR #51 merged | done | B3, B4, S3 decision record, S5 drift naming, S6, S8 keyboard loop, S9, S11 Apply, S14, S17, nits |
 | Fixes: shell/global | agent (worktree `fix/walkthrough-shell`) | — | in progress | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
-| Fixes: import + users | agent (worktree `fix/walkthrough-import-users`) | — | in progress | S15 import demo, S16 users screen + availability + workload |
+| Fixes: import + users | agent (worktree) | PR #49 | final: deactivation releases items; reset restores seeded people | S15 import demo, S16 users screen + availability + workload |
 | Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
 | Deploy (apply + first deploy) | orchestrator | live | https://clearpath.spencerpresley.com (and d1qhgfjuad1hh0.cloudfront.net) — smoke 10/10; CloudFront overwrites spoofed viewer IP (verified); max_connections 79; seed 44 items + 178 tracker + 11 people. First deploy failed on a first-boot NAT race (compose download), box fixed via SSM, PR #46 prevents it on rebuild | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
@@ -44,6 +44,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: deactivating a reviewer releases their open items through auto-assignment (reason recorded); Reset demo restores the seeded people set (later-created users removed) so no account exists without its audit trail.
+- Ruling: lead workload is a disclosure panel using assignment's own load function, not a stats-strip number (a weighted load has no list to open).
 
 - Ruling: on a terms publish, in-flight items whose quoted values all hold under the new version are re-linked to it (event recorded); approved items are never re-linked (decision records immutable).
 
