@@ -18,6 +18,22 @@ function allauthMessage(body: unknown): string | undefined {
   return typeof first.message === 'string' ? first.message : undefined;
 }
 
+/**
+ * Only a 400 is about what was typed. A 403 is CSRF or a firewall in front of the app, a 429 is allauth's
+ * throttle, a 5xx is the server: telling someone to recheck a correct password there sends them the wrong way.
+ */
+function signInRefusal(error: ApiError): string {
+  if (error.status === 403) return 'Sign-in was refused by the server (403). Reload the page and try again.';
+  if (error.status === 429) return 'Too many sign-in attempts. Wait a few minutes and try again.';
+  if (error.status >= 500) return 'The server had a problem. Try again in a minute.';
+  if (error.status === 400) {
+    return allauthMessage(error.body) ?? 'Couldn’t sign in. Check the email and password.';
+  }
+  return (
+    allauthMessage(error.body) ?? `Couldn’t sign in (${String(error.status)}). Reload the page and try again.`
+  );
+}
+
 async function ensureCsrfCookie(): Promise<void> {
   try {
     await customFetch(SESSION_URL);
@@ -43,9 +59,7 @@ export async function signIn(email: string, password: string): Promise<void> {
           cause: error,
         });
       }
-      throw new Error(allauthMessage(error.body) ?? 'Couldn’t sign in. Check the email and password.', {
-        cause: error,
-      });
+      throw new Error(signInRefusal(error), { cause: error });
     }
     throw new Error('Can’t reach the server. Check your connection and try again.', { cause: error });
   }

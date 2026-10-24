@@ -27,6 +27,9 @@ const PAIRS: [string, string, number][] = [
   ['focus', 'base-100', 3],
   ['focus', 'base-200', 3],
   ['focus-on-brand', 'primary', 3],
+  // Metrics series are non-text marks (bars, lines) on the page background.
+  ['chart-native', 'base-100', 3],
+  ['chart-imported', 'base-100', 3],
   ...TONES.flatMap((tone): [string, string, number][] => [
     [`status-${tone}-content`, `status-${tone}`, 4.5],
     [`status-${tone}-soft-content`, `status-${tone}-soft`, 4.5],
@@ -49,6 +52,32 @@ describe('contrastRatio', () => {
     // #767676: linear 0.1812, OKLab L = cbrt(0.1812) = 0.5658
     expect(contrastRatio('oklch(56.58% 0 0)', 'oklch(100% 0 0)')).toBeCloseTo(4.54, 1);
   });
+});
+
+/** The hue of an `oklch(L C h)` value. */
+function hueOf(value: string): number {
+  const match = /oklch\(\s*[\d.]+%?\s+[\d.]+\s+([\d.]+)/.exec(value);
+  if (match === null) throw new Error(`not an oklch color: ${value}`);
+  return Number(match[1]);
+}
+
+function hueDistance(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
+
+describe('chart palette (walkthrough-1 nit 11)', () => {
+  it.each(['chart-native', 'chart-imported'])(
+    '%s borrows neither brand navy nor a status hue (§5.2)',
+    (series) => {
+      const hue = hueOf(resolveToken(tokens, `color-${series}`));
+      const reserved = ['primary', ...TONES.map((tone) => `status-${tone}`)];
+      const near = reserved.filter(
+        (name) => hueDistance(hue, hueOf(resolveToken(tokens, `color-${name}`))) < 30,
+      );
+      expect(near).toEqual([]);
+    },
+  );
 });
 
 describe('theme tokens', () => {

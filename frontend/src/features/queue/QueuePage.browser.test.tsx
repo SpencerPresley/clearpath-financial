@@ -97,3 +97,100 @@ it('keeps the page from scrolling sideways at 1280px with the drawer open', asyn
   const rowHeight = must(document.querySelector('tr.app-tr'), 'row').getBoundingClientRect().height;
   expect(Math.round(rowHeight)).toBe(36);
 });
+
+function headers(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('table[aria-label="Queue"] thead th')].map(
+    (th) => th.dataset.column ?? '',
+  );
+}
+
+function region(): HTMLElement {
+  return must(document.querySelector<HTMLElement>('.app-queue-region'), 'queue region');
+}
+
+function titleWidth(): number {
+  const th = must(document.querySelector('th[data-column="title"]'), 'title header');
+  return th.getBoundingClientRect().width;
+}
+
+// Walkthrough-1 nit 3: narrow layouts keep the triage columns and give the title what's left.
+it.each([
+  [1440, 900, '/queue?item=1047', 'the drawer open'],
+  [1280, 800, '/queue', 'nothing open'],
+  [1280, 800, '/queue?item=1047', 'the drawer open'],
+])('keeps Risk and Assignee at %ix%i with %s, without sideways scrolling', async (w, h, path) => {
+  await page.viewport(w, h);
+  const { screen } = await renderApp(path);
+  await expect.element(screen.getByTitle('RateRadar lead-gen form copy')).toBeVisible();
+
+  await expect.poll(headers).toEqual(expect.arrayContaining(['risk_tier', 'assignee', 'status', 'title']));
+  expect(region().scrollWidth).toBeLessThanOrEqual(region().clientWidth);
+  expect(titleWidth()).toBeGreaterThanOrEqual(180);
+});
+
+it('at 1280 with nothing open, tightens instead of dropping columns, and the title has room', async () => {
+  await page.viewport(1280, 800);
+  const { screen } = await renderApp('/queue');
+  await expect.element(screen.getByTitle('RateRadar lead-gen form copy')).toBeVisible();
+  await expect
+    .poll(headers)
+    .toEqual([
+      'select',
+      'key',
+      'title',
+      'status',
+      'risk_tier',
+      'partner',
+      'assignee',
+      'open_findings',
+      'age',
+      'round',
+    ]);
+  expect(titleWidth()).toBeGreaterThanOrEqual(240);
+});
+
+/** Whether a pointer at (dx, dy) from the element's center lands on it. */
+function hitsAt(el: Element, dx: number, dy: number): boolean {
+  const box = el.getBoundingClientRect();
+  const target = document.elementFromPoint(box.left + box.width / 2 + dx, box.top + box.height / 2 + dy);
+  return target !== null && el.contains(target);
+}
+
+// Walkthrough-1 nit 17: 40px hit areas on small frequent controls, without growing what you see.
+it('gives the bell and the shortcuts button a 40x40 hit area at their visible size', async () => {
+  const { screen } = await renderApp('/queue');
+  await expect.element(screen.getByText('RateRadar lead-gen form copy')).toBeVisible();
+  for (const name of ['Notifications', 'Keyboard shortcuts (?)']) {
+    const el = must(document.querySelector(`[aria-label^="${name}"]`), name);
+    const box = el.getBoundingClientRect();
+    expect(Math.max(box.width, box.height)).toBeLessThanOrEqual(32);
+    for (const [dx, dy] of [
+      [-19, 0],
+      [19, 0],
+      [0, -19],
+      [0, 19],
+    ] as const) {
+      expect(hitsAt(el, dx, dy), `${name} at ${String(dx)},${String(dy)}`).toBe(true);
+    }
+  }
+});
+
+it('gives a filter chip clear 40px of height without taking the chip button’s clicks', async () => {
+  const { screen } = await renderApp('/queue?product=%5B%22personal_loan%22%5D');
+  await expect.element(screen.getByRole('button', { name: 'Clear Product filter' })).toBeVisible();
+  const clear = must(document.querySelector('[aria-label="Clear Product filter"]'), 'clear');
+  expect(clear.getBoundingClientRect().height).toBeLessThanOrEqual(28);
+  expect(hitsAt(clear, 0, -19)).toBe(true);
+  expect(hitsAt(clear, 0, 19)).toBe(true);
+  const chipButton = must(clear.parentElement?.querySelector('.app-chip-btn'), 'chip button');
+  const box = clear.getBoundingClientRect();
+  const left = document.elementFromPoint(box.left - 2, box.top + box.height / 2);
+  expect(left !== null && chipButton.contains(left)).toBe(true);
+});
+
+it('makes the row checkbox hit area the whole 40px select cell', async () => {
+  const { screen } = await renderApp('/queue');
+  await expect.element(screen.getByText('RateRadar lead-gen form copy')).toBeVisible();
+  const label = must(document.querySelector('tbody .app-check-hit'), 'checkbox label');
+  expect(Math.round(label.getBoundingClientRect().width)).toBe(40);
+});

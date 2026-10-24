@@ -187,6 +187,23 @@ describe('MetricsPage', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
+  it('tells a marketer who opens it by URL that it is for reviewers, leads and admins, without asking', async () => {
+    server.use(getGetMeMockHandler({ ...ME_LEAD, roles: ['marketer'], effective_roles: ['marketer'] }));
+    table();
+    expect(
+      await screen.findByRole('heading', { name: 'Metrics is for reviewers, leads and admins' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('status', { busy: true })).toBeNull();
+    // Nothing that would be refused: no summary or drill-down request went out.
+    expect(requests).toEqual([]);
+  });
+
+  it('opens for an admin, whom the server also allows', async () => {
+    server.use(getGetMeMockHandler({ ...ME_LEAD, roles: ['admin'], effective_roles: ['admin'] }));
+    table();
+    expect(await screen.findByRole('button', { name: /Time to first review/ })).toBeInTheDocument();
+  });
+
   it('applies a custom period only when it is complete and in order', async () => {
     const { router } = table({ range: 'custom', from: '2026-03-01', to: '2026-03-31' });
     const from = await screen.findByLabelText('From');

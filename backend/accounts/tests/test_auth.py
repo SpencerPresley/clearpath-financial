@@ -1,5 +1,5 @@
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 
 from conftest import TEST_PASSWORD, UserFactory
 from core.domain import Role
@@ -28,6 +28,7 @@ def test_headless_login_by_email_then_me(user_factory: UserFactory) -> None:
         "roles": ["reviewer"],
         "effective_roles": ["reviewer"],
         "is_available": True,
+        "assistant_configured": False,
     }
 
 
@@ -96,3 +97,16 @@ def test_me_requires_a_session() -> None:
 
     assert response.status_code == 401
     assert response.json()["code"] == "not_authenticated"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("key", "configured"), [(None, False), ("", False), ("sk-ant-test", True)])
+def test_me_says_whether_the_assistant_can_answer(user_factory: UserFactory, key: str | None, configured: bool) -> None:
+    # The panel disables its input up front instead of failing on the first send (walkthrough-1 nit 13).
+    client = Client()
+    client.force_login(user_factory(roles=[Role.MARKETER]))
+
+    with override_settings(ASSISTANT_ANTHROPIC_API_KEY=key):
+        me = client.get("/api/me")
+
+    assert me.json()["assistant_configured"] is configured

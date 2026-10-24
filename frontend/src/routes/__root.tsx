@@ -1,7 +1,8 @@
-import { createRootRouteWithContext } from '@tanstack/react-router';
+import { createRootRouteWithContext, useRouter } from '@tanstack/react-router';
 import type { QueryClient } from '@tanstack/react-query';
 
 import { AppShell } from '../ui/layout/AppShell';
+import { afterSignIn } from '../ui/layout/landing';
 import { SessionGate } from '../ui/layout/SessionGate';
 
 interface RouterContext {
@@ -9,8 +10,18 @@ interface RouterContext {
 }
 
 function Root() {
+  const router = useRouter();
   return (
-    <SessionGate>
+    <SessionGate
+      onSignedIn={async (me, userChanged) => {
+        const target = afterSignIn({
+          pathname: router.state.location.pathname,
+          roles: me.effective_roles,
+          userChanged,
+        });
+        if (target !== null) await router.navigate({ to: target, replace: true });
+      }}
+    >
       <AppShell />
     </SessionGate>
   );

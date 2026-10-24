@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from accounts.models import User
+from assistant.llm import assistant_configured
 from core.domain import Role
 from core.permissions import effective_roles
 
@@ -13,6 +14,7 @@ class Me:
     roles: tuple[Role, ...]
     effective_roles: tuple[Role, ...]
     is_available: bool
+    assistant_configured: bool
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,7 @@ def get_me(user: User) -> Me:
         roles=_sorted(user.roles),
         effective_roles=_sorted(effective_roles(user)),
         is_available=user.is_available,
+        assistant_configured=assistant_configured(),
     )
 
 

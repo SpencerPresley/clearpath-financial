@@ -20,6 +20,7 @@ import { EmptyState } from '../../../ui/EmptyState';
 import { apiErrorMessage } from '../../../ui/forms/apiErrors';
 import { IconButton } from '../../../ui/IconButton';
 import { useViewer } from '../../../ui/layout/Viewer';
+import { formatDateTime } from '../../../ui/labels';
 import { RelativeAge } from '../../../ui/RelativeAge';
 import { openAssistant, openAssistantThread } from '../storage';
 
@@ -39,8 +40,6 @@ const COLUMNS = [
 type ColumnId = (typeof COLUMNS)[number]['id'];
 /** With an email open, the pane shows To and the people. */
 const COMPACT: ReadonlySet<ColumnId> = new Set(['sent', 'subject', 'item']);
-
-const sentFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
 function itemKey(id: number): string {
   return `CP-${String(id)}`;
@@ -134,7 +133,7 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
         <dl className="app-drawer-facts app-outbox-facts">
           <div className="app-drawer-fact">
             <dt>{system ? 'Sent' : 'Approved and sent'}</dt>
-            <dd>{sentFormat.format(new Date(email.sent_at))}</dd>
+            <dd>{formatDateTime(email.sent_at)}</dd>
           </div>
           <div className="app-drawer-fact">
             <dt>To</dt>

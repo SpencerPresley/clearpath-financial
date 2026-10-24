@@ -3,6 +3,7 @@
  * days, always one decimal so figures don't jump width (they also render with tabular figures).
  */
 import type { MetricBucket, MetricPointOut } from '../../api/generated/model';
+import { formatDate, formatDayMonth, formatMonth } from '../../ui/labels';
 import type { MetricsSearch } from './search';
 
 export function formatHours(hours: number | null | undefined): string {
@@ -65,14 +66,10 @@ export function periodFor(
   }
 }
 
-const SHORT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-const LONG = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const MONTH = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' });
-
 /** "Oct 19" for a week, "Oct 2026" for a month. */
 export function bucketLabel(periodStart: string, bucket: MetricBucket): string {
   const date = localDate(periodStart);
-  return bucket === 'week' ? SHORT.format(date) : MONTH.format(date);
+  return bucket === 'week' ? formatDayMonth(date) : formatMonth(date);
 }
 
 /** "Oct 19 – Oct 24"; with years when the range crosses a year or isn't in the current one. */
@@ -80,8 +77,8 @@ export function rangeLabel(from: string, to: string, today: Date = new Date()): 
   const a = localDate(from);
   const b = localDate(to);
   const years = a.getFullYear() !== b.getFullYear() || b.getFullYear() !== today.getFullYear();
-  const f = years ? LONG : SHORT;
-  return from === to ? f.format(a) : `${f.format(a)} – ${f.format(b)}`;
+  const f = years ? formatDate : formatDayMonth;
+  return from === to ? f(a) : `${f(a)} – ${f(b)}`;
 }
 
 /** The last day of the bucket starting at `periodStart`. */

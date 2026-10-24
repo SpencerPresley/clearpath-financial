@@ -24,9 +24,9 @@ import type {
 } from '../model';
 
 
-export const getGetMeResponseMock = (overrideResponse: Partial<Extract<MeOut, object>> = {}): MeOut => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), effective_roles: faker.helpers.arrayElements(Object.values(Role)), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
+export const getGetMeResponseMock = (overrideResponse: Partial<Extract<MeOut, object>> = {}): MeOut => ({assistant_configured: faker.datatype.boolean(), display_name: faker.string.alpha({length: {min: 10, max: 20}}), effective_roles: faker.helpers.arrayElements(Object.values(Role)), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
 
-export const getUpdateMeResponseMock = (overrideResponse: Partial<Extract<MeOut, object>> = {}): MeOut => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), effective_roles: faker.helpers.arrayElements(Object.values(Role)), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
+export const getUpdateMeResponseMock = (overrideResponse: Partial<Extract<MeOut, object>> = {}): MeOut => ({assistant_configured: faker.datatype.boolean(), display_name: faker.string.alpha({length: {min: 10, max: 20}}), effective_roles: faker.helpers.arrayElements(Object.values(Role)), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
 
 
 export const getGetMeMockHandler = (overrideResponse?: MeOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<MeOut> | MeOut), options?: RequestHandlerOptions) => {

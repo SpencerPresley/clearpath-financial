@@ -3,12 +3,15 @@
  * (401) shows the sign-in form; any other failure says so with a retry. Roles are `effective_roles` (granted
  * plus implied, e.g. a lead is also a reviewer), so the UI never re-implements role implication.
  */
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
-import { useGetMe } from '../../api/generated/me/me';
+import { getGetMeQueryKey, getMe, useGetMe } from '../../api/generated/me/me';
 import type { MeOut } from '../../api/generated/model';
 import { Button } from '../Button';
 import { errorMessage, errorStatus } from '../errorMessage';
+import { forgetQueueTrail } from '../queueTrail';
 import { SignIn } from './SignIn';
 import { ViewerProvider } from './Viewer';
 import type { Viewer } from './Viewer';
@@ -22,13 +25,53 @@ function isSignedOut(error: unknown): boolean {
   return status === 401 || status === 403;
 }
 
-export function SessionGate({ children }: { children: ReactNode }) {
+export interface SessionGateProps {
+  children: ReactNode;
+  /**
+   * Runs after a sign-in, before the app shows: the root route moves to the person's landing here, so the
+   * screen left in the URL never renders for them. `userChanged`: someone else was signed in to this tab.
+   */
+  onSignedIn?: (me: MeOut, userChanged: boolean) => Promise<void> | void;
+}
+
+export function SessionGate({ children, onSignedIn }: SessionGateProps) {
+  const queryClient = useQueryClient();
   const me = useGetMe({
     query: {
       retry: (count, error) => !isSignedOut(error) && count < 2,
       staleTime: 5 * 60_000,
     },
   });
+  // Who this tab last showed the app to; survives a sign-out or an expired session (the gate stays mounted).
+  const lastUserId = useRef<number | null>(null);
+  const shownId = me.isError ? undefined : me.data?.id;
+  useEffect(() => {
+    if (shownId !== undefined) lastUserId.current = shownId;
+  }, [shownId]);
+
+  // Signed out (sign-out or an expired session): nothing of the previous person stays, neither cached data nor
+  // their queue order in this tab. An effect, so it runs after the pages have unmounted; a still-mounted page
+  // would re-create what is dropped.
+  const signedOut = me.isError && isSignedOut(me.error);
+  useEffect(() => {
+    if (!signedOut) return;
+    queryClient.getMutationCache().clear();
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== getGetMeQueryKey()[0] });
+    forgetQueueTrail();
+  }, [signedOut, queryClient]);
+
+  const enter = async () => {
+    let next: MeOut;
+    try {
+      next = await getMe();
+    } catch {
+      await me.refetch(); // the gate shows whatever went wrong
+      return;
+    }
+    const previous = lastUserId.current;
+    await onSignedIn?.(next, previous !== null && previous !== next.id);
+    queryClient.setQueryData(getGetMeQueryKey(), next);
+  };
 
   if (me.isPending) {
     return (
@@ -42,7 +85,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
       return (
         <SignIn
           onSignedIn={() => {
-            void me.refetch();
+            void enter();
           }}
         />
       );

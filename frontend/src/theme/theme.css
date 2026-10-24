@@ -290,6 +290,24 @@
   .app-btn.app-btn-icon[data-size='sm'] {
     @apply w-7;
   }
+  /*
+   * Minimum 40x40 hit area for small frequent controls (make-interfaces-feel-better #16) without growing what
+   * you see: an invisible pseudo-element centered on the control. Density stays (§5.1); neighbors are spaced so
+   * two hit areas never overlap.
+   */
+  .app-topbar-btn::after,
+  .app-hit-40::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 2.5rem);
+    height: max(100%, 2.5rem);
+    translate: -50% -50%;
+  }
+  .app-hit-40 {
+    @apply relative;
+  }
 
   /* ---- Overlays: the only things that float. --------------------------------------------------- */
   .app-tooltip {
@@ -1047,12 +1065,6 @@
   .app-decision-bar-meta > * {
     @apply shrink-0;
   }
-  /* Risk tier is also on the Details tab; below 1366px the bar keeps room for the decisions. */
-  @media (width < 1366px) {
-    .app-decision-bar-risk {
-      @apply hidden;
-    }
-  }
   .app-meta-text {
     @apply text-meta whitespace-nowrap text-muted;
   }
@@ -1468,7 +1480,7 @@
     outline-color: var(--color-focus-on-brand);
   }
   .app-topbar-btn {
-    @apply inline-flex size-8 cursor-default items-center justify-center rounded-md text-brand-muted;
+    @apply relative inline-flex size-8 cursor-default items-center justify-center rounded-md text-brand-muted;
   }
   .app-topbar-btn[data-hovered],
   .app-topbar-btn[data-pressed] {
@@ -1497,8 +1509,9 @@
     @apply min-w-0 flex-1 bg-transparent text-ui text-primary-content outline-none placeholder:text-brand-muted;
   }
 
+  /* gap-2: room for each 32px button's 40px hit area (.app-topbar-btn::after) without two of them overlapping. */
   .app-topbar-end {
-    @apply ml-auto flex items-center gap-1;
+    @apply ml-auto flex items-center gap-2;
   }
   .app-api-quiet {
     @apply inline-flex size-8 items-center justify-center rounded-md text-brand-muted;
@@ -1694,6 +1707,10 @@
   /* Resize grip: an 8px hit area on the column edge; the 2px rule shows on hover and while dragging. */
   .app-th-resize {
     @apply absolute top-0 -right-1 z-20 h-full w-2 cursor-col-resize touch-none;
+  }
+  /* The last handle stays inside the table, or it alone makes the region scroll sideways by 4px. */
+  .app-th:last-child .app-th-resize {
+    @apply right-0;
   }
   .app-th-resize::after {
     content: '';
@@ -1922,6 +1939,10 @@
   .app-toolbar-end {
     @apply ml-auto flex shrink-0 items-center gap-1;
   }
+  /* 8px from the layout toggle, so its 40px hit area (.app-hit-40) stops short of the toggle. */
+  .app-queue-shortcuts {
+    @apply ml-1;
+  }
   .app-segmented {
     @apply inline-flex rounded-md border border-base-300 bg-base-100 p-0.5;
   }
@@ -1938,7 +1959,7 @@
   }
 
   .app-filter-bar {
-    @apply flex flex-wrap items-center gap-1.5;
+    @apply flex flex-wrap items-center gap-x-1.5 gap-y-3;
   }
   .app-queue-search {
     @apply flex h-7 w-48 items-center gap-1.5 rounded-md border border-base-300 bg-base-100 px-2;
@@ -1971,7 +1992,15 @@
     @apply h-7 gap-1.5 text-muted;
   }
   .app-chip-clear.app-btn {
-    @apply mr-0.5 size-6 w-6 rounded-sm;
+    @apply relative mr-0.5 size-6 w-6 rounded-sm;
+  }
+  /* Hit area: 40px tall, and 6px out to the right into the gap before the next chip. Not to the left: that is
+     the chip's own button. 40px of height fits because wrapped rows of chips sit 12px apart (gap-y-3). The
+     insets are from the padding box, so each side adds the 1px border back. */
+  .app-chip-clear.app-btn::after {
+    content: '';
+    position: absolute;
+    inset: -9px -7px -9px -1px;
   }
   .app-menu-check {
     @apply pl-1.5;
@@ -2197,11 +2226,12 @@
 
 /* ---- Metrics (workstream J) --------------------------------------------------------------------------- */
 @theme static {
-  /* Chart series. Native = brand navy; imported = a lighter navy (3.6:1 on base-100, WCAG 1.4.11), so the two
-     read as one family that differs in provenance, never as a status (§5.2). The legend and the table view say
-     which is which in words. */
-  --color-chart-native: oklch(30% 0.085 262);
-  --color-chart-imported: oklch(62% 0.07 262);
+  /* Chart series: a data palette, neither brand nor status (§5.2: navy is brand and primary action, and every
+     other hue in use names a status). Teal (hue 200) sits clear of navy 262, info 252, success 152, amber 80 and
+     the reds. Native = dark teal (6.7:1 on base-100), imported = a lighter teal (3.2:1, WCAG 1.4.11), so the two
+     read as one family that differs in provenance. The legend and the table view say which is which in words. */
+  --color-chart-native: oklch(46% 0.07 200);
+  --color-chart-imported: oklch(64% 0.065 200);
 }
 
 @layer components {
@@ -2753,6 +2783,13 @@
   }
   .app-import-panel {
     @apply min-w-0 overflow-x-auto rounded-lg border border-base-300 bg-base-100;
+  }
+  /* A page this role can't use (ui/layout/RoleGate): the same panel as Import's own role gate. */
+  .app-gate {
+    @apply flex max-w-[80rem] flex-col gap-4 pb-8;
+  }
+  .app-gate-panel {
+    @apply rounded-lg border border-base-300 bg-base-100;
   }
   .app-import-start {
     @apply flex flex-col gap-6;
@@ -3781,13 +3818,9 @@
   .app-main {
     container: main / inline-size;
   }
-  /* Review screen: risk tier steps out first (it's on Details), then the decisions take their own row under
-     the title so none of them runs under the panel. */
-  @container main (width < 1100px) {
-    .app-decision-bar-risk {
-      @apply hidden;
-    }
-  }
+  /* Review screen: below 1000px the decisions take their own row under the title, so none of them runs under
+     the panel. The risk chip stays at every width (walkthrough-1 nit 3): the meta row has room for it at 1280,
+     and once the decisions wrap it has the whole row. */
   @container main (width < 1000px) {
     .app-decision-bar {
       @apply flex-wrap gap-y-2;
@@ -3803,6 +3836,13 @@
     }
     .app-review-body {
       @apply grid-cols-[minmax(0,1fr)_22rem];
+    }
+  }
+  /* Queue: a slightly narrower preview drawer once the page is narrow (1280, or beside the assistant), so the
+     table keeps Risk and Assignee beside it (features/queue/fit.ts). */
+  @container main (width < 1100px) {
+    .app-drawer {
+      @apply w-92;
     }
   }
 }

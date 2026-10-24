@@ -24,9 +24,12 @@ const wait = (ms: number) =>
 export function ResetDemoDialog({
   isOpen,
   onOpenChange,
+  onDone,
 }: {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  /** After a reset finished: leave the screen (it may show deleted data). Default: refetch everything. */
+  onDone?: () => Promise<void>;
 }) {
   const qc = useQueryClient();
   const start = useResetDemo();
@@ -52,7 +55,7 @@ export function ResetDemoDialog({
       setJob(null);
       onOpenChange(false);
       showToast({ title: 'Demo reset', description: `${String(current.seeded_items)} items seeded.` });
-      await qc.invalidateQueries();
+      await (onDone === undefined ? qc.invalidateQueries() : onDone());
     } else {
       showToast({ title: "The demo reset didn't finish", description: current.error, tone: 'error' });
     }

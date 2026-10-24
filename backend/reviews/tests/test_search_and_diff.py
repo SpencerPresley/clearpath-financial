@@ -6,7 +6,7 @@ from core.domain import DecisionLane, DecisionOutcome, ItemStatus, Product
 from reviews.diff import DiffOp, DiffSegment, diff_texts
 from reviews.filters import ItemFilter
 from reviews.models import Decision
-from reviews.search import find_phrase, search_text
+from reviews.search import _window, find_phrase, search_text
 from reviews.tests.factories import AT, make_item, make_version
 
 
@@ -152,3 +152,52 @@ def test_precedent_is_ever_approved_wording_with_its_current_status(
             (lapsed.pk, 1, ItemStatus.EXPIRED),
             (reworded.pk, 1, ItemStatus.SUBMITTED),
         ]
+
+
+_LONG = (
+    "Personal loans from ClearPath for debt consolidation and home projects. Borrow $15,000 over 48 months at "
+    "10.49% APR and pay $384 a month, with no origination fee for applicants who qualify today. Checking your "
+    "rate won't affect your credit score."
+)
+
+
+def _whole_words(shown: str, source: str) -> bool:
+    words = shown.split()
+    return f" {words[0]} " in f" {source} " and f" {words[-1]} " in f" {source} "
+
+
+def test_phrase_snippet_snaps_to_word_boundaries_with_ellipses() -> None:
+    parts = _window(_LONG, "10.49% APR")
+
+    text = "".join(p.text for p in parts)
+    assert text.startswith("…")
+    assert text.endswith("…")
+    # The cut lands between words: the first and last words shown are whole words of the copy.
+    assert _whole_words(text.removeprefix("…").removesuffix("…"), _LONG)
+    assert [p.text for p in parts if p.highlighted] == ["10.49% APR"]
+
+
+def test_phrase_snippet_of_short_text_is_the_whole_text_without_ellipses() -> None:
+    parts = _window("No annual fee, ever.", "annual fee")
+
+    assert "".join(p.text for p in parts) == "No annual fee, ever."
+
+
+def test_phrase_at_the_very_start_gets_no_leading_ellipsis() -> None:
+    text = "".join(p.text for p in _window(_LONG, "Personal loans"))
+
+    assert text.startswith("Personal loans")
+    assert text.endswith("…")
+
+
+@pytest.mark.django_db
+def test_text_snippet_marks_where_it_was_cut(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    item = make_item(marketer, title="Long")
+    filler = " ".join(f"word{i}" for i in range(60))
+    _approved(item, make_version(item, f"{filler} rates for good credit. {filler}"), reviewer)
+
+    hits = search_text(viewer=reviewer, query="credit", filters=ItemFilter(), clock=clock)
+
+    text = "".join(p.text for p in hits[0].snippet)
+    assert text.startswith("…")
+    assert text.endswith("…")

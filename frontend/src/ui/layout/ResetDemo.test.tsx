@@ -1,9 +1,15 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
+import { getImportsMock } from '../../api/generated/imports/imports.msw';
+import { getLibraryMock } from '../../api/generated/library/library.msw';
 import type { DemoResetOut } from '../../api/generated/model';
+import { getPartnersMock } from '../../api/generated/partners/partners.msw';
+import { getUsersMock } from '../../api/generated/users/users.msw';
+import { renderApp } from '../../test/renderApp';
 import { server } from '../../test/server';
 import { renderWithQuery } from '../../test/render';
 import { ResetDemoDialog } from './ResetDemo';
@@ -105,5 +111,49 @@ describe('ResetDemoDialog', () => {
       'The reset failed and nothing changed.',
     );
     expect(screen.getByRole('button', { name: 'Reset demo' })).toBeEnabled();
+  });
+});
+
+describe('Reset demo from the account menu', () => {
+  it('leaves the deleted import job for the landing page and drops the old cache', async () => {
+    const user = userEvent.setup();
+    server.use(
+      ...getLibraryMock(),
+      ...getImportsMock(),
+      ...getPartnersMock(),
+      ...getUsersMock(),
+      getGetMeMockHandler({
+        id: 9,
+        display_name: 'Avery Kim',
+        email: 'admin@clearpath.demo',
+        roles: ['admin'],
+        effective_roles: ['admin'],
+        is_available: true,
+      }),
+      http.post('*/api/admin/demo/reset', () => HttpResponse.json(job('queued'), { status: 202 })),
+      http.get('*/api/admin/demo/resets/7', () => HttpResponse.json(job('done', { seeded_items: 44 }))),
+    );
+    // The review's repro: the Import page open on job 2, which the reset deletes.
+    const { router, queryClient } = renderApp('/import?job=2');
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['/api/imports/2'])).toBeDefined();
+    });
+    await user.click(screen.getByRole('button', { name: /account$/ }));
+    await user.click(await screen.findByRole('button', { name: 'Reset demo…' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Reset the demo?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Reset demo' }));
+
+    await waitFor(
+      () => {
+        expect(router.state.location.pathname).toBe('/import');
+        expect(router.state.location.search).toEqual({});
+        expect(queryClient.getQueryData(['/api/imports/2'])).toBeUndefined();
+      },
+      { timeout: 4000 },
+    );
+    // The start screen, not the deleted job's preview.
+    expect(await screen.findByRole('region', { name: 'Start an import' })).toBeInTheDocument();
+    // Same person, same session: the shell stays up (no sign-in, no blank loading screen).
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import { Focusable } from 'react-aria-components';
 
+import { formatDateTime } from './labels';
 import { Tooltip } from './Tooltip';
 
 const MINUTE = 60;
@@ -23,11 +24,6 @@ export function formatAge(at: Date, now: Date): string {
   return `${String(Math.floor(days / 365))}y`;
 }
 
-const absoluteFormat = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
 export interface RelativeAgeProps {
   at: string | Date;
   /** Reference time; defaults to render time. Pass it in tests and for lists that share one clock. */
@@ -40,7 +36,7 @@ export function RelativeAge({ at, now }: RelativeAgeProps) {
     return <span className="app-age">—</span>;
   }
   const age = formatAge(date, now ?? new Date());
-  const absolute = absoluteFormat.format(date);
+  const absolute = formatDateTime(date);
   // role="img" + aria-label: the spoken name is the absolute time ("3d" reads badly), and RAC's
   // Focusable requires an interactive or img role on a tooltip trigger.
   return (

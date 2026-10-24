@@ -7556,6 +7556,12 @@
       },
       "MeOut": {
         "properties": {
+          "assistant_configured": {
+            "default": true,
+            "description": "This server has an assistant model key; false means every assistant run would fail.",
+            "title": "Assistant Configured",
+            "type": "boolean"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"

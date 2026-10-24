@@ -7,6 +7,8 @@
 import type { Role } from './role';
 
 export interface MeOut {
+  /** This server has an assistant model key; false means every assistant run would fail. */
+  assistant_configured?: boolean;
   display_name: string;
   /** Granted roles plus implied ones (a lead is also a reviewer). */
   effective_roles: Role[];

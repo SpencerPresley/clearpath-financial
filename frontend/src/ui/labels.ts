@@ -100,12 +100,52 @@ export function plural(count: number, one: string, many = `${one}s`): string {
   return `${String(count)} ${count === 1 ? one : many}`;
 }
 
-/** "Oct 24, 2026". Dates from the API are ISO strings; date-only strings are read as local dates. */
-export function formatDate(value: string): string {
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+/*
+ * Dates: every date the app shows goes through these, so one screen never says "2025-09-26" or
+ * "10/22/2026, 2:40:00 PM" next to another's "Oct 22, 2026". Values from the API are ISO strings; a date-only
+ * string ("2026-07-21") is that calendar day wherever the viewer is, not UTC midnight shifted a day back.
+ */
+const DATE_FORMAT = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+const DAY_MONTH_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const MONTH_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' });
+
+export type DateValue = string | Date | null | undefined;
+
+function toDate(value: DateValue): Date | null {
+  if (value === null || value === undefined || value === '') return null;
+  const date =
+    value instanceof Date
+      ? value
+      : /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? new Date(`${value}T00:00:00`)
+        : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function format(formatter: Intl.DateTimeFormat, value: DateValue): string {
+  const date = toDate(value);
+  return date === null ? '—' : formatter.format(date);
+}
+
+/** "Oct 24, 2026"; "—" when there's no date. */
+export function formatDate(value: DateValue): string {
+  return format(DATE_FORMAT, value);
+}
+
+/** "Oct 22, 2026, 2:40 PM": tooltips behind relative ages, sent times. */
+export function formatDateTime(value: DateValue): string {
+  return format(DATE_TIME_FORMAT, value);
+}
+
+/** "Oct 19": weekly chart ticks and same-year mentions where the year is plain from context. */
+export function formatDayMonth(value: DateValue): string {
+  return format(DAY_MONTH_FORMAT, value);
+}
+
+/** "Oct 2026": monthly chart ticks. */
+export function formatMonth(value: DateValue): string {
+  return format(MONTH_FORMAT, value);
 }
 
 /** "12.4 KB". */

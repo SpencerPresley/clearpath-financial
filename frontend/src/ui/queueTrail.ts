@@ -32,6 +32,15 @@ export const DEFAULT_TRAIL: QueueTrail = {
   href: '/queue',
 };
 
+/** Sign-out: the next person in this tab must not walk the previous person's queue. */
+export function forgetQueueTrail(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Storage disabled: nothing was stored.
+  }
+}
+
 export function rememberQueueTrail(trail: QueueTrail): void {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(trail));

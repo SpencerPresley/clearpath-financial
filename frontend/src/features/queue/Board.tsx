@@ -16,6 +16,7 @@ import { Icon } from '../../ui/Icon';
 import { ItemKey } from '../../ui/ItemKey';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { errorMessage } from '../../ui/errorMessage';
+import { formatDateTime } from '../../ui/labels';
 import { formatAge } from '../../ui/RelativeAge';
 import { FindingsCount } from './FindingsCount';
 import { toListParams } from './search';
@@ -61,7 +62,7 @@ function Card({
         <time
           className="app-age ml-auto"
           dateTime={row.submitted_at}
-          title={new Date(row.submitted_at).toLocaleString('en-US')}
+          title={formatDateTime(row.submitted_at)}
         >
           {formatAge(new Date(row.submitted_at), now)}
         </time>
