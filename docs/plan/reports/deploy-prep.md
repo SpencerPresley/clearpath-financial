@@ -134,7 +134,7 @@ django-storages 1.14.6, checked in ctx7 docs and `storages/backends/s3.py`.
   and it leaks through history, logs and forwards.
 - It would also put `s3.amazonaws.com` in the browser, outside WAF and the geo restriction. The SPA's
   `<a download>` and `<img src=download_url>` would need CORS or CSP thought.
-- Cost of streaming: bytes pass EC2 and the NAT ($0.045/GB). That's negligible here. CloudFront's 60 s
+- Cost of streaming: bytes pass EC2. S3 reads go through the free gateway endpoint, not the NAT. That's negligible here. CloudFront's 60 s
   read timeout is per packet, not per response.
 - I updated `docs/decisions.md` (Hosting) and the storage.tf comment, which both said "presigned".
 
@@ -283,13 +283,51 @@ the demo seed create users directly, so they're unaffected (accounts and demo te
 | `grep -rn signup frontend/src` (non-generated) | only a comment in SignIn.tsx ("no ... signup"), so closing signup changes no UI |
 | `shellcheck deploy/*.sh` | clean |
 | `terraform fmt -check -recursive`, `validate` | exit 0, valid |
-| `AWS_PROFILE=clearpath terraform plan -lock=false` | **`Plan: 76 to add, 0 to change, 0 to destroy.`** |
+| `AWS_PROFILE=clearpath terraform plan -lock=false` | **`Plan: 77 to add, 0 to change, 0 to destroy.`** |
 | local e2e (above) | as listed |
 
-**Plan delta.** Main (with #39) already plans 76 to add: 74 plus `random_password.demo_user` and its SSM
-parameter. This branch adds no resources. The only difference is inside the to-be-created
-`aws_iam_role_policy.app`: `DocumentsReadWrite` is `GetObject, PutObject, AbortMultipartUpload` instead of
-`GetObject, PutObject, DeleteObject`. Nothing exists yet, so it's all "add".
+**Plan delta.** Main (with #39) plans 76 to add: 74 plus `random_password.demo_user` and its SSM parameter.
+This branch makes it 77. Nothing exists yet, so it's all "add". Two differences:
+- **+1 resource:** `aws_vpc_endpoint.s3`, a Gateway endpoint for `com.amazonaws.us-east-1.s3` on the
+  private route table. Its policy is the default.
+- **Changed contents of the to-be-created `aws_iam_role_policy.app`:** `DocumentsReadWrite` is
+  `GetObject, PutObject, AbortMultipartUpload` instead of `GetObject, PutObject, DeleteObject`.
+
+### S3 gateway endpoint (orchestrator follow-up)
+
+`infra/main/network.tf` adds `aws_vpc_endpoint.s3`: Gateway type, no charge, on `aws_route_table.private`.
+That is the only private route table; both private subnets use it. In-region S3 traffic now skips the NAT's
+$0.045/GB. That's mostly ECR image layers: the ECR VPC-endpoint docs say "Amazon ECR uses Amazon S3 to store
+your image layers" in `arn:aws:s3:::prod-<region>-starport-layer-bucket/*`. The documents bucket goes the
+same way.
+
+**The endpoint policy is left at the default (full access). My call, for these reasons:**
+1. **It wouldn't contain exfiltration.** An endpoint policy governs only in-region S3 reached through this
+   route. The app security group allows all egress through the NAT, so any other host, or a bucket in
+   another region, stays reachable. The real limit is the instance role (app.tf), and an endpoint policy
+   can only narrow it, never widen it.
+2. **An allowlist must name every AWS-managed bucket the box reads through the endpoint.** Three of them
+   are documented:
+   - ECR layers: `prod-us-east-1-starport-layer-bucket`, from the ECR docs. A scoped policy would not
+     break ECR pulls.
+   - SSM Agent: `amazon-ssm-us-east-1` and `aws-ssm-us-east-1`, from the SSM Agent technical-details page.
+
+   The fourth isn't confirmed:
+   - AL2023's dnf repositories. EMR's docs name `al2023-repos-<region>-de612dc2`. But the AL2023 image
+     builds its repo hostname from dnf vars: `awsregion`, `dualstack`, `repoguid`. The container image
+     I inspected has a different `repoguid` value and uses `cdn.amazonlinux.com`, and I can't see the
+     EC2 AMI's repo file without launching it.
+   - `user_data.sh.tftpl` runs `dnf install -y docker jq` once, under `set -e`. One miss leaves the
+     server without Docker, and the only fix is `terraform apply -replace aws_instance.app`, which also
+     redeploys the VPC origin.
+
+   Cost of a scoped policy: that risk on first boot. Benefit: none of real value, per reason 1.
+3. **If you want it scoped anyway**, apply as is, then read `/etc/yum.repos.d/amazonlinux.repo` and
+   `/etc/dnf/vars/*` on the box. Add a policy with `s3:GetObject` on the four AWS buckets plus the
+   documents bucket's app actions, and run `dnf makecache` to prove it before relying on it.
+
+The ECR docs also warn that adding the gateway endpoint can briefly interrupt existing S3 connections. That
+doesn't matter on a first apply.
 
 New dependencies:
 - `django-storages[s3]>=1.14.6`, which brings boto3 1.43.118.
@@ -305,7 +343,7 @@ from the US. `cd infra/main` throughout.
 **1. Apply** (~20–25 min, mostly the VPC origin and the distribution):
 ```sh
 terraform init
-terraform plan -out=main.tfplan      # expect: Plan: 76 to add, 0 to change, 0 to destroy
+terraform plan -out=main.tfplan      # expect: Plan: 77 to add, 0 to change, 0 to destroy
 terraform apply main.tfplan
 ```
 Merging to main doesn't deploy yet: every Deploy job is skipped while `DEPLOY_ROLE_ARN` is unset.
@@ -408,15 +446,15 @@ it: that streams from S3. Request an evidence pack.
 
 ## For the orchestrator to decide or know
 
-1. **Public signup fix is in this PR** (security, small). Say if you'd rather split it out. The SPA never
-   offered signup, so there's no UI change.
+1. **Public signup fix is in this PR**, accepted by the orchestrator. `docs/decisions.md` (Stack) now says
+   accounts are provisioned and there's no self-signup. The SPA never offered signup, so there's no UI
+   change.
 2. **No `DeleteObject` for the app.** A future "expire old export files" job (G follow-up) needs it back,
    scoped to `exports/*`. Reset demo leaves the previous seed's attachment objects in S3 as orphans
    (pennies; versioned bucket).
 3. **The `sk-ant-` prefix requirement** in E001 rejects a wrongly pasted secret. If Anthropic ever changes
    the key format, deploys stop with E001 until the check is relaxed.
-4. **Optional, not done**: an S3 gateway VPC endpoint (free) would take document traffic off the NAT
-   ($0.045/GB). It's one `aws_vpc_endpoint` plus a route-table association, worth it only if files get
-   big.
-5. **Ledger cleanup**: Rulings line 51 ("seed_demo runs after migrate on container start") contradicts
-   line 42 and the merged deploy.sh (seed in deploy.sh). The later ruling, deploy.sh, is what shipped.
+4. **S3 gateway endpoint: added, with its policy left open.** The reasons and the steps to scope it later
+   are in "S3 gateway endpoint" above.
+5. **Ledger cleanup** (orchestrator is fixing it): Rulings line 51 ("seed_demo runs after migrate on
+   container start") contradicts line 42 and the merged deploy.sh, which seeds in deploy.sh.

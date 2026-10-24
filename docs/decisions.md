@@ -241,6 +241,7 @@ Search returns ranked candidates, so a semantic channel can be fused in later wi
   - ASGI server, with SSE for assistant streaming
   - **no Channels**: live queue updates come from React Query refetch-on-focus plus polling
   - django-allauth in headless mode, with MFA
+  - **accounts are provisioned by an admin; there is no self-signup.** allauth's signup endpoint is closed by the account adapter (`accounts/adapter.py`); its default would let anyone who reaches the site create a signed-in account
   - uv + `pyproject.toml`; ruff; Pyrefly with django-stubs, with selectors returning typed dataclasses to cover Pyrefly's loose `annotate`/`values` typing
   - pytest
 - **Frontend:**
@@ -263,7 +264,7 @@ Search returns ranked candidates, so a semantic channel can be fused in later wi
   - `/api/*` and `/_allauth/*` go to the app server, so session cookies and CSRF are same-origin and there's no CORS
   - SPA deep links are handled by a CloudFront Function on the S3 behavior only. Custom error responses apply to the whole distribution, so they would turn API 404s into `index.html`.
 - **App server:** EC2 in a private subnet with no public IP, reached through a **CloudFront VPC origin**.
-  - Outbound traffic (Anthropic API, image pulls) goes through a NAT gateway.
+  - Outbound traffic (Anthropic API, ECR API, Docker Hub) goes through a NAT gateway. In-region S3 (ECR image layers, the documents bucket) takes a free S3 gateway endpoint instead, which avoids NAT data charges. Its policy is left open: with all egress open through the NAT, a bucket allowlist on it would block no exfiltration path, and it would risk breaking first-boot package installs.
   - Docker Compose on the server runs web, Celery worker and beat, Redis, and the outbox dispatcher. Postgres runs on RDS instead.
 - **Database:** RDS Postgres in private subnets, encrypted, accepting connections only from the app's security group.
 - **Edge security:** CloudFront geo restriction to the US, plus AWS WAF:
@@ -277,7 +278,7 @@ Search returns ranked candidates, so a semantic channel can be fused in later wi
     the common GET-only SSRF. The alternative, handing credentials only to the web and worker containers,
     costs extra secret plumbing for one demo server.
   - secrets in SSM Parameter Store
-  - documents bucket private, encrypted and versioned. Downloads stream through Django's permission-checked endpoints; the bucket is never exposed. **Rejected: presigned URLs.** A presigned URL is a bearer link: it keeps working for its lifetime after the user is deactivated or loses access, and it can leak through history, logs or a forwarded link. It would also put a second origin (S3) in the browser outside WAF and the geo restriction, and the SPA would need to change. The cost of streaming is that file bytes pass through the app server and NAT, which is negligible at demo file sizes.
+  - documents bucket private, encrypted and versioned. Downloads stream through Django's permission-checked endpoints; the bucket is never exposed. **Rejected: presigned URLs.** A presigned URL is a bearer link: it keeps working for its lifetime after the user is deactivated or loses access, and it can leak through history, logs or a forwarded link. It would also put a second origin (S3) in the browser outside WAF and the geo restriction, and the SPA would need to change. The cost of streaming is that file bytes pass through the app server (S3 reads take the free gateway endpoint, not the NAT), which is negligible at demo file sizes.
   - the app's role can read and write documents but not delete them (nothing in the app deletes a stored file)
   - allauth rate limits key on `CloudFront-Viewer-Address`, which is trustworthy only because the origin is reachable solely through the CloudFront VPC origin
 - **Deploy:**

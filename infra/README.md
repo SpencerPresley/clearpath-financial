@@ -15,7 +15,8 @@ viewer ─▶ CloudFront (WAF, geo=US) ─┬─ default ───────�
                                     └─ /api /_allauth /accounts /django-admin
                                           ─▶ VPC origin ─▶ EC2 :8000 (private subnet, compose: web/worker/beat/redis)
                                                               ├─▶ RDS Postgres 17 (private)
-                                                              └─▶ NAT ─▶ ECR, SSM, Anthropic API
+                                                              ├─▶ S3 gateway endpoint ─▶ ECR image layers, documents bucket
+                                                              └─▶ NAT ─▶ ECR API, SSM, Anthropic API, Docker Hub
 ```
 
 ## Bootstrap (once; already done)
@@ -189,7 +190,8 @@ Unit prices from the AWS Price List API (`aws pricing get-products`, queried 202
 
 | Component | Basis | $/month |
 |---|---|---|
-| NAT gateway | $0.045/h + $0.045/GB processed (~5 GB of image pulls/API calls) | 33.10 |
+| NAT gateway | $0.045/h + $0.045/GB processed (~1 GB of API calls and Docker Hub; ECR layers and documents go through the S3 gateway endpoint) | 32.90 |
+| S3 gateway endpoint | no charge (AWS) | 0 |
 | EC2 t3.medium | $0.0416/h | 30.37 |
 | RDS db.t4g.micro, Single-AZ | $0.016/h | 11.68 |
 | WAF | $5/web ACL (AWS WAF pricing page, *not* from the API) + 4 rules × $1 + $0.60/M requests | ~9.00 |
@@ -202,6 +204,7 @@ Unit prices from the AWS Price List API (`aws pricing get-products`, queried 202
 | **Total** | | **≈ $93** |
 
 The NAT gateway is the largest line and is pure fixed cost. Cheaper options if this outlives the demo:
-VPC endpoints don't help (interface endpoints are ~$7.30/mo per endpoint per AZ, *estimate*, and we'd need ECR api+dkr, SSM ×3, S3
-gateway, plus egress to Anthropic still needs NAT); a NAT instance (t4g.nano, ~$3/mo) would.
+interface VPC endpoints don't help (~$7.30/mo per endpoint per AZ, *estimate*, and we'd need ECR api+dkr and SSM ×3,
+plus egress to Anthropic still needs NAT; the S3 gateway endpoint is already in place and free); a NAT instance
+(t4g.nano, ~$3/mo) would.
 Stopping the EC2 and RDS instances when idle saves ~$42/mo; RDS auto-restarts after 7 days stopped.
