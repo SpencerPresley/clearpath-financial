@@ -28,7 +28,8 @@ Branch `ws0/foundation`, closes #1. Plan: `docs/plan/foundation.md`. Review and 
   generated `english` tsvector on version content with GIN; event outbox/item/entity/type indexes.
 - **Patterns**: typed domain errors + one set of exception handlers; injectable clock; role checks;
   `submit_item` end to end; event payload registry; gap-free outbox with idempotent handlers; `ItemFilter` +
-  keyset queue selector; a query-count test on every real read endpoint (24, data grown between two
+  keyset queue selector; a query-count test on 22 read operations, every real list plus the detail reads that
+  embed lists (24 cases, data grown between two
   measurements); precedent search; word diff.
 - **API contract** for every screen, with `operation_id` and one tag per operation; regenerated
   `frontend/openapi/ninja.json` and `frontend/src/api/generated` (health badge test unchanged and passing).
