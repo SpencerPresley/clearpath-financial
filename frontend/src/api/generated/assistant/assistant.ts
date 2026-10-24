@@ -25,6 +25,7 @@ import type {
 
 import type {
   ApproveIn,
+  AssistantHistoryIn,
   AssistantRunIn,
   AssistantThreadOut,
   AssistantThreadStateOut,
@@ -329,7 +330,96 @@ export function useGetAssistantThread<TData = Awaited<ReturnType<typeof getAssis
 
 
 
-export const getRespondToAssistantInterruptUrl = (threadId: string,
+export const getGetAssistantThreadHistoryUrl = (threadId: string,) => {
+
+
+
+
+  return `/api/assistant/threads/${threadId}/history`
+}
+
+/**
+ * Checkpoint history isn't exposed; always empty. The SDK asks for it on hydrate.
+ * @summary Get Thread History
+ */
+export const getAssistantThreadHistory = async (threadId: string,
+    assistantHistoryIn: AssistantHistoryIn, options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadStateOut[]> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AssistantThreadStateOut[]>(getGetAssistantThreadHistoryUrl(threadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(assistantHistoryIn)
+  }
+);}
+
+
+
+
+
+export const getGetAssistantThreadHistoryMutationKey = () => ['getAssistantThreadHistory'] as const;
+
+export const getGetAssistantThreadHistoryMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getAssistantThreadHistory>>, TError,GetAssistantThreadHistoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof getAssistantThreadHistory>>, TError,GetAssistantThreadHistoryMutationVariables, TContext> => {
+
+const mutationKey = getGetAssistantThreadHistoryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getAssistantThreadHistory>>, GetAssistantThreadHistoryMutationVariables> = (props) => {
+          const {threadId,data} = props ?? {};
+
+          return  getAssistantThreadHistory(threadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetAssistantThreadHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof getAssistantThreadHistory>>>
+    export type GetAssistantThreadHistoryMutationBody = AssistantHistoryIn
+    export type GetAssistantThreadHistoryMutationError = ErrorOut
+    export type GetAssistantThreadHistoryMutationVariables = {threadId: string;data: AssistantHistoryIn}
+
+    /**
+ * @summary Get Thread History
+ */
+export const useGetAssistantThreadHistory = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getAssistantThreadHistory>>, TError,GetAssistantThreadHistoryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof getAssistantThreadHistory>>,
+        TError,
+        GetAssistantThreadHistoryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGetAssistantThreadHistoryMutationOptions(options), queryClient);
+    }
+    export const getRespondToAssistantInterruptUrl = (threadId: string,
     interruptId: string,) => {
 
 

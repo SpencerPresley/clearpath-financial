@@ -123,8 +123,11 @@ def sse_frame(event: WireEvent) -> bytes:
     return f"event: {event['method']}\ndata: {data}\n\n".encode()
 
 
-def thread_state(snapshot: StateSnapshot) -> AssistantThreadStateOut:
-    """The protocol's `getState` shape: what hydrates the panel, including a pending approval."""
+def thread_state(snapshot: StateSnapshot, *, run_alive: bool) -> AssistantThreadStateOut:
+    """The protocol's `getState` shape: what hydrates the panel, including a pending approval.
+
+    Runs live only as long as their request, so a checkpoint with a next step, no pending approval and no
+    live request is a dead run (cut short): `next` is empty, the thread is idle."""
     values = snapshot.values if isinstance(snapshot.values, Mapping) else {}
     configurable = (snapshot.config or {}).get("configurable", {})
     checkpoint_id = configurable.get("checkpoint_id")
@@ -132,7 +135,7 @@ def thread_state(snapshot: StateSnapshot) -> AssistantThreadStateOut:
     return AssistantThreadStateOut.model_validate(
         {
             "values": {"messages": _messages(values)},
-            "next": list(snapshot.next),
+            "next": list(snapshot.next) if run_alive or any(t.interrupts for t in snapshot.tasks) else [],
             "tasks": [
                 {
                     "id": task.id,

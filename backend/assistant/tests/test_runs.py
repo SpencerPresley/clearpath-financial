@@ -68,3 +68,26 @@ def test_title_is_collapsed_and_capped() -> None:
     title = services.thread_title("word " * 40)
     assert len(title) == services.TITLE_LENGTH
     assert title.endswith("…")
+
+
+def test_dangling_tool_calls_get_a_stopped_result() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
+    calls = [
+        {"name": "get_item", "args": {}, "id": "c1"},
+        {"name": "search_items", "args": {}, "id": "c2"},
+        {"name": "send_email", "args": {}, "id": "c3"},
+    ]
+    messages = [
+        HumanMessage("hi"),
+        AIMessage(content="", tool_calls=calls),
+        ToolMessage(content="{}", tool_call_id="c1", name="get_item"),
+    ]
+
+    stopped = runs.dangling_tool_results(messages, pending_tool_call_ids={"c3"})
+
+    assert [(m.tool_call_id, m.name, m.status) for m in stopped] == [("c2", "search_items", "error")]
+    assert (
+        runs.dangling_tool_results([HumanMessage("hi"), AIMessage(content="Hello.")], pending_tool_call_ids=set()) == []
+    )
+    assert runs.dangling_tool_results([], pending_tool_call_ids=set()) == []

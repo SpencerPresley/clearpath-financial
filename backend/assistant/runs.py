@@ -12,7 +12,7 @@ ORM calls go through `sync_to_async` (thread-sensitive), so they use the request
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, suppress
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,7 +22,7 @@ from uuid import UUID
 import anthropic
 from asgiref.sync import sync_to_async
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 KEEPALIVE_SECONDS: float = 15.0
 REJECT_DEFAULT: Final = "The user declined to send this email. Don't send it again unless they ask."
+STOPPED_RESULT: Final = '{"error":"Stopped before it finished."}'
 
 type ModelFactory = Callable[[], BaseChatModel]
 type CheckpointerFactory = Callable[[], AbstractAsyncContextManager[BaseCheckpointSaver]]
@@ -79,10 +80,36 @@ def _config(thread_id: UUID) -> RunnableConfig:
     return {"configurable": {"thread_id": str(thread_id)}}
 
 
-def _input(command: RunCommand) -> dict[str, Any] | Command[Any]:
-    if isinstance(command, StartRun):
-        return {"messages": [HumanMessage(id=command.message_id, content=command.content)]}
-    return Command(resume={command.interrupt_id: command.decision})
+def dangling_tool_results(messages: Sequence[BaseMessage], *, pending_tool_call_ids: set[str]) -> list[ToolMessage]:
+    """Results for the last AI message's tool calls that never got one (a run cut short mid-tool), so the next
+    request isn't a `tool_use` without its `tool_result` (Anthropic rejects that). Calls paused on an
+    approval are left alone: that thread takes no new message until the approval is answered."""
+    last_ai = next((i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], AIMessage)), None)
+    if last_ai is None:
+        return []
+    ai = messages[last_ai]
+    assert isinstance(ai, AIMessage)  # noqa: S101  # narrowed by the search above
+    answered = {m.tool_call_id for m in messages[last_ai + 1 :] if isinstance(m, ToolMessage)}
+    return [
+        ToolMessage(content=STOPPED_RESULT, tool_call_id=call["id"], name=call["name"], status="error")
+        for call in ai.tool_calls
+        if call["id"] and call["id"] not in answered and call["id"] not in pending_tool_call_ids
+    ]
+
+
+async def _input(agent: CompiledStateGraph, command: RunCommand, thread_id: UUID) -> dict[str, Any] | Command[Any]:
+    if isinstance(command, Resume):
+        return Command(resume={command.interrupt_id: command.decision})
+    snapshot = await agent.aget_state(_config(thread_id))
+    values = snapshot.values if isinstance(snapshot.values, dict) else {}
+    paused = {
+        str(i.value.get("tool_call_id"))
+        for task in snapshot.tasks
+        for i in task.interrupts
+        if isinstance(i.value, dict)
+    }
+    stopped = dangling_tool_results(values.get("messages", []), pending_tool_call_ids=paused)
+    return {"messages": [*stopped, HumanMessage(id=command.message_id, content=command.content)]}
 
 
 def failure_message(error: BaseException) -> str:
@@ -125,7 +152,13 @@ async def _produce(  # the run's inputs, all keyword-only
                 viewer=viewer, model=model, checkpointer=saver, item=item, clock=clock, thread_id=str(thread_id)
             )
             try:
-                run = await agent.astream_events(_input(command), _config(thread_id), version="v3")
+                # durability="sync": a finished step is checkpointed before the next one starts, so a disconnect
+                # later in the run can't lose it. A disconnect *during* the tools step still loses that step
+                # (the sync send can't be cancelled, the step can): the approval comes back pending, and
+                # send_approved_email's per-tool-call idempotency makes approving it again send nothing new.
+                run = await agent.astream_events(
+                    await _input(agent, command, thread_id), _config(thread_id), version="v3", durability="sync"
+                )
                 outcome.run = run
                 seen: set[str] = set()
                 async for event in run:
@@ -188,6 +221,15 @@ async def stream_run(  # the run's inputs, all keyword-only
             producer.cancel()
             with suppress(asyncio.CancelledError):
                 await producer
+            if outcome.awaiting_approval is None:
+                # Cut short: read what the checkpoint says now (an approval may have been answered and run).
+                try:
+                    pending = await pending_interrupt_ids(
+                        thread_id=thread_id, viewer=viewer, checkpointer_factory=checkpointer_factory
+                    )
+                    outcome.awaiting_approval = bool(pending)
+                except Exception:
+                    logger.exception("assistant state read after disconnect failed")
         await sync_to_async(services.release_run)(
             thread_id=thread_id,
             claimed_at=claimed_at,
@@ -206,8 +248,8 @@ async def pending_interrupt_ids(
 
 
 async def read_state(
-    *, thread_id: UUID, viewer: User, checkpointer_factory: CheckpointerFactory | None = None
+    *, thread_id: UUID, viewer: User, run_alive: bool, checkpointer_factory: CheckpointerFactory | None = None
 ) -> AssistantThreadStateOut:
     async with (checkpointer_factory or CHECKPOINTER_FACTORY)() as saver:
         snapshot = await state_graph(viewer=viewer, checkpointer=saver).aget_state(_config(thread_id))
-    return thread_state(snapshot)
+    return thread_state(snapshot, run_alive=run_alive)

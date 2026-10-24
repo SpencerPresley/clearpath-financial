@@ -113,3 +113,19 @@ def test_injection_in_item_copy_changes_nothing(world: World, clock: FixedClock)
     (interrupt,) = run.interrupts
     assert (interrupt.value["tool_call_id"], interrupt.value["args"]["to"]) == ("c3", ["compliance@clearpath.demo"])
     assert not OutboxEmail.objects.exists()
+
+
+@pytest.mark.django_db
+def test_multi_line_subject_is_refused_before_approval(owner: User, dana: User, clock: FixedClock) -> None:
+    run = run_agent(
+        owner,
+        clock,
+        _call("send_email", "c1", to=["dana@clearpath.demo"], subject="Hi\r\nBcc: x@evil.example", body="b"),
+        "Fixed the subject.",
+    )
+
+    assert run.interrupts == []
+    (refusal,) = _tool_messages(run)
+    assert refusal.status == "error"
+    assert "subject: Subject must be one line." in str(refusal.content)
+    assert "\n" not in str(refusal.content)

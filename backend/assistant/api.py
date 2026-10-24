@@ -18,16 +18,16 @@ from assistant.email import check_recipients
 from assistant.schemas import (
     ApprovalResponseIn,
     ApproveIn,
+    AssistantHistoryIn,
     AssistantRunIn,
     AssistantThreadOut,
     AssistantThreadStateOut,
     EditIn,
     RejectIn,
 )
-from assistant.tools import parse_item_key
+from core.clock import SYSTEM_CLOCK
 from core.errors import Conflict, InvalidInput
 from core.schemas import ERRORS
-from reviews.models import ReviewItem
 from reviews.selectors import get_item_row
 
 router = Router(tags=["assistant"])
@@ -100,8 +100,22 @@ def get_thread(request: HttpRequest, thread_id: UUID) -> selectors.ThreadRow:
 def get_thread_state(request: HttpRequest, thread_id: UUID) -> AssistantThreadStateOut:
     """The checkpointed conversation and any pending approval (hydrates the panel)."""
     viewer = current_user(request)
-    selectors.owned_thread(owner=viewer, thread_id=thread_id)
-    return async_to_sync(runs.read_state)(thread_id=thread_id, viewer=viewer)
+    thread = selectors.owned_thread(owner=viewer, thread_id=thread_id)
+    alive = selectors.has_live_run(thread, now=SYSTEM_CLOCK.now())
+    return async_to_sync(runs.read_state)(thread_id=thread_id, viewer=viewer, run_alive=alive)
+
+
+@router.post(
+    "/assistant/threads/{uuid:thread_id}/history",
+    response={200: list[AssistantThreadStateOut], **ERRORS},
+    operation_id="getAssistantThreadHistory",
+)
+def get_thread_history(
+    request: HttpRequest, thread_id: UUID, body: AssistantHistoryIn
+) -> list[AssistantThreadStateOut]:
+    """Checkpoint history isn't exposed; always empty. The SDK asks for it on hydrate."""
+    selectors.owned_thread(owner=current_user(request), thread_id=thread_id)
+    return []
 
 
 @router.post(
@@ -135,10 +149,8 @@ def hitl_decision(body: ApproveIn | EditIn | RejectIn) -> dict[str, Any]:
     if isinstance(body, EditIn):
         args = body.edited_action.args
         to = check_recipients(args.to)
-        if args.item_key is not None:
-            item_id = parse_item_key(args.item_key)
-            if item_id is None or not ReviewItem.objects.filter(pk=item_id).exists():
-                raise InvalidInput.for_field("item_key", f"No item {args.item_key}.")
+        if args.item_key is not None and selectors.resolve_item_key(args.item_key) is None:
+            raise InvalidInput.for_field("item_key", f"No item {args.item_key}.")
         edited = {"to": list(to), "subject": args.subject, "body": args.body, "item_key": args.item_key}
         return {"type": "edit", "edited_action": {"name": "send_email", "args": edited}}
     return {"type": "reject", "message": body.message.strip() or runs.REJECT_DEFAULT}

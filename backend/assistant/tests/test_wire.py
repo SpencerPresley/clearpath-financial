@@ -131,7 +131,7 @@ def test_state_of_an_empty_thread() -> None:
         interrupts=(),
     )
 
-    state = thread_state(snapshot)
+    state = thread_state(snapshot, run_alive=False)
 
     assert state.model_dump() == {
         "values": {"messages": []},

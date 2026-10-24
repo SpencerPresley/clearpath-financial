@@ -13,6 +13,7 @@ export * from './approvalExpiringPayload';
 export * from './approveIn';
 export * from './assignIn';
 export * from './assignmentMode';
+export * from './assistantHistoryIn';
 export * from './assistantRunIn';
 export * from './assistantStateValuesOut';
 export * from './assistantThreadOut';

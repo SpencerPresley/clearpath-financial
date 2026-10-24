@@ -1,10 +1,18 @@
+import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Final
 from uuid import UUID
 
 from accounts.models import User
 from assistant.models import AssistantThread
 from core.errors import NotFound
+from reviews.models import ReviewItem
+
+# A run normally ends well inside this (12 model calls, each capped at ~4 min with retries is the far tail);
+# a lock older than this belongs to a process that died, and the next run takes it over.
+STALE_RUN: Final = timedelta(minutes=10)
+_ITEM_KEY: Final = re.compile(r"^\s*(?:CP-?)?(\d{1,12})\s*$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -34,6 +42,11 @@ def owned_thread(*, owner: User, thread_id: UUID) -> AssistantThread:
     return thread
 
 
+def has_live_run(thread: AssistantThread, *, now: datetime) -> bool:
+    """A request is running the agent on this thread right now (runs live only as long as their request)."""
+    return thread.running_since is not None and thread.running_since >= now - STALE_RUN
+
+
 def get_thread(*, owner: User, thread_id: UUID) -> ThreadRow:
     return thread_row(owned_thread(owner=owner, thread_id=thread_id))
 
@@ -41,3 +54,17 @@ def get_thread(*, owner: User, thread_id: UUID) -> ThreadRow:
 def list_threads(*, owner: User, limit: int = 50) -> tuple[ThreadRow, ...]:
     threads = AssistantThread.objects.filter(owner=owner).order_by("-updated_at", "-created_at")[:limit]
     return tuple(thread_row(t) for t in threads)
+
+
+def parse_item_key(key: str) -> int | None:
+    """`CP-1042`, `cp-1042` or `1042` -> 1042; anything else -> None."""
+    match = _ITEM_KEY.match(key)
+    return int(match.group(1)) if match else None
+
+
+def resolve_item_key(key: str) -> int | None:
+    """The id of an existing item for this key, or None."""
+    item_id = parse_item_key(key)
+    if item_id is None or not ReviewItem.objects.filter(pk=item_id).exists():
+        return None
+    return item_id

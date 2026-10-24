@@ -20,6 +20,7 @@ class OutboxMeta:
     requested_by_id: int
     approved_by_id: int
     thread_id: str
+    tool_call_id: str
     item_id: int | None
     sent_at: datetime
 
@@ -50,6 +51,7 @@ class OutboxEmailBackend(BaseEmailBackend):
                 requested_by_id=meta.requested_by_id,
                 approved_by_id=meta.approved_by_id,
                 thread_id=meta.thread_id,
+                tool_call_id=meta.tool_call_id,
                 sent_at=meta.sent_at,
             )
             message.outbox_id = row.pk  # pyrefly: ignore[missing-attribute]  # read back by the sender

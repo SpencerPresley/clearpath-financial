@@ -28,6 +28,12 @@ export const getCreateAssistantThreadResponseMock = (overrideResponse: Partial<E
 
 export const getGetAssistantThreadResponseMock = (overrideResponse: Partial<Extract<AssistantThreadOut, object>> = {}): AssistantThreadOut => ({awaiting_approval: faker.datatype.boolean(), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.uuid(), title: faker.string.alpha({length: {min: 10, max: 20}}), updated_at: faker.date.past().toISOString().slice(0, 19) + 'Z', ...overrideResponse})
 
+export const getGetAssistantThreadHistoryResponseMock = (): AssistantThreadStateOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({checkpoint: faker.helpers.arrayElement([{checkpoint_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,])},null,]), created_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), metadata: faker.helpers.arrayElement([{step: faker.helpers.arrayElement([faker.number.int(),null,])},null,]), next: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}}))), tasks: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), interrupts: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), value: {args: {body: faker.string.alpha({length: {min: 10, max: 20}}), item_key: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, description: faker.string.alpha({length: {min: 10, max: 20}}), name: "send_email", tool_call_id: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_approval"}})), name: faker.string.alpha({length: {min: 10, max: 20}})})), values: {messages: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({artifact: faker.helpers.arrayElement([{}, undefined]), content: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({
+        [faker.string.alphanumeric(5)]: {}
+      })),]), id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['success','error'] as const),null,]), tool_call_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), tool_calls: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({args: {
+        [faker.string.alphanumeric(5)]: {}
+      }, id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_call"})), undefined]), type: faker.helpers.arrayElement(['human','ai','tool','system'] as const)}))}})))
+
 export const getRespondToAssistantInterruptResponseMock = (): string => (faker.word.sample())
 
 export const getStartAssistantRunResponseMock = (): string => (faker.word.sample())
@@ -75,6 +81,18 @@ export const getGetAssistantThreadMockHandler = (overrideResponse?: AssistantThr
   }, options)
 }
 
+export const getGetAssistantThreadHistoryMockHandler = (overrideResponse?: AssistantThreadStateOut[] | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<AssistantThreadStateOut[]> | AssistantThreadStateOut[]), options?: RequestHandlerOptions) => {
+  return http.post('*/api/assistant/threads/:threadId/history', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetAssistantThreadHistoryResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getRespondToAssistantInterruptMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
   return http.post('*/api/assistant/threads/:threadId/interrupts/:interruptId', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -116,6 +134,7 @@ export const getAssistantMock = () => [
   getListAssistantThreadsMockHandler(),
   getCreateAssistantThreadMockHandler(),
   getGetAssistantThreadMockHandler(),
+  getGetAssistantThreadHistoryMockHandler(),
   getRespondToAssistantInterruptMockHandler(),
   getStartAssistantRunMockHandler(),
   getGetAssistantThreadStateMockHandler()

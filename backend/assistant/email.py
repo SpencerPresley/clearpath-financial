@@ -23,6 +23,7 @@ from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import EntityType, EventType
 from core.errors import InvalidInput, NotFound
 from notifications.email_backend import OutboxMeta
+from notifications.models import OutboxEmail
 from reviews.models import ReviewItem
 
 TO_FIELD: Final = "to"
@@ -84,12 +85,26 @@ def _item(item_id: int | None) -> ReviewItem | None:
     return item
 
 
-def send_approved_email(
-    *, requester: User, approver: User, draft: EmailDraft, thread_id: str, clock: Clock = SYSTEM_CLOCK
+def send_approved_email(  # who, what, and where it came from
+    *,
+    requester: User,
+    approver: User,
+    draft: EmailDraft,
+    thread_id: str,
+    tool_call_id: str = "",
+    clock: Clock = SYSTEM_CLOCK,
 ) -> int:
     """Send an approved draft through `EMAIL_BACKEND` (the Outbox) and record `EMAIL_SENT`. Returns the
-    OutboxEmail id."""
+    OutboxEmail id.
+
+    Idempotent per (thread, tool call): if a resumed run executes the same approved `send_email` again (the
+    step that ran it was cut short before its checkpoint landed), the existing email's id comes back and
+    nothing is sent or recorded twice. The unique constraint backs this up under concurrency."""
     with transaction.atomic():
+        if tool_call_id:
+            sent = OutboxEmail.objects.filter(thread_id=thread_id, tool_call_id=tool_call_id).first()
+            if sent is not None:
+                return sent.pk
         to = check_recipients(draft.to)
         item = _item(draft.item_id)
         now = clock.now()
@@ -114,6 +129,7 @@ def send_approved_email(
             requested_by_id=requester.pk,
             approved_by_id=approver.pk,
             thread_id=thread_id,
+            tool_call_id=tool_call_id,
             item_id=item.pk if item else None,
             sent_at=now,
         )

@@ -44,10 +44,19 @@ class OutboxEmail(models.Model):
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     thread_id = models.CharField(max_length=100, blank=True)
+    # The approved send_email call that produced it: one email per (thread, tool call), however often it runs.
+    tool_call_id = models.CharField(max_length=100, blank=True)
     sent_at = models.DateTimeField()
 
     class Meta:
-        constraints = [models.CheckConstraint(condition=Q(to__len__gte=1), name="outbox_email_has_recipient")]
+        constraints = [
+            models.CheckConstraint(condition=Q(to__len__gte=1), name="outbox_email_has_recipient"),
+            models.UniqueConstraint(
+                fields=["thread_id", "tool_call_id"],
+                condition=~Q(tool_call_id=""),
+                name="outbox_email_once_per_tool_call",
+            ),
+        ]
         indexes = [models.Index(fields=["-sent_at"], name="outbox_email_sent_idx")]
 
     def __str__(self) -> str:

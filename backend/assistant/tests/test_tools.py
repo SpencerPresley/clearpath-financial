@@ -201,3 +201,28 @@ def test_send_email_checks_recipients_itself(world: World, clock: FixedClock) ->
 
     assert result == {"error": "Not sent. Not an internal address: partner@evil.example"}
     assert not OutboxEmail.objects.exists()
+
+
+@pytest.mark.django_db
+def test_send_email_is_idempotent_per_tool_call(world: World, clock: FixedClock) -> None:
+    """A resumed run may execute the same approved call again; the email goes out once."""
+    from audit.models import Event
+    from core.domain import EventType
+
+    send = _tools(world.reviewer, clock)["send_email"]
+    args = {"to": ["dana@clearpath.demo"], "subject": "Findings", "body": "One open finding."}
+
+    first, _ = call(send, **args)
+    again, _ = call(send, **args)  # same tool call id ("c1")
+
+    email = OutboxEmail.objects.get()
+    assert first == again == {"sent": True, "outbox_id": email.pk, "to": ["dana@clearpath.demo"]}
+    assert email.tool_call_id == "c1"
+    assert Event.objects.filter(type=EventType.EMAIL_SENT).count() == 1
+
+
+@pytest.mark.django_db
+def test_send_email_schema_hides_the_tool_call_id(world: World, clock: FixedClock) -> None:
+    send = _tools(world.reviewer, clock)["send_email"]
+    properties = send.tool_call_schema.model_json_schema()["properties"]  # pyrefly: ignore[missing-attribute]
+    assert set(properties) == {"to", "subject", "body", "item_key"}

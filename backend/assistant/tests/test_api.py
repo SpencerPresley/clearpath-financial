@@ -3,6 +3,7 @@ step. A run that pauses on `send_email` in one request is resumed by the next, s
 checkpoint and nowhere else."""
 
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -10,18 +11,21 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.http import StreamingHttpResponse
 from django.test import Client, override_settings
 from django.utils import timezone
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from accounts.models import User
 from assistant import runs
+from assistant.agent import state_graph
+from assistant.checkpointer import open_checkpointer
 from assistant.llm import get_assistant_model
 from assistant.models import AssistantThread
 from assistant.tests.conftest import World
-from assistant.tests.fakes import FailingModel, SlowModel, scripted
+from assistant.tests.fakes import FailingModel, RecordingModel, SlowModel, scripted
 from audit.models import Event
 from core.domain import EventType
 from notifications.models import OutboxEmail
@@ -330,3 +334,156 @@ def test_keepalive_while_the_model_is_slow(owner: User, monkeypatch: pytest.Monk
 
     assert stream.keepalives >= 2
     assert stream.lifecycle() == ["running", "completed"]
+
+
+def _cut_short(panel: Panel, item_key: str) -> tuple[str, ...]:
+    """Checkpoint a run that stopped after the model asked for a tool and before the tool's result was saved
+    (what a disconnect mid-tool leaves). Returns the checkpoint's `next`."""
+
+    async def write() -> tuple[str, ...]:
+        config: Any = {"configurable": {"thread_id": str(panel.thread_id)}}
+        async with open_checkpointer() as saver:
+            graph = state_graph(viewer=panel.user, checkpointer=saver)
+            call = {"name": "get_item", "args": {"item_key": item_key}, "id": "c9"}
+            messages = [HumanMessage("Look up my item", id="u0"), AIMessage(content="", id="a0", tool_calls=[call])]
+            await graph.aupdate_state(config, {"messages": messages}, as_node="model")
+            return (await graph.aget_state(config)).next
+
+    return async_to_sync(write)()
+
+
+def test_a_run_cut_short_mid_tool_gets_its_tool_result_before_the_next_message(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    panel = Panel(world.reviewer)
+    assert _cut_short(panel, world.item.key)  # the dead run left a step to do and no interrupt
+    model = RecordingModel(messages=iter(["Back again."]))
+    use_models(monkeypatch, model)
+
+    stream = read(panel.send("Are you there?", message_id="u1"))
+
+    assert stream.lifecycle() == ["running", "completed"]
+    (request,) = model.requests
+    assert [m.type for m in request] == ["system", "human", "ai", "tool", "human"]
+    stopped = request[3]
+    assert isinstance(stopped, ToolMessage)
+    assert (stopped.tool_call_id, stopped.name, stopped.status) == ("c9", "get_item", "error")
+    assert stopped.content == '{"error":"Stopped before it finished."}'
+
+
+def test_state_of_a_dead_run_has_nothing_next(world: World) -> None:
+    panel = Panel(world.reviewer)
+    assert _cut_short(panel, world.item.key)
+
+    state = panel.state()
+
+    assert state["next"] == []
+    assert [m["type"] for m in state["values"]["messages"]] == ["human", "ai"]
+
+    # While a request holds a fresh lock the run is alive, and its next step is real.
+    AssistantThread.objects.filter(pk=panel.thread_id).update(running_since=timezone.now())
+    assert panel.state()["next"] != []
+
+
+def test_history_is_owner_checked_and_empty(world: World) -> None:
+    panel = Panel(world.reviewer)
+    url = f"{panel.base}/history"
+
+    response = panel.client.post(url, {"limit": 20, "before": None}, content_type="application/json")
+    assert response.status_code == 200
+    assert response.json() == []
+    assert panel.client.post(url, {}, content_type="application/json").json() == []
+    assert panel.client.post(url, {"limit": 500}, content_type="application/json").status_code == 422
+
+    other = Client()
+    other.force_login(world.marketer)
+    assert other.post(url, {"limit": 20}, content_type="application/json").status_code == 404
+
+
+@pytest.mark.parametrize("subject", ["Findings\r\nBcc: partner@evil.example", "Two\nlines"])
+def test_edit_with_a_multi_line_subject_is_a_field_error(
+    world: World, monkeypatch: pytest.MonkeyPatch, subject: str
+) -> None:
+    panel = Panel(world.reviewer)
+    interrupt_id = _pause(panel, world, monkeypatch)
+    args = {"to": ["dana@clearpath.demo"], "subject": subject, "body": "Here."}
+
+    response = panel.respond(interrupt_id, {"type": "edit", "edited_action": {"name": "send_email", "args": args}})
+
+    assert response.status_code == 422
+    (field,) = response.json()["fields"]
+    assert field["loc"][-1] == "subject"
+    assert "one line" in field["message"]
+    assert not OutboxEmail.objects.exists()
+
+
+def test_edit_with_an_unknown_item_key_is_a_field_error(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
+    panel = Panel(world.reviewer)
+    interrupt_id = _pause(panel, world, monkeypatch)
+    args = {"to": ["dana@clearpath.demo"], "subject": "s", "body": "b", "item_key": "CP-999999"}
+
+    response = panel.respond(interrupt_id, {"type": "edit", "edited_action": {"name": "send_email", "args": args}})
+
+    assert response.status_code == 422
+    assert response.json()["fields"][0]["loc"] == ["body", "item_key"]
+
+
+def test_disconnect_while_the_approved_send_runs_never_sends_twice(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ASGI smoke failure: the client leaves while `send_email` is executing. The email commits (sync code
+    can't be cancelled), but the tools step is cancelled before its checkpoint, so the approval still shows as
+    pending. Approving again must not send a second email: the send is idempotent per tool call."""
+    from assistant import tools
+
+    panel = Panel(world.reviewer)
+    interrupt_id = _pause(panel, world, monkeypatch)
+    claimed_at = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
+    send = tools.send_approved_email
+
+    def send_then_stall(**kwargs: Any) -> int:
+        outbox_id = send(**kwargs)
+        time.sleep(0.5)  # still inside the tool when the client goes away
+        return outbox_id
+
+    monkeypatch.setattr(tools, "send_approved_email", send_then_stall)
+
+    async def approve_then_disconnect() -> None:
+        stream = runs.stream_run(
+            thread_id=panel.thread_id,
+            viewer=world.reviewer,
+            command=runs.Resume(interrupt_id=interrupt_id, decision={"type": "approve"}),
+            claimed_at=claimed_at,
+            model_factory=lambda: scripted("Sent it to Dana."),
+        )
+        async for frame in stream:
+            if frame.startswith(b"event: tools") and b'"tool-started"' in frame:
+                break
+        await stream.aclose()
+
+    async_to_sync(approve_then_disconnect)()
+
+    assert OutboxEmail.objects.count() == 1
+    assert panel.thread().running_since is None
+    pending = [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]]
+    monkeypatch.setattr(tools, "send_approved_email", send)
+    use_models(monkeypatch, scripted("Sent it to Dana."))
+
+    # The step was cut short: the card is back, and Approve finishes the run without a resend.
+    assert pending == [interrupt_id]
+    assert panel.thread().awaiting_approval is True
+    assert read(panel.respond(interrupt_id, {"type": "approve"})).lifecycle() == ["running", "completed"]
+
+    assert OutboxEmail.objects.count() == 1
+    assert Event.objects.filter(type=EventType.EMAIL_SENT).count() == 1
+    assert panel.state()["tasks"] == []
+    assert panel.thread().awaiting_approval is False
+
+
+def test_subject_with_a_newline_is_rejected_in_the_run_input_schema() -> None:
+    from pydantic import ValidationError
+
+    from assistant.schemas import EmailDraftIn
+
+    with pytest.raises(ValidationError, match="Subject must be one line"):
+        EmailDraftIn(to=["dana@clearpath.demo"], subject="a\rb", body="b")

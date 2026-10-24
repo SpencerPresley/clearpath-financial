@@ -47,6 +47,72 @@ export const GetAssistantThreadResponse = zod.object({
 })
 
 /**
+ * Checkpoint history isn't exposed; always empty. The SDK asks for it on hydrate.
+ * @summary Get Thread History
+ */
+export const GetAssistantThreadHistoryParams = zod.object({
+  "thread_id": zod.uuid()
+})
+
+export const getAssistantThreadHistoryBodyLimitOneMax = 100;
+
+
+
+export const GetAssistantThreadHistoryBody = zod.object({
+  "limit": zod.union([zod.int().min(1).max(getAssistantThreadHistoryBodyLimitOneMax),zod.null()]).optional()
+}).describe('The SDK\'s `threads.getHistory` body; only `limit` is read, other keys are ignored.')
+
+export const getAssistantThreadHistoryResponseValuesMessagesItemToolCallsItemTypeDefault = `tool_call`;
+
+export const GetAssistantThreadHistoryResponseItem = zod.object({
+  "checkpoint": zod.union([zod.object({
+  "checkpoint_id": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "created_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "metadata": zod.union([zod.object({
+  "step": zod.union([zod.int(),zod.null()])
+}),zod.null()]),
+  "next": zod.array(zod.string()).describe('Non-empty while a run is paused (approval pending).'),
+  "tasks": zod.array(zod.object({
+  "id": zod.string(),
+  "interrupts": zod.array(zod.object({
+  "id": zod.string(),
+  "value": zod.object({
+  "args": zod.object({
+  "body": zod.string(),
+  "item_key": zod.union([zod.string(),zod.null()]).optional(),
+  "subject": zod.string(),
+  "to": zod.array(zod.string())
+}),
+  "description": zod.string(),
+  "name": zod.literal("send_email").meta({ title: 'Name' }),
+  "tool_call_id": zod.string(),
+  "type": zod.literal("tool_approval").meta({ title: 'Type' })
+}).describe('HumanInTheLoopMiddleware\'s per-call interrupt value.')
+})),
+  "name": zod.string()
+})),
+  "values": zod.object({
+  "messages": zod.array(zod.object({
+  "artifact": zod.unknown().optional().describe('tool messages: {"item_keys": [...]} for links.'),
+  "content": zod.union([zod.string(),zod.array(zod.record(zod.string(), zod.unknown()))]),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.union([zod.string(),zod.null()]).optional(),
+  "status": zod.union([zod.enum(['success', 'error']),zod.null()]).optional().describe('tool messages only.'),
+  "tool_call_id": zod.union([zod.string(),zod.null()]).optional().describe('tool messages only.'),
+  "tool_calls": zod.array(zod.object({
+  "args": zod.record(zod.string(), zod.unknown()),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.string(),
+  "type": zod.literal("tool_call").default(getAssistantThreadHistoryResponseValuesMessagesItemToolCallsItemTypeDefault).meta({ title: 'Type' })
+})).optional().describe('ai messages only.'),
+  "type": zod.enum(['human', 'ai', 'tool', 'system'])
+}).describe('A LangChain message as `BaseMessage.model_dump()` gives it, minus provider metadata.'))
+})
+})
+export const GetAssistantThreadHistoryResponse = zod.array(GetAssistantThreadHistoryResponseItem)
+
+/**
  * Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.
  * @summary Respond To Interrupt
  */

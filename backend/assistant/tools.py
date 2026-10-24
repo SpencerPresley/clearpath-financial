@@ -12,18 +12,19 @@ transaction) instead of an executor thread's.
 """
 
 import json
-import re
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import date, datetime
-from typing import Any, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
 from asgiref.sync import sync_to_async
-from langchain_core.tools import BaseTool, StructuredTool
+from langchain_core.tools import BaseTool, InjectedToolCallId, StructuredTool
 from pydantic import BaseModel, Field
 
 from accounts.models import User
 from assistant.email import EmailDraft, check_recipients, send_approved_email
+from assistant.schemas import SubjectLine
+from assistant.selectors import parse_item_key
 from checks.selectors import list_findings
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import Channel, FindingState, ItemStatus, Product
@@ -41,7 +42,6 @@ from terms.selectors import current_offer_terms
 COPY_LIMIT: Final = 4_000
 COMMENT_LIMIT: Final = 5
 SEND_EMAIL: Final = "send_email"  # the one gated tool (HITL + recipient allowlist)
-_KEY: Final = re.compile(r"^\s*(?:CP-?)?(\d{1,12})\s*$", re.IGNORECASE)
 
 type Artifact = dict[str, list[str]]
 type ToolOutput = tuple[str, Artifact]
@@ -59,11 +59,6 @@ def _result(value: object, keys: Sequence[str] = ()) -> ToolOutput:
 
 def _error(message: str) -> ToolOutput:
     return _result({"error": message})
-
-
-def parse_item_key(key: str) -> int | None:
-    match = _KEY.match(key)
-    return int(match.group(1)) if match else None
 
 
 def item_key(item_id: int) -> str:
@@ -318,9 +313,14 @@ class SendEmailArgs(BaseModel):
     to: list[str] = Field(
         min_length=1, max_length=20, description="Bare addresses from the staff directory, e.g. dana@clearpath.demo."
     )
-    subject: str = Field(min_length=1, max_length=300)
+    subject: SubjectLine = Field(min_length=1, max_length=300, description="One line.")
     body: str = Field(min_length=1, max_length=20_000, description="Plain text; blank lines separate paragraphs.")
     item_key: str | None = Field(default=None, max_length=20, description="CP-1042 if the email is about one item.")
+
+
+class _SendEmailCall(SendEmailArgs):
+    # Injected from the model's tool call, hidden from the model's schema: it makes a resumed send idempotent.
+    tool_call_id: Annotated[str, InjectedToolCallId]
 
 
 # --- implementations (sync; each tool runs one in sync_to_async) ---------------------------------------------------
@@ -535,7 +535,7 @@ def _build_export(viewer: User, args: BuildExportArgs, clock: Clock) -> ToolOutp
     return _result(ExportStarted(export_id=export_id, poll_url=f"/api/exports/{export_id}"))
 
 
-def _send_email(viewer: User, args: SendEmailArgs, clock: Clock, thread_id: str) -> ToolOutput:
+def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str) -> ToolOutput:
     """Runs only after the user approved (or edited) the draft. Third recipient check: `send_approved_email`
     checks again inside its transaction."""
     try:
@@ -550,7 +550,12 @@ def _send_email(viewer: User, args: SendEmailArgs, clock: Clock, thread_id: str)
     draft = EmailDraft(to=to, subject=args.subject, body=args.body, item_id=item_id)
     try:
         outbox_id = send_approved_email(
-            requester=viewer, approver=viewer, draft=draft, thread_id=thread_id, clock=clock
+            requester=viewer,
+            approver=viewer,
+            draft=draft,
+            thread_id=thread_id,
+            tool_call_id=args.tool_call_id,
+            clock=clock,
         )
     except DomainError as e:
         return _error(f"Not sent. {e.message}")
@@ -631,5 +636,5 @@ def build_tools(viewer: User, *, clock: Clock = SYSTEM_CLOCK, thread_id: str = "
     ]
     if has_role(viewer, *EXPORT_ROLES):
         tools.append(_tool("build_export", BuildExportArgs, lambda a: _build_export(viewer, a, clock)))
-    tools.append(_tool("send_email", SendEmailArgs, lambda a: _send_email(viewer, a, clock, thread_id)))
+    tools.append(_tool("send_email", _SendEmailCall, lambda a: _send_email(viewer, a, clock, thread_id)))
     return tools

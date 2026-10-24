@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from ninja import Schema
-from pydantic import Field, JsonValue
+from pydantic import AfterValidator, Field, JsonValue
 
 
 class AssistantThreadOut(Schema):
@@ -21,6 +21,16 @@ class AssistantThreadOut(Schema):
     created_at: datetime
     updated_at: datetime
     awaiting_approval: bool = Field(description="The last run paused on an email that needs your approval.")
+
+
+def _one_line(value: str) -> str:
+    # A CR or LF in a header is header injection; Django would refuse it at send time (BadHeaderError).
+    if "\r" in value or "\n" in value:
+        raise ValueError("Subject must be one line.")
+    return value
+
+
+SubjectLine = Annotated[str, AfterValidator(_one_line)]
 
 
 # --- run input ----------------------------------------------------------------------------------------------------
@@ -38,7 +48,7 @@ class AssistantRunIn(Schema):
 
 class EmailDraftIn(Schema):
     to: list[str] = Field(min_length=1, max_length=20)
-    subject: str = Field(min_length=1, max_length=300)
+    subject: SubjectLine = Field(min_length=1, max_length=300)
     body: str = Field(min_length=1, max_length=20_000)
     item_key: str | None = Field(default=None, max_length=20, description="CP-<id> the email is about, if any.")
 
@@ -63,6 +73,12 @@ class RejectIn(Schema):
 
 
 ApprovalResponseIn = Annotated[ApproveIn | EditIn | RejectIn, Field(discriminator="type")]
+
+
+class AssistantHistoryIn(Schema):
+    """The SDK's `threads.getHistory` body; only `limit` is read, other keys are ignored."""
+
+    limit: int | None = Field(default=None, ge=1, le=100)
 
 
 # --- thread state (protocol getState shape) -----------------------------------------------------------------------

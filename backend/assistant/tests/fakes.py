@@ -17,6 +17,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
+from pydantic import Field
 
 
 class ToolCallingFakeModel(GenericFakeChatModel):
@@ -86,3 +87,13 @@ class SlowModel(ToolCallingFakeModel):
     def _stream(self, *args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
         time.sleep(self.delay)  # runs in langchain's executor thread, not on the event loop
         yield from super()._stream(*args, **kwargs)
+
+
+class RecordingModel(ToolCallingFakeModel):
+    """Keeps the messages of every request, to check what the model was actually sent."""
+
+    requests: list[list[BaseMessage]] = Field(default_factory=list)
+
+    def _stream(self, messages: list[BaseMessage], *args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
+        self.requests.append(list(messages))
+        yield from super()._stream(messages, *args, **kwargs)

@@ -2,7 +2,7 @@
 Event; the emails a thread sends do (`EMAIL_SENT`, in `assistant.email`)."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Final
 from uuid import UUID
 
@@ -10,15 +10,12 @@ from django.db.models import Q
 
 from accounts.models import User
 from assistant.models import AssistantThread
-from assistant.selectors import owned_thread
+from assistant.selectors import STALE_RUN, owned_thread
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import Role
 from core.errors import Conflict
 from core.permissions import require_role
 
-# A run normally ends well inside this (12 model calls, each capped at ~4 min with retries is the far tail);
-# a lock older than this belongs to a process that died, and the next run takes it over.
-STALE_RUN: Final = timedelta(minutes=10)
 TITLE_LENGTH: Final = 80
 
 

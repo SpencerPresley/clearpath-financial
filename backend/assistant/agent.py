@@ -65,8 +65,11 @@ def recipient_refusal(tool_call: dict[str, Any]) -> ToolMessage | None:
     try:
         draft = SendEmailArgs.model_validate(tool_call.get("args") or {})
     except ValidationError as e:
-        fields = ", ".join(sorted({str(err["loc"][0]) for err in e.errors() if err["loc"]})) or "arguments"
-        return _refusal(tool_call, f"Invalid {fields}.")
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc']) or 'arguments'}: {err['msg'].removeprefix('Value error, ')}"
+            for err in e.errors()
+        )
+        return _refusal(tool_call, f"Invalid draft. {problems}".replace("\r", " ").replace("\n", " "))
     try:
         check_recipients(draft.to)
     except InvalidInput as e:
