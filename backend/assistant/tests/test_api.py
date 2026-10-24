@@ -2,8 +2,9 @@
 step. A run that pauses on `send_email` in one request is resumed by the next, so the approval survives in the
 checkpoint and nowhere else."""
 
+import asyncio
 import json
-import time
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -447,43 +448,12 @@ def test_disconnect_while_the_approved_send_runs_never_sends_twice(
     """The ASGI smoke failure: the client leaves while `send_email` is executing. The email commits (sync code
     can't be cancelled), but the tools step is cancelled before its checkpoint, so the approval still shows as
     pending. Approving again must not send a second email: the send is idempotent per tool call."""
-    from assistant import tools
-
     panel = Panel(world.reviewer)
-    interrupt_id = _pause(panel, world, monkeypatch)
-    token = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
-    send = tools.send_approved_email
-
-    def send_then_stall(**kwargs: Any) -> Any:
-        sent = send(**kwargs)
-        time.sleep(0.5)  # still inside the tool when the client goes away
-        return sent
-
-    monkeypatch.setattr(tools, "send_approved_email", send_then_stall)
-
-    async def approve_then_disconnect() -> None:
-        stream = runs.stream_run(
-            thread_id=panel.thread_id,
-            viewer=world.reviewer,
-            command=runs.Resume(interrupt_id=interrupt_id, decision={"type": "approve"}),
-            token=token,
-            model_factory=lambda: scripted("Sent it to Dana."),
-        )
-        async for frame in stream:
-            if frame.startswith(b"event: tools") and b'"tool-started"' in frame:
-                break
-        await stream.aclose()
-
-    async_to_sync(approve_then_disconnect)()
-
-    assert OutboxEmail.objects.count() == 1
-    assert panel.thread().running_since is None
-    pending = [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]]
-    monkeypatch.setattr(tools, "send_approved_email", send)
+    interrupt_id = _cut_send_short(panel, world, monkeypatch)
     use_models(monkeypatch, scripted("Sent it to Dana."))
 
     # The step was cut short: the card is back, and Approve finishes the run without a resend.
-    assert pending == [interrupt_id]
+    assert panel.thread().running_since is None
     assert panel.thread().awaiting_approval is True
     assert read(panel.respond(interrupt_id, {"type": "approve"})).lifecycle() == ["running", "completed"]
 
@@ -525,23 +495,22 @@ def test_blocked_send_outcome_on_the_wire_and_in_state(world: World, monkeypatch
     assert [m["artifact"] for m in values if m["type"] == "tool"] == [tool["artifact"]]
 
 
-def _cut_send_short(panel: Panel, world: World, monkeypatch: pytest.MonkeyPatch) -> str:
-    """Pause on the draft to dana@, approve, and disconnect while the send runs: the email is in the Outbox
-    but the approval is pending again. Returns the interrupt id."""
-    from assistant import tools
-
+def _approve_and_leave(
+    panel: Panel,
+    world: World,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    leave: threading.Event,
+    arm: Callable[[], Callable[[], None]],
+) -> str:
+    """Pause on the draft to dana@, approve, and disconnect once `leave` is set (by a step `arm` patches in,
+    at the exact point the test is about). `arm` runs after the pause, so only the approved run is patched, and
+    returns the undo. Returns the interrupt id."""
     interrupt_id = _pause(panel, world, monkeypatch)
     token = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
-    send = tools.send_approved_email
+    disarm = arm()
 
-    def send_then_stall(**kwargs: Any) -> Any:
-        sent = send(**kwargs)
-        time.sleep(0.5)
-        return sent
-
-    monkeypatch.setattr(tools, "send_approved_email", send_then_stall)
-
-    async def approve_then_disconnect() -> None:
+    async def approve_then_leave() -> None:
         stream = runs.stream_run(
             thread_id=panel.thread_id,
             viewer=world.reviewer,
@@ -549,16 +518,132 @@ def _cut_send_short(panel: Panel, world: World, monkeypatch: pytest.MonkeyPatch)
             token=token,
             model_factory=lambda: scripted("Sent."),
         )
-        async for frame in stream:
-            if frame.startswith(b"event: tools") and b'"tool-started"' in frame:
-                break
+        await anext(stream)  # the run is under way
+        assert await asyncio.to_thread(leave.wait, 10), "the run never reached the point the test leaves at"
         await stream.aclose()
 
-    async_to_sync(approve_then_disconnect)()
-    monkeypatch.setattr(tools, "send_approved_email", send)
+    async_to_sync(approve_then_leave)()
+    disarm()
+    return interrupt_id
+
+
+def _swap(module: Any, name: str, value: Any) -> Callable[[], Callable[[], None]]:
+    """An `arm` for `_approve_and_leave`: put `value` at `module.name`, and return how to put it back."""
+
+    def arm() -> Callable[[], None]:
+        original = getattr(module, name)
+        setattr(module, name, value)
+        return lambda: setattr(module, name, original)
+
+    return arm
+
+
+def _held_until_the_run_is_cut(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """Set once the run has been cancelled: `stream_run` reads the checkpoint's pending approvals only after
+    stopping a cut-short run. A send held on this is still executing when the cancel lands."""
+    cut = threading.Event()
+    pending = runs.pending_interrupt_ids
+
+    async def mark_then_read(**kwargs: Any) -> set[str]:
+        cut.set()
+        return await pending(**kwargs)
+
+    monkeypatch.setattr(runs, "pending_interrupt_ids", mark_then_read)
+    return cut
+
+
+def _cut_send_short(panel: Panel, world: World, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Approve, let the email commit, and disconnect while the send is still inside the tool: the email is in the
+    Outbox but the step never checkpointed, so the approval is pending again. Returns the interrupt id."""
+    from assistant import tools
+
+    real = tools.send_approved_email
+    stored = threading.Event()
+    cut = _held_until_the_run_is_cut(monkeypatch)
+
+    def send_then_hold(**kwargs: Any) -> Any:
+        sent = real(**kwargs)
+        stored.set()  # committed: send_approved_email's transaction has closed
+        assert cut.wait(10), "the run was never cut short"
+        return sent
+
+    interrupt_id = _approve_and_leave(
+        panel, world, monkeypatch, leave=stored, arm=_swap(tools, "send_approved_email", send_then_hold)
+    )
     assert OutboxEmail.objects.count() == 1
     assert [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]] == [interrupt_id]  # the card is back
     return interrupt_id
+
+
+def test_a_disconnect_before_the_send_starts_sends_nothing_and_shows_the_card_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other side of a cut-short send (and the ordering that made CI flaky): the client leaves after
+    `tool-started` but before the send's sync work begins. The cancel stops it from ever running, so nothing is
+    stored or recorded, and the user answers the same card again."""
+    from assistant import tools
+
+    real = tools.sync_to_async
+    parked = threading.Event()
+
+    def park_first(fn: Any, *args: Any, **kwargs: Any) -> Any:  # wraps sync_to_async
+        inner = real(fn, *args, **kwargs)
+
+        async def go(*a: Any, **kw: Any) -> Any:
+            parked.set()
+            await asyncio.Event().wait()  # until the run is cancelled
+            return await inner(*a, **kw)
+
+        return go
+
+    panel = Panel(world.reviewer)
+    interrupt_id = _approve_and_leave(
+        panel, world, monkeypatch, leave=parked, arm=_swap(tools, "sync_to_async", park_first)
+    )
+
+    assert OutboxEmail.objects.count() == 0
+    assert not Event.objects.filter(type=EventType.EMAIL_SENT).exists()
+    assert panel.thread().running_since is None
+    assert panel.thread().awaiting_approval is True
+    assert [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]] == [interrupt_id]
+
+    use_models(monkeypatch, scripted("Sent it to Dana."))
+    assert read(panel.respond(interrupt_id, {"type": "approve"})).lifecycle() == ["running", "completed"]
+    assert list(OutboxEmail.objects.values_list("to", flat=True)) == [["dana@clearpath.demo"]]
+    assert Event.objects.filter(type=EventType.EMAIL_SENT).count() == 1
+
+
+def test_a_disconnect_mid_send_still_commits_the_whole_send_before_the_thread_is_released(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cancel lands while the send is executing but before it has written anything. Sync code can't be
+    interrupted, and the lease release is queued behind it on the same thread, so by the time the thread is free
+    the email and its EMAIL_SENT event are both committed: never half-sent, never sent after the run let go."""
+    from assistant import tools
+
+    real = tools.send_approved_email
+    started = threading.Event()
+    cut = _held_until_the_run_is_cut(monkeypatch)
+
+    held_at_commit: list[bool] = []
+
+    def hold_then_send(**kwargs: Any) -> Any:
+        started.set()
+        assert cut.wait(10), "the run was never cut short"
+        sent = real(**kwargs)
+        held_at_commit.append(AssistantThread.objects.get(pk=panel.thread_id).running_since is not None)
+        return sent
+
+    panel = Panel(world.reviewer)
+    interrupt_id = _approve_and_leave(
+        panel, world, monkeypatch, leave=started, arm=_swap(tools, "send_approved_email", hold_then_send)
+    )
+
+    assert held_at_commit == [True]  # the run still held the thread when the email committed
+    assert panel.thread().running_since is None
+    assert OutboxEmail.objects.count() == 1
+    assert Event.objects.filter(type=EventType.EMAIL_SENT).count() == 1
+    assert [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]] == [interrupt_id]
 
 
 @pytest.mark.parametrize(
