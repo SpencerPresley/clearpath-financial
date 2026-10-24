@@ -40,9 +40,8 @@ You land on **My queue**: five items, ordered by what to do first.
    approval" for "Guaranteed approval for most applicants", the guarantee taken out in round 1. **Details** →
    *Where it runs* shows the check and its diff; Dana's comment asks Jordan to get the approved copy back. The page
    is one ClearPath hosts for the demo (`/demo-partners/lendcompare/`), so you can open it and see the edit.
-   The decision bar offers **Check now** and **Pull**, not Reaffirm: the page still differs. Play the partner
-   fixing it: *Where it runs* → **Restore original page**, then **Check now**. The check comes back *unchanged*
-   and **Reaffirm** appears; reaffirming returns CP-7 to approved.
+   The decision bar offers **Check now** and **Pull**, not Reaffirm: the page still differs. (Playing the partner
+   who fixes it takes a lead; see Rachel's drift bullet.)
 4. **CP-26, Money with Maya: card payoff reel**. An influencer's second round: the "#ad" disclosure is fixed, and
    the AI flags a new urgency line ("Rates this low won't last") with a suggested rewrite.
 
@@ -66,7 +65,10 @@ she can also:
   page, last check unchanged), **Details** → *Where it runs* → **Simulate partner edit** (CardScout drops the offer)
   → **Check now**. The check comes back *missing* and the item returns to the queue as a re-review. **CP-32,
   BudgetBee** shows the opposite case: the partner redesigns the article but keeps the approved words, and the
-  check stays *unchanged*. **Restore original page** puts a page back; **Reset demo** restores all three;
+  check stays *unchanged*. **Restore original page** puts a page back; **Reset demo** restores all three. To
+  close **CP-7** the way the partner would: *Where it runs* → **Restore original page**, then **Check now**. The
+  check comes back *unchanged*, **Reaffirm** appears in the decision bar, and reaffirming returns CP-7 to
+  approved;
 - check **Metrics**: ten weeks of submissions, findings and decisions behind them.
 
 ### Marketer (Priya)

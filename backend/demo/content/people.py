@@ -194,7 +194,8 @@ _CC_BASE: Final = {
 
 # The terms in force at go-live are entered that morning: the PL floor is 9.49%, where the tracker's 6/1/26 rate
 # sheet left it (the 8.99% era lives in the imported tracker). The demo adds a change six days before the seed so a
-# terms-change re-review with fast-track versions is waiting in the queue.
+# terms-change re-review with fast-track versions is waiting in the queue. day(68) is go-live morning
+# (demo/content/calendar.py GO_LIVE, 08:00); test_seed checks nothing native predates it.
 PL_FLOOR_NOW: Final = Decimal("9.99")
 TERMS: Final = (
     TermsSpec(

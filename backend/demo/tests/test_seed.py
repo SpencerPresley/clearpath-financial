@@ -198,7 +198,7 @@ def test_the_drift_rereview_comes_from_a_real_check(seeded: Seeded) -> None:
 
 
 def test_the_guide_closes_cp7_by_restoring_the_page_then_reaffirming(seeded: Seeded) -> None:
-    """docs/demo.md, reviewer step 3: Reaffirm is refused while the page differs; Restore original page, Check
+    """docs/demo.md, the lead's drift bullet: Reaffirm is refused while the page differs; Restore original page, Check
     now (unchanged), then Reaffirm approves it. Rolled back afterwards, and the page put back to edited."""
     item = ReviewItem.objects.get(title="LendCompare: best debt consolidation loans listing")
     users = {p.key: User.objects.get(email=p.email) for p in CATALOG.personas}

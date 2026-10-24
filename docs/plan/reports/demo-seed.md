@@ -82,7 +82,7 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
     fresh seed: `reviewer`, `lead`, `marketer`, `admin`, `reviewer-fast-track-rereview`, `reviewer-ai-failed`,
     `reviewer-drift-cp7` (now **Check now** / **Pull**), `lead-offer-terms` (v1→v2 from go-live), `lead-metrics`
     (imported bars end the week of Aug 10; native starts Aug 17), `lead-partners`, and the new
-    `reviewer-drift-cp7-restored`. That last one is the guide's path run live: Restore original page, Check now
+    `reviewer-drift-cp7-restored` (as Rachel; the page buttons are lead/admin). That last one is the guide's path run live: Restore original page, Check now
     through the real worker (*unchanged*), and **Reaffirm v3** appears;
   - I clicked Reset demo as admin while a marketer was also signed in: the job finished in about 10 s, a toast
     reported 42 items (44 since the drift stories), and both sessions survived.
