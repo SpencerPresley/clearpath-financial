@@ -55,6 +55,12 @@ class Env(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
 
+    # Demo logins (seed_demo_users); optional so environments without demo users still boot.
+    demo_user_password: SecretStr | None = None
+
+    # Parallel worktrees share one Postgres; each gets its own test database.
+    clearpath_test_db_suffix: str = ""
+
 
 env = Env()  # pyrefly: ignore[missing-argument]  # populated from the environment
 
