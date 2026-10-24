@@ -259,16 +259,16 @@ export const STATS: QueueStatsOut = {
   ],
 };
 
-export const SAVED_VIEWS: SavedViewOut[] = [
-  {
-    id: 21,
-    name: 'Affiliate, high risk',
-    created_at: '2026-10-01T09:00:00Z',
-    filters: { channel: ['affiliate_page'], risk_tier: ['high'] },
-    sort: 'queue',
-    columns: [],
-  },
-];
+export const AFFILIATE_VIEW: SavedViewOut = {
+  id: 21,
+  name: 'Affiliate, high risk',
+  created_at: '2026-10-01T09:00:00Z',
+  filters: { channel: ['affiliate_page'], risk_tier: ['high'] },
+  sort: 'queue',
+  columns: [],
+};
+
+export const SAVED_VIEWS: SavedViewOut[] = [AFFILIATE_VIEW];
 
 export function makeFinding(overrides: Partial<FindingOut> = {}): FindingOut {
   return {

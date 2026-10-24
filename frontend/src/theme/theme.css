@@ -1713,6 +1713,137 @@
     @apply border-focus;
   }
 
+  /* ---- Page header: title + counts, views, filters --------------------------------------------- */
+  .app-queue-head {
+    @apply flex flex-wrap items-end justify-between gap-x-6 gap-y-2;
+  }
+  .app-queue-title {
+    @apply text-lg leading-7 font-semibold text-base-content;
+  }
+  .app-stats {
+    @apply flex items-stretch gap-px text-ui;
+  }
+  .app-stat {
+    @apply flex flex-col items-start justify-center rounded-md px-2.5 py-0.5 text-left;
+  }
+  .app-stat + .app-stat {
+    box-shadow: -1px 0 0 var(--color-base-300);
+  }
+  .app-stat-btn {
+    @apply cursor-default;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-stat-btn:hover:not(:disabled) {
+    @apply bg-hover;
+  }
+  .app-stat-btn[data-active] .app-stat-label {
+    @apply text-primary;
+  }
+  .app-stat-figure {
+    @apply text-base leading-6 font-semibold text-base-content tabular-nums;
+  }
+  .app-stat-btn[data-alert] .app-stat-figure {
+    @apply text-status-alert-soft-content;
+  }
+  .app-stat-label {
+    @apply text-meta whitespace-nowrap text-muted;
+  }
+
+  .app-view-bar {
+    @apply flex min-h-8 flex-wrap items-center gap-2;
+  }
+  .app-view-tabs {
+    @apply flex flex-wrap items-center gap-0.5;
+  }
+  .app-view-tab {
+    @apply inline-flex h-7 cursor-default items-center rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap text-muted;
+    transition-property: background-color, color, border-color;
+    transition-duration: 120ms;
+  }
+  .app-view-tab[data-hovered] {
+    @apply bg-hover text-base-content;
+  }
+  .app-view-tab[data-selected] {
+    @apply border-base-300 bg-base-100 font-medium text-base-content;
+  }
+  .app-view-sep {
+    @apply mx-1.5 h-4 w-px bg-base-300;
+  }
+  .app-view-saved {
+    @apply inline-flex items-center;
+  }
+  .app-view-modified {
+    @apply text-meta text-muted italic;
+  }
+  .app-inline-error {
+    @apply inline-flex items-center gap-1.5 text-meta text-status-error-soft-content;
+  }
+
+  .app-toolbar-end {
+    @apply ml-auto flex items-center gap-1;
+  }
+  .app-segmented {
+    @apply inline-flex rounded-md border border-base-300 bg-base-100 p-0.5;
+  }
+  .app-segmented-item {
+    @apply inline-flex h-6 cursor-default items-center gap-1.5 rounded-sm px-2 text-ui text-muted;
+    transition-property: background-color, color;
+    transition-duration: 120ms;
+  }
+  .app-segmented-item[data-hovered] {
+    @apply text-base-content;
+  }
+  .app-segmented-item[data-selected] {
+    @apply bg-nav-active font-medium text-primary;
+  }
+
+  .app-filter-bar {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .app-queue-search {
+    @apply flex h-7 w-56 items-center gap-1.5 rounded-md border border-base-300 bg-base-100 px-2;
+  }
+  .app-queue-search[data-focus-within] {
+    @apply border-focus;
+  }
+  .app-queue-search-input {
+    @apply min-w-0 flex-1 bg-transparent text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-queue-search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .app-chip {
+    @apply inline-flex h-7 max-w-72 items-center rounded-md border border-base-300 bg-base-100 text-ui text-base-content;
+  }
+  .app-chip[data-active] {
+    @apply border-primary/30 bg-selected;
+  }
+  .app-chip-btn {
+    @apply inline-flex h-full min-w-0 cursor-default items-center gap-1 rounded-md px-2 whitespace-nowrap outline-none;
+  }
+  .app-chip-btn[data-hovered] {
+    @apply bg-hover;
+  }
+  .app-chip:not([data-active]) .app-chip-btn {
+    @apply text-muted;
+  }
+  .app-chip-btn.app-chip-plain {
+    @apply h-7 gap-1.5 text-muted;
+  }
+  .app-chip-clear.app-btn {
+    @apply mr-0.5 size-5 w-5 rounded-sm;
+  }
+  .app-menu-check {
+    @apply pl-1.5;
+  }
+  .app-menu-check-mark {
+    @apply inline-flex size-4 shrink-0 items-center justify-center text-primary;
+  }
+  .app-menu-item[data-selected] {
+    @apply font-medium;
+  }
+
   .app-table-footer {
     @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
   }
