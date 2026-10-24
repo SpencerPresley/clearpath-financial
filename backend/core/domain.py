@@ -202,6 +202,14 @@ class NotificationKind(StrEnum):
     PAGE_FINDINGS = "page_findings"  # new blocking findings on a partner page beside intact approved copy
 
 
+class OutboxSource(StrEnum):
+    """Who wrote an Outbox email: the assistant (after a person approved it), or the app itself (allauth mail
+    such as password resets, which only admins see)."""
+
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
 class TermsField(StrEnum):
     """What an offer-terms claim in copy refers to (spec §4.2 ruling 1).
 

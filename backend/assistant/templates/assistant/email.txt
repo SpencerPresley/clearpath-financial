@@ -1,0 +1,8 @@
+{% autoescape off %}{{ body }}
+{% if item_key %}
+{{ item_key }}: {{ item_title }}
+{{ item_url }}
+{% endif %}
+--
+Drafted by the ClearPath assistant for {{ requester }}. Approved by {{ approver }}.
+{% endautoescape %}

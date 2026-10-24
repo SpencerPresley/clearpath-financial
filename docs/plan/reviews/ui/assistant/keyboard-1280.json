@@ -1,0 +1,34 @@
+{
+  "toggleAttrs": {
+    "ariaExpanded": "false",
+    "ariaKeyshortcuts": "Meta+. Control+."
+  },
+  "afterShortcutOpen": "textarea \"\"",
+  "escapeClosesPanel": false,
+  "afterShortcutClose": "button \"Assistant\"",
+  "panelVisibleAfterShortcutClose": false,
+  "afterToggleOpen": "textarea \"\"",
+  "afterCloseButton": "button \"Assistant\"",
+  "shiftTabFromComposer": [
+    "button \"Email compliance this week's re-reviews\"",
+    "button \"Find precedent for “no impact to your cr\"",
+    "button \"What's waiting on me?\"",
+    "button \"Close assistant\"",
+    "button \"Threads\"",
+    "input \"Select CP-1042\""
+  ],
+  "afterDraftArrives": "h3 \"Email draft — needs your approval\"",
+  "tabAfterDraftArrives": "a \"CP-1\"",
+  "thenShiftTab": "a \"CP-1\"",
+  "tabFromCardItemLink": [
+    "a \"CP-1\"",
+    "button \"Send email\"",
+    "button \"Edit\"",
+    "button \"Don't send\"",
+    "body",
+    "a \"Skip to content\""
+  ],
+  "afterEditPressed": "textarea \"compliance@clearpath.demo\"",
+  "escapeInEditCancels": true,
+  "panelAria": "- complementary \"Assistant\":\n  - heading \"Email compliance a summary of CP-1\" [level=2]\n  - button \"Threads\"\n  - button \"New thread\"\n  - button \"Close assistant\"\n  - log \"Conversation\":\n    - text: \"You:\"\n    - paragraph: Email compliance a summary of CP-1\n    - text: \"Assistant:\"\n    - paragraph: I'll draft it for your approval.\n    - list \"Tool calls\":\n      - listitem:\n        - text: Email waiting for your approval\n        - link \"CP-1\":\n          - /url: /items/1\n    - region \"Email draft — needs your approval\":\n      - heading \"Email draft — needs your approval\" [level=3]\n      - paragraph: Nothing is sent until you approve.\n      - term: To\n      - definition:\n        - list \"Recipients\":\n          - listitem: compliance@clearpath.demo\n      - term: Subject\n      - definition: CP-1 findings summary\n      - term: Item\n      - definition:\n        - link \"CP-1\":\n          - /url: /items/1\n      - term: Body\n      - definition: \"CP-1 has two blocking findings: the APR range and the credit-score claim.\"\n      - button \"Send email\"\n      - button \"Edit\"\n      - button \"Don't send\"\n  - text: Message the assistant\n  - textbox \"Message the assistant\" [disabled]:\n    - /placeholder: Decide on the email draft first\n  - text: Decide on the email draft first\n  - button \"Send\" [disabled]"
+}

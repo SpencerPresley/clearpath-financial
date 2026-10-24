@@ -4,12 +4,13 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
-import type { AssistantMessageOut } from './assistantMessageOut';
-import type { PendingApprovalOut } from './pendingApprovalOut';
 
 export interface AssistantThreadOut {
+  /** The last run paused on an email that needs your approval. */
+  awaiting_approval: boolean;
   created_at: string;
   id: string;
-  messages: AssistantMessageOut[];
-  pending_approval: PendingApprovalOut | null;
+  /** First message of the thread, trimmed; "" until the first run. */
+  title: string;
+  updated_at: string;
 }

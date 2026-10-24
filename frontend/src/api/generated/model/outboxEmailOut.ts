@@ -4,15 +4,22 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { OutboxSource } from './outboxSource';
 import type { PartyRefOut } from './partyRefOut';
 
 export interface OutboxEmailOut {
-  approved_by: PartyRefOut;
+  /** null for system mail. */
+  approved_by: PartyRefOut | null;
   body: string;
+  /** HTML alternative; render only in a sandboxed iframe. */
+  html_body: string;
   id: number;
   item_id: number | null;
-  requested_by: PartyRefOut;
+  /** null for system mail. */
+  requested_by: PartyRefOut | null;
   sent_at: string;
+  /** assistant: approved by a person. system: the app's own mail (admins only). */
+  source: OutboxSource;
   subject: string;
   thread_id: string;
   to: string[];

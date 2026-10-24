@@ -58,14 +58,9 @@ describe('AppShell', () => {
     expect(await screen.findByRole('link', { name: 'ClearPath Compliance Review' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     expect(within(nav).getByRole('link', { name: 'Queue' })).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('shows unbuilt sections as disabled, not as links to placeholder pages', async () => {
-    renderApp();
-    const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const outbox = within(nav).getByRole('link', { name: 'Outbox, soon' });
-    expect(outbox).toHaveAttribute('aria-disabled', 'true');
-    expect(outbox.tagName).not.toBe('A');
+    // Every section is a real page: no placeholder links.
+    for (const link of within(nav).getAllByRole('link')) expect(link).toHaveAttribute('href');
+    expect(within(nav).getByRole('link', { name: 'Outbox' })).toHaveAttribute('href', '/outbox');
   });
 
   it('filters sections by the viewer roles', async () => {
@@ -118,19 +113,6 @@ describe('AppShell', () => {
     await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-  });
-
-  it('keeps unbuilt sections reachable by keyboard and named in the collapsed rail', async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(NAV_COLLAPSED_KEY, 'true');
-    renderApp();
-    const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const outbox = within(nav).getByRole('link', { name: 'Outbox, soon' });
-    expect(outbox).toHaveAttribute('aria-disabled', 'true');
-    expect(outbox).not.toHaveAttribute('href');
-    for (let i = 0; i < 20 && document.activeElement !== outbox; i += 1) await user.tab();
-    expect(outbox).toHaveFocus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Outbox · Soon');
   });
 
   it('collapses the nav, keeps every item named, and remembers the choice', async () => {

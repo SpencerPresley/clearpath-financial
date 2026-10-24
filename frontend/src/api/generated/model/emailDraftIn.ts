@@ -11,6 +11,8 @@ export interface EmailDraftIn {
      * @maxLength 20000
      */
   body: string;
+  /** CP-<id> the email is about, if any. */
+  item_key?: string | null;
   /**
      * @minLength 1
      * @maxLength 300

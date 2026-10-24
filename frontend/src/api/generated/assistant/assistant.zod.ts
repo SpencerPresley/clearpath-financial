@@ -8,169 +8,230 @@ import * as zod from 'zod';
 
 
 /**
- * [workstream K]
+ * Your assistant threads, most recent activity first.
+ * @summary List Threads
+ */
+export const ListAssistantThreadsResponseItem = zod.object({
+  "awaiting_approval": zod.boolean().describe('The last run paused on an email that needs your approval.'),
+  "created_at": zod.iso.datetime({"offset":true}),
+  "id": zod.uuid(),
+  "title": zod.string().describe('First message of the thread, trimmed; "" until the first run.'),
+  "updated_at": zod.iso.datetime({"offset":true})
+})
+export const ListAssistantThreadsResponse = zod.array(ListAssistantThreadsResponseItem)
+
+/**
  * @summary Create Thread
  */
 export const CreateAssistantThreadResponse = zod.object({
+  "awaiting_approval": zod.boolean().describe('The last run paused on an email that needs your approval.'),
   "created_at": zod.iso.datetime({"offset":true}),
-  "id": zod.string(),
-  "messages": zod.array(zod.object({
-  "content": zod.string(),
-  "created_at": zod.iso.datetime({"offset":true}),
-  "id": zod.string(),
-  "role": zod.enum(['user', 'assistant', 'tool']),
-  "tool_name": zod.union([zod.string(),zod.null()]).optional()
-})),
-  "pending_approval": zod.union([zod.object({
-  "draft": zod.object({
-  "body": zod.string(),
-  "subject": zod.string(),
-  "to": zod.array(zod.string())
-}),
-  "interrupt_id": zod.string(),
-  "tool": zod.literal("send_email").meta({ title: 'Tool' })
-}),zod.null()])
+  "id": zod.uuid(),
+  "title": zod.string().describe('First message of the thread, trimmed; "" until the first run.'),
+  "updated_at": zod.iso.datetime({"offset":true})
 })
 
 /**
- * [workstream K]
  * @summary Get Thread
  */
 export const GetAssistantThreadParams = zod.object({
-  "thread_id": zod.string()
+  "thread_id": zod.uuid()
 })
 
 export const GetAssistantThreadResponse = zod.object({
+  "awaiting_approval": zod.boolean().describe('The last run paused on an email that needs your approval.'),
   "created_at": zod.iso.datetime({"offset":true}),
-  "id": zod.string(),
-  "messages": zod.array(zod.object({
-  "content": zod.string(),
-  "created_at": zod.iso.datetime({"offset":true}),
-  "id": zod.string(),
-  "role": zod.enum(['user', 'assistant', 'tool']),
-  "tool_name": zod.union([zod.string(),zod.null()]).optional()
-})),
-  "pending_approval": zod.union([zod.object({
-  "draft": zod.object({
-  "body": zod.string(),
-  "subject": zod.string(),
-  "to": zod.array(zod.string())
-}),
-  "interrupt_id": zod.string(),
-  "tool": zod.literal("send_email").meta({ title: 'Tool' })
-}),zod.null()])
+  "id": zod.uuid(),
+  "title": zod.string().describe('First message of the thread, trimmed; "" until the first run.'),
+  "updated_at": zod.iso.datetime({"offset":true})
 })
 
 /**
- * Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.
- * @summary Resolve Approval
+ * Checkpoint history isn't exposed; always empty. The SDK asks for it on hydrate.
+ * @summary Get Thread History
  */
-export const ResolveAssistantApprovalParams = zod.object({
-  "thread_id": zod.string(),
+export const GetAssistantThreadHistoryParams = zod.object({
+  "thread_id": zod.uuid()
+})
+
+export const getAssistantThreadHistoryBodyLimitOneMax = 100;
+
+
+
+export const GetAssistantThreadHistoryBody = zod.object({
+  "limit": zod.union([zod.int().min(1).max(getAssistantThreadHistoryBodyLimitOneMax),zod.null()]).optional()
+}).describe('The SDK\'s `threads.getHistory` body; only `limit` is read, other keys are ignored.')
+
+export const getAssistantThreadHistoryResponseValuesMessagesItemToolCallsItemTypeDefault = `tool_call`;
+
+export const GetAssistantThreadHistoryResponseItem = zod.object({
+  "checkpoint": zod.union([zod.object({
+  "checkpoint_id": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "created_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "metadata": zod.union([zod.object({
+  "step": zod.union([zod.int(),zod.null()])
+}),zod.null()]),
+  "next": zod.array(zod.string()).describe('Non-empty while a run is paused (approval pending).'),
+  "tasks": zod.array(zod.object({
+  "id": zod.string(),
+  "interrupts": zod.array(zod.object({
+  "id": zod.string(),
+  "value": zod.object({
+  "args": zod.object({
+  "body": zod.string(),
+  "item_key": zod.union([zod.string(),zod.null()]).optional(),
+  "subject": zod.string(),
+  "to": zod.array(zod.string())
+}),
+  "description": zod.string(),
+  "name": zod.literal("send_email").meta({ title: 'Name' }),
+  "tool_call_id": zod.string(),
+  "type": zod.literal("tool_approval").meta({ title: 'Type' })
+}).describe('HumanInTheLoopMiddleware\'s per-call interrupt value.')
+})),
+  "name": zod.string()
+})),
+  "values": zod.object({
+  "messages": zod.array(zod.object({
+  "artifact": zod.unknown().optional().describe('tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: {"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} (the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused before approval: outside recipients, or an invalid draft with refused = []).'),
+  "content": zod.union([zod.string(),zod.array(zod.record(zod.string(), zod.unknown()))]),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.union([zod.string(),zod.null()]).optional(),
+  "status": zod.union([zod.enum(['success', 'error']),zod.null()]).optional().describe('tool messages only.'),
+  "tool_call_id": zod.union([zod.string(),zod.null()]).optional().describe('tool messages only.'),
+  "tool_calls": zod.array(zod.object({
+  "args": zod.record(zod.string(), zod.unknown()),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.string(),
+  "type": zod.literal("tool_call").default(getAssistantThreadHistoryResponseValuesMessagesItemToolCallsItemTypeDefault).meta({ title: 'Type' })
+})).optional().describe('ai messages only.'),
+  "type": zod.enum(['human', 'ai', 'tool', 'system'])
+}).describe('A LangChain message as `BaseMessage.model_dump()` gives it, minus provider metadata.'))
+})
+})
+export const GetAssistantThreadHistoryResponse = zod.array(GetAssistantThreadHistoryResponseItem)
+
+/**
+ * Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.
+ * @summary Respond To Interrupt
+ */
+export const RespondToAssistantInterruptParams = zod.object({
+  "thread_id": zod.uuid(),
   "interrupt_id": zod.string()
 })
 
-export const resolveAssistantApprovalBodyEditedOneBodyMax = 20000;
+export const respondToAssistantInterruptBodyTwoEditedActionArgsBodyMax = 20000;
 
-export const resolveAssistantApprovalBodyEditedOneSubjectMax = 300;
+export const respondToAssistantInterruptBodyTwoEditedActionArgsItemKeyOneMax = 20;
 
-export const resolveAssistantApprovalBodyEditedOneToMax = 20;
+export const respondToAssistantInterruptBodyTwoEditedActionArgsSubjectMax = 300;
 
-export const resolveAssistantApprovalBodyReasonDefault = ``;
-export const resolveAssistantApprovalBodyReasonMax = 2000;
+export const respondToAssistantInterruptBodyTwoEditedActionArgsToMax = 20;
+
+export const respondToAssistantInterruptBodyThreeMessageDefault = ``;
+export const respondToAssistantInterruptBodyThreeMessageMax = 2000;
 
 
 
-export const ResolveAssistantApprovalBody = zod.object({
-  "decision": zod.enum(['approve', 'edit', 'reject']),
-  "edited": zod.union([zod.object({
-  "body": zod.string().min(1).max(resolveAssistantApprovalBodyEditedOneBodyMax),
-  "subject": zod.string().min(1).max(resolveAssistantApprovalBodyEditedOneSubjectMax),
-  "to": zod.array(zod.string()).min(1).max(resolveAssistantApprovalBodyEditedOneToMax)
-}),zod.null()]).optional().describe('Required when decision is edit.'),
-  "reason": zod.string().max(resolveAssistantApprovalBodyReasonMax).default(resolveAssistantApprovalBodyReasonDefault)
-})
-
-export const ResolveAssistantApprovalResponse = zod.union([zod.object({
-  "text": zod.string(),
-  "type": zod.literal("token").meta({ title: 'Type' })
+export const RespondToAssistantInterruptBody = zod.union([zod.object({
+  "type": zod.literal("approve").meta({ title: 'Type' })
 }),zod.object({
-  "args": zod.record(zod.string(), zod.unknown()),
-  "call_id": zod.string(),
-  "name": zod.string(),
-  "type": zod.literal("tool_call").meta({ title: 'Type' })
-}),zod.object({
-  "call_id": zod.string(),
-  "name": zod.string(),
-  "summary": zod.string().describe('One line for the panel, e.g. \'12 items match\'.'),
-  "type": zod.literal("tool_result").meta({ title: 'Type' })
-}),zod.object({
-  "approval": zod.object({
-  "draft": zod.object({
-  "body": zod.string(),
-  "subject": zod.string(),
-  "to": zod.array(zod.string())
+  "edited_action": zod.object({
+  "args": zod.object({
+  "body": zod.string().min(1).max(respondToAssistantInterruptBodyTwoEditedActionArgsBodyMax),
+  "item_key": zod.union([zod.string().max(respondToAssistantInterruptBodyTwoEditedActionArgsItemKeyOneMax),zod.null()]).optional().describe('CP-<id> the email is about, if any.'),
+  "subject": zod.string().min(1).max(respondToAssistantInterruptBodyTwoEditedActionArgsSubjectMax),
+  "to": zod.array(zod.string()).min(1).max(respondToAssistantInterruptBodyTwoEditedActionArgsToMax)
 }),
-  "interrupt_id": zod.string(),
-  "tool": zod.literal("send_email").meta({ title: 'Tool' })
+  "name": zod.literal("send_email").meta({ title: 'Name' })
 }),
-  "type": zod.literal("approval_required").meta({ title: 'Type' })
+  "type": zod.literal("edit").meta({ title: 'Type' })
 }),zod.object({
-  "message_id": zod.string(),
-  "type": zod.literal("done").meta({ title: 'Type' })
-}),zod.object({
-  "code": zod.string(),
-  "message": zod.string(),
-  "type": zod.literal("error").meta({ title: 'Type' })
+  "message": zod.string().max(respondToAssistantInterruptBodyThreeMessageMax).default(respondToAssistantInterruptBodyThreeMessageDefault).describe('Why, for the assistant. Optional.'),
+  "type": zod.literal("reject").meta({ title: 'Type' })
 })])
+
+export const RespondToAssistantInterruptResponse = zod.unknown()
 
 /**
- * Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.
- * @summary Stream Reply
+ * Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.
+ * @summary Start Run
  */
-export const StreamAssistantReplyParams = zod.object({
-  "thread_id": zod.string()
+export const StartAssistantRunParams = zod.object({
+  "thread_id": zod.uuid()
 })
 
-export const streamAssistantReplyBodyContentMax = 8000;
+export const startAssistantRunBodyMessageContentMax = 8000;
+
+export const startAssistantRunBodyMessageIdMax = 100;
 
 
 
-export const StreamAssistantReplyBody = zod.object({
-  "content": zod.string().min(1).max(streamAssistantReplyBodyContentMax),
-  "item_id": zod.union([zod.int(),zod.null()]).optional().describe('The item open in the review screen, as context.')
+export const StartAssistantRunBody = zod.object({
+  "item_id": zod.union([zod.int(),zod.null()]).optional().describe('The item open in the review screen, as context.'),
+  "message": zod.object({
+  "content": zod.string().min(1).max(startAssistantRunBodyMessageContentMax),
+  "id": zod.string().min(1).max(startAssistantRunBodyMessageIdMax).describe('Client-minted id; the checkpoint keeps it.')
+})
 })
 
-export const StreamAssistantReplyResponse = zod.union([zod.object({
-  "text": zod.string(),
-  "type": zod.literal("token").meta({ title: 'Type' })
-}),zod.object({
-  "args": zod.record(zod.string(), zod.unknown()),
-  "call_id": zod.string(),
-  "name": zod.string(),
-  "type": zod.literal("tool_call").meta({ title: 'Type' })
-}),zod.object({
-  "call_id": zod.string(),
-  "name": zod.string(),
-  "summary": zod.string().describe('One line for the panel, e.g. \'12 items match\'.'),
-  "type": zod.literal("tool_result").meta({ title: 'Type' })
-}),zod.object({
-  "approval": zod.object({
-  "draft": zod.object({
+export const StartAssistantRunResponse = zod.unknown()
+
+/**
+ * The checkpointed conversation and any pending approval (hydrates the panel).
+ * @summary Get Thread State
+ */
+export const GetAssistantThreadStateParams = zod.object({
+  "thread_id": zod.uuid()
+})
+
+export const getAssistantThreadStateResponseValuesMessagesItemToolCallsItemTypeDefault = `tool_call`;
+
+export const GetAssistantThreadStateResponse = zod.object({
+  "checkpoint": zod.union([zod.object({
+  "checkpoint_id": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "created_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "metadata": zod.union([zod.object({
+  "step": zod.union([zod.int(),zod.null()])
+}),zod.null()]),
+  "next": zod.array(zod.string()).describe('Non-empty while a run is paused (approval pending).'),
+  "tasks": zod.array(zod.object({
+  "id": zod.string(),
+  "interrupts": zod.array(zod.object({
+  "id": zod.string(),
+  "value": zod.object({
+  "args": zod.object({
   "body": zod.string(),
+  "item_key": zod.union([zod.string(),zod.null()]).optional(),
   "subject": zod.string(),
   "to": zod.array(zod.string())
 }),
-  "interrupt_id": zod.string(),
-  "tool": zod.literal("send_email").meta({ title: 'Tool' })
-}),
-  "type": zod.literal("approval_required").meta({ title: 'Type' })
-}),zod.object({
-  "message_id": zod.string(),
-  "type": zod.literal("done").meta({ title: 'Type' })
-}),zod.object({
-  "code": zod.string(),
-  "message": zod.string(),
-  "type": zod.literal("error").meta({ title: 'Type' })
-})])
+  "description": zod.string(),
+  "name": zod.literal("send_email").meta({ title: 'Name' }),
+  "tool_call_id": zod.string(),
+  "type": zod.literal("tool_approval").meta({ title: 'Type' })
+}).describe('HumanInTheLoopMiddleware\'s per-call interrupt value.')
+})),
+  "name": zod.string()
+})),
+  "values": zod.object({
+  "messages": zod.array(zod.object({
+  "artifact": zod.unknown().optional().describe('tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: {"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} (the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused before approval: outside recipients, or an invalid draft with refused = []).'),
+  "content": zod.union([zod.string(),zod.array(zod.record(zod.string(), zod.unknown()))]),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.union([zod.string(),zod.null()]).optional(),
+  "status": zod.union([zod.enum(['success', 'error']),zod.null()]).optional().describe('tool messages only.'),
+  "tool_call_id": zod.union([zod.string(),zod.null()]).optional().describe('tool messages only.'),
+  "tool_calls": zod.array(zod.object({
+  "args": zod.record(zod.string(), zod.unknown()),
+  "id": zod.union([zod.string(),zod.null()]),
+  "name": zod.string(),
+  "type": zod.literal("tool_call").default(getAssistantThreadStateResponseValuesMessagesItemToolCallsItemTypeDefault).meta({ title: 'Type' })
+})).optional().describe('ai messages only.'),
+  "type": zod.enum(['human', 'ai', 'tool', 'system'])
+}).describe('A LangChain message as `BaseMessage.model_dump()` gives it, minus provider metadata.'))
+})
+})
 

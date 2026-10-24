@@ -315,7 +315,8 @@ export const useMarkNotificationRead = <TError = ErrorOut,
 }
 
 /**
- * Emails the assistant sent after a human approved them (the demo's stand-in for real mail).
+ * The demo's stand-in for real mail: emails the assistant sent after a person approved them, and, for admins,
+ * the app's own mail (`source=system`, e.g. password resets).
  * @summary List Outbox
  */
 export const listOutboxEmails = async ( options?: Parameters<typeof customFetch>[1]): Promise<OutboxEmailOut[]> => {

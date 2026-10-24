@@ -1400,10 +1400,11 @@
 
   /* ---- App shell ------------------------------------------------------------------------------- */
   .app-shell {
-    @apply grid h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
+    /* nav | page | assistant panel (an empty auto track when the panel is closed) */
+    @apply grid h-screen grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
   }
   .app-topbar {
-    @apply col-span-2 flex h-topbar items-center gap-3 bg-primary pr-3 pl-2 text-primary-content;
+    @apply col-span-full flex h-topbar items-center gap-3 bg-primary pr-3 pl-2 text-primary-content;
   }
   .app-topbar [data-focus-visible],
   .app-topbar :focus-visible {
@@ -1474,7 +1475,7 @@
   .app-nav-item {
     @apply flex h-8 items-center gap-2.5 rounded-md px-2 text-ui whitespace-nowrap text-base-content;
   }
-  .app-nav-item[data-hovered]:not([aria-disabled]),
+  .app-nav-item[data-hovered],
   a.app-nav-item:hover {
     @apply bg-hover;
   }
@@ -1482,14 +1483,8 @@
     @apply bg-nav-active font-medium text-primary;
     box-shadow: inset 2px 0 0 var(--color-primary);
   }
-  .app-nav-item[aria-disabled='true'] {
-    @apply cursor-default text-muted;
-  }
   .app-nav-item-label {
     @apply min-w-0 flex-1 truncate;
-  }
-  .app-nav-item-note {
-    @apply text-meta text-muted;
   }
   .app-nav[data-collapsed] .app-nav-item {
     @apply justify-center px-0;
@@ -2360,6 +2355,107 @@
   }
   .app-metric-table tbody tr:last-child > * {
     @apply border-b-0;
+  }
+}
+
+/* ---- Outbox (workstream K): sent demo mail, a dense table beside the selected message. ----------- */
+@layer components {
+  .app-outbox {
+    @apply flex max-w-[96rem] flex-col gap-4;
+    container: outbox / inline-size;
+  }
+  .app-outbox-split {
+    @apply grid grid-cols-[minmax(0,1fr)] items-start gap-3;
+  }
+  .app-outbox-split[data-detail] {
+    @apply grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)];
+  }
+  /* Column widths live here (table-layout: fixed reads the header row); Subject takes what's left. */
+  .app-outbox-table [data-col='sent'] {
+    @apply w-18;
+  }
+  .app-outbox-table [data-col='to'] {
+    @apply w-[22%];
+  }
+  .app-outbox-table [data-col='item'] {
+    @apply w-22;
+  }
+  .app-outbox-table :is([data-col='requested'], [data-col='approved']) {
+    @apply w-32;
+  }
+  /* Narrow (beside the assistant panel): To and Requested by go; the detail pane shows both. */
+  @container outbox (width < 760px) {
+    .app-outbox-table :is([data-col='to'], [data-col='requested']) {
+      @apply hidden;
+    }
+  }
+  /* Too narrow for list and message side by side: the message goes under the list. */
+  @container outbox (width < 680px) {
+    .app-outbox-split[data-detail] {
+      @apply grid-cols-[minmax(0,1fr)];
+    }
+  }
+  .app-outbox-head > th {
+    @apply h-8 border-b border-base-300 px-3 text-left align-middle text-meta font-medium text-muted;
+  }
+  .app-outbox-row > td {
+    @apply h-row truncate border-b border-base-300 px-3 align-middle text-ui;
+  }
+  .app-outbox-row:last-child > td {
+    @apply border-b-0;
+  }
+  .app-outbox-row {
+    @apply cursor-default;
+  }
+  .app-outbox-row:hover > td {
+    @apply bg-hover;
+  }
+  .app-outbox-row[data-selected] > td {
+    @apply bg-selected;
+  }
+  .app-outbox-row[data-selected] > td:first-child {
+    box-shadow: inset 2px 0 0 var(--color-primary);
+  }
+  .app-outbox-row > td[data-col='sent'] {
+    @apply text-muted tabular-nums;
+  }
+  .app-outbox-row > td[data-col='to'] {
+    @apply text-muted;
+  }
+  .app-outbox-subject {
+    @apply block max-w-full cursor-default truncate rounded-xs text-left font-medium text-base-content underline-offset-2 hover:underline;
+  }
+  .app-outbox-item {
+    @apply rounded-xs font-mono text-meta text-primary underline-offset-2 hover:underline;
+  }
+  .app-outbox-detail {
+    @apply sticky top-0 flex h-[calc(100dvh-var(--spacing-topbar)-6.5rem)] min-h-96 min-w-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-outbox-detail-title {
+    @apply truncate;
+  }
+  .app-outbox-detail-body {
+    @apply flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3;
+  }
+  /* The pane header already draws a rule; the facts only need the one under them. */
+  .app-outbox-facts {
+    @apply border-t-0 pt-0;
+  }
+  .app-outbox-thread.app-btn {
+    @apply self-start;
+  }
+  .app-outbox-recipients {
+    @apply flex flex-col;
+  }
+  .app-outbox-text {
+    @apply font-sans text-sm whitespace-pre-wrap text-base-content;
+  }
+  /* A sandboxed srcdoc can't be measured, so the frame fills the pane rather than fitting the email. */
+  .app-outbox-frame {
+    @apply min-h-64 w-full flex-1 rounded-md border border-base-300 bg-white;
+  }
+  .app-outbox-error .app-empty-icon {
+    @apply text-status-error-soft-content;
   }
 }
 
@@ -3354,5 +3450,286 @@
   }
   .app-tp-citation {
     @apply whitespace-nowrap;
+  }
+}
+
+/* ---- Assistant panel (workstream K): a flat column beside the page, same surface as the nav. ------- */
+@keyframes app-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@layer components {
+  .app-spin {
+    animation: app-spin 900ms linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-spin {
+      animation: none;
+    }
+  }
+  .app-assistant {
+    @apply flex min-h-0 w-100 flex-col border-l border-base-300 bg-base-100;
+  }
+  /* The topbar toggle while the panel is open. */
+  .app-topbar-btn[data-active] {
+    @apply bg-brand-hover text-primary-content;
+  }
+  .app-assistant-toggle {
+    @apply relative;
+  }
+  /* An email waits for approval somewhere: a dot on the toggle (the accessible name says it too). */
+  .app-assistant-toggle-dot {
+    @apply absolute top-1.5 right-1.5 size-2 rounded-full border border-primary bg-primary-content;
+  }
+  .app-assistant-head {
+    @apply flex h-10 shrink-0 items-center gap-1 border-b border-base-300 pr-1.5 pl-3;
+  }
+  .app-assistant-title {
+    @apply min-w-0 flex-1 truncate text-ui font-semibold text-base-content;
+  }
+  .app-assistant-threads-btn {
+    @apply gap-1;
+  }
+  .app-assistant-thread-item {
+    @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5;
+  }
+  .app-assistant-thread-title {
+    @apply truncate;
+  }
+  .app-assistant-thread-item .app-age {
+    @apply col-start-2 row-start-1 text-meta text-muted;
+  }
+  .app-assistant-thread-pending {
+    @apply col-span-2 inline-flex items-center gap-1 text-meta font-medium text-base-content;
+  }
+  .app-assistant-body {
+    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3;
+  }
+  .app-assistant-empty {
+    @apply flex flex-col gap-2 text-ui;
+  }
+  .app-assistant-empty-title {
+    @apply font-medium text-base-content;
+  }
+  .app-assistant-asks {
+    @apply mt-1 flex flex-col gap-1;
+  }
+  .app-assistant-ask {
+    @apply w-full cursor-default rounded-md border border-base-300 px-2.5 py-1.5 text-left text-ui text-base-content;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-assistant-ask:hover {
+    @apply bg-hover;
+  }
+  .app-assistant-log {
+    @apply flex flex-col gap-4;
+  }
+  .app-assistant-msg {
+    @apply flex flex-col gap-1.5 text-sm leading-6;
+  }
+  .app-assistant-msg[data-role='user'] {
+    @apply self-end rounded-md bg-base-200 px-2.5 py-1.5;
+    max-width: 85%;
+  }
+  .app-assistant-user-text {
+    @apply whitespace-pre-wrap text-base-content;
+  }
+  .app-assistant-markdown {
+    @apply flex flex-col gap-2 text-base-content;
+  }
+  .app-assistant-markdown :where(ul, ol) {
+    @apply flex flex-col gap-0.5 pl-5;
+  }
+  .app-assistant-markdown ul {
+    @apply list-disc;
+  }
+  .app-assistant-markdown ol {
+    @apply list-decimal;
+  }
+  .app-assistant-markdown :where(h1, h2, h3, h4) {
+    @apply text-sm font-semibold;
+  }
+  .app-assistant-markdown code {
+    @apply rounded-xs bg-base-200 px-1 font-mono text-meta;
+  }
+  .app-assistant-markdown pre {
+    @apply overflow-x-auto rounded-md bg-base-200 p-2 font-mono text-meta;
+  }
+  .app-assistant-markdown table {
+    @apply w-full border-collapse text-ui;
+  }
+  .app-assistant-markdown :where(th, td) {
+    @apply border border-base-300 px-1.5 py-0.5 text-left;
+  }
+  .app-assistant-markdown blockquote {
+    @apply border-l-2 border-base-300 pl-2 text-muted;
+  }
+  .app-assistant-item-link {
+    @apply rounded-xs font-mono text-[0.92em] font-medium text-primary underline-offset-2 hover:underline;
+  }
+  .app-assistant-caret {
+    @apply inline-block h-4 w-1.5 bg-muted;
+    animation: app-indeterminate-blink 1s steps(2, start) infinite;
+  }
+  .app-assistant-tools {
+    @apply flex flex-col gap-1;
+  }
+  /* Glyph beside a body that wraps on its own, so a long line never leaves the glyph alone above it. */
+  .app-assistant-tool {
+    @apply flex items-start gap-1.5 text-ui text-muted;
+  }
+  .app-assistant-tool > .app-icon {
+    @apply mt-0.5 shrink-0;
+  }
+  .app-assistant-tool-body {
+    @apply flex min-w-0 flex-wrap items-baseline gap-x-1.5;
+  }
+  .app-assistant-tool[data-status='finished']:not([data-icon])::before {
+    content: '';
+    @apply mt-[0.5625rem] size-1.5 shrink-0 rounded-full bg-muted;
+  }
+  .app-assistant-tool[data-tone='error'] {
+    @apply text-status-error-soft-content;
+  }
+  /* What became of an email is the one irreversible thing in the panel: it reads at full weight. */
+  .app-assistant-tool[data-outcome] {
+    @apply text-base-content;
+  }
+  .app-assistant-tool[data-outcome='blocked'] {
+    @apply font-medium text-status-error-soft-content;
+  }
+  .app-assistant-chip-link {
+    @apply rounded-xs font-medium text-primary underline-offset-2 hover:underline;
+  }
+  .app-assistant-tool[data-status='awaiting'] {
+    @apply font-medium text-base-content;
+  }
+  .app-assistant-thinking {
+    @apply flex flex-col gap-1.5 py-1;
+  }
+  .app-assistant-error {
+    @apply mx-3 mb-2 flex items-start gap-1.5 rounded-sm border border-status-error-line bg-status-error-soft px-2 py-1 text-ui text-status-error-soft-content;
+  }
+  .app-assistant-error > p {
+    @apply min-w-0 flex-1;
+  }
+  .app-assistant-error-icon {
+    @apply mt-0.5 shrink-0;
+  }
+  .app-assistant-error > .app-btn {
+    @apply shrink-0;
+  }
+  .app-assistant-msg[data-pending] {
+    @apply opacity-70;
+  }
+  /* The streaming caret sits after the last text, not on a line of its own. */
+  .app-assistant-markdown[data-streaming] > :is(p, h1, h2, h3, h4, blockquote):last-child::after,
+  .app-assistant-markdown[data-streaming] > :is(ul, ol):last-child > li:last-child::after {
+    content: '';
+    @apply ml-0.5 inline-block h-4 w-1.5 bg-muted align-text-bottom;
+    animation: app-indeterminate-blink 1s steps(2, start) infinite;
+  }
+  .app-assistant-composer {
+    @apply flex shrink-0 flex-col gap-1.5 border-t border-base-300 px-3 py-2;
+  }
+  .app-assistant-composer-field {
+    @apply flex flex-col;
+  }
+  .app-assistant-composer-input {
+    @apply w-full resize-none rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 text-sm leading-6 text-base-content outline-none placeholder:text-muted;
+  }
+  /* The shared field focus (border plus 1px ring: 2px of navy), not a bare border change. */
+  .app-assistant-composer-input[data-focused] {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+  }
+  .app-assistant-composer-input[data-disabled] {
+    @apply cursor-not-allowed bg-base-200;
+  }
+  .app-assistant-composer-bar {
+    @apply flex items-center justify-between gap-2;
+  }
+  .app-assistant-context {
+    @apply truncate text-meta text-muted;
+  }
+  /* Neutral: amber is the marketer's court and warning findings (§5.2); the heading says it needs you. */
+  .app-assistant-approval {
+    @apply flex flex-col gap-2.5 rounded-md border border-base-300 px-3 py-2.5;
+  }
+  .app-assistant-approval-head {
+    @apply flex items-center gap-1.5 text-base-content;
+  }
+  .app-assistant-approval-title {
+    @apply rounded-xs text-ui font-semibold text-base-content outline-none;
+  }
+  .app-assistant-approval-title:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-assistant-approval-note {
+    @apply text-meta text-muted;
+  }
+  .app-assistant-draft {
+    @apply flex flex-col gap-1.5 text-ui;
+  }
+  .app-assistant-draft-row {
+    @apply grid grid-cols-[4rem_minmax(0,1fr)] gap-2;
+  }
+  .app-assistant-draft-row dt {
+    @apply text-muted;
+  }
+  .app-assistant-draft-body dd {
+    @apply max-h-64 overflow-y-auto rounded-sm border border-base-300 bg-base-200 px-2 py-1.5 text-sm whitespace-pre-wrap text-base-content;
+  }
+  .app-assistant-recipients {
+    @apply flex flex-wrap gap-1;
+  }
+  .app-assistant-recipient {
+    @apply rounded-sm border border-base-300 px-1.5 font-mono text-meta leading-5 break-all;
+  }
+  .app-assistant-approval-actions {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .app-assistant-edit {
+    @apply flex flex-col gap-2.5;
+  }
+}
+@keyframes app-indeterminate-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* ---- The page area as a container: pages adapt to #main's width, which the nav and the assistant panel
+   change, not just the viewport's. ------------------------------------------------------------------------ */
+@layer components {
+  .app-main {
+    container: main / inline-size;
+  }
+  /* Review screen: risk tier steps out first (it's on Details), then the decisions take their own row under
+     the title so none of them runs under the panel. */
+  @container main (width < 1100px) {
+    .app-decision-bar-risk {
+      @apply hidden;
+    }
+  }
+  @container main (width < 1000px) {
+    .app-decision-bar {
+      @apply flex-wrap gap-y-2;
+    }
+    .app-decision-bar-heading {
+      @apply basis-full;
+    }
+    .app-decision-bar-actions {
+      @apply ml-0 items-start;
+    }
+    .app-decision-bar-buttons {
+      @apply flex-wrap justify-start;
+    }
+    .app-review-body {
+      @apply grid-cols-[minmax(0,1fr)_22rem];
+    }
   }
 }
