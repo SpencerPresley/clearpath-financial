@@ -2,9 +2,10 @@
 
 from collections.abc import Iterable
 
+from accounts.models import User
 from audit.outbox import EventRecord, handles
 from audit.payloads import CommentAddedPayload, DecisionRecordedPayload, ItemAssignedPayload
-from core.domain import DecisionOutcome, EventType, NotificationKind
+from core.domain import AssignmentMode, DecisionOutcome, EventType, NotificationKind, Role
 from notifications.models import Notification
 from reviews.models import ReviewItem
 
@@ -35,12 +36,26 @@ def _item(event: EventRecord) -> ReviewItem:
 
 @handles(EventType.ITEM_ASSIGNED, name="notifications.assignment")
 def notify_assignee(event: EventRecord) -> None:
+    """The new assignee; for a pool assignment, the active leads (decisions.md "Reviewer assignment" rule 3).
+
+    A resubmission or re-review records a sticky assignment back to the previous reviewer (rule 1), so this
+    is also how that reviewer hears the item is back. A manual unassign notifies nobody.
+    """
     payload = event.payload
     assert isinstance(payload, ItemAssignedPayload)  # noqa: S101  # guaranteed by the registry
     if payload.assignee_id is None:
+        if payload.mode is not AssignmentMode.POOL:
+            return
+        item = _item(event)
+        leads = User.objects.filter(is_active=True, roles__contains=[Role.LEAD.value]).values_list("pk", flat=True)
+        _notify(event, NotificationKind.ASSIGNMENT, leads, f"{item.key} {item.title} is in the unassigned pool")
         return
     item = _item(event)
-    _notify(event, NotificationKind.ASSIGNMENT, [payload.assignee_id], f"{item.key} {item.title} was assigned to you")
+    if payload.mode is AssignmentMode.STICKY:
+        message = f"{item.key} {item.title} is back for your review"
+    else:
+        message = f"{item.key} {item.title} was assigned to you"
+    _notify(event, NotificationKind.ASSIGNMENT, [payload.assignee_id], message)
 
 
 @handles(EventType.COMMENT_ADDED, name="notifications.mention")

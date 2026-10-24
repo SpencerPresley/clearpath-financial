@@ -58,8 +58,14 @@ def test_assignment_notifies_assignee_once_under_replay(
 
 
 @pytest.mark.django_db
-def test_pool_assignment_notifies_nobody(marketer: User, clock: FixedClock) -> None:
-    item = make_item(marketer)
+def test_pool_assignment_notifies_the_active_leads(
+    marketer: User, reviewer: User, user_factory: UserFactory, clock: FixedClock
+) -> None:
+    # decisions.md "Reviewer assignment" rule 3: nobody eligible -> unassigned pool, lead notified.
+    lead = user_factory(roles=[Role.LEAD])
+    away = user_factory(roles=[Role.LEAD])
+    User.objects.filter(pk=away.pk).update(is_active=False)
+    item = make_item(marketer, title="Spring email")
     payload = ItemAssignedPayload(
         assignee_id=None, previous_assignee_id=None, mode=AssignmentMode.POOL, reason="nobody available"
     )
@@ -67,7 +73,40 @@ def test_pool_assignment_notifies_nobody(marketer: User, clock: FixedClock) -> N
 
     deliver(event_id=event_id, handler_name="notifications.assignment")
 
+    assert list(Notification.objects.values_list("user_id", "kind", "message")) == [
+        (lead.pk, NotificationKind.ASSIGNMENT, f"{item.key} Spring email is in the unassigned pool")
+    ]
+
+
+@pytest.mark.django_db
+def test_manual_unassign_notifies_nobody(marketer: User, lead: User, clock: FixedClock) -> None:
+    item = make_item(marketer)
+    payload = ItemAssignedPayload(
+        assignee_id=None, previous_assignee_id=None, mode=AssignmentMode.MANUAL, reason="unassigned"
+    )
+    event_id = _emit(item, lead, EventType.ITEM_ASSIGNED, payload, clock)
+
+    deliver(event_id=event_id, handler_name="notifications.assignment")
+
     assert not Notification.objects.exists()
+
+
+@pytest.mark.django_db
+def test_sticky_assignment_tells_the_reviewer_it_is_back(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    # Resubmissions and re-reviews return to the previous reviewer (rule 1) via a sticky ITEM_ASSIGNED, which
+    # is how "the assignee is notified on resubmit" happens without a second handler double-notifying.
+    item = make_item(marketer, title="Spring email")
+    payload = ItemAssignedPayload(
+        assignee_id=reviewer.pk,
+        previous_assignee_id=reviewer.pk,
+        mode=AssignmentMode.STICKY,
+        reason="previous reviewer",
+    )
+    event_id = _emit(item, marketer, EventType.ITEM_ASSIGNED, payload, clock)
+
+    deliver(event_id=event_id, handler_name="notifications.assignment")
+
+    assert Notification.objects.get(user=reviewer).message == f"{item.key} Spring email is back for your review"
 
 
 @pytest.mark.django_db
