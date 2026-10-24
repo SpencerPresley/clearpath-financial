@@ -59,7 +59,7 @@ describe('describeNotification', () => {
 
   it('phrases blocking findings on a partner page without a payload', () => {
     expect(text({ kind: 'page_findings' as NotificationKind, actor: null, detail: null })).toBe(
-      'New blocking findings on the partner page carrying CP-42 · Fall personal loan promo',
+      'Partner page carrying CP-42 · Fall personal loan promo has new blocking findings',
     );
   });
 

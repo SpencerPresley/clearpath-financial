@@ -3745,7 +3745,7 @@
     box-shadow: 0 0 0 1.5px var(--color-primary);
   }
   .app-inbox {
-    @apply flex max-h-[min(34rem,calc(100vh-4rem))] w-[27rem] flex-col p-0;
+    @apply flex max-h-[min(34rem,calc(100vh-4rem))] w-[32rem] flex-col p-0;
   }
   .app-inbox-dialog {
     @apply flex min-h-0 flex-col outline-none;
@@ -3801,9 +3801,10 @@
   .app-inbox-icon[data-tone='alert'] {
     @apply text-status-alert-soft-content;
   }
-  /* One line; only the item title gives way, so the verb and anything after the item stay readable. */
+  /* One line; only the item title gives way, so the verb and anything after the item stay readable. The clip
+     keeps an unusually long actor name from running under the age. */
   .app-inbox-line {
-    @apply flex min-w-0 items-baseline whitespace-nowrap text-muted;
+    @apply flex min-w-0 items-baseline overflow-hidden whitespace-nowrap text-muted;
   }
   .app-inbox-row[data-unread] .app-inbox-line {
     @apply text-base-content;

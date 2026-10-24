@@ -141,9 +141,9 @@ describe('NotificationBell', () => {
     expect(within(list).getAllByRole('group')).toEqual([today, earlier]);
     const todayRows = within(today).getAllByRole('option');
     expect(todayRows.map((row) => row.querySelector('.app-inbox-line')?.textContent)).toEqual([
-      'Unread: Dana Reyes requested changes on CP-42 · Fall personal loan promo',
-      'Unread: Sam Okafor mentioned you on CP-1042 · Spring balance transfer email',
-      'Unread: Priya Raman assigned CP-1051 · LendRight comparison page to you',
+      'Unread: Dana Reyes requested changes on CP-1038 · Spring balance transfer email',
+      'Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social',
+      'Unread: Lee Chen assigned CP-1051 · LendRight comparison page to you',
     ]);
     expect(todayRows[0]).toHaveTextContent('12m');
     const earlierRows = within(earlier).getAllByRole('option');

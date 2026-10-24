@@ -104,7 +104,7 @@ function words(n: NotificationOut): [string, string] | null {
     default:
       // The drift monitor's alert (PR #40) needs nothing from the payload.
       return (n.kind as string) === 'page_findings'
-        ? ['New blocking findings on the partner page carrying ', '']
+        ? ['Partner page carrying ', ' has new blocking findings']
         : null;
   }
 }
