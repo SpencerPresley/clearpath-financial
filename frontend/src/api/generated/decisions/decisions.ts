@@ -29,6 +29,7 @@ import type {
   DecisionIn,
   DecisionOut,
   ErrorOut,
+  FastTrackIn,
   ItemRowOut,
   PullIn,
   ReaffirmIn
@@ -65,7 +66,9 @@ export const getBulkFastTrackApproveUrl = () => {
 }
 
 /**
- * Approve generated terms-change versions; items with open findings are skipped (ruling 4). [workstream F]
+ * Leads only. Approve each item's current generated version, one item at a time; anything that can't be
+ * fast-tracked (open findings, not in needs_rereview, a newer version) is listed in `skipped` with its error code
+ * and stays in the normal lane (ruling 4).
  * @summary Bulk Fast Track
  */
 export const bulkFastTrackApprove = async (bulkFastTrackIn: BulkFastTrackIn, options?: Parameters<typeof customFetch>[1]): Promise<BulkResultOut> => {
@@ -336,6 +339,98 @@ export const useRecordDecision = <TError = ErrorOut,
         TContext
       > => {
       return useMutation(getRecordDecisionMutationOptions(options), queryClient);
+    }
+    export const getFastTrackApproveUrl = (itemId: number,) => {
+
+
+
+
+  return `/api/items/${itemId}/fast-track-approve`
+}
+
+/**
+ * One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the
+ * reviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409
+ * open_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current
+ * version isn't a generated one; 409 invalid_transition unless the item is in needs_rereview.
+ * @summary Fast Track Approve
+ */
+export const fastTrackApprove = async (itemId: number,
+    fastTrackIn: FastTrackIn, options?: Parameters<typeof customFetch>[1]): Promise<DecisionOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<DecisionOut>(getFastTrackApproveUrl(itemId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(fastTrackIn)
+  }
+);}
+
+
+
+
+
+export const getFastTrackApproveMutationKey = () => ['fastTrackApprove'] as const;
+
+export const getFastTrackApproveMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fastTrackApprove>>, TError,FastTrackApproveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof fastTrackApprove>>, TError,FastTrackApproveMutationVariables, TContext> => {
+
+const mutationKey = getFastTrackApproveMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof fastTrackApprove>>, FastTrackApproveMutationVariables> = (props) => {
+          const {itemId,data} = props ?? {};
+
+          return  fastTrackApprove(itemId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FastTrackApproveMutationResult = NonNullable<Awaited<ReturnType<typeof fastTrackApprove>>>
+    export type FastTrackApproveMutationBody = FastTrackIn
+    export type FastTrackApproveMutationError = ErrorOut
+    export type FastTrackApproveMutationVariables = {itemId: number;data: FastTrackIn}
+
+    /**
+ * @summary Fast Track Approve
+ */
+export const useFastTrackApprove = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof fastTrackApprove>>, TError,FastTrackApproveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof fastTrackApprove>>,
+        TError,
+        FastTrackApproveMutationVariables,
+        TContext
+      > => {
+      return useMutation(getFastTrackApproveMutationOptions(options), queryClient);
     }
     export const getPullItemUrl = (itemId: number,) => {
 

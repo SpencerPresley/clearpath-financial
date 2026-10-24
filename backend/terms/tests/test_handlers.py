@@ -9,10 +9,11 @@ from accounts.models import User
 from audit.models import Event
 from audit.outbox import EventRecord, deliver, dispatch_pending
 from core.clock import FixedClock
-from core.domain import EventType, ItemStatus
-from reviews.models import ReviewItem
+from core.domain import DecisionLane, EventType, ItemStatus
+from reviews.models import Decision, ReviewItem
 from reviews.services import SubmitItemResult
 from terms import handlers, tasks
+from terms.fast_track import fast_track_approve
 from terms.models import OfferTerms
 from terms.tests.conftest import WORKED_EXAMPLE, approve, go_live, publish
 
@@ -62,6 +63,8 @@ def test_full_path_through_the_outbox(
     monkeypatch: pytest.MonkeyPatch,
     django_capture_on_commit_callbacks: OnCommit,
 ) -> None:
+    """The worked example end to end: $10,000 / 36 months at the 7.49% floor ($311) is approved and live; the lead
+    publishes a 12.99% floor through the API; the outbox fans out; the reviewer approves $337 in one click."""
     live, idle = _approved(submit, reviewer, clock), _approved(submit, reviewer, clock)
     go_live(ReviewItem.objects.get(pk=live), marketer, clock)
     publish(lead, clock)
@@ -79,6 +82,14 @@ def test_full_path_through_the_outbox(
     assert [o.value for o in redelivered] == ["duplicate"]
     statuses = dict(ReviewItem.objects.filter(pk__in=[live, idle]).values_list("pk", "status"))
     assert statuses == {live: ItemStatus.NEEDS_REREVIEW, idle: ItemStatus.EXPIRED}
+    generated = ReviewItem.objects.select_related("current_version").get(pk=live).current_version
+    assert generated is not None
+    assert "at 12.99% APR has 36 monthly payments of $337." in generated.content_text
+
+    result = fast_track_approve(actor=reviewer, item_id=live, version_n=generated.n, reason="Numbers only", clock=clock)
+
+    assert (result.status, result.version_n) == (ItemStatus.APPROVED, generated.n)
+    assert Decision.objects.get(pk=result.decision_id).lane == DecisionLane.FAST_TRACK
 
 
 @pytest.mark.django_db

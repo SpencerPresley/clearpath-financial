@@ -10,6 +10,15 @@
           "item": {
             "$ref": "#/components/schemas/ItemRowOut"
           },
+          "lane": {
+            "$ref": "#/components/schemas/FastTrackLane",
+            "description": "fast_track: a version with the new numbers is generated for one-click approval. normal: the quoted numbers no longer fit the copy, so it's re-reviewed in full."
+          },
+          "numbers_change": {
+            "description": "False when none of the numbers this item quotes change (the generated version has no diff).",
+            "title": "Numbers Change",
+            "type": "boolean"
+          },
           "quoted_fields": {
             "items": {
               "$ref": "#/components/schemas/TermsField"
@@ -19,14 +28,16 @@
           },
           "will_become": {
             "$ref": "#/components/schemas/ItemStatus",
-            "description": "needs_rereview if live, expired if not (ruling 2)."
+            "description": "needs_rereview if live, expired if not (ruling 2); items already in needs_rereview stay there."
           }
         },
         "required": [
           "item",
           "is_live",
           "quoted_fields",
-          "will_become"
+          "will_become",
+          "lane",
+          "numbers_change"
         ],
         "title": "AffectedItemOut",
         "type": "object"
@@ -2324,6 +2335,35 @@
         "title": "ExportStatus",
         "type": "string"
       },
+      "FastTrackIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "version_n": {
+            "description": "The generated version the reviewer looked at; stale if a newer one exists.",
+            "title": "Version N",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_n",
+          "reason"
+        ],
+        "title": "FastTrackIn",
+        "type": "object"
+      },
+      "FastTrackLane": {
+        "enum": [
+          "fast_track",
+          "normal"
+        ],
+        "title": "FastTrackLane",
+        "type": "string"
+      },
       "FetchCopyIn": {
         "properties": {
           "url": {
@@ -3048,8 +3088,13 @@
         "type": "object"
       },
       "ImpactPreviewOut": {
-        "description": "'14 approved items quote v12; 9 will need re-review' before the lead confirms.",
+        "description": "'14 approved items quote v12; 9 will need re-review, 5 will expire.' before the lead confirms.",
         "properties": {
+          "already_in_rereview": {
+            "description": "Already in needs_rereview; they get a generated version too.",
+            "title": "Already In Rereview",
+            "type": "integer"
+          },
           "approved_items_quoting": {
             "title": "Approved Items Quoting",
             "type": "integer"
@@ -3072,12 +3117,33 @@
             ],
             "title": "Current Terms Id"
           },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version in effect now; null for a product's first terms.",
+            "title": "Current Version"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/AffectedItemOut"
             },
             "title": "Items",
             "type": "array"
+          },
+          "next_version": {
+            "title": "Next Version",
+            "type": "integer"
+          },
+          "normal_lane": {
+            "description": "Affected items that can't be fast-tracked (lane normal).",
+            "title": "Normal Lane",
+            "type": "integer"
           },
           "partners": {
             "items": {
@@ -3086,21 +3152,35 @@
             "title": "Partners",
             "type": "array"
           },
+          "summary": {
+            "examples": [
+              "14 approved items quote v12; 9 will need re-review, 5 will expire."
+            ],
+            "title": "Summary",
+            "type": "string"
+          },
           "will_expire": {
+            "description": "Approved, not live: expired; the next round starts from the new numbers.",
             "title": "Will Expire",
             "type": "integer"
           },
           "will_need_rereview": {
+            "description": "Approved and live: back to the reviewer in the fast-track lane.",
             "title": "Will Need Rereview",
             "type": "integer"
           }
         },
         "required": [
           "current_terms_id",
+          "current_version",
+          "next_version",
           "approved_items_quoting",
           "will_need_rereview",
           "will_expire",
+          "already_in_rereview",
+          "normal_lane",
           "changed_fields",
+          "summary",
           "items",
           "partners"
         ],
@@ -7116,20 +7196,8 @@
         "type": "object"
       },
       "OfferTermsPublishIn": {
-        "description": "A new version of a product's terms. It takes effect at `effective_from` (default: now) and closes the\ncurrent version's range at the same instant.",
+        "description": "A new version of a product's terms. It takes effect now and closes the current version's range at the same\ninstant. Values identical to the version in effect are refused (422 on `values`).",
         "properties": {
-          "effective_from": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective From"
-          },
           "note": {
             "default": "",
             "maxLength": 2000,
@@ -13331,7 +13399,7 @@
     },
     "/api/items/bulk/fast-track-approve": {
       "post": {
-        "description": "Approve generated terms-change versions; items with open findings are skipped (ruling 4). [workstream F]",
+        "description": "Leads only. Approve each item's current generated version, one item at a time; anything that can't be\nfast-tracked (open findings, not in needs_rereview, a newer version) is listed in `skipped` with its error code\nand stays in the normal lane (ruling 4).",
         "operationId": "bulkFastTrackApprove",
         "parameters": [],
         "requestBody": {
@@ -13414,16 +13482,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15010,6 +15068,114 @@
         "summary": "Create Evidence Pack",
         "tags": [
           "exports"
+        ]
+      }
+    },
+    "/api/items/{item_id}/fast-track-approve": {
+      "post": {
+        "description": "One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the\nreviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409\nopen_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current\nversion isn't a generated one; 409 invalid_transition unless the item is in needs_rereview.",
+        "operationId": "fastTrackApprove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FastTrackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Fast Track Approve",
+        "tags": [
+          "decisions"
         ]
       }
     },
@@ -19296,7 +19462,7 @@
         ]
       },
       "post": {
-        "description": "Save a new version: generates fast-track versions and moves affected items to needs_rereview or expired.\nOverlapping ranges fail with 409 terms_range_overlap. Leads only. [workstream F]",
+        "description": "Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a\ngenerated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),\nthe rest to expired(terms_changed). Unchanged values are 422 on `values`.",
         "operationId": "publishOfferTerms",
         "parameters": [],
         "requestBody": {
@@ -19379,16 +19545,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -19495,7 +19651,7 @@
     },
     "/api/terms/impact-preview": {
       "post": {
-        "description": "Which approved items and partners a new version would affect, before saving. [workstream F]",
+        "description": "Which items and partners publishing `values` now would affect, before saving. Read-only; leads only.",
         "operationId": "previewTermsImpact",
         "parameters": [],
         "requestBody": {
@@ -19578,16 +19734,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [

@@ -140,10 +140,17 @@ def _candidates(items: QuerySet[ReviewItem]) -> list[_Candidate]:
 
 
 def affected_approvals(
-    *, product: Product, clock: Clock = SYSTEM_CLOCK, item_ids: Iterable[int] | None = None
+    *,
+    product: Product,
+    clock: Clock = SYSTEM_CLOCK,
+    item_ids: Iterable[int] | None = None,
+    if_published_now: bool = False,
 ) -> tuple[AffectedApproval, ...]:
     """Non-legacy items of `product` (optionally only `item_ids`) whose copy quotes a terms version not in effect
-    now (see `AffectedApproval`), ordered by item id. Four queries whatever the item count."""
+    now (see `AffectedApproval`), ordered by item id. Four queries whatever the item count.
+
+    `if_published_now` (the impact preview): as if a new version took effect now, so every version counts as
+    superseded and any quoted terms make the item affected."""
     items = ReviewItem.objects.filter(status__in=[s.value for s in AFFECTED_STATUSES], is_legacy=False, product=product)
     if item_ids is not None:
         items = items.filter(pk__in=list(item_ids))
@@ -159,11 +166,11 @@ def affected_approvals(
         .order_by("span_start", "span_end", "pk")
     ):
         refs_by_version.setdefault(ref.version_id, []).append(ref)  # pyrefly: ignore[missing-attribute]
-    stale = [
-        c
-        for c in candidates
-        if any(not _in_effect(ref.offer_terms, now) for ref in refs_by_version.get(c.checked_version_id, []))
-    ]
+
+    def superseded(ref: TermsRef) -> bool:
+        return if_published_now or not _in_effect(ref.offer_terms, now)
+
+    stale = [c for c in candidates if any(superseded(r) for r in refs_by_version.get(c.checked_version_id, []))]
     versions = {
         v.pk: v
         for v in Version.objects.filter(pk__in={c.approved_version_id for c in stale}).only("id", "n", "content_text")

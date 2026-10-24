@@ -57,8 +57,9 @@ export const ListOfferTermsResponseItem = zod.object({
 export const ListOfferTermsResponse = zod.array(ListOfferTermsResponseItem)
 
 /**
- * Save a new version: generates fast-track versions and moves affected items to needs_rereview or expired.
- * Overlapping ranges fail with 409 terms_range_overlap. Leads only. [workstream F]
+ * Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
+ * generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
+ * the rest to expired(terms_changed). Unchanged values are 422 on `values`.
  * @summary Publish Terms
  */
 export const publishOfferTermsBodyNoteDefault = ``;
@@ -72,7 +73,6 @@ export const publishOfferTermsBodyValuesTwoProductDefault = `credit_card`;
 export const publishOfferTermsBodyValuesTwoPurchaseAprVariableDefault = true;
 
 export const PublishOfferTermsBody = zod.object({
-  "effective_from": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "note": zod.string().max(publishOfferTermsBodyNoteMax).default(publishOfferTermsBodyNoteDefault),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
   "values": zod.union([zod.object({
@@ -95,7 +95,7 @@ export const PublishOfferTermsBody = zod.object({
   "purchase_apr_min": zod.string(),
   "purchase_apr_variable": zod.boolean().default(publishOfferTermsBodyValuesTwoPurchaseAprVariableDefault)
 })])
-}).describe('A new version of a product\'s terms. It takes effect at `effective_from` (default: now) and closes the\ncurrent version\'s range at the same instant.')
+}).describe('A new version of a product\'s terms. It takes effect now and closes the current version\'s range at the same\ninstant. Values identical to the version in effect are refused (422 on `values`).')
 
 export const publishOfferTermsResponseValuesOneProductDefault = `personal_loan`;
 export const publishOfferTermsResponseValuesTwoIntroMonthsOneExclusiveMin = 0;
@@ -182,7 +182,7 @@ export const GetCurrentOfferTermsResponseItem = zod.object({
 export const GetCurrentOfferTermsResponse = zod.array(GetCurrentOfferTermsResponseItem)
 
 /**
- * Which approved items and partners a new version would affect, before saving. [workstream F]
+ * Which items and partners publishing `values` now would affect, before saving. Read-only; leads only.
  * @summary Impact Preview
  */
 export const previewTermsImpactBodyValuesOneProductDefault = `personal_loan`;
@@ -217,9 +217,11 @@ export const PreviewTermsImpactBody = zod.object({
 })
 
 export const PreviewTermsImpactResponse = zod.object({
+  "already_in_rereview": zod.int().describe('Already in needs_rereview; they get a generated version too.'),
   "approved_items_quoting": zod.int(),
   "changed_fields": zod.array(zod.enum(['apr_min', 'apr_max', 'amount_min', 'amount_max', 'term_months', 'origination_fee_min_pct', 'origination_fee_max_pct', 'purchase_apr_min', 'purchase_apr_max', 'intro_apr', 'intro_months', 'balance_transfer_fee_pct', 'annual_fee', 'example_amount', 'example_term_months', 'example_apr', 'example_payment']).describe('What an offer-terms claim in copy refers to (spec §4.2 ruling 1).\n\nMost members are field names of `PersonalLoanTerms` / `CreditCardTerms`; `example_*` members are the\nparts of a representative example, which fast-track recomputes rather than copies.')),
   "current_terms_id": zod.union([zod.int(),zod.null()]),
+  "current_version": zod.union([zod.int(),zod.null()]).describe('The version in effect now; null for a product\'s first terms.'),
   "items": zod.array(zod.object({
   "is_live": zod.boolean(),
   "item": zod.object({
@@ -256,9 +258,13 @@ export const PreviewTermsImpactResponse = zod.object({
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
 }),
+  "lane": zod.enum(['fast_track', 'normal']).describe('fast_track: a version with the new numbers is generated for one-click approval. normal: the quoted numbers no longer fit the copy, so it\'s re-reviewed in full.'),
+  "numbers_change": zod.boolean().describe('False when none of the numbers this item quotes change (the generated version has no diff).'),
   "quoted_fields": zod.array(zod.enum(['apr_min', 'apr_max', 'amount_min', 'amount_max', 'term_months', 'origination_fee_min_pct', 'origination_fee_max_pct', 'purchase_apr_min', 'purchase_apr_max', 'intro_apr', 'intro_months', 'balance_transfer_fee_pct', 'annual_fee', 'example_amount', 'example_term_months', 'example_apr', 'example_payment']).describe('What an offer-terms claim in copy refers to (spec §4.2 ruling 1).\n\nMost members are field names of `PersonalLoanTerms` / `CreditCardTerms`; `example_*` members are the\nparts of a representative example, which fast-track recomputes rather than copies.')),
-  "will_become": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']).describe('needs_rereview if live, expired if not (ruling 2).')
+  "will_become": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']).describe('needs_rereview if live, expired if not (ruling 2); items already in needs_rereview stay there.')
 })),
+  "next_version": zod.int(),
+  "normal_lane": zod.int().describe('Affected items that can\'t be fast-tracked (lane normal).'),
   "partners": zod.array(zod.object({
   "item_count": zod.int(),
   "partner": zod.object({
@@ -266,9 +272,10 @@ export const PreviewTermsImpactResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.')
 })),
-  "will_expire": zod.int(),
-  "will_need_rereview": zod.int()
-}).describe('\'14 approved items quote v12; 9 will need re-review\' before the lead confirms.')
+  "summary": zod.string(),
+  "will_expire": zod.int().describe('Approved, not live: expired; the next round starts from the new numbers.'),
+  "will_need_rereview": zod.int().describe('Approved and live: back to the reviewer in the fast-track lane.')
+}).describe('\'14 approved items quote v12; 9 will need re-review, 5 will expire.\' before the lead confirms.')
 
 /**
  * @summary Get Terms

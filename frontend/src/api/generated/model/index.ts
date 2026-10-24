@@ -71,6 +71,8 @@ export * from './exportIn';
 export * from './exportKind';
 export * from './exportOut';
 export * from './exportStatus';
+export * from './fastTrackIn';
+export * from './fastTrackLane';
 export * from './fetchCopyIn';
 export * from './fetchedCopyOut';
 export * from './fieldChange';

@@ -171,8 +171,9 @@ export const getPublishOfferTermsUrl = () => {
 }
 
 /**
- * Save a new version: generates fast-track versions and moves affected items to needs_rereview or expired.
- * Overlapping ranges fail with 409 terms_range_overlap. Leads only. [workstream F]
+ * Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
+ * generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
+ * the rest to expired(terms_changed). Unchanged values are 422 on `values`.
  * @summary Publish Terms
  */
 export const publishOfferTerms = async (offerTermsPublishIn: OfferTermsPublishIn, options?: Parameters<typeof customFetch>[1]): Promise<OfferTermsOut> => {
@@ -360,7 +361,7 @@ export const getPreviewTermsImpactUrl = () => {
 }
 
 /**
- * Which approved items and partners a new version would affect, before saving. [workstream F]
+ * Which items and partners publishing `values` now would affect, before saving. Read-only; leads only.
  * @summary Impact Preview
  */
 export const previewTermsImpact = async (impactPreviewIn: ImpactPreviewIn, options?: Parameters<typeof customFetch>[1]): Promise<ImpactPreviewOut> => {

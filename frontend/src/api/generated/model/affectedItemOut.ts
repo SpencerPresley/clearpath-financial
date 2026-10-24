@@ -4,6 +4,7 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { FastTrackLane } from './fastTrackLane';
 import type { ItemRowOut } from './itemRowOut';
 import type { ItemStatus } from './itemStatus';
 import type { TermsField } from './termsField';
@@ -11,7 +12,11 @@ import type { TermsField } from './termsField';
 export interface AffectedItemOut {
   is_live: boolean;
   item: ItemRowOut;
+  /** fast_track: a version with the new numbers is generated for one-click approval. normal: the quoted numbers no longer fit the copy, so it's re-reviewed in full. */
+  lane: FastTrackLane;
+  /** False when none of the numbers this item quotes change (the generated version has no diff). */
+  numbers_change: boolean;
   quoted_fields: TermsField[];
-  /** needs_rereview if live, expired if not (ruling 2). */
+  /** needs_rereview if live, expired if not (ruling 2); items already in needs_rereview stay there. */
   will_become: ItemStatus;
 }

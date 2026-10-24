@@ -5,6 +5,7 @@ from pydantic import Field
 
 from core.domain import ItemStatus, OfferTermsValues, Product, TermsField
 from reviews.schemas import ItemRowOut, PartyRefOut
+from terms.impact import FastTrackLane
 
 
 class OfferTermsOut(Schema):
@@ -39,7 +40,16 @@ class AffectedItemOut(Schema):
     item: ItemRowOut
     is_live: bool
     quoted_fields: list[TermsField]
-    will_become: ItemStatus = Field(description="needs_rereview if live, expired if not (ruling 2).")
+    will_become: ItemStatus = Field(
+        description="needs_rereview if live, expired if not (ruling 2); items already in needs_rereview stay there."
+    )
+    lane: FastTrackLane = Field(
+        description="fast_track: a version with the new numbers is generated for one-click approval. normal: the "
+        "quoted numbers no longer fit the copy, so it's re-reviewed in full."
+    )
+    numbers_change: bool = Field(
+        description="False when none of the numbers this item quotes change (the generated version has no diff)."
+    )
 
 
 class AffectedPartnerOut(Schema):
@@ -48,13 +58,18 @@ class AffectedPartnerOut(Schema):
 
 
 class ImpactPreviewOut(Schema):
-    """'14 approved items quote v12; 9 will need re-review' before the lead confirms."""
+    """'14 approved items quote v12; 9 will need re-review, 5 will expire.' before the lead confirms."""
 
     current_terms_id: int | None
+    current_version: int | None = Field(description="The version in effect now; null for a product's first terms.")
+    next_version: int
     approved_items_quoting: int
-    will_need_rereview: int
-    will_expire: int
+    will_need_rereview: int = Field(description="Approved and live: back to the reviewer in the fast-track lane.")
+    will_expire: int = Field(description="Approved, not live: expired; the next round starts from the new numbers.")
+    already_in_rereview: int = Field(description="Already in needs_rereview; they get a generated version too.")
+    normal_lane: int = Field(description="Affected items that can't be fast-tracked (lane normal).")
     changed_fields: list[TermsField]
+    summary: str = Field(examples=["14 approved items quote v12; 9 will need re-review, 5 will expire."])
     items: list[AffectedItemOut]
     partners: list[AffectedPartnerOut]
 

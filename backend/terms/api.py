@@ -3,11 +3,10 @@ from ninja import Router, Status
 
 from accounts.api import current_user
 from core.domain import Product
-from core.errors import NotImplementedYet
-from core.schemas import ERRORS, STUB_ERRORS
+from core.schemas import ERRORS
 from reviews import assignment, records
 from reviews.schemas import BulkFastTrackIn, BulkResultOut, DecisionOut
-from terms import fast_track, selectors, services
+from terms import fast_track, impact, selectors, services
 from terms.schemas import FastTrackIn, ImpactPreviewIn, ImpactPreviewOut, OfferTermsOut, OfferTermsPublishIn
 
 router = Router(tags=["terms"])
@@ -31,12 +30,10 @@ def get_terms(request: HttpRequest, terms_id: int) -> selectors.OfferTermsRow:
     return selectors.get_offer_terms(terms_id=terms_id)
 
 
-@router.post(
-    "/terms/impact-preview", response={200: ImpactPreviewOut, **STUB_ERRORS}, operation_id="previewTermsImpact"
-)
-def impact_preview(request: HttpRequest, body: ImpactPreviewIn) -> ImpactPreviewOut:
-    """Which approved items and partners a new version would affect, before saving. [workstream F]"""
-    raise NotImplementedYet("terms impact preview")
+@router.post("/terms/impact-preview", response={200: ImpactPreviewOut, **ERRORS}, operation_id="previewTermsImpact")
+def impact_preview(request: HttpRequest, body: ImpactPreviewIn) -> impact.ImpactPreview:
+    """Which items and partners publishing `values` now would affect, before saving. Read-only; leads only."""
+    return impact.impact_preview(viewer=current_user(request), product=body.product, values=body.values)
 
 
 @router.post("/terms", response={201: OfferTermsOut, **ERRORS}, operation_id="publishOfferTerms")
