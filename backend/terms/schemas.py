@@ -57,3 +57,8 @@ class ImpactPreviewOut(Schema):
     changed_fields: list[TermsField]
     items: list[AffectedItemOut]
     partners: list[AffectedPartnerOut]
+
+
+class FastTrackIn(Schema):
+    version_n: int = Field(description="The generated version the reviewer looked at; stale if a newer one exists.")
+    reason: str = Field(min_length=1, max_length=2000)

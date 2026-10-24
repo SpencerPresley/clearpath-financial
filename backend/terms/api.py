@@ -5,10 +5,14 @@ from accounts.api import current_user
 from core.domain import Product
 from core.errors import NotImplementedYet
 from core.schemas import ERRORS, STUB_ERRORS
-from terms import selectors, services
-from terms.schemas import ImpactPreviewIn, ImpactPreviewOut, OfferTermsOut, OfferTermsPublishIn
+from reviews import assignment, records
+from reviews.schemas import BulkFastTrackIn, BulkResultOut, DecisionOut
+from terms import fast_track, selectors, services
+from terms.schemas import FastTrackIn, ImpactPreviewIn, ImpactPreviewOut, OfferTermsOut, OfferTermsPublishIn
 
 router = Router(tags=["terms"])
+# Fast-track approval is a decision; it lives here with the fan-out that creates the versions it approves.
+fast_track_router = Router(tags=["decisions"])
 
 
 @router.get("/terms", response={200: list[OfferTermsOut], **ERRORS}, operation_id="listOfferTerms")
@@ -45,3 +49,30 @@ def publish_terms(request: HttpRequest, body: OfferTermsPublishIn) -> Status[sel
         data=services.PublishTermsInput(product=body.product, values=body.values, note=body.note),
     )
     return Status(201, selectors.get_offer_terms(terms_id=terms_id))
+
+
+# --- fast-track approval ---------------------------------------------------------------------------------------
+
+
+@fast_track_router.post(
+    "/items/{int:item_id}/fast-track-approve", response={201: DecisionOut, **ERRORS}, operation_id="fastTrackApprove"
+)
+def fast_track_approve(request: HttpRequest, item_id: int, body: FastTrackIn) -> Status[records.DecisionRow]:
+    """One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the
+    reviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409
+    open_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current
+    version isn't a generated one; 409 invalid_transition unless the item is in needs_rereview."""
+    result = fast_track.fast_track_approve(
+        actor=current_user(request), item_id=item_id, version_n=body.version_n, reason=body.reason
+    )
+    return Status(201, records.get_decision(decision_id=result.decision_id))
+
+
+@fast_track_router.post(
+    "/items/bulk/fast-track-approve", response={200: BulkResultOut, **ERRORS}, operation_id="bulkFastTrackApprove"
+)
+def bulk_fast_track(request: HttpRequest, body: BulkFastTrackIn) -> assignment.BulkResult:
+    """Leads only. Approve each item's current generated version, one item at a time; anything that can't be
+    fast-tracked (open findings, not in needs_rereview, a newer version) is listed in `skipped` with its error code
+    and stays in the normal lane (ruling 4)."""
+    return fast_track.bulk_fast_track_approve(actor=current_user(request), item_ids=body.item_ids, reason=body.reason)

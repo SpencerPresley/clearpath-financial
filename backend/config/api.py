@@ -20,6 +20,7 @@ from metrics.api import router as metrics_router
 from notifications.api import router as notifications_router
 from partners.api import router as partners_router
 from reviews.api import decisions_router, items_router, library_router
+from terms.api import fast_track_router
 from terms.api import router as terms_router
 
 
@@ -83,6 +84,7 @@ api.add_router("/", users_router)
 api.add_router("/", accounts_admin_router)
 api.add_router("/", items_router)
 api.add_router("/", decisions_router)
+api.add_router("/", fast_track_router)
 api.add_router("/", library_router)
 api.add_router("/", findings_router)
 api.add_router("/", terms_router)

@@ -105,7 +105,6 @@ def test_no_operation_returns_a_raw_dict() -> None:
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
-    ("post", "/api/items/bulk/fast-track-approve", {"item_ids": [1], "reason": "Numbers only"}),
     ("post", "/api/terms/impact-preview", None),
     ("get", "/api/metrics/summary", None),
     ("get", "/api/metrics/series?metric=rounds_per_item", None),
@@ -162,9 +161,7 @@ def test_stub_still_validates_input_first(marketer: User) -> None:
     client = Client()
     client.force_login(marketer)
 
-    response = client.post(
-        "/api/items/bulk/fast-track-approve", {"item_ids": [], "reason": "x"}, content_type="application/json"
-    )
+    response = client.post("/api/items/fetch-url", {"url": "ftp://x"}, content_type="application/json")
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
