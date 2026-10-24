@@ -67,8 +67,9 @@ async function panel() {
 }
 
 /** A run that reads CP-1042 (tool result links the item) and answers in Markdown. */
-function itemRun(): ScriptedRun {
-  const human = { type: 'human', id: 'u1', content: 'What about CP-1042?' };
+function itemRun(body: unknown): ScriptedRun {
+  const { message } = body as { message: { id: string; content: string } };
+  const human = { type: 'human', id: message.id, content: message.content };
   const call = { id: 'c1', name: 'get_item', args: { item_key: 'CP-1042' }, type: 'tool_call' };
   const ai1 = { type: 'ai', id: 'a1', content: '', tool_calls: [call] };
   const tool = {
@@ -151,7 +152,7 @@ describe('assistant conversation', () => {
     ).toEqual([
       "What's waiting on me?",
       'Find precedent for “no impact to your credit score”',
-      'Email compliance a summary of CP-',
+      'Email compliance a summary of CP-…',
     ]);
     await user.click(within(asks).getByRole('button', { name: "What's waiting on me?" }));
     expect(screen.getByRole('textbox', { name: 'Message the assistant' })).toHaveValue(
@@ -178,7 +179,7 @@ describe('assistant conversation', () => {
 
   it('renders Markdown, links item keys, and lists tool calls under the turn that made them', async () => {
     const user = userEvent.setup();
-    setup({ runs: [itemRun()], threads: [threadFixture()], activeThread: 't-1' });
+    setup({ runs: [itemRun], threads: [threadFixture()], activeThread: 't-1' });
     const region = await panel();
     await user.type(
       await within(region).findByRole('textbox', { name: 'Message the assistant' }),
@@ -186,6 +187,7 @@ describe('assistant conversation', () => {
     );
 
     const strong = await within(region).findByText('two blocking findings');
+    expect(within(region).getAllByText('What about CP-1042?')).toHaveLength(1); // echo reconciled by id
     expect(strong.tagName).toBe('STRONG');
     const tools = within(region).getByRole('list', { name: 'Tool calls' });
     const chip = within(tools).getByRole('listitem');

@@ -146,6 +146,23 @@ describe('AssistantTransport under useStream', () => {
     ]);
   });
 
+  it('hydrates a run cut short (next set, no approval) as idle, not loading forever', async () => {
+    // What a Stop, a closed tab or a dropped connection leaves: the checkpoint of the last finished step.
+    const human = { type: 'human', id: 'u1', content: 'hi' };
+    const { handlers } = assistantHandlers({
+      runs: [],
+      state: { ...EMPTY_STATE, values: { messages: [human] }, next: ['model'], tasks: [] },
+    });
+    server.use(...handlers);
+    const { result } = renderStream();
+    await waitFor(() => {
+      expect(result.current.isThreadLoading).toBe(false);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.isLoading).toBe(false);
+    expect(texts(result.current.messages)).toEqual(['human:hi']);
+  });
+
   it('surfaces a 409 from the run endpoint as stream.error with the API body', async () => {
     server.use(
       http.get('*/api/assistant/threads/:threadId/state', () => HttpResponse.json(EMPTY_STATE)),

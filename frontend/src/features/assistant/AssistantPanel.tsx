@@ -30,7 +30,7 @@ const UNTITLED = 'Untitled thread';
 
 /** Three short asks for an empty thread, by what the viewer does all day. */
 export function exampleAsks(roles: readonly Role[], itemKey: string | undefined): string[] {
-  const about = itemKey ?? 'CP-';
+  const about = itemKey ?? 'CP-…';
   const precedent = 'Find precedent for “no impact to your credit score”';
   if (roles.includes('reviewer') || roles.includes('lead')) {
     return ["What's waiting on me?", precedent, `Email compliance a summary of ${about}`];

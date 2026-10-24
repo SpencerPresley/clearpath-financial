@@ -300,7 +300,13 @@ export class AssistantTransport implements AgentServerAdapter {
           signal: request.signal,
         },
       );
-      return state as unknown as { values: StateType };
+      // Runs live inside their request, so a hydrate never has a stream to join. A checkpoint with `next` set
+      // and no pending approval is a run cut short (Stop, closed tab, dropped connection) or another tab's run
+      // we can't observe; reported as-is, the controller would show it as loading with nothing to end it. Only
+      // an approval keeps the thread active; a real concurrent run answers the next send with a 409.
+      const paused = state.tasks.some((task) => task.interrupts.length > 0);
+      const normalized = paused ? state : { ...state, next: [] };
+      return normalized as unknown as { values: StateType };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null; // not yours, or gone
       throw error;
