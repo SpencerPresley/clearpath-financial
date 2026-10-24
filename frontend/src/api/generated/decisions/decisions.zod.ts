@@ -205,6 +205,7 @@ export const PullItemBody = zod.object({
 
 export const PullItemResponse = zod.object({
   "age_days": zod.int(),
+  "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
@@ -214,8 +215,18 @@ export const PullItemResponse = zod.object({
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "key": zod.string(),
+  "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "decided_at": zod.iso.datetime({"offset":true}),
+  "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
+  "reason": zod.string()
+}).describe('The latest decision as a queue row shows it; `DecisionOut` is the full record.'),zod.null()]),
   "llm_check_status": zod.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']),
   "markets": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')),
+  "notes": zod.string(),
   "open_findings_count": zod.int(),
   "owner": zod.union([zod.object({
   "id": zod.int(),

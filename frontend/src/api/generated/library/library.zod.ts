@@ -54,7 +54,7 @@ export const ListLibraryQueryParams = zod.object({
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
   "run_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or before this date.'),
   "scope": zod.enum(['approved_to_run', 'ever_approved']).describe('The library\'s two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn\'t lapse; run-permission does).').default(listLibraryQueryScopeDefault),
-  "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title']).default(listLibraryQuerySortDefault),
+  "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title', 'title_desc', 'status', 'status_desc', 'risk_tier', 'risk_tier_desc', 'assignee', 'assignee_desc', 'partner', 'partner_desc', 'open_findings', 'open_findings_desc', 'round', 'round_desc']).describe('One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.').default(listLibraryQuerySortDefault),
   "cursor": zod.union([zod.string(),zod.null()]).optional(),
   "limit": zod.int().min(1).max(listLibraryQueryLimitMax).default(listLibraryQueryLimitDefault)
 })
@@ -63,6 +63,7 @@ export const ListLibraryResponse = zod.object({
   "next_cursor": zod.union([zod.string(),zod.null()]).describe('Pass as `cursor` for the next page; null on the last page.'),
   "rows": zod.array(zod.object({
   "age_days": zod.int(),
+  "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
@@ -72,8 +73,18 @@ export const ListLibraryResponse = zod.object({
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "key": zod.string(),
+  "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "decided_at": zod.iso.datetime({"offset":true}),
+  "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
+  "reason": zod.string()
+}).describe('The latest decision as a queue row shows it; `DecisionOut` is the full record.'),zod.null()]),
   "llm_check_status": zod.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']),
   "markets": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')),
+  "notes": zod.string(),
   "open_findings_count": zod.int(),
   "owner": zod.union([zod.object({
   "id": zod.int(),
@@ -94,7 +105,8 @@ export const ListLibraryResponse = zod.object({
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})
-}))
+})),
+  "total": zod.int().describe('Items matching the filters, across all pages.')
 })
 
 /**

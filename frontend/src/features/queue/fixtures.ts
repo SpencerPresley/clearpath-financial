@@ -6,9 +6,11 @@ import type {
   DecisionOut,
   FindingOut,
   ItemDetailOut,
+  ItemFilter,
   ItemRowOut,
   MeOut,
   PartnerRowOut,
+  QueueStatFiltersOut,
   QueueStatsOut,
   SavedViewOut,
   UserOut,
@@ -119,9 +121,12 @@ export function makeRow(overrides: Partial<ItemRowOut> = {}, now: Date = new Dat
     is_legacy: false,
     markets: ['national', 'CA'],
     tags: [],
+    notes: '',
     current_version_n: 1,
     planned_first_run: '2026-11-01',
     planned_last_run: null,
+    approval_expires_at: null,
+    latest_decision: null,
     submitted_at: ago(3 * DAY + 2 * HOUR, now),
     updated_at: ago(5 * HOUR, now),
     ...overrides,
@@ -244,19 +249,71 @@ export function queueRows(now: Date = new Date()): ItemRowOut[] {
   ];
 }
 
+/**
+ * An ItemFilter as the API serializes it: every field present, defaults included (pydantic dumps them all).
+ * Copied from `GET /items/stats` on the backend (reviews.selectors.queue_stat_filters), so the views' tests
+ * read the shape the server really sends.
+ */
+export function serverFilter(overrides: Partial<ItemFilter>): ItemFilter {
+  return {
+    q: null,
+    status: [],
+    product: [],
+    channel: [],
+    partner_id: [],
+    assignee_id: [],
+    owner_id: [],
+    mine: false,
+    submitted_by_me: false,
+    unassigned: false,
+    risk_tier: [],
+    market: [],
+    tag: [],
+    is_legacy: null,
+    has_open_findings: null,
+    reopen_reason: [],
+    submitted_after: null,
+    submitted_before: null,
+    waiting_more_than_days: null,
+    approved_after: null,
+    approved_before: null,
+    approved_within_days: null,
+    run_from: null,
+    run_to: null,
+    ...overrides,
+  };
+}
+
+const QUEUED: ItemFilter['status'] = ['submitted', 'in_review', 'needs_rereview'];
+
+export const STAT_FILTERS: QueueStatFiltersOut = {
+  open: serverFilter({ status: QUEUED, is_legacy: false }),
+  mine: serverFilter({ status: QUEUED, is_legacy: false, mine: true }),
+  unassigned: serverFilter({ status: QUEUED, is_legacy: false, unassigned: true }),
+  needs_rereview: serverFilter({ status: ['needs_rereview'], is_legacy: false }),
+  waiting_over_3_days: serverFilter({ status: QUEUED, is_legacy: false, waiting_more_than_days: 3 }),
+};
+
 export const STATS: QueueStatsOut = {
   open: 23,
   mine: 8,
   unassigned: 4,
   needs_rereview: 2,
   waiting_over_3_days: 6,
-  by_status: [
-    { status: 'submitted', count: 9 },
-    { status: 'in_review', count: 12 },
-    { status: 'changes_requested', count: 5 },
-    { status: 'needs_rereview', count: 2 },
-    { status: 'approved', count: 31 },
-  ],
+  by_status: (
+    [
+      ['submitted', 9],
+      ['in_review', 12],
+      ['changes_requested', 5],
+      ['needs_rereview', 2],
+      ['approved', 31],
+    ] as const
+  ).map(([status, count]) => ({
+    status,
+    count,
+    filters: serverFilter({ status: [status], is_legacy: false }),
+  })),
+  filters: STAT_FILTERS,
 };
 
 export const AFFILIATE_VIEW: SavedViewOut = {

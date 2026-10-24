@@ -210,7 +210,8 @@ export async function stubApi(page: Page, options: StubOptions = {}): Promise<St
       if (options.previewDelayMs) await new Promise((r) => setTimeout(r, options.previewDelayMs));
       return json(route, preview(body as CheckPreviewIn));
     }
-    if (path === '/items' && method === 'GET') return json(route, { rows: state.rows, next_cursor: null });
+    if (path === '/items' && method === 'GET')
+      return json(route, { rows: state.rows, next_cursor: null, total: state.rows.length });
     if (path === '/items' && method === 'POST') {
       const data = body as SubmitItemIn;
       const created = itemFixture({

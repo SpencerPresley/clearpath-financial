@@ -1,26 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  DECISION_APPROVED,
-  DECISION_CHANGES,
-  REVIEWER,
-  itemFixture,
-  itemRowFixture,
-} from '../../test/fixtures/review';
+import { DECISION_APPROVED, DECISION_CHANGES, REVIEWER, itemRowFixture } from '../../test/fixtures/review';
 import { waitingOn } from './waitingOn';
 
 describe('waitingOn', () => {
-  it('changes requested: on you, with who asked and the first line of why', () => {
-    const row = itemRowFixture({ status: 'changes_requested' });
-    const detail = itemFixture({ status: 'changes_requested', latest_decision: DECISION_CHANGES });
-    expect(waitingOn(row, detail)).toEqual({
+  it('changes requested: on you, with who asked and the first line of why (from the row alone)', () => {
+    const row = itemRowFixture({ status: 'changes_requested', latest_decision: DECISION_CHANGES });
+    expect(waitingOn(row)).toEqual({
       bucket: 'you',
       why: 'Dana Reyes: Add the California license line.',
       action: 'resubmit',
     });
   });
 
-  it('changes requested before the decision loads: still on you, no invented reason', () => {
+  it('changes requested with no decision on record: still on you, no invented reason', () => {
     expect(waitingOn(itemRowFixture({ status: 'changes_requested' }))).toEqual({
       bucket: 'you',
       why: 'Changes requested',
@@ -77,19 +70,13 @@ describe('waitingOn', () => {
     );
   });
 
-  it('approved: expiry when the detail has it', () => {
-    expect(waitingOn(itemRowFixture({ status: 'approved' }))).toEqual({
+  it('approved: with the expiry date from the row', () => {
+    expect(waitingOn(itemRowFixture({ status: 'approved', approval_expires_at: null }))).toEqual({
       bucket: 'approved',
       why: 'Approved',
     });
-    const detail = itemFixture({
-      status: 'approved',
-      latest_decision: DECISION_APPROVED,
-      approval_expires_at: '2027-04-24T00:00:00Z',
-    });
-    expect(waitingOn(itemRowFixture({ status: 'approved' }), detail).why).toMatch(
-      /^Approved · expires Apr 2[34], 2027$/,
-    );
+    const row = itemRowFixture({ status: 'approved', approval_expires_at: '2027-04-24T00:00:00Z' });
+    expect(waitingOn(row).why).toMatch(/^Approved · expires Apr 2[34], 2027$/);
   });
 
   it('rejected: closed', () => {
@@ -99,8 +86,8 @@ describe('waitingOn', () => {
     });
   });
 
-  it('ignores a detail whose decision is not a change request', () => {
-    const detail = itemFixture({ status: 'changes_requested', latest_decision: DECISION_APPROVED });
-    expect(waitingOn(itemRowFixture({ status: 'changes_requested' }), detail).why).toBe('Changes requested');
+  it('ignores a latest decision that is not a change request', () => {
+    const row = itemRowFixture({ status: 'changes_requested', latest_decision: DECISION_APPROVED });
+    expect(waitingOn(row).why).toBe('Changes requested');
   });
 });

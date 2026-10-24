@@ -2,6 +2,8 @@
 
 import importlib
 import os
+from collections.abc import Callable, Iterator
+from types import ModuleType
 
 import pytest
 from django.test import Client
@@ -41,3 +43,44 @@ def test_base_settings_use_the_redis_cache() -> None:
 
     assert base.CACHES["default"]["BACKEND"] == "django.core.cache.backends.redis.RedisCache"
     assert base.CACHES["default"]["LOCATION"] == base.env.redis_url
+
+
+type Load = Callable[[str, str | None], ModuleType]
+
+
+@pytest.fixture
+def load_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[Load]:
+    """Import a settings module fresh under a given DJANGO_CSRF_TRUSTED_ORIGINS, then restore the originals.
+    Django's own settings were read at startup, so reloading these modules doesn't change them."""
+
+    def load(name: str, origins: str | None) -> ModuleType:
+        monkeypatch.setenv("CLEARPATH_ENV_FILE", "")  # never the repo-root .env
+        monkeypatch.setenv("POSTGRES_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "x"))
+        if origins is None:
+            monkeypatch.delenv("DJANGO_CSRF_TRUSTED_ORIGINS", raising=False)
+        else:
+            monkeypatch.setenv("DJANGO_CSRF_TRUSTED_ORIGINS", origins)
+        importlib.reload(importlib.import_module("config.settings.base"))
+        return importlib.reload(importlib.import_module(f"config.settings.{name}"))
+
+    yield load
+    monkeypatch.undo()
+    for name in ("base", "dev", "prod"):
+        importlib.reload(importlib.import_module(f"config.settings.{name}"))
+
+
+def test_dev_trusts_local_vite_and_preview_ports_and_any_listed_origin(load_settings: Load) -> None:
+    default = load_settings("dev", None).CSRF_TRUSTED_ORIGINS
+    # An E2E run on another port lists it; the .env's usual single 5173 origin keeps the defaults too.
+    extra = load_settings("dev", "http://localhost:4391,http://localhost:5173").CSRF_TRUSTED_ORIGINS
+
+    assert {"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173"} <= set(default)
+    assert set(extra) == {*default, "http://localhost:4391"}
+    assert len(extra) == len(set(extra))
+
+
+def test_prod_trusts_only_the_listed_origins(load_settings: Load) -> None:
+    assert load_settings("prod", None).CSRF_TRUSTED_ORIGINS == []
+    assert load_settings("prod", "https://review.clearpath.example").CSRF_TRUSTED_ORIGINS == [
+        "https://review.clearpath.example"
+    ]

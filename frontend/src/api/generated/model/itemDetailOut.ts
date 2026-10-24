@@ -19,6 +19,7 @@ import type { VersionSummaryOut } from './versionSummaryOut';
 
 export interface ItemDetailOut {
   age_days: number;
+  /** When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved. */
   approval_expires_at: string | null;
   approved_at: string | null;
   assignee: PartyRefOut | null;

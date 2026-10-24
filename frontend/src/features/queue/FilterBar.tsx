@@ -36,12 +36,26 @@ export interface ChipOption {
   label: string;
 }
 
+/** Exhaustive on purpose: a new server sort doesn't compile until someone names it. Menu order is this order. */
 export const SORT_LABEL: Record<ItemSort, string> = {
   queue: 'Queue order',
   oldest: 'Oldest first',
   newest: 'Newest first',
   updated: 'Recently updated',
   title: 'Title A–Z',
+  title_desc: 'Title Z–A',
+  status: 'Status, submitted first',
+  status_desc: 'Status, closed first',
+  risk_tier: 'Risk, low to high',
+  risk_tier_desc: 'Risk, high to low',
+  assignee: 'Assignee A–Z',
+  assignee_desc: 'Assignee Z–A',
+  partner: 'Partner A–Z',
+  partner_desc: 'Partner Z–A',
+  open_findings: 'Fewest findings first',
+  open_findings_desc: 'Most findings first',
+  round: 'Round, first to latest',
+  round_desc: 'Round, latest first',
 };
 
 const SORT_HINT: Partial<Record<ItemSort, string>> = {
@@ -317,7 +331,7 @@ export function FilterBar({
         .map((chip) => (
           <FilterChip key={chip.label} {...chip} />
         ))}
-      <MoreFilters chips={secondary.filter((chip) => chip.selected.length === 0)} />
+      <MoreFilters chips={secondary} />
       {modified && (
         <Button size="sm" variant="ghost" onPress={onClear}>
           Clear filters
@@ -328,11 +342,26 @@ export function FilterBar({
   );
 }
 
-/** Filters without a value, each a submenu with the same choices its chip has. */
+const isEmpty = (chip: ChipProps) => chip.selected.length === 0;
+
+/**
+ * Filters without a value, each a submenu with the same choices its chip has.
+ *
+ * The list is frozen while the menu is open. A pick gives that filter a value, which would otherwise drop
+ * its submenu trigger out of the list and unmount the submenu that holds focus. Focus would land on <body>
+ * (where Escape reaches no menu) and the root menu could stay open with nothing able to close it from the
+ * keyboard; it would also end a multi-select after one choice. The filter moves to the bar on close.
+ */
 function MoreFilters({ chips }: { chips: readonly ChipProps[] }) {
-  if (chips.length === 0) return null;
+  const [frozen, setFrozen] = useState<readonly string[] | null>(null);
+  const shown = frozen ? chips.filter((chip) => frozen.includes(chip.label)) : chips.filter(isEmpty);
+  if (shown.length === 0) return null;
   return (
-    <MenuTrigger>
+    <MenuTrigger
+      onOpenChange={(open) => {
+        setFrozen(open ? chips.filter(isEmpty).map((chip) => chip.label) : null);
+      }}
+    >
       <AriaButton className="app-chip-btn app-chip-plain app-filter-more">
         <Icon name="action.filter" size={14} />
         <span>More filters</span>
@@ -340,7 +369,7 @@ function MoreFilters({ chips }: { chips: readonly ChipProps[] }) {
       </AriaButton>
       <Popover className="app-popover" placement="bottom start" offset={4}>
         <Menu className="app-menu" aria-label="More filters">
-          {chips.map((chip) => (
+          {shown.map((chip) => (
             <SubmenuTrigger key={chip.label}>
               <MenuItem id={chip.label} textValue={chip.label} className="app-menu-item justify-between">
                 <span>{chip.label}</span>

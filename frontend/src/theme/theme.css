@@ -1565,9 +1565,10 @@
   .app-th-sort:focus-visible .app-th-sort-icon {
     opacity: 1;
   }
-  /* Sortable headers show a dim glyph at rest so it's clear which 2 of the headers sort. */
-  .app-th-sort-icon[data-idle] {
-    opacity: 0.4;
+  /* Nearly every header sorts, so an idle glyph shows only on hover or focus (the space stays reserved, so the
+     header doesn't shift); the sorted column always shows its direction. */
+  .app-th:not([aria-sort]) .app-th-sort:not(:hover, :focus-visible) .app-th-sort-icon {
+    opacity: 0;
   }
   .app-th-sort-icon {
     transition-property: opacity;

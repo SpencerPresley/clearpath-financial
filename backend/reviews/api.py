@@ -39,6 +39,7 @@ from reviews.schemas import (
     ResubmitIn,
     SavedViewIn,
     SavedViewOut,
+    SavedViewUpdateIn,
     SearchResultsOut,
     SubmitItemIn,
     VersionDiffOut,
@@ -346,6 +347,23 @@ def create_saved_view(request: HttpRequest, body: SavedViewIn) -> Status[records
         data=services.NewSavedView(name=body.name, filters=body.filters, sort=body.sort, columns=tuple(body.columns)),
     )
     return Status(201, next(v for v in records.list_saved_views(owner=viewer) if v.id == view_id))
+
+
+@items_router.patch("/views/{int:view_id}", response={200: SavedViewOut, **ERRORS}, operation_id="updateSavedView")
+def update_saved_view(request: HttpRequest, view_id: int, body: SavedViewUpdateIn) -> records.SavedViewRow:
+    """Save a modified view in place: name, filters, sort, and/or columns. Owner only (404 otherwise)."""
+    viewer = current_user(request)
+    services.update_saved_view(
+        actor=viewer,
+        view_id=view_id,
+        changes=services.SavedViewChanges(
+            name=body.name,
+            filters=body.filters,
+            sort=body.sort,
+            columns=tuple(body.columns) if body.columns is not None else None,
+        ),
+    )
+    return records.get_saved_view(owner=viewer, view_id=view_id)
 
 
 @items_router.delete("/views/{int:view_id}", response={204: None, **ERRORS}, operation_id="deleteSavedView")

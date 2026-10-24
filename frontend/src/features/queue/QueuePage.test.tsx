@@ -18,7 +18,9 @@ import { server } from '../../test/server';
 import { FINDINGS, makeDetail, ME_REVIEWER, PARTNERS, queueRows, STATS, USERS } from './fixtures';
 
 function serveItems(rows: ItemRowOut[]) {
-  server.use(http.get('*/api/items', () => HttpResponse.json({ rows, next_cursor: null })));
+  server.use(
+    http.get('*/api/items', () => HttpResponse.json({ rows, next_cursor: null, total: rows.length })),
+  );
 }
 
 beforeEach(() => {

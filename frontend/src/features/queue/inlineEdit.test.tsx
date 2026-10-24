@@ -38,7 +38,7 @@ function Harness({ viewer }: { viewer: Viewer }) {
         onOpen={() => undefined}
         rowSelection={{}}
         onRowSelectionChange={() => undefined}
-        columnVisibility={{ ...DEFAULT_COLUMN_VISIBILITY, tags: true }}
+        columnVisibility={{ ...DEFAULT_COLUMN_VISIBILITY, tags: true, notes: true }}
         cells={cells}
       />
       <ToastHost />
@@ -48,13 +48,77 @@ function Harness({ viewer }: { viewer: Viewer }) {
 
 function serveRow(row: ItemRowOut) {
   let current = row;
-  server.use(http.get('*/api/items', () => HttpResponse.json({ rows: [current], next_cursor: null })));
+  server.use(
+    http.get('*/api/items', () => HttpResponse.json({ rows: [current], next_cursor: null, total: 1 })),
+  );
   return {
     set(next: ItemRowOut) {
       current = next;
     },
   };
 }
+
+describe('inline notes', () => {
+  it('lets a reviewer edit notes in the table, shown before the server answers', async () => {
+    const served = serveRow({ ...ROW, notes: 'Check the APR footnote.' });
+    let release: () => void = () => undefined;
+    const bodies: ItemUpdateIn[] = [];
+    server.use(
+      http.patch('*/api/items/:itemId', async ({ request }) => {
+        const body = (await request.json()) as ItemUpdateIn;
+        bodies.push(body);
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const saved = { ...ROW, notes: body.notes ?? '' };
+        served.set(saved);
+        return HttpResponse.json(saved);
+      }),
+    );
+    renderWithQuery(<Harness viewer={REVIEWER} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Notes for CP-1042/ }));
+    const box = await screen.findByRole('textbox', { name: 'Notes for CP-1042' });
+    expect(box).toHaveValue('Check the APR footnote.');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'Partner confirmed the APR range.');
+    await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
+
+    const cell = () => screen.getByRole('button', { name: /Notes for CP-1042/ });
+    expect(cell()).toHaveTextContent('Partner confirmed the APR range.');
+    await waitFor(() => {
+      expect(bodies).toEqual([{ notes: 'Partner confirmed the APR range.' }]);
+    });
+    release();
+    await waitFor(() => {
+      expect(cell()).toHaveTextContent('Partner confirmed the APR range.');
+    });
+  });
+
+  it('leaves the notes alone on Cancel', async () => {
+    serveRow({ ...ROW, notes: 'Keep me.' });
+    let patched = false;
+    server.use(
+      http.patch('*/api/items/:itemId', () => {
+        patched = true;
+        return HttpResponse.json(ROW);
+      }),
+    );
+    renderWithQuery(<Harness viewer={REVIEWER} />);
+    await userEvent.click(await screen.findByRole('button', { name: /Notes for CP-1042/ }));
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Notes for CP-1042' }), ' and more');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: /Notes for CP-1042/ })).toHaveTextContent('Keep me.');
+    expect(patched).toBe(false);
+  });
+
+  it('shows notes as text to someone who cannot edit them', async () => {
+    serveRow({ ...ROW, notes: 'Reviewer-only context.', owner: { id: 99, name: 'Someone' } });
+    renderWithQuery(<Harness viewer={MARKETER} />);
+    expect(await screen.findByText('Reviewer-only context.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Notes for/ })).toBeNull();
+  });
+});
 
 describe('inline edits', () => {
   it('shows a new risk tier before the server answers, then keeps it', async () => {

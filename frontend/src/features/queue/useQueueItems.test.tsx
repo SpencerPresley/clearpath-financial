@@ -32,13 +32,13 @@ describe('useQueueItems', () => {
         const cursor = new URL(request.url).searchParams.get('cursor');
         seen.push(cursor);
         return cursor === null
-          ? HttpResponse.json({ rows: [makeRow({ id: 1 }), makeRow({ id: 2 })], next_cursor: 'c2' })
-          : HttpResponse.json({ rows: [makeRow({ id: 3 })], next_cursor: null });
+          ? HttpResponse.json({ rows: [makeRow({ id: 1 }), makeRow({ id: 2 })], next_cursor: 'c2', total: 3 })
+          : HttpResponse.json({ rows: [makeRow({ id: 3 })], next_cursor: null, total: 3 });
       }),
     );
     renderWithQuery(<List />);
     expect(await screen.findByText('CP-2')).toBeInTheDocument();
-    expect(screen.getByText('2 items loaded')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3 items loaded')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
     expect(await screen.findByText('CP-3')).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('useQueueItems', () => {
     server.use(
       http.get('*/api/items', ({ request }) => {
         urls.push(new URL(request.url));
-        return HttpResponse.json({ rows: [], next_cursor: null });
+        return HttpResponse.json({ rows: [], next_cursor: null, total: 0 });
       }),
     );
     renderWithQuery(<List />);
@@ -68,7 +68,7 @@ describe('useQueueItems', () => {
       http.get('*/api/items', ({ request }) => {
         const cursor = new URL(request.url).searchParams.get('cursor');
         if (cursor === null) {
-          return HttpResponse.json({ rows: [makeRow({ id: 1 })], next_cursor: 'stale' });
+          return HttpResponse.json({ rows: [makeRow({ id: 1 })], next_cursor: 'stale', total: 2 });
         }
         if (failNext) {
           failNext = false;
@@ -77,7 +77,7 @@ describe('useQueueItems', () => {
             { status: 422 },
           );
         }
-        return HttpResponse.json({ rows: [makeRow({ id: 2 })], next_cursor: null });
+        return HttpResponse.json({ rows: [makeRow({ id: 2 })], next_cursor: null, total: 2 });
       }),
     );
     renderWithQuery(<List />);

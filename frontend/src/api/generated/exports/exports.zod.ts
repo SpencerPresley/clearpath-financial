@@ -51,7 +51,7 @@ export const CreateExportBody = zod.object({
   "waiting_more_than_days": zod.union([zod.int().min(createExportBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
 }).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.').optional(),
   "include_evidence_packs": zod.boolean().default(createExportBodyIncludeEvidencePacksDefault).describe('Return a zip: the xlsx plus an evidence pack for every item in the view with an approval (at most 200).'),
-  "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title']).default(createExportBodySortDefault)
+  "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title', 'title_desc', 'status', 'status_desc', 'risk_tier', 'risk_tier_desc', 'assignee', 'assignee_desc', 'partner', 'partner_desc', 'open_findings', 'open_findings_desc', 'round', 'round_desc']).describe('One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.').default(createExportBodySortDefault)
 }).describe('Export any filtered view as xlsx, in the view\'s sort order.')
 
 export const CreateExportResponse = zod.object({
@@ -202,6 +202,7 @@ export const GetEvidencePackResponse = zod.object({
   "generated_at": zod.iso.datetime({"offset":true}),
   "item": zod.object({
   "age_days": zod.int(),
+  "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
@@ -211,8 +212,18 @@ export const GetEvidencePackResponse = zod.object({
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "key": zod.string(),
+  "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "decided_at": zod.iso.datetime({"offset":true}),
+  "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
+  "reason": zod.string()
+}).describe('The latest decision as a queue row shows it; `DecisionOut` is the full record.'),zod.null()]),
   "llm_check_status": zod.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']),
   "markets": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')),
+  "notes": zod.string(),
   "open_findings_count": zod.int(),
   "owner": zod.union([zod.object({
   "id": zod.int(),

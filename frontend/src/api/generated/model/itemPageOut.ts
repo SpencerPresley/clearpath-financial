@@ -10,4 +10,6 @@ export interface ItemPageOut {
   /** Pass as `cursor` for the next page; null on the last page. */
   next_cursor: string | null;
   rows: ItemRowOut[];
+  /** Items matching the filters, across all pages. */
+  total: number;
 }

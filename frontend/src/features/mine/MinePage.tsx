@@ -2,11 +2,10 @@
  * My submissions (product-spec): what's waiting on the marketer and why, so nobody has to email "any
  * update?". Sections in the order the marketer acts on them; each row says who has the ball and what's next.
  */
-import { useQueries } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-import { getGetItemQueryOptions, useListItems } from '../../api/generated/items/items';
-import type { ItemDetailOut, ItemRowOut } from '../../api/generated/model';
+import { useListItems } from '../../api/generated/items/items';
+import type { ItemRowOut } from '../../api/generated/model';
 import { StatusBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { ButtonLink } from '../../ui/ButtonLink';
@@ -16,7 +15,7 @@ import { ItemKey } from '../../ui/ItemKey';
 import { plural } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonTable } from '../../ui/Skeleton';
-import { BUCKETS, NEEDS_DETAIL, waitingOn } from './waitingOn';
+import { BUCKETS, waitingOn } from './waitingOn';
 import type { WaitingBucket, WaitingOn } from './waitingOn';
 
 export const MINE_PARAMS = { submitted_by_me: true, sort: 'updated', limit: 200 } as const;
@@ -104,19 +103,10 @@ export function MinePage() {
   const list = useListItems(MINE_PARAMS);
   const rows = list.data?.rows ?? [];
 
-  // The why line for a change request quotes the decision, which only the item detail carries.
-  const detailRows = rows.filter((row) => NEEDS_DETAIL.has(row.status));
-  const details = useQueries({ queries: detailRows.map((row) => getGetItemQueryOptions(row.id)) });
-  const detailById = new Map<number, ItemDetailOut>();
-  details.forEach((query, index) => {
-    const row = detailRows[index];
-    if (row !== undefined && query.data !== undefined) detailById.set(row.id, query.data);
-  });
-
   const now = new Date();
   const grouped = new Map<WaitingBucket, Row[]>();
   for (const item of rows) {
-    const waiting = waitingOn(item, detailById.get(item.id));
+    const waiting = waitingOn(item);
     grouped.set(waiting.bucket, [...(grouped.get(waiting.bucket) ?? []), { item, waiting }]);
   }
 

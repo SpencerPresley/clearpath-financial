@@ -13,6 +13,7 @@ export interface QueueCellContextValue {
   activeId?: number | null;
   canEditRisk: (row: ItemRowOut) => boolean;
   canEditTags: (row: ItemRowOut) => boolean;
+  canEditNotes: (row: ItemRowOut) => boolean;
   save: (row: ItemRowOut, patch: ItemUpdateIn) => void;
   /** Take an unassigned submitted item (claim) or hand one off (assign); see useAssignment.ts. */
   canClaim: (row: ItemRowOut) => boolean;
@@ -26,6 +27,7 @@ const never = () => false;
 export const READ_ONLY_CELLS: QueueCellContextValue = {
   canEditRisk: never,
   canEditTags: never,
+  canEditNotes: never,
   save: () => undefined,
   canClaim: never,
   canAssign: never,

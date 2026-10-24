@@ -95,6 +95,24 @@ def test_export_follows_the_view_sort(
     assert [r[1] for r in _sheet(_file(job_id))[1:]] == ["Alpha", "Beta", "Gamma"]
 
 
+@pytest.mark.parametrize("sort", list(ItemSort))
+def test_export_rows_are_the_list_view_in_its_order(
+    lead: User, marketer: User, user_factory: UserFactory, clock: FixedClock, sort: ItemSort
+) -> None:
+    from exports.selectors import export_rows
+    from reviews.selectors import list_items
+
+    reviewer = user_factory(roles=[Role.REVIEWER])
+    for n, status in enumerate((ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.APPROVED)):
+        make_item(marketer, title=f"Item {n}", status=status, assignee=reviewer if n else None, round=3 - n)
+    make_item(None, status=ItemStatus.SUBMITTED, is_legacy=True, legacy_ref="REQ-9", markets=[])  # not in the queue
+
+    listed = list_items(viewer=lead, filters=ItemFilter(), sort=sort, clock=clock).rows
+    exported = list(export_rows(viewer=lead, filters=ItemFilter(), sort=sort, clock=clock))
+
+    assert [r.key for r in exported] == [r.key for r in listed]
+
+
 def test_marketers_cannot_export_views(marketer: User, clock: FixedClock) -> None:
     with pytest.raises(NotPermitted):
         services.request_export(actor=marketer, filters=ItemFilter(), clock=clock)
@@ -190,6 +208,10 @@ def test_evidence_pack_zip_verifies(
     assert terms["quoted_in_approved_version"][0]["quote"] == "7.49%"
     decision = json.loads(zf.read("decision.json"))
     assert (decision["decision_label"], decision["findings"][0]["state"]) == ("Approve", "dismissed")
+    # The pack records the approval, not the queue's working fields: no internal notes, and no "latest
+    # decision" that could contradict the approval it records.
+    assert {"notes", "latest_decision", "approval_expires_at"}.isdisjoint(decision["item"])
+    assert decision["item"]["key"] == f"CP-{approved.item.pk}"
     assert "attachment.added" in {e["type"] for e in json.loads(zf.read("history.json"))}
     summary = zf.read("summary.txt").decode()
     assert "Decision:         Approve (Standard review) by Dana Kim" in summary

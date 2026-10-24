@@ -29,7 +29,11 @@ function serve() {
       const url = new URL(request.url);
       urls.push(url);
       const approved = url.searchParams.getAll('status').includes('approved');
-      return HttpResponse.json({ rows: approved ? APPROVED : ACTIVE, next_cursor: null });
+      return HttpResponse.json({
+        rows: approved ? APPROVED : ACTIVE,
+        next_cursor: null,
+        total: (approved ? APPROVED : ACTIVE).length,
+      });
     }),
   );
   return urls;

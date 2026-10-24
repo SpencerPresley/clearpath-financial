@@ -1403,20 +1403,20 @@
           }
         },
         "required": [
+          "outcome",
+          "reason",
+          "decided_at",
+          "approver",
           "id",
           "version_n",
-          "outcome",
           "lane",
-          "approver",
-          "reason",
           "ruleset_date",
           "engine_version",
           "expires_at",
           "llm_override_reason",
           "ai_review_carried_from_n",
           "terms_versions",
-          "evidence",
-          "decided_at"
+          "evidence"
         ],
         "title": "DecisionOut",
         "type": "object"
@@ -1595,6 +1595,34 @@
           "expires_at"
         ],
         "title": "DecisionRecordedPayload",
+        "type": "object"
+      },
+      "DecisionSummaryOut": {
+        "description": "The latest decision as a queue row shows it; `DecisionOut` is the full record.",
+        "properties": {
+          "approver": {
+            "$ref": "#/components/schemas/PartyRefOut"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "title": "Decided At",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "reason",
+          "decided_at",
+          "approver"
+        ],
+        "title": "DecisionSummaryOut",
         "type": "object"
       },
       "DemoResetEventOut": {
@@ -4074,6 +4102,7 @@
                 "type": "null"
               }
             ],
+            "description": "When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.",
             "title": "Approval Expires At"
           },
           "approved_at": {
@@ -4368,6 +4397,7 @@
           "is_legacy",
           "markets",
           "tags",
+          "notes",
           "open_findings_count",
           "submitted_at",
           "updated_at",
@@ -4375,10 +4405,11 @@
           "planned_first_run",
           "planned_last_run",
           "current_version_n",
+          "approval_expires_at",
+          "latest_decision",
           "partner",
           "owner",
           "assignee",
-          "notes",
           "is_prescreen",
           "risk_tier_overridden",
           "source_url",
@@ -4387,11 +4418,9 @@
           "legacy_reviewer",
           "legacy_history",
           "approved_at",
-          "approval_expires_at",
           "retention_until",
           "current_version",
           "versions",
-          "latest_decision",
           "live_placements_count",
           "numbers_change",
           "llm_check_failure_code",
@@ -5235,11 +5264,17 @@
             },
             "title": "Rows",
             "type": "array"
+          },
+          "total": {
+            "description": "Items matching the filters, across all pages.",
+            "title": "Total",
+            "type": "integer"
           }
         },
         "required": [
           "rows",
-          "next_cursor"
+          "next_cursor",
+          "total"
         ],
         "title": "ItemPageOut",
         "type": "object"
@@ -5639,6 +5674,19 @@
             "title": "Age Days",
             "type": "integer"
           },
+          "approval_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.",
+            "title": "Approval Expires At"
+          },
           "assignee": {
             "anyOf": [
               {
@@ -5678,6 +5726,16 @@
             "title": "Key",
             "type": "string"
           },
+          "latest_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "llm_check_status": {
             "$ref": "#/components/schemas/CheckStatus"
           },
@@ -5687,6 +5745,10 @@
             },
             "title": "Markets",
             "type": "array"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
           },
           "open_findings_count": {
             "title": "Open Findings Count",
@@ -5795,6 +5857,7 @@
           "is_legacy",
           "markets",
           "tags",
+          "notes",
           "open_findings_count",
           "submitted_at",
           "updated_at",
@@ -5802,6 +5865,8 @@
           "planned_first_run",
           "planned_last_run",
           "current_version_n",
+          "approval_expires_at",
+          "latest_decision",
           "partner",
           "owner",
           "assignee"
@@ -5810,12 +5875,26 @@
         "type": "object"
       },
       "ItemSort": {
+        "description": "One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.",
         "enum": [
           "queue",
           "oldest",
           "newest",
           "updated",
-          "title"
+          "title",
+          "title_desc",
+          "status",
+          "status_desc",
+          "risk_tier",
+          "risk_tier_desc",
+          "assignee",
+          "assignee_desc",
+          "partner",
+          "partner_desc",
+          "open_findings",
+          "open_findings_desc",
+          "round",
+          "round_desc"
         ],
         "title": "ItemSort",
         "type": "string"
@@ -8420,24 +8499,59 @@
         "title": "PullIn",
         "type": "object"
       },
+      "QueueStatFiltersOut": {
+        "description": "Each stat as the view that lists exactly what it counts: `GET /items` with these filters (any sort)\nreturns `total` equal to the stat.",
+        "properties": {
+          "mine": {
+            "$ref": "#/components/schemas/ItemFilter"
+          },
+          "needs_rereview": {
+            "$ref": "#/components/schemas/ItemFilter"
+          },
+          "open": {
+            "$ref": "#/components/schemas/ItemFilter"
+          },
+          "unassigned": {
+            "$ref": "#/components/schemas/ItemFilter"
+          },
+          "waiting_over_3_days": {
+            "$ref": "#/components/schemas/ItemFilter"
+          }
+        },
+        "required": [
+          "open",
+          "mine",
+          "unassigned",
+          "needs_rereview",
+          "waiting_over_3_days"
+        ],
+        "title": "QueueStatFiltersOut",
+        "type": "object"
+      },
       "QueueStatsOut": {
         "properties": {
           "by_status": {
+            "description": "Non-legacy items in each status.",
             "items": {
               "$ref": "#/components/schemas/StatusCountOut"
             },
             "title": "By Status",
             "type": "array"
           },
+          "filters": {
+            "$ref": "#/components/schemas/QueueStatFiltersOut"
+          },
           "mine": {
             "title": "Mine",
             "type": "integer"
           },
           "needs_rereview": {
+            "description": "Status needs_rereview. A re-review a reviewer has opened is in review.",
             "title": "Needs Rereview",
             "type": "integer"
           },
           "open": {
+            "description": "In a reviewer's queue: submitted, in review, or needs re-review.",
             "title": "Open",
             "type": "integer"
           },
@@ -8456,7 +8570,8 @@
           "unassigned",
           "needs_rereview",
           "waiting_over_3_days",
-          "by_status"
+          "by_status",
+          "filters"
         ],
         "title": "QueueStatsOut",
         "type": "object"
@@ -8668,6 +8783,61 @@
         "title": "SavedViewOut",
         "type": "object"
       },
+      "SavedViewUpdateIn": {
+        "description": "Omitted fields are left as they are. `filters` replaces the view's filters whole.",
+        "properties": {
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemSort"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "SavedViewUpdateIn",
+        "type": "object"
+      },
       "SearchHitOut": {
         "properties": {
           "channel": {
@@ -8865,13 +9035,18 @@
             "title": "Count",
             "type": "integer"
           },
+          "filters": {
+            "$ref": "#/components/schemas/ItemFilter",
+            "description": "The view this is the total of."
+          },
           "status": {
             "$ref": "#/components/schemas/ItemStatus"
           }
         },
         "required": [
           "status",
-          "count"
+          "count",
+          "filters"
         ],
         "title": "StatusCountOut",
         "type": "object"
@@ -13158,12 +13333,26 @@
             "schema": {
               "allOf": [
                 {
+                  "description": "One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.",
                   "enum": [
                     "queue",
                     "oldest",
                     "newest",
                     "updated",
-                    "title"
+                    "title",
+                    "title_desc",
+                    "status",
+                    "status_desc",
+                    "risk_tier",
+                    "risk_tier_desc",
+                    "assignee",
+                    "assignee_desc",
+                    "partner",
+                    "partner_desc",
+                    "open_findings",
+                    "open_findings_desc",
+                    "round",
+                    "round_desc"
                   ],
                   "title": "ItemSort",
                   "type": "string"
@@ -16847,12 +17036,26 @@
             "schema": {
               "allOf": [
                 {
+                  "description": "One member per order: each runs one direction so a keyset page boundary is a single row comparison.\nColumn sorts come in pairs, `x` ascending and `x_desc` the exact reverse.",
                   "enum": [
                     "queue",
                     "oldest",
                     "newest",
                     "updated",
-                    "title"
+                    "title",
+                    "title_desc",
+                    "status",
+                    "status_desc",
+                    "risk_tier",
+                    "risk_tier_desc",
+                    "assignee",
+                    "assignee_desc",
+                    "partner",
+                    "partner_desc",
+                    "open_findings",
+                    "open_findings_desc",
+                    "round",
+                    "round_desc"
                   ],
                   "title": "ItemSort",
                   "type": "string"
@@ -20313,6 +20516,112 @@
           }
         ],
         "summary": "Delete Saved View",
+        "tags": [
+          "items"
+        ]
+      },
+      "patch": {
+        "description": "Save a modified view in place: name, filters, sort, and/or columns. Owner only (404 otherwise).",
+        "operationId": "updateSavedView",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "view_id",
+            "required": true,
+            "schema": {
+              "title": "View Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Update Saved View",
         "tags": [
           "items"
         ]

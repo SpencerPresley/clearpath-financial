@@ -4,9 +4,12 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { ItemFilter } from './itemFilter';
 import type { ItemStatus } from './itemStatus';
 
 export interface StatusCountOut {
   count: number;
+  /** The view this is the total of. */
+  filters: ItemFilter;
   status: ItemStatus;
 }

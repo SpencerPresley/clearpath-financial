@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ItemSort } from '../../api/generated/model';
 import { getListPartnersMockHandler } from '../../api/generated/partners/partners.msw';
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { server } from '../../test/server';
@@ -38,12 +39,17 @@ beforeEach(() => {
 describe('FilterBar', () => {
   it('filters by status from a chip and names the choice on the chip', async () => {
     const spy = vi.fn();
-    renderWithQuery(<Harness initial={viewSearch('mine')} spy={spy} />);
+    renderWithQuery(<Harness initial={parseQueueSearch({ view: 'x', mine: true })} spy={spy} />);
     await userEvent.click(screen.getByRole('button', { name: 'Status' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'In review' }));
     expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ status: ['in_review'], mine: true }));
     await userEvent.keyboard('{Escape}');
     expect(screen.getByRole('button', { name: 'Status: In review' })).toBeInTheDocument();
+  });
+
+  it("shows a queue view's statuses on its Status chip", () => {
+    renderWithQuery(<Harness initial={viewSearch('rereview')} spy={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Status: Needs re-review' })).toBeInTheDocument();
   });
 
   it('clears one chip without touching the others', async () => {
@@ -108,6 +114,18 @@ describe('FilterBar', () => {
     expect(onChange).toHaveBeenLastCalledWith('oldest');
   });
 
+  it('offers every server sort, each column both ways', async () => {
+    renderWithQuery(<SortMenu sort="risk_tier_desc" onChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sort: Risk, high to low' }));
+    const options = await screen.findAllByRole('menuitemradio');
+    expect(options).toHaveLength(Object.keys(ItemSort).length);
+    expect(screen.getByRole('menuitemradio', { name: 'Risk, high to low' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: 'Most findings first' })).toBeInTheDocument();
+  });
+
   it('offers Clear filters only when filters beyond the view are set, and resets to the view', async () => {
     const spy = vi.fn();
     const { unmount } = renderWithQuery(<Harness initial={viewSearch('mine')} spy={spy} />);
@@ -129,7 +147,18 @@ describe('FilterBar', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Product' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Credit card' }));
     expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ product: ['credit_card'] }));
+    // The menu keeps its list while open: the submenu holding focus stays mounted, so a second pick works and
+    // each Escape lands in a menu (submenu, then root). Product joins the bar once the menu closes.
+    expect(screen.getByRole('menuitem', { name: 'Product' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Personal loan' }));
+    expect(spy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ product: ['credit_card', 'personal_loan'] }),
+    );
     await userEvent.keyboard('{Escape}{Escape}');
-    expect(await screen.findByRole('button', { name: 'Product: Credit card' })).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Product: Credit card, Personal loan/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(await screen.findByRole('menu', { name: 'More filters' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Product' })).toBeNull();
   });
 });

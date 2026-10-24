@@ -40,9 +40,13 @@ export function readColumns(): ColumnVisibility {
     if (raw === null) return DEFAULT_COLUMN_VISIBILITY;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return DEFAULT_COLUMN_VISIBILITY;
-    return Object.fromEntries(
-      Object.entries(parsed).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'),
-    );
+    // Over the defaults, so a column added since the choice was stored starts at its default (hidden).
+    return {
+      ...DEFAULT_COLUMN_VISIBILITY,
+      ...Object.fromEntries(
+        Object.entries(parsed).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'),
+      ),
+    };
   } catch {
     return DEFAULT_COLUMN_VISIBILITY;
   }

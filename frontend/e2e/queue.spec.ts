@@ -10,7 +10,11 @@ test('queue table loads in queue order and a filter chip writes the URL', async 
   await expect(table.getByRole('row')).toHaveCount(11); // header + 10
   await expect(table.getByRole('row').nth(1)).toContainText('CP-1031');
 
-  await page.getByRole('button', { name: 'Risk', exact: true }).click();
+  // Scoped: the Risk column header is a sort button too.
+  await page
+    .getByRole('group', { name: 'Filters' })
+    .getByRole('button', { name: 'Risk', exact: true })
+    .click();
   await page.getByRole('menuitemcheckbox', { name: 'High' }).click();
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/risk_tier=/);

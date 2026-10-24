@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SavedViewOut } from '../../api/generated/model';
+import { STAT_FILTERS } from './fixtures';
 import {
   BUILT_IN_VIEWS,
+  STAT_VIEWS,
   activeView,
+  builtInView,
+  filtersFromItemFilter,
   filtersOf,
   parseQueueSearch,
   sameFilters,
   savedViewToSearch,
   searchToSavedViewIn,
+  statSearch,
   toListParams,
   viewSearch,
 } from './search';
+import type { BuiltInViewId } from './search';
 
 function savedView(overrides: Partial<SavedViewOut> = {}): SavedViewOut {
   return {
@@ -30,8 +36,15 @@ describe('parseQueueSearch', () => {
     const search = parseQueueSearch({});
     expect(search.view).toBe('mine');
     expect(search.mine).toBe(true);
+    expect(search.status).toEqual(['submitted', 'in_review', 'needs_rereview']);
+    expect(search.is_legacy).toBe(false);
     expect(search.sort).toBe('queue');
     expect(search.layout).toBe('table');
+  });
+
+  it('keeps is_legacy false (a real filter), and drops a non-boolean', () => {
+    expect(parseQueueSearch({ view: 'x', is_legacy: false }).is_legacy).toBe(false);
+    expect(parseQueueSearch({ view: 'x', is_legacy: 'no' }).is_legacy).toBeUndefined();
   });
 
   it('keeps an explicit view without adding My queue filters', () => {
@@ -88,8 +101,22 @@ describe('toListParams', () => {
   });
 
   it('passes cursor and limit through', () => {
-    const params = toListParams(parseQueueSearch({}), { cursor: 'abc', limit: 25 });
+    const params = toListParams(parseQueueSearch({ view: 'x', mine: true }), { cursor: 'abc', limit: 25 });
     expect(params).toEqual({ mine: true, sort: 'queue', cursor: 'abc', limit: 25 });
+  });
+
+  it('sends has_open_findings=false (the "No open findings" choice) instead of dropping it', () => {
+    const params = toListParams(parseQueueSearch({ view: 'x', has_open_findings: false }));
+    expect(params).toEqual({ has_open_findings: false, sort: 'queue' });
+  });
+
+  it('sends is_legacy=false, which a queue view needs to exclude legacy imports under any sort', () => {
+    expect(toListParams({ ...viewSearch('mine'), sort: 'title' })).toEqual({
+      status: ['submitted', 'in_review', 'needs_rereview'],
+      is_legacy: false,
+      mine: true,
+      sort: 'title',
+    });
   });
 
   it('never sends UI-only keys (view, layout, item)', () => {
@@ -99,25 +126,39 @@ describe('toListParams', () => {
 });
 
 describe('views', () => {
-  it('defines the five built-in views in order', () => {
+  it('defines the six built-in views in order', () => {
     expect(BUILT_IN_VIEWS.map((v) => v.label)).toEqual([
       'My queue',
       'Unassigned',
       'Waiting >3 days',
       'Needs re-review',
+      'In queue',
       'All active',
     ]);
   });
 
-  it('keys Needs re-review on every reopen reason, so claimed re-reviews stay in it', () => {
-    const rereview = BUILT_IN_VIEWS.find((v) => v.id === 'rereview');
-    expect(rereview?.filters.reopen_reason).toEqual(['terms_changed', 'approval_expired', 'drift_detected']);
-    expect(rereview?.filters.status).toBeUndefined();
+  it('is exactly the view each stat counts, as the server defines it', () => {
+    // Stat number = the view's total only if the view sends the server's filter (ledger ruling).
+    for (const [stat, id] of Object.entries(STAT_VIEWS) as [keyof typeof STAT_FILTERS, BuiltInViewId][]) {
+      const fromServer = filtersFromItemFilter(STAT_FILTERS[stat]);
+      expect(sameFilters(fromServer, builtInView(id)?.filters ?? {}), `${stat} -> ${id}`).toBe(true);
+      expect(activeView(statSearch(stat, STAT_FILTERS[stat]), []), stat).toMatchObject({
+        kind: 'builtin',
+        id,
+        modified: false,
+      });
+    }
   });
 
-  it('includes changes requested in All active', () => {
+  it('counts Needs re-review by status, so the view matches its stat', () => {
+    const rereview = BUILT_IN_VIEWS.find((v) => v.id === 'rereview');
+    expect(rereview?.filters).toEqual({ status: ['needs_rereview'], is_legacy: false });
+  });
+
+  it('includes changes requested in All active, still without legacy imports', () => {
     const active = BUILT_IN_VIEWS.find((v) => v.id === 'active');
     expect(active?.filters.status).toEqual(['submitted', 'in_review', 'changes_requested', 'needs_rereview']);
+    expect(active?.filters.is_legacy).toBe(false);
   });
 
   it('compares filters regardless of array order and absent-vs-empty', () => {
@@ -137,7 +178,11 @@ describe('views', () => {
   });
 
   it('recognises a built-in view by its filters when the view key is missing', () => {
-    const search = parseQueueSearch({ unassigned: true });
+    const search = parseQueueSearch({
+      unassigned: true,
+      status: ['needs_rereview', 'submitted', 'in_review'],
+      is_legacy: false,
+    });
     expect(activeView(search, [])).toMatchObject({ kind: 'builtin', id: 'unassigned', modified: false });
   });
 

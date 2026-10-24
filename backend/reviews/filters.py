@@ -11,6 +11,9 @@ from core.domain import Channel, ItemStatus, Market, Product, ReopenReason, Risk
 
 
 class ItemSort(StrEnum):
+    """One member per order: each runs one direction so a keyset page boundary is a single row comparison.
+    Column sorts come in pairs, `x` ascending and `x_desc` the exact reverse."""
+
     # Re-reviews of live content first, then risk tier, then age (spec §4.3 Review). With no status filter,
     # limited to the queue statuses (submitted, in_review, needs_rereview).
     QUEUE = "queue"
@@ -18,6 +21,21 @@ class ItemSort(StrEnum):
     NEWEST = "newest"
     UPDATED = "updated"  # most recently changed first
     TITLE = "title"
+    TITLE_DESC = "title_desc"
+    STATUS = (
+        "status"  # draft, then board order: submitted, in review, changes requested, needs re-review, approved, ...
+    )
+    STATUS_DESC = "status_desc"
+    RISK_TIER = "risk_tier"  # low, medium, high
+    RISK_TIER_DESC = "risk_tier_desc"
+    ASSIGNEE = "assignee"  # by name, case-insensitive; unassigned last
+    ASSIGNEE_DESC = "assignee_desc"
+    PARTNER = "partner"  # by name, case-insensitive; no partner last
+    PARTNER_DESC = "partner_desc"
+    OPEN_FINDINGS = "open_findings"  # fewest first
+    OPEN_FINDINGS_DESC = "open_findings_desc"
+    ROUND = "round"
+    ROUND_DESC = "round_desc"
 
 
 class ItemFilter(Schema):

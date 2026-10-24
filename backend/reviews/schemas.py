@@ -52,6 +52,15 @@ class SpanOut(Schema):
 # --- queue -----------------------------------------------------------------------------------------------------
 
 
+class DecisionSummaryOut(Schema):
+    """The latest decision as a queue row shows it; `DecisionOut` is the full record."""
+
+    outcome: DecisionOutcome
+    reason: str
+    decided_at: datetime
+    approver: PartyRefOut
+
+
 class ItemRowOut(Schema):
     id: int
     key: str = Field(examples=["CP-1042"])
@@ -66,6 +75,7 @@ class ItemRowOut(Schema):
     is_legacy: bool
     markets: list[Market]
     tags: list[str]
+    notes: str
     open_findings_count: int
     submitted_at: datetime
     updated_at: datetime
@@ -73,6 +83,11 @@ class ItemRowOut(Schema):
     planned_first_run: date | None
     planned_last_run: date | None
     current_version_n: int | None
+    approval_expires_at: datetime | None = Field(
+        description="When the latest approval expires. Kept after it lapses or the item is reopened (read it with "
+        "`status`); null if the item was never approved."
+    )
+    latest_decision: DecisionSummaryOut | None
     partner: PartyRefOut | None
     owner: PartyRefOut | None
     assignee: PartyRefOut | None
@@ -81,20 +96,34 @@ class ItemRowOut(Schema):
 class ItemPageOut(Schema):
     rows: list[ItemRowOut]
     next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page.")
+    total: int = Field(description="Items matching the filters, across all pages.")
 
 
 class StatusCountOut(Schema):
     status: ItemStatus
     count: int
+    filters: ItemFilter = Field(description="The view this is the total of.")
+
+
+class QueueStatFiltersOut(Schema):
+    """Each stat as the view that lists exactly what it counts: `GET /items` with these filters (any sort)
+    returns `total` equal to the stat."""
+
+    open: ItemFilter
+    mine: ItemFilter
+    unassigned: ItemFilter
+    needs_rereview: ItemFilter
+    waiting_over_3_days: ItemFilter
 
 
 class QueueStatsOut(Schema):
-    open: int
+    open: int = Field(description="In a reviewer's queue: submitted, in review, or needs re-review.")
     mine: int
     unassigned: int
-    needs_rereview: int
+    needs_rereview: int = Field(description="Status needs_rereview. A re-review a reviewer has opened is in review.")
     waiting_over_3_days: int
-    by_status: list[StatusCountOut]
+    by_status: list[StatusCountOut] = Field(description="Non-legacy items in each status.")
+    filters: QueueStatFiltersOut
 
 
 # --- intake and item detail ------------------------------------------------------------------------------------
@@ -168,13 +197,10 @@ class EvidenceOut(Schema):
     original_name: str
 
 
-class DecisionOut(Schema):
+class DecisionOut(DecisionSummaryOut):
     id: int
     version_n: int
-    outcome: DecisionOutcome
     lane: DecisionLane
-    approver: PartyRefOut
-    reason: str
     ruleset_date: date
     engine_version: str = Field(description="The code-check engine version the findings came from; '' if unknown.")
     expires_at: datetime | None
@@ -182,11 +208,9 @@ class DecisionOut(Schema):
     ai_review_carried_from_n: int | None
     terms_versions: list[OfferTermsRefOut]
     evidence: list[EvidenceOut]
-    decided_at: datetime
 
 
 class ItemDetailOut(ItemRowOut):
-    notes: str
     is_prescreen: bool
     risk_tier_overridden: bool
     source_url: str | None
@@ -195,11 +219,11 @@ class ItemDetailOut(ItemRowOut):
     legacy_reviewer: str
     legacy_history: str
     approved_at: datetime | None
-    approval_expires_at: datetime | None
     retention_until: date | None
     current_version: VersionOut | None
     versions: list[VersionSummaryOut]
-    latest_decision: DecisionOut | None
+    # The row's summary, as the full record. Pydantic fields may narrow; pyrefly treats them as plain attributes.
+    latest_decision: DecisionOut | None  # pyrefly: ignore[bad-override-mutable-attribute]
     live_placements_count: int
     numbers_change: bool | None = Field(
         description="Generated (fast-track) current version only: false when none of the numbers the copy quotes "
@@ -377,6 +401,15 @@ class SavedViewIn(Schema):
     filters: ItemFilter
     sort: ItemSort = ItemSort.QUEUE
     columns: list[str] = Field(default_factory=list, max_length=50)
+
+
+class SavedViewUpdateIn(Schema):
+    """Omitted fields are left as they are. `filters` replaces the view's filters whole."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    filters: ItemFilter | None = None
+    sort: ItemSort | None = None
+    columns: list[str] | None = Field(default=None, max_length=50)
 
 
 class SavedViewOut(SavedViewIn):
