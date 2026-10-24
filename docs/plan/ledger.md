@@ -139,11 +139,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 Resurface these when Spencer is back. Each has what I did meanwhile.
 
-- **For Spencer (not blocking):** the hosted demo is live at https://d1qhgfjuad1hh0.cloudfront.net (US only).
-  Logins are in docs/demo.md; the shared password is in SSM. Read it with
-  `aws ssm get-parameter --profile clearpath --region us-east-1 --name /clearpath/prod/DEMO_USER_PASSWORD --with-decryption --query Parameter.Value --output text`
-  and put it in 1Password for evaluators. Optional: a custom subdomain of spencerpresley.com (needs a DNS CNAME +
-  ACM validation record at Squarespace; I'd prepare the Terraform and hand you the two records).
+- **For Spencer (not blocking): custom domain DNS at Squarespace, record 1 of 2.** Add CNAME
+  host `_a19188f223dbe68c9c9fb197121b0907.clearpath` → `_f8b970183b87503436fcf121334e9e61.wzccmgtwzk.acm-validations.aws.`
+  Meanwhile: certificate requested (phase 1 applied, branch infra/custom-domain). After ACM shows Issued, I
+  apply phase 2 and hand over record 2 (`clearpath` → the CloudFront domain), then redeploy.
+  Demo password: Spencer has it in the 1Password env as PROD_DEMO_PASSWORD (verified equal to SSM).
 
 
 ## Orchestrator notes
