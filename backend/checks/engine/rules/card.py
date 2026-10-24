@@ -8,7 +8,7 @@ from collections.abc import Iterable
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis, PercentMention
-from checks.engine.rule import ADOPTED, REGZ_1026_16, URL_1026_16, URL_COMPANY_FACTS, Hit, Rule, make_spec
+from checks.engine.rule import REGZ_1026_16, UNVERSIONED, URL_1026_16, URL_COMPANY_FACTS, Hit, Rule, make_spec
 from checks.engine.text import compile_i, first_span, phrase_pattern, window_after, window_before
 from checks.engine.types import RuleContext, Span
 from core.domain import CreditCardTerms, Product, Severity
@@ -104,7 +104,7 @@ ISSUER_LINE = make_spec(
     url=URL_COMPANY_FACTS,
     severity=Severity.WARNING,
     products=CARD,
-    effective_from=ADOPTED,
+    effective_from=UNVERSIONED,
 )
 
 _NEGATIVE_TRIGGER = compile_i(
@@ -134,11 +134,11 @@ _PURCHASE_DATE_WARNING = compile_i(
     r"(?:the\s+)?purchase)"
 )
 _NOT_PAID_IN_FULL = compile_i(r"\bnot\s+paid\s+in\s+full\b")
+_GRACE_PERIOD = compile_i(r"\bin\s+full\s+(?:each|every)\s+(?:month|billing\s+cycle)\b|\bgrace\s+period\b")
 _FIXED = compile_i(r"\bfixed\b")
 _RATE_WORD = compile_i(r"\b(?:APRs?|rates?)\b")
 _ANY_ISSUER = compile_i(r"\bissued\s+by\s+\w")
 _PHRASE_REACH = 30
-_DEFERRED_REACH = 80
 
 
 def _triggers(a: Analysis) -> list[Span]:
@@ -217,21 +217,36 @@ def _intro_terms(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[H
                   '"then 19.99%\u201329.99% variable APR"')  # fmt: skip
 
 
-def _deferred_interest(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
-    matches = list(_DEFERRED.finditer(a.text))
-    for m in matches:
+def _deferred_offers(a: Analysis) -> list[re.Match[str]]:
+    """Statements that describe a deferred-interest offer. A grace period ("pay in full each month and pay no
+    interest") is excluded by 16(h)(2), and a 0% intro APR described as "no interest" is a promotional rate under
+    16(g), not deferred interest (comment 16(h)-1)."""
+    offers = []
+    for m in _DEFERRED.finditer(a.text):
         sentence = a.segments.sentence(m.start())
-        reach = min(sentence.end, m.end() + _DEFERRED_REACH)
-        paid = _IF_PAID_IN_FULL.search(a.text, m.end(), reach)
-        period = _DEFERRED_PERIOD.search(a.text, m.end(), reach)
-        if paid is None or (period is not None and period.start() < paid.start()):
+        if m.group(0).lower().startswith("no"):
+            if _GRACE_PERIOD.search(a.text, sentence.start, sentence.end):
+                continue
+            if any(p.promotional and p.value == 0 and sentence.start <= p.span.start < sentence.end for p in a.rates):
+                continue
+        offers.append(m)
+    return offers
+
+
+def _deferred_interest(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+    offers = _deferred_offers(a)
+    for m in offers:
+        sentence = a.segments.sentence(m.start())
+        paid = _IF_PAID_IN_FULL.search(a.text, sentence.start, sentence.end)
+        period = _DEFERRED_PERIOD.search(a.text, sentence.start, sentence.end)
+        if paid is None or period is None or period.start() < paid.start():
             yield Hit(
                 Span(m.start(), m.end()),
-                'Put "if paid in full" before the deferred-interest period, in the same phrase.',
+                'State the deferred-interest period with "if paid in full" in front of it, in the same phrase.',
                 '"No interest if paid in full within 12 months"',
             )
-    if matches:
-        first = matches[0]
+    if offers:
+        first = offers[0]
         para = a.segments.paragraph(first.start())
         warned = _PURCHASE_DATE_WARNING.search(a.text, para.start, para.end) and _NOT_PAID_IN_FULL.search(
             a.text, para.start, para.end

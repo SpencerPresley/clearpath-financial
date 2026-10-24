@@ -25,6 +25,9 @@ def _index(rules: tuple[Rule, ...]) -> Mapping[str, RuleSpec]:
 RULES: Mapping[str, RuleSpec] = _index(ALL_RULES)
 # The rule-set date a decision records: the latest date any rule (as written) took effect.
 RULESET_VERSION = max(spec.effective_from for spec in RULES.values())
+# Bump on ANY change to engine behavior (a regex, a severity, a message). RULESET_VERSION only moves when the law
+# does, so a check-result cache keyed on content hash must include this too or it serves stale findings.
+ENGINE_VERSION = "2026-10-24.2"
 
 
 def _sort_key(f: FindingDraft) -> tuple[int, int, str, str]:

@@ -19,6 +19,12 @@ from core.domain import CreditCardTerms, PersonalLoanTerms
 
 Terms = PersonalLoanTerms | CreditCardTerms
 
+
+class StaleTermsRef(ValueError):  # noqa: N818 - a domain error named for the condition, like the spec's examples
+    """A ref doesn't fit the text: out of bounds, overlapping, wrong field, or the text at its span no longer
+    reads as its quoted value. The item can't be fast-tracked; send it to the normal review lane."""
+
+
 REFERENCEABLE: dict[type[PersonalLoanTerms | CreditCardTerms], frozenset[str]] = {
     PersonalLoanTerms: frozenset(
         {
@@ -48,7 +54,7 @@ _NO_FEE = re.compile(
 def _fullmatch(pattern: re.Pattern[str], quote: str) -> re.Match[str]:
     m = pattern.fullmatch(quote)
     if m is None:
-        raise ValueError(f"can't re-render {quote!r}")
+        raise StaleTermsRef(f"can't re-render {quote!r}")
     return m
 
 
@@ -107,12 +113,13 @@ def _format(quote: str, new: Decimal) -> str:
 
 
 def _new_term(old: int, offered: tuple[int, ...], role: str) -> int:
-    if old in offered:
-        return old
+    """Range ends track the new bounds (like APR min/max); a single stated length stays if still offered."""
     if role == "min":
         return min(offered)
     if role == "max":
         return max(offered)
+    if old in offered:
+        return old
     return min(offered, key=lambda n: (abs(n - old), n))
 
 
@@ -137,15 +144,15 @@ def _validate(text: str, refs: Sequence[TermsRefDraft], allowed: frozenset[str])
     ordered = sorted(refs, key=lambda r: (r.span.start, r.span.end))
     for prev, cur in pairwise(ordered):
         if cur.span.start < prev.span.end:
-            raise ValueError(f"refs overlap at [{cur.span.start}, {prev.span.end})")
+            raise StaleTermsRef(f"refs overlap at [{cur.span.start}, {prev.span.end})")
     for ref in ordered:
         if ref.field not in allowed:
-            raise ValueError(f"field {ref.field!r} is not a referenceable offer term for these terms")
+            raise StaleTermsRef(f"field {ref.field!r} is not a referenceable offer term for these terms")
         if ref.span.end > len(text):
-            raise ValueError(f"ref span [{ref.span.start}, {ref.span.end}) is outside the text")
+            raise StaleTermsRef(f"ref span [{ref.span.start}, {ref.span.end}) is outside the text")
         quote = text[ref.span.start : ref.span.end]
         if _parse(quote) != ref.quoted_value:
-            raise ValueError(f"text {quote!r} at the ref span doesn't match the quoted value {ref.quoted_value}")
+            raise StaleTermsRef(f"text {quote!r} at the ref span doesn't match the quoted value {ref.quoted_value}")
     return ordered
 
 
@@ -168,7 +175,7 @@ def render_fast_track(text: str, refs: Sequence[TermsRefDraft], new_terms: Perso
             continue
         example = examples.get(ref.span)
         if example is None:
-            raise ValueError(f"no representative example around the payment at [{ref.span.start}, {ref.span.end})")
+            raise StaleTermsRef(f"no representative example around the payment at [{ref.span.start}, {ref.span.end})")
         replacements[ref.span] = _example_payment(example, text[ref.span.start : ref.span.end], new_values)
     out = text
     for span in sorted(replacements, key=lambda s: s.start, reverse=True):

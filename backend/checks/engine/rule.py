@@ -17,7 +17,8 @@ CALIFORNIA = frozenset({Market.CA})
 
 # effective_from = date of the current version of the cited CFR section per the eCFR versioner API (fetched
 # 2026-10-24). 2017-01-01 is eCFR's point-in-time baseline, i.e. "unchanged since at least then". Sources with
-# no versioned record (statute-only, California code, ClearPath policy) use the rule-set adoption date.
+# no versioned record (statute-only, California code, ClearPath policy) use that same baseline rather than the
+# adoption date: a long-standing rule must not silently drop out of a context whose `today` is earlier.
 REGZ_1026_24 = date(2017, 1, 1)
 REGZ_1026_16 = date(2020, 2, 28)
 REGN_1014 = date(2017, 1, 1)
@@ -27,7 +28,7 @@ REGB_1002_4 = date(2026, 7, 21)
 TCPA_64_1200 = date(2026, 3, 25)
 CANSPAM_16_CFR_316 = date(2016, 12, 22)
 FTC_255_5 = date(2023, 7, 26)
-ADOPTED = date(2026, 10, 24)
+UNVERSIONED = date(2017, 1, 1)  # statute, state code or policy; not eCFR-versioned
 
 URL_1026_24 = "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
 URL_1026_16 = "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"

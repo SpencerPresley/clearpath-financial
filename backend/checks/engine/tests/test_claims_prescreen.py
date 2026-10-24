@@ -56,7 +56,9 @@ def test_preapproved_with_prescreen_criteria_is_not_flagged() -> None:
     assert "claims.preapproved" not in codes(result)
 
 
-@pytest.mark.parametrize("text", ["Guaranteed approval!", "Approval guaranteed, no matter what.", "We guarantee it."])
+@pytest.mark.parametrize(
+    "text", ["Guaranteed approval!", "Approval guaranteed, no matter what.", "Every applicant is guaranteed a loan."]
+)
 def test_guarantee_claims_flag(text: str) -> None:
     assert "claims.guaranteed" in codes(run_code_checks(make_ctx(text, attachments=CRITERIA)))
 

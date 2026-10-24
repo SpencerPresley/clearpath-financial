@@ -11,7 +11,7 @@ from functools import cache
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
-from checks.engine.rule import ADOPTED, CALIFORNIA, CLOSED_END, URL_CA_22162, Hit, Rule, make_spec
+from checks.engine.rule import CALIFORNIA, CLOSED_END, UNVERSIONED, URL_CA_22162, Hit, Rule, make_spec
 from checks.engine.text import phrase_pattern
 from checks.engine.types import RuleContext
 from core.domain import Severity
@@ -24,7 +24,7 @@ LICENSE_DISCLOSURE = make_spec(
     severity=Severity.BLOCKING,
     products=CLOSED_END,
     markets=CALIFORNIA,
-    effective_from=ADOPTED,
+    effective_from=UNVERSIONED,
 )
 
 

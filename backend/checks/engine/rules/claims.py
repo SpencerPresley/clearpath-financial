@@ -5,8 +5,8 @@ from collections.abc import Iterable
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
 from checks.engine.rule import (
-    ADOPTED,
     ALL_PRODUCTS,
+    UNVERSIONED,
     URL_PRIME_CHOICE,
     URL_SH24,
     Hit,
@@ -20,20 +20,23 @@ from core.domain import AttachmentKind, Severity
 PREAPPROVED = make_spec(
     "claims.preapproved",
     title="Pre-approval claims need a prescreened firm offer",
-    citation="Reg N 12 CFR 1014.3(q); 12 U.S.C. 5536; CFPB v. Prime Choice Funding (2020)",
+    citation=(
+        "12 U.S.C. 5536; Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3(q), "
+        "CFPB v. Prime Choice Funding (2020)"
+    ),
     url=URL_PRIME_CHOICE,
     severity=Severity.BLOCKING,
     products=ALL_PRODUCTS,
-    effective_from=ADOPTED,
+    effective_from=UNVERSIONED,
 )
 GUARANTEED = make_spec(
     "claims.guaranteed",
     title="Approval can't be promised",
-    citation="Reg N 12 CFR 1014.3(q); Reg Z 12 CFR 1026.24(a), 1026.16(a); 12 U.S.C. 5536",
+    citation="12 U.S.C. 5536; Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3(q)",
     url=URL_PRIME_CHOICE,
     severity=Severity.BLOCKING,
     products=ALL_PRODUCTS,
-    effective_from=ADOPTED,
+    effective_from=UNVERSIONED,
 )
 CREDIT_IMPACT = make_spec(
     "claims.credit_impact",
@@ -42,7 +45,7 @@ CREDIT_IMPACT = make_spec(
     url=URL_SH24,
     severity=Severity.BLOCKING,
     products=ALL_PRODUCTS,
-    effective_from=ADOPTED,
+    effective_from=UNVERSIONED,
 )
 
 _PREAPPROVED = compile_i(
@@ -50,6 +53,11 @@ _PREAPPROVED = compile_i(
     rf"|\byou(?:{APOS}re|\s+are)\s+(?:already\s+)?approved\b|\byou(?:{APOS}ve|\s+have)?\s+(?:already\s+)?qualif(?:y|ied)\b"
 )
 _GUARANTEE = compile_i(r"\bguarantee(?:d|s)?\b")
+# Only guarantees about approval or getting the credit; a rate lock or a fixed rate "guarantee" is a different claim.
+_APPROVAL_WORDS = compile_i(r"\b(?:approv\w*|accept\w*|qualif\w*|loans?|credit|funds?|funding|cash|everyone|anyone)\b")
+_RATE_BEFORE = compile_i(r"\brates?(?:\s+lock)?(?:\s+(?:is|are|stays?))?\s*$")
+_RATE_AFTER = compile_i(r"^\s*(?:(?:your\s+)?rate|for\s+the\s+life)\b")
+_GUARANTEE_REACH = 32
 _CREDIT_IMPACT = compile_i(
     r"\bno\s+(?:hard\s+)?credit\s+checks?\b|\bwithout\s+a\s+(?:hard\s+)?credit\s+check\b"
     rf"|\b(?:won{APOS}t|will\s+not|doesn{APOS}t|does\s+not|never)\s+(?:affect|impact|hurt|harm|lower|ding)\s+"
@@ -57,8 +65,14 @@ _CREDIT_IMPACT = compile_i(
     r"|\bno\s+(?:impact|effect)\s+(?:on|to)\s+your\s+credit(?:\s+scores?)?\b"
     r"|\bwithout\s+(?:affecting|impacting|hurting)\s+your\s+credit(?:\s+scores?)?\b"
 )
-_NEGATION = compile_i(rf"\b(?:not|no|never|isn{APOS}t|aren{APOS}t|can{APOS}?t|cannot|without)\b[^.!?]{{0,12}}$")
-_ASKING = compile_i(r"\b(?:if|whether|see|check|find\s+out|how)\s+$")
+# Negation must be in the same clause: "No paperwork, pre-approved in minutes" is still a claim.
+_NEGATION = compile_i(rf"\b(?:not|no|never|isn{APOS}t|aren{APOS}t|can{APOS}?t|cannot|without)\b[^.!?,;]{{0,12}}$")
+# "you qualify" inside a question, condition or call to action isn't an assertion that the reader qualifies.
+_ASKING = compile_i(
+    r"\b(?:if|whether|what|how(?:\s+much)?|once|when|after|until|unless|see|check|find\s+out|learn)\b"
+    r"[^.!?,;]{0,15}$"
+)
+_CTA = compile_i(r"\b(?:get|getting|be|become)\s+$")
 _QUESTION_AFTER = compile_i(r"^[^.!]{0,20}\?")
 _LOOKBACK = 24
 
@@ -72,7 +86,7 @@ def _preapproved(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
         return
     for m in _PREAPPROVED.finditer(a.text):
         before = window_before(a.text, m.start(), _LOOKBACK)
-        if _negated(a.text, m.start()) or _ASKING.search(before):
+        if _negated(a.text, m.start()) or _ASKING.search(before) or _CTA.search(before):
             continue
         if "qualif" in m.group(0).lower() and _QUESTION_AFTER.match(window_after(a.text, m.end(), 24)):
             continue
@@ -87,6 +101,11 @@ def _preapproved(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
 def _guaranteed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     for m in _GUARANTEE.finditer(a.text):
         if _negated(a.text, m.start()):
+            continue
+        sentence = a.segments.sentence(m.start())
+        before = window_before(a.text, m.start(), _GUARANTEE_REACH, sentence.start)
+        after = window_after(a.text, m.end(), _GUARANTEE_REACH, sentence.end)
+        if _RATE_BEFORE.search(before) or _RATE_AFTER.match(after) or not _APPROVAL_WORDS.search(before + after):
             continue
         yield Hit(
             Span(m.start(), m.end()),

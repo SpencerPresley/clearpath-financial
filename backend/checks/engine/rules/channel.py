@@ -105,7 +105,12 @@ _EMAIL_OPT_OUT = compile_i(
 )
 _STREET = compile_i(
     r"\b\d{1,6}\s+(?:[\w.'\u2019-]+\s+){0,4}?(?:St|Street|Ave|Avenue|Blvd|Boulevard|Rd|Road|Dr|Drive|Ln|Lane|"
-    r"Way|Ct|Court|Pl|Place|Pkwy|Parkway|Sq|Square|Ter|Terrace|Hwy|Highway|Cir|Circle|Plaza)\b\.?"
+    r"Way|Ct|Court|Pl|Place|Pkwy|Parkway|Sq|Square|Ter|Terrace|Hwy|Highway|Cir|Circle|Plaza|Center|Centre|Tower)"
+    r"\b\.?"
+)
+# "One Market Plaza": a spelled-out building number.
+_NAMED_BUILDING = compile_i(
+    r"\b(?:One|Two|Three|Four|Five)\s+(?:[A-Z][\w'-]*\s+){1,3}(?:Plaza|Center|Centre|Tower|Square)\b"
 )
 _PO_BOX = compile_i(r"\bP\.?\s?O\.?\s+Box\s+\d+|\bPost\s+Office\s+Box\s+\d+")
 _ZIP = re.compile(r"\b\d{5}(?:-\d{4})?\b")
@@ -146,7 +151,7 @@ def _email_opt_out(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable
 
 
 def _has_postal_address(text: str) -> bool:
-    for m in (*_STREET.finditer(text), *_PO_BOX.finditer(text)):
+    for m in (*_STREET.finditer(text), *_NAMED_BUILDING.finditer(text), *_PO_BOX.finditer(text)):
         if _ZIP.search(text, m.end(), min(len(text), m.end() + _ZIP_REACH)):
             return True
     return False

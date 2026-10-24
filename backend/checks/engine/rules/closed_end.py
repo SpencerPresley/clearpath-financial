@@ -173,9 +173,12 @@ def _other_rate(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
 
 
 def _example_labeled(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+    labeled: dict[Span, bool] = {}
     for example in a.examples:
         para = a.segments.paragraph(example.payment.span.start)
-        if not _EXAMPLE_LABEL.search(a.text, para.start, para.end):
+        if para not in labeled:
+            labeled[para] = _EXAMPLE_LABEL.search(a.text, para.start, para.end) is not None
+        if not labeled[para]:
             yield Hit(example.payment.span, "Label this as a representative example.", '"Example: …"')
 
 

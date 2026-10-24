@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
 from checks.engine.rule import REGZ_1026_24, URL_1026_24, Hit, Rule, make_spec
-from checks.engine.text import APOS, compile_i, first_span, window_after, window_before
+from checks.engine.text import APOS, compile_i, window_after, window_before
 from checks.engine.types import RuleContext, Span
 from core.domain import Product, Severity
 
@@ -66,6 +66,8 @@ COUNSELOR = make_spec(
 _ARM_CONTEXT = re.compile(r"\bARM\b|(?i:\b(?:adjustable|variable)[-\s]rate\b|\brate\s+(?:may\s+)?adjusts?\b)")
 _ARM_NAME = re.compile(r"\bARM\b|(?i:\b(?:adjustable|variable)[-\s]rate\s+mortgage\b)")
 _FIXED = compile_i(r"\bfixed\b")
+# "fixed" naming a fixed-rate product in an ad that offers both kinds (1026.24(i)(1)(iii)): "30-year fixed".
+_FIXED_PRODUCT = compile_i(r"\b\d{1,2}[-\s]year\s+fixed\b|\bfixed[-\s]rate\s+(?:mortgages?|loans?|options?)\b")
 _FIXED_PERIOD = compile_i(r"\b\d+\s*(?:-\s*)?(?:years?|yrs?|months?)\b")
 _MAY_CHANGE = compile_i(
     r"\b(?:may|can|could|will|then)\s+(?:\w+\s+)?(?:adjust|change|vary|increase|reset)\w*|\badjusts?\b|\badjustable\b"
@@ -94,13 +96,17 @@ _DEBT_ELIMINATION = compile_i(
     r"debts?\b|\bdebt\s+(?:forgiveness|elimination)\b|\bpre-?payment\s+penalty\s+waiver\b"
 )
 _COUNSELOR = compile_i(r"\bcounsell?ors?\b")
+_DISCLAIMER = compile_i(r"\b(?:not|no|never|nor)\b[^.!?;]{0,40}$")
+_HOUSING_COUNSELING = compile_i(r"HUD[-\s]approved\s+(?:housing\s+)?counsel|\bhousing\s+counsell?ors?\b")
+_DISCLAIMER_REACH = 48
 
 
 def _arm_fixed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     text = a.text
     if not _ARM_CONTEXT.search(text):
         return
-    fixed = list(_FIXED.finditer(text))
+    products = [Span(m.start(), m.end()) for m in _FIXED_PRODUCT.finditer(text)]
+    fixed = [m for m in _FIXED.finditer(text) if not any(p.start <= m.start() < p.end for p in products)]
     if not fixed:
         return
     first = fixed[0]
@@ -148,6 +154,10 @@ def _payment_taxes_insurance(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -
 def _government(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     matches = sorted([*_GOVERNMENT.finditer(a.text), *_AGENCIES.finditer(a.text)], key=lambda m: m.start())
     for m in matches:
+        sentence = a.segments.sentence(m.start())
+        before = window_before(a.text, m.start(), _DISCLAIMER_REACH, sentence.start)
+        if _DISCLAIMER.search(before) or _HOUSING_COUNSELING.match(a.text, m.start()):
+            continue  # "not affiliated with HUD", "a HUD-approved housing counselor"
         yield Hit(
             Span(m.start(), m.end()),
             "ClearPath isn't a government program or FHA-approved; remove language implying government backing.",
@@ -165,8 +175,12 @@ def _debt_elimination(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Itera
 
 
 def _counselor(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
-    if span := first_span(_COUNSELOR, a.text):
+    for m in _COUNSELOR.finditer(a.text):
+        if _HOUSING_COUNSELING.search(window_before(a.text, m.end(), _DISCLAIMER_REACH)):
+            continue  # referring consumers to housing counseling is not calling loan staff counselors
+        span = Span(m.start(), m.end())
         yield Hit(span, 'Call loan staff "loan officers," not "counselors."', '"loan officer"')
+        return
 
 
 RULES: tuple[Rule, ...] = (

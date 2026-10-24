@@ -6,6 +6,7 @@ number means.
 """
 
 import re
+from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
@@ -46,8 +47,14 @@ _TERM = compile_i(
     r"(?:monthly\s+)?payments)\b"
 )
 _TERM_RANGE = compile_i(
-    rf"(?<![\w.$,/])(?P<a>\d{{1,3}})\s*(?:{DASH}|to|or)\s*(?P<b>\d{{1,3}})(?:\s*-\s*|\s+)(?P<unit>months?|years?)\b"
+    rf"(?<![\w.$,/])(?P<a>\d{{1,3}})\s*(?:{DASH}|to)\s*(?P<b>\d{{1,3}})(?:\s*-\s*|\s+)(?P<unit>months?|years?)\b"
 )
+# "24, 36, 48, or 60 months" / "36 or 60 months": every listed length is a term the ad offers.
+_TERM_LIST = compile_i(
+    r"(?<![\w.$,/])(?P<list>\d{1,3}(?:\s*,\s*\d{1,3})*\s*,?\s*(?:or|and)\s*\d{1,3})(?:\s*-\s*|\s+)"
+    r"(?P<unit>months?|years?)\b"
+)
+_LIST_NUMBER = re.compile(r"\d{1,3}")
 
 _MODIFIERS = r"(?:(?:intro(?:ductory)?|promo(?:tional)?|fixed|variable|purchase|standard|regular|ongoing|"
 _MODIFIERS += r"balance[-\s]transfer|go-to|simple|annual)\s+)*"
@@ -66,7 +73,8 @@ _AFTER_DOWN = compile_i(r"\s*down\b")
 _AFTER_FINANCING = compile_i(r"\s*(?:financing\b|LTV\b|loan[-\s]to[-\s]value)")
 _BEFORE_DOWN = compile_i(r"down\s+payments?\s*(?:of|:|is)?\s*(?:as\s+little\s+as|just|only)?\s*$")
 _AFTER_NONRATE = compile_i(
-    r"\s*(?:cash\s*back|back\b|off\b|rewards?\b|discount|more\b|less\b|faster\b|savings?\b|"
+    r"\s*(?:cash\s*back|back\b|off\b|rewards?\b|discount|more\b|less\b|faster\b|savings?\b|lower\b|higher\b|"
+    r"below\b|above\b|better\b|cheaper\b|fewer\b|"
     r"of\s+(?:customers|borrowers|applicants|people|users|members|our|all))"
 )
 _AFTER_RATE = compile_i(rf"\s*{_MODIFIERS}(?:interest|rates?\b|APY\b|intro(?:ductory)?\b|promo(?:tional)?\b)")
@@ -113,15 +121,27 @@ _BEFORE_FINANCE = compile_i(
 )
 _AFTER_ANNUAL_FEE = compile_i(r"\s*annual\s+(?:membership\s+)?fee")
 _BEFORE_ANNUAL_FEE = compile_i(r"annual\s+(?:membership\s+)?fee\s*(?:of|:|is)?\s*$")
-_AFTER_OTHER_FEE = compile_i(r"\s*(?:\w+\s+){0,2}fees?\b")
+_AFTER_OTHER_FEE = compile_i(
+    r"\s*(?:in\s+)?(?:(?:origination|late|annual|application|prepayment|processing|closing|balance\s+transfer|"
+    r"cash\s+advance|foreign\s+transaction|service|returned\s+payment)\s+)?fees?\b"
+)
+# Savings, bonuses and rewards are dollar figures but not loan terms: "save up to $200 a month", "get $100".
+_BEFORE_NOT_TERMS = compile_i(
+    r"\b(?:save|saving|savings\s+of|cut|reduce|lower|bonus|reward|earn|cash\s*back|refer\w*|gift\s+card)\b"
+    r"[^$]{0,20}$"
+)
 _BEFORE_AMOUNT = compile_i(
-    r"(?:borrow|loans?(?:\s+amounts?)?|amounts?|get|access|up\s+to|from|between|as\s+much\s+as|"
+    r"(?:borrow|loans?(?:\s+amounts?)?|amounts?|access|up\s+to|from|between|as\s+much\s+as|"
     r"as\s+little\s+as)\b[^$]{0,15}$"
 )
 _AFTER_AMOUNT = compile_i(r"\s*(?:personal\s+)?loans?\b")
 
 _TERM_CREDIT_BEFORE = compile_i(r"\b(?:terms?|repay(?:ment)?|over|loans?|mortgages?|pay\s*off|payoff|financ\w*)\b")
 _TERM_CREDIT_AFTER = compile_i(r"^\s*(?:terms?|loans?|repayment|to\s+repay|of\s+payments|fixed|mortgage|ARM)\b")
+_TERM_NONCREDIT_BEFORE = compile_i(
+    r"\b(?:for\s+(?:over|more\s+than|nearly|almost)|trusted|serving|served|in\s+business|founded|experience|since|"
+    r"helping|helped)\b"
+)
 _TERM_NONCREDIT_AFTER = compile_i(
     r"^\s*(?:of\s+(?:experience|service|business|history|helping)|in\s+business|history|track\s+record|"
     r"warranty|anniversary|old)\b"
@@ -129,6 +149,8 @@ _TERM_NONCREDIT_AFTER = compile_i(
 
 _NO_ANNUAL_FEE = compile_i(r"\bno\s+annual\s+(?:membership\s+)?fees?\b")
 _NO_ORIGINATION_FEE = compile_i(r"\bno\s+origination\s+fees?\b")
+_FIRST_YEAR_FEE = compile_i(r"^\s*(?:intro(?:ductory)?\s+)?annual\s+fee\s+(?:for\s+)?(?:the\s+)?first\s+year\b")
+_THEN = compile_i(r"\bthen\s*$")
 
 
 # --- Mentions ------------------------------------------------------------------------------------------------
@@ -174,6 +196,7 @@ class TermMention:
     credit_context: bool
     qualifier: Qualifier | None
     range_role: RangeRole | None
+    listed: bool = False  # one of "24, 36, or 60 months"
 
 
 @dataclass(frozen=True)
@@ -183,7 +206,7 @@ class Example:
     apr: PercentMention
     payment: MoneyMention
 
-    @property
+    @cached_property
     def extent(self) -> Span:
         parts = (self.amount.span, self.term.span, self.apr.span, self.payment.span)
         return Span(min(p.start for p in parts), max(p.end for p in parts))
@@ -329,7 +352,7 @@ def _scan_percents(text: str, segments: Segments) -> list[_RawPercent]:
     return raw
 
 
-def _percents(text: str, segments: Segments, product: Product, terms: Terms | None) -> tuple[PercentMention, ...]:
+def _percents(text: str, segments: Segments, product: Product) -> tuple[PercentMention, ...]:
     raw = _scan_percents(text, segments)
     out: list[PercentMention] = []
     for i, r in enumerate(raw):
@@ -342,9 +365,9 @@ def _percents(text: str, segments: Segments, product: Product, terms: Terms | No
         intro = bool(_INTRO_WORD.search(leading_word) or _INTRO_WORD.search(tail.apr_label_text))
         promo = intro or bool(_PROMO_WORD.search(leading_word) or _PROMO_WORD.search(tail.apr_label_text))
         if product is Product.CREDIT_CARD and r.kind == "rate" and not promo:
-            promo = bool(_PROMO_PERIOD.match(tail.after))
-            if isinstance(terms, CreditCardTerms) and r.value < terms.purchase_apr_min:
-                promo = True
+            # A 0% card APR is always promotional; any other rate needs an intro word or a stated period. A low
+            # non-zero rate is a purchase APR that pricing.terms_available flags as not offered.
+            promo = r.value == 0 or bool(_PROMO_PERIOD.match(tail.after))
         out.append(
             PercentMention(
                 span=r.span,
@@ -355,8 +378,8 @@ def _percents(text: str, segments: Segments, product: Product, terms: Terms | No
                 kind=r.kind,
                 intro_labeled=intro,
                 promotional=promo,
-                qualifier=lead.qualifier,
-                qualifier_start=lead.qualifier_start,
+                qualifier=None if r.range_role == "hi" else lead.qualifier,
+                qualifier_start=None if r.range_role == "hi" else lead.qualifier_start,
                 range_role=r.range_role,
                 origination=bool(_ORIGINATION.search(context)),
                 balance_transfer=bool(_BALANCE_TRANSFER.search(context)),
@@ -367,12 +390,13 @@ def _percents(text: str, segments: Segments, product: Product, terms: Terms | No
 
 
 _MONEY_ROLES: tuple[tuple[MoneyRole, re.Pattern[str] | None, re.Pattern[str] | None], ...] = (
+    ("other", None, _BEFORE_NOT_TERMS),
     ("down", _AFTER_DOWN, _BEFORE_DOWN),
+    ("annual_fee", _AFTER_ANNUAL_FEE, _BEFORE_ANNUAL_FEE),
+    ("fee", _AFTER_OTHER_FEE, None),
     ("payment", _AFTER_PAYMENT, _BEFORE_PAYMENT),
     ("payment", None, _BEFORE_MONTHLY),
     ("finance_charge", _AFTER_FINANCE, _BEFORE_FINANCE),
-    ("annual_fee", _AFTER_ANNUAL_FEE, _BEFORE_ANNUAL_FEE),
-    ("fee", _AFTER_OTHER_FEE, None),
     ("amount", _AFTER_AMOUNT, _BEFORE_AMOUNT),
 )
 
@@ -463,13 +487,35 @@ def _term_context(text: str, segments: Segments, start: int, end: int, *, hyphen
     if hyphenated or _TERM_CREDIT_AFTER.match(after):
         return True
     before = window_before(text, start, CONTEXT, sentence.start)
+    if _TERM_NONCREDIT_BEFORE.search(before):
+        return False
     return bool(_TERM_CREDIT_BEFORE.search(before))
 
 
 def _terms(text: str, segments: Segments) -> tuple[TermMention, ...]:
     out: list[TermMention] = []
     taken: list[Span] = []
+    for m in _TERM_LIST.finditer(text):
+        unit = _unit(m.group("unit"))
+        credit = _term_context(text, segments, m.start(), m.end(), hyphenated=False)
+        for n in _LIST_NUMBER.finditer(text, m.start("list"), m.end("list")):
+            count = int(n.group(0))
+            out.append(
+                TermMention(
+                    span=Span(n.start(), n.end()),
+                    count=count,
+                    unit=unit,
+                    months=count * 12 if unit == "year" else count,
+                    credit_context=credit,
+                    qualifier=None,
+                    range_role=None,
+                    listed=True,
+                )
+            )
+        taken.append(Span(m.start(), m.end()))
     for m in _TERM_RANGE.finditer(text):
+        if any(t.start <= m.start() < t.end for t in taken):
+            continue
         unit = _unit(m.group("unit"))
         credit = _term_context(text, segments, m.start(), m.end(), hyphenated=False)
         sentence = segments.sentence(m.start())
@@ -512,37 +558,48 @@ def _terms(text: str, segments: Segments) -> tuple[TermMention, ...]:
     return tuple(out)
 
 
-def _nearest[T: (PercentMention, MoneyMention, TermMention)](items: list[T], pos: int) -> T | None:
-    return min(items, key=lambda m: abs(m.span.start - pos), default=None)
+class _ByStart[T: (PercentMention, MoneyMention, TermMention)]:
+    """Mentions sorted by start offset, for O(log n) nearest-before / nearest-after lookups."""
+
+    def __init__(self, items: list[T]) -> None:
+        self.items = sorted(items, key=lambda m: m.span.start)
+        self.starts = [m.span.start for m in self.items]
+
+    def pick(self, before: tuple[int, int], after: tuple[int, int]) -> T | None:
+        """The part closest before the payment (but after any earlier payment), else the closest after it in the
+        same paragraph (but before any later payment). Binding parts to their own payment keeps two examples in one
+        paragraph from borrowing each other's numbers."""
+        i = bisect_left(self.starts, before[1]) - 1
+        while i >= 0 and self.items[i].span.start >= before[0]:
+            if self.items[i].span.end <= before[1]:
+                return self.items[i]
+            i -= 1
+        j = bisect_left(self.starts, after[0])
+        if j < len(self.items) and self.items[j].span.end <= after[1]:
+            return self.items[j]
+        return None
 
 
 def _examples(
+    text: str,
     segments: Segments,
     percents: tuple[PercentMention, ...],
     moneys: tuple[MoneyMention, ...],
     terms: tuple[TermMention, ...],
 ) -> tuple[Example, ...]:
     out: list[Example] = []
-    for pay in moneys:
-        if pay.role != "payment" or not pay.monthly:
-            continue
+    payments = [m for m in moneys if m.role == "payment" and m.monthly]
+    aprs = _ByStart([p for p in percents if p.kind == "rate" and p.apr_labeled and p.range_role is None])
+    lengths = _ByStart([t for t in terms if t.range_role is None and not t.listed])
+    principals = [m for m in moneys if m.role in {"amount", "other"} and m.range_role is None]
+    for i, pay in enumerate(payments):
         para = segments.paragraph(pay.span.start)
-        lo = max(para.start, pay.span.start - EXAMPLE_REACH)
-        hi = min(para.end, pay.span.end + EXAMPLE_REACH)
-
-        def near(span: Span, lo: int = lo, hi: int = hi) -> bool:
-            return lo <= span.start and span.end <= hi
-
-        aprs = [p for p in percents if p.kind == "rate" and p.apr_labeled and p.range_role is None and near(p.span)]
-        lengths = [t for t in terms if t.unit in {"month", "year"} and t.range_role is None and near(t.span)]
-        amounts = [
-            m
-            for m in moneys
-            if m.role in {"amount", "other"} and m.range_role is None and m.value > pay.value and near(m.span)
-        ]
-        apr = _nearest(aprs, pay.span.start)
-        term = _nearest(lengths, pay.span.start)
-        amount = _nearest(amounts, pay.span.start)
+        prev_end = payments[i - 1].span.end if i > 0 else 0
+        next_start = payments[i + 1].span.start if i + 1 < len(payments) else len(text)
+        before = (max(para.start, prev_end, pay.span.start - EXAMPLE_REACH), pay.span.start)
+        after = (pay.span.end, min(para.end, next_start, pay.span.end + EXAMPLE_REACH))
+        nearby = _ByStart([m for m in principals if before[0] <= m.span.start < after[1] and m.value > pay.value])
+        apr, term, amount = aprs.pick(before, after), lengths.pick(before, after), nearby.pick(before, after)
         if apr and term and amount:
             out.append(Example(amount=amount, term=term, apr=apr, payment=pay))
     return tuple(out)
@@ -584,8 +641,10 @@ def _personal_loan_percent_claims(a: Analysis, terms: PersonalLoanTerms) -> Iter
 
 
 def _personal_loan_claims(a: Analysis, terms: PersonalLoanTerms) -> list[Claim]:
+    extents = [e.extent for e in a.examples]
+
     def in_example(span: Span) -> bool:
-        return any(e.covers(span) for e in a.examples)
+        return any(x.start <= span.start and span.end <= x.end for x in extents)
 
     claims = list(_personal_loan_percent_claims(a, terms))
     claims.extend(
@@ -594,7 +653,7 @@ def _personal_loan_claims(a: Analysis, terms: PersonalLoanTerms) -> list[Claim]:
         if m.role == "amount" and not in_example(m.span) and (hit := _range_field(m, "amount_min", "amount_max"))
     )
     for t in a.credit_terms:
-        if t.unit != "year" and not in_example(t.span):
+        if t.unit != "year" and not t.listed and not in_example(t.span):
             role = _range_field(t, "min", "max")
             claims.append(Claim("term_months", t.span, Decimal(t.count), role[1] if role else "value"))
     claims.extend(
@@ -611,7 +670,8 @@ def _credit_card_claims(a: Analysis, terms: CreditCardTerms) -> list[Claim]:
         if p.kind == "rate" and p.apr_labeled and not p.cash_advance:
             if p.promotional:
                 claims.append(Claim("intro_apr", p.span, p.value, "value"))
-                if months := _FOR_MONTHS.search(a.text, p.span.end, min(len(a.text), p.span.end + 60)):
+                sentence_end = a.segments.sentence(p.span.start).end
+                if months := _FOR_MONTHS.search(a.text, p.span.end, min(sentence_end, p.span.end + 60)):
                     claims.append(Claim("intro_months", Span(months.start("n"), months.end("n")),
                                         Decimal(months.group("n")), "value"))  # fmt: skip
                 continue
@@ -622,9 +682,23 @@ def _credit_card_claims(a: Analysis, terms: CreditCardTerms) -> list[Claim]:
                 claims.append(Claim(hit[0], p.span, p.value, hit[1]))
         elif p.kind == "fee" and p.balance_transfer:
             claims.append(Claim("balance_transfer_fee_pct", p.span, p.value, "value"))
-    claims.extend(Claim("annual_fee", m.span, m.value, "value") for m in a.moneys if m.role == "annual_fee")
+    claims.extend(_annual_fee_claims(a))
     claims.extend(Claim("annual_fee", span, Decimal(0), "value") for span in _phrase_spans(_NO_ANNUAL_FEE, a.text))
     return claims
+
+
+def _annual_fee_claims(a: Analysis) -> Iterator[Claim]:
+    """ "$95 annual fee" claims the annual fee; "$0 annual fee for the first year, then $95" claims the $95."""
+    for i, m in enumerate(a.moneys):
+        if m.role != "annual_fee":
+            continue
+        sentence = a.segments.sentence(m.span.start)
+        if not _FIRST_YEAR_FEE.match(window_after(a.text, m.span.end, CONTEXT, sentence.end)):
+            yield Claim("annual_fee", m.span, m.value, "value")
+            continue
+        then = next((n for n in a.moneys[i + 1 :] if n.span.end <= sentence.end), None)
+        if then is not None and _THEN.search(window_before(a.text, then.span.start, CONTEXT, m.span.end)):
+            yield Claim("annual_fee", then.span, then.value, "value")
 
 
 def _phrase_spans(pattern: re.Pattern[str], text: str) -> list[Span]:
@@ -633,10 +707,10 @@ def _phrase_spans(pattern: re.Pattern[str], text: str) -> list[Span]:
 
 def analyze(text: str, product: Product, terms: Terms | None) -> Analysis:
     segments = Segments(text)
-    percents = _percents(text, segments, product, terms)
+    percents = _percents(text, segments, product)
     moneys = _moneys(text, segments)
     term_mentions = _terms(text, segments)
-    examples = _examples(segments, percents, moneys, term_mentions)
+    examples = _examples(text, segments, percents, moneys, term_mentions)
     analysis = Analysis(text, product, segments, percents, moneys, term_mentions, examples, ())
     if isinstance(terms, PersonalLoanTerms):
         claims = _personal_loan_claims(analysis, terms)
