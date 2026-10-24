@@ -49,7 +49,14 @@ def test_findings_newest_first_with_item_and_version(marketer: User, reviewer: U
     partner = make_partner("LoanFinder")
     version = _partner_version(marketer, partner)
     item = version.item
-    _finding(version, minutes=1, rule_id="ftc.material_connection", citation="16 CFR 255.5", source=FindingSource.LLM)
+    _finding(
+        version,
+        minutes=1,
+        rule_id="ftc.material_connection",
+        citation="16 CFR 255.5",
+        source=FindingSource.LLM,
+        severity=Severity.WARNING,  # AI findings are never blocking (ledger ruling, enforced by a constraint)
+    )
     _finding(
         version,
         minutes=2,
