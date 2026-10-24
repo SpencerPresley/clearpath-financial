@@ -110,9 +110,11 @@ export const GetMetricsSummaryResponse = zod.object({
   "rounds_per_item": zod.object({
   "count": zod.int(),
   "imported_count": zod.int(),
-  "mean": zod.union([zod.number(),zod.null()]),
+  "imported_mean": zod.union([zod.number(),zod.null()]),
+  "mean": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
   "median": zod.union([zod.number(),zod.null()]),
-  "native_count": zod.int()
+  "native_count": zod.int(),
+  "native_mean": zod.union([zod.number(),zod.null()])
 }),
   "throughput": zod.object({
   "count": zod.int().describe('Decisions recorded in the period (imported rows: the final decision only).'),
@@ -123,22 +125,28 @@ export const GetMetricsSummaryResponse = zod.object({
   "time_per_round": zod.object({
   "count": zod.int(),
   "imported_count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
   "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
 }).describe('Native only: the tracker has no per-round dates.'),
   "time_to_first_review": zod.object({
   "count": zod.int(),
   "imported_count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
   "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
 }),
   "time_to_fix_live": zod.object({
   "count": zod.int(),
   "imported_count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
   "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
 }).describe('Native only: imported items are never reopened.'),
   "waiting": zod.array(zod.object({

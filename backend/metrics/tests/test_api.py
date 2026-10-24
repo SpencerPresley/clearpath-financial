@@ -65,6 +65,8 @@ def test_summary_reads_list_filters_and_the_period(lead: User, clock: FixedClock
         "p90_hours": 48.0,
         "native_count": 0,
         "imported_count": 1,
+        "native_median_hours": None,
+        "imported_median_hours": 48.0,
     }
     assert [w["more_than_days"] for w in body["waiting"]] == [3, 7, 14, 30]
     assert miss.json()["throughput"]["count"] == 0

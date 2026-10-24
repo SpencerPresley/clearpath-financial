@@ -315,6 +315,8 @@ def test_duration_stat_splits_native_and_imported() -> None:
     stat = duration_stat(ms)
 
     assert (stat.count, stat.native_count, stat.imported_count, stat.median_hours) == (3, 2, 1, 4)
+    # A blended median hides the before/after, so each source's median is reported too.
+    assert (stat.native_median_hours, stat.imported_median_hours) == (3, 48)
 
 
 def test_empty_stats_have_no_value() -> None:
@@ -326,6 +328,7 @@ def test_count_stat_mean_and_median() -> None:
     stat = count_stat([_m(MetricName.ROUNDS_PER_ITEM, v) for v in (1, 1, 4)])
 
     assert (stat.count, stat.mean, stat.median) == (3, 2, 1)
+    assert (stat.native_mean, stat.imported_mean) == (2, None)
 
 
 @pytest.mark.parametrize(

@@ -21,18 +21,22 @@ class MetricsQuery(Schema):
 
 class DurationStatOut(Schema):
     count: int
-    median_hours: float | None
+    median_hours: float | None = Field(description="Across both sources.")
     p90_hours: float | None
     native_count: int
     imported_count: int
+    native_median_hours: float | None
+    imported_median_hours: float | None
 
 
 class CountStatOut(Schema):
     count: int
-    mean: float | None
+    mean: float | None = Field(description="Across both sources.")
     median: float | None
     native_count: int
     imported_count: int
+    native_mean: float | None
+    imported_mean: float | None
 
 
 class ThroughputOut(Schema):

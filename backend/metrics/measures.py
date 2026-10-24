@@ -208,9 +208,16 @@ def percentile(values: Sequence[float], q: float) -> float:
     return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
 
 
-def _split(measurements: Sequence[Measurement]) -> tuple[int, int]:
-    native = sum(1 for m in measurements if m.source is MetricSource.NATIVE)
-    return native, len(measurements) - native
+def _values(measurements: Sequence[Measurement], source: MetricSource | None = None) -> list[float]:
+    return [m.value for m in measurements if source is None or m.source is source]
+
+
+def _median(values: Sequence[float]) -> float | None:
+    return statistics.median(values) if values else None
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    return statistics.fmean(values) if values else None
 
 
 @dataclass(frozen=True)
@@ -220,17 +227,23 @@ class DurationStat:
     p90_hours: float | None
     native_count: int
     imported_count: int
+    # Per source: a blended median hides the tracker-era vs in-app difference.
+    native_median_hours: float | None
+    imported_median_hours: float | None
 
 
 def duration_stat(measurements: Sequence[Measurement]) -> DurationStat:
-    values = [m.value for m in measurements]
-    native, imported = _split(measurements)
+    values = _values(measurements)
+    native = _values(measurements, MetricSource.NATIVE)
+    imported = _values(measurements, MetricSource.IMPORTED)
     return DurationStat(
         count=len(values),
-        median_hours=statistics.median(values) if values else None,
+        median_hours=_median(values),
         p90_hours=percentile(values, 0.9) if values else None,
-        native_count=native,
-        imported_count=imported,
+        native_count=len(native),
+        imported_count=len(imported),
+        native_median_hours=_median(native),
+        imported_median_hours=_median(imported),
     )
 
 
@@ -241,17 +254,22 @@ class CountStat:
     median: float | None
     native_count: int
     imported_count: int
+    native_mean: float | None
+    imported_mean: float | None
 
 
 def count_stat(measurements: Sequence[Measurement]) -> CountStat:
-    values = [m.value for m in measurements]
-    native, imported = _split(measurements)
+    values = _values(measurements)
+    native = _values(measurements, MetricSource.NATIVE)
+    imported = _values(measurements, MetricSource.IMPORTED)
     return CountStat(
         count=len(values),
-        mean=statistics.fmean(values) if values else None,
-        median=statistics.median(values) if values else None,
-        native_count=native,
-        imported_count=imported,
+        mean=_mean(values),
+        median=_median(values),
+        native_count=len(native),
+        imported_count=len(imported),
+        native_mean=_mean(native),
+        imported_mean=_mean(imported),
     )
 
 
