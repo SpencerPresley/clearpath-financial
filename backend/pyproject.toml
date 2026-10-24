@@ -36,7 +36,10 @@ typecheck = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
-addopts = ["--strict-markers"]
+addopts = ["--strict-markers", "-m", "not live"]
+markers = [
+    "live: calls a real external API (needs credentials); deselected by default, run with `-m live`",
+]
 
 [tool.ruff]
 line-length = 120
