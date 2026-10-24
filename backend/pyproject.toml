@@ -61,6 +61,6 @@ ignore = [
 "**/api.py" = ["ARG001"]  # ninja passes request to every operation
 
 [tool.pyrefly]
-project-includes = ["config", "core"]
+project-includes = ["config", "core", "checks"]
 project-excludes = ["**/migrations/**", "**/.venv/**", "**/__pycache__/**"]
 python-version = "3.13"
