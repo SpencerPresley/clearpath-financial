@@ -5,6 +5,9 @@ import { createRoot } from 'react-dom/client';
 
 import { createQueryClient } from './api/queryClient';
 import { createAppRouter } from './router';
+// Self-hosted variable fonts (no third-party font CDN). Loaded before theme.css, which names them.
+import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
 import './theme/theme.css';
 
 const queryClient = createQueryClient();
