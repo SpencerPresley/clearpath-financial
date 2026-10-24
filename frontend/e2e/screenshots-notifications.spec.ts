@@ -18,7 +18,12 @@ const OUT = '../docs/plan/reviews/ui/notifications';
 test.skip(process.env.SCREENSHOTS !== '1', 'set SCREENSHOTS=1 to capture UI-review screenshots');
 test.use({ viewport: { width: 1440, height: 900 }, timezoneId: 'UTC' });
 
-const shots: { name: string; rows: NotificationOut[]; mode?: InboxMode; ready: (page: Page) => Promise<void> }[] = [
+const shots: {
+  name: string;
+  rows: NotificationOut[];
+  mode?: InboxMode;
+  ready: (page: Page) => Promise<void>;
+}[] = [
   {
     name: 'unread',
     rows: INBOX_ROWS,
@@ -46,7 +51,7 @@ const shots: { name: string; rows: NotificationOut[]; mode?: InboxMode; ready: (
     mode: 'error',
     // The query client retries 5xx before showing the error.
     ready: (page) =>
-      expect(page.getByText('Notifications didn’t load.', { exact: false })).toBeVisible({ timeout: 20_000 }),
+      expect(page.getByText('Notifications are temporarily unavailable.')).toBeVisible({ timeout: 20_000 }),
   },
 ];
 

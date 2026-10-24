@@ -13,9 +13,12 @@ import { Inbox } from './Inbox';
 import { notificationLink } from './text';
 import { useMarkAllRead, useMarkRead, useNotifications } from './useNotifications';
 
+/** One digit keeps the pill off the glyph; the exact count is in the bell's name and the inbox header. */
 export function countLabel(unread: number): string {
-  return unread > 99 ? '99+' : String(unread);
+  return unread > 9 ? '9+' : String(unread);
 }
+
+const INBOX_MAX_HEIGHT = 544; // 34rem; React Aria also caps it to the space below the bell
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -31,7 +34,11 @@ export function NotificationBell() {
     const link = notificationLink(row);
     if (link === null) return; // nothing to open: marking it read is the whole action
     setOpen(false);
-    void navigate({ to: '/items/$itemId', params: { itemId: link.itemId }, search: link.search });
+    // Land on the page, not back on the bell (where the popover would restore focus and open its tooltip
+    // over the review header). Focus moved out before the popover unmounts isn't restored.
+    void navigate({ to: '/items/$itemId', params: { itemId: link.itemId }, search: link.search }).then(() => {
+      document.getElementById('main')?.focus();
+    });
   };
 
   return (
@@ -50,8 +57,13 @@ export function NotificationBell() {
           )}
         </AriaButton>
       </Tooltip>
-      <Popover className="app-popover app-inbox" placement="bottom end" offset={6}>
-        <Dialog className="app-inbox-dialog" aria-label="Notifications">
+      <Popover
+        className="app-popover app-inbox"
+        placement="bottom end"
+        offset={6}
+        maxHeight={INBOX_MAX_HEIGHT}
+      >
+        <Dialog className="app-inbox-dialog">
           <Inbox
             query={notifications}
             onOpenRow={openRow}

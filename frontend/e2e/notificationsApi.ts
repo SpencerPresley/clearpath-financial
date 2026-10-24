@@ -59,7 +59,11 @@ export async function stubNotifications(
     if (request.method() === 'GET' && path === '/notifications') {
       if (mode === 'loading') return new Promise<never>(() => undefined);
       if (mode === 'error') {
-        return json(route, { code: 'server_error', message: 'Notifications are temporarily unavailable.' }, 503);
+        return json(
+          route,
+          { code: 'server_error', message: 'Notifications are temporarily unavailable.' },
+          503,
+        );
       }
       return json(route, view());
     }

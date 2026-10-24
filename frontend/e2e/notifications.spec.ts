@@ -28,8 +28,9 @@ test('a mention arrives on the next poll, opens its comment, and is marked read'
     name: /Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social/,
   });
 
-  // Navigate: the item's Comments tab on the comment's version.
-  await row.click();
+  // Navigate (by keyboard: the newest row has focus on open): the item's Comments tab on the comment's version.
+  await expect(row).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/items\/1042\?/);
   const url = new URL(page.url());
   expect(url.searchParams.get('tab')).toBe('comments');
@@ -37,6 +38,10 @@ test('a mention arrives on the next poll, opens its comment, and is marked read'
   await expect(page.getByRole('tab', { name: 'Comments', selected: true })).toBeVisible();
   await expect(page.getByText(MENTION_COMMENT.body)).toBeVisible();
   await expect(dialog).toBeHidden();
+  // Focus lands on the page, not back on the bell (whose tooltip would cover the review header), and stays
+  // there once the popover's exit has run.
+  await page.clock.runFor(1_000);
+  await expect(page.locator('#main')).toBeFocused();
 
   // Read: one receipt, and the bell is quiet again.
   await expect.poll(() => inbox.posted).toEqual(['read 8']);

@@ -60,15 +60,14 @@ describe('describeNotification', () => {
 
   it('phrases blocking findings on a partner page, with the count when the event has it', () => {
     const page = (detail: NotificationOut['detail']) => text({ kind: 'page_findings', actor: null, detail });
+    // The item leads, so its title is what truncates last; the finding count follows it.
     expect(page({ kind: 'page_findings', new_blocking_count: 2 })).toBe(
-      'Partner page carrying CP-42 · Fall personal loan promo has 2 new blocking findings',
+      'CP-42 · Fall personal loan promo · 2 new blocking findings on the partner page',
     );
     expect(page({ kind: 'page_findings', new_blocking_count: 1 })).toBe(
-      'Partner page carrying CP-42 · Fall personal loan promo has 1 new blocking finding',
+      'CP-42 · Fall personal loan promo · 1 new blocking finding on the partner page',
     );
-    expect(page(null)).toBe(
-      'Partner page carrying CP-42 · Fall personal loan promo has new blocking findings',
-    );
+    expect(page(null)).toBe('CP-42 · Fall personal loan promo · new blocking findings on the partner page');
   });
 
   it('falls back to the stored message when the row has no event detail or no item', () => {
@@ -90,6 +89,20 @@ describe('describeNotification', () => {
     ).toBe('status.approved');
     expect(describeNotification(notificationFixture({ kind: 'mention', detail: null })).icon).toBe(
       'notify.mention',
+    );
+  });
+
+  it('shows the pool, not the assign glyph, when an item lands in the unassigned pool', () => {
+    const assigned = (mode: 'pool' | 'manual') =>
+      describeNotification(notificationFixture({ kind: 'assignment', detail: { kind: 'assignment', mode } }))
+        .icon;
+    expect(assigned('pool')).toBe('nav.queue');
+    expect(assigned('manual')).toBe('action.assign');
+  });
+
+  it('tones drift findings as alert, like the placement on the item page', () => {
+    expect(describeNotification(notificationFixture({ kind: 'page_findings', detail: null })).tone).toBe(
+      'alert',
     );
   });
 

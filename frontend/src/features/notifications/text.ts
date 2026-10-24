@@ -40,7 +40,7 @@ export const KIND_ICONS: Readonly<Record<NotificationKind, IconKey>> = {
 
 const KIND_TONES: Readonly<Partial<Record<NotificationKind, Tone>>> = {
   rereview: 'alert',
-  page_findings: 'error',
+  page_findings: 'alert', // live content at risk (§5.2), as the placement shows it on Details
 };
 
 const OUTCOME_ICONS: Record<DecisionOutcome, { icon: IconKey; tone: Tone }> = {
@@ -106,13 +106,16 @@ function words(n: NotificationOut): [string, string] | null {
     case 'page_findings':
       // The drift monitor: the approved copy is intact, but partner text beside it trips blocking rules.
       return detail?.kind === 'page_findings'
-        ? ['Partner page carrying ', ` has ${plural(detail.new_blocking_count, 'new blocking finding')}`]
-        : ['Partner page carrying ', ' has new blocking findings'];
+        ? ['', ` · ${plural(detail.new_blocking_count, 'new blocking finding')} on the partner page`]
+        : ['', ' · new blocking findings on the partner page'];
   }
 }
 
 function iconFor(n: NotificationOut): { icon: IconKey; tone: Tone | undefined } {
   if (n.detail?.kind === 'decision') return OUTCOME_ICONS[n.detail.outcome];
+  // Sent to the unassigned pool: nobody was assigned, so not the assign glyph.
+  if (n.detail?.kind === 'assignment' && n.detail.mode === 'pool')
+    return { icon: 'nav.queue', tone: undefined };
   return { icon: KIND_ICONS[n.kind], tone: KIND_TONES[n.kind] };
 }
 

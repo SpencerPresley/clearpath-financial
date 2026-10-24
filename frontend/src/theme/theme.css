@@ -3745,7 +3745,8 @@
     box-shadow: 0 0 0 1.5px var(--color-primary);
   }
   .app-inbox {
-    @apply flex max-h-[min(34rem,calc(100vh-4rem))] w-[32rem] flex-col p-0;
+    /* Height: React Aria's inline max-height (the Popover's maxHeight prop, capped to the space below). */
+    @apply flex w-[36rem] flex-col p-0;
   }
   .app-inbox-dialog {
     @apply flex min-h-0 flex-col outline-none;
@@ -3801,6 +3802,10 @@
   .app-inbox-icon[data-tone='alert'] {
     @apply text-status-alert-soft-content;
   }
+  /* Once read, the status hue steps back so new rows lead; the glyph still says the outcome (§5.2). */
+  .app-inbox-row:not([data-unread]) .app-inbox-icon {
+    @apply text-muted;
+  }
   /* One line; only the item title gives way, so the verb and anything after the item stay readable. The clip
      keeps an unusually long actor name from running under the age. */
   .app-inbox-line {
@@ -3825,7 +3830,10 @@
     @apply text-meta text-muted tabular-nums;
   }
   .app-inbox-error {
-    @apply m-2 flex items-center gap-3 rounded-md border border-status-error-line bg-status-error-soft px-3 py-2 text-ui text-status-error-soft-content;
+    @apply m-2 flex items-center gap-2 rounded-md border border-status-error-line bg-status-error-soft py-1.5 pr-1.5 pl-3 text-ui text-status-error-soft-content;
+  }
+  .app-inbox-error-text {
+    @apply min-w-0 flex-1;
   }
   .app-inbox-foot {
     @apply flex shrink-0 items-center gap-1.5 border-t border-base-300 px-3 py-1.5 text-meta text-muted;

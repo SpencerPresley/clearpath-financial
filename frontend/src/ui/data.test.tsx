@@ -103,7 +103,7 @@ describe('toast', () => {
       showToast({ title: 'Claimed', description: 'CP-1042' });
     });
 
-    const region = await screen.findByRole('region', { name: 'Notifications' });
+    const region = await screen.findByRole('region', { name: 'Messages' });
     expect(region).toHaveTextContent('Claimed');
     expect(region).toHaveTextContent('CP-1042');
 

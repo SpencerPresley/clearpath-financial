@@ -1,9 +1,11 @@
 /*
  * The inbox inside the bell's popover: newest first, grouped Today / Earlier. A React Aria ListBox, so arrow
  * keys move between rows and Enter opens one (onAction); rows aren't links because React Aria's own router
- * isn't wired to TanStack's, and an href would reload the page.
+ * isn't wired to TanStack's, and an href would reload the page. Opening the popover puts focus on the newest
+ * row, so the first Enter opens it rather than reaching Mark all read.
  */
-import { Header, ListBox, ListBoxItem, ListBoxSection } from 'react-aria-components';
+import { useId, useRef } from 'react';
+import { Header, Heading, ListBox, ListBoxItem, ListBoxSection } from 'react-aria-components';
 
 import type { NotificationOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
@@ -62,15 +64,19 @@ function Row({ row, now }: { row: NotificationOut; now: Date }) {
       </span>
       <time className="app-inbox-age" dateTime={at.toISOString()} title={absoluteFormat.format(at)}>
         <span aria-hidden="true">{formatAge(at, now)}</span>
-        <span className="sr-only">, {absoluteFormat.format(at)}</span>
+        <span className="sr-only">{absoluteFormat.format(at)}</span>
       </time>
     </ListBoxItem>
   );
 }
 
+/** Same rhythm as the loaded list (a group header, then rows), so nothing jumps when it arrives. */
 function Loading() {
   return (
     <div role="status" aria-label="Loading notifications" className="app-inbox-body">
+      <div className="app-inbox-group" aria-hidden="true">
+        <SkeletonText width="3rem" />
+      </div>
       {[16, 12, 14, 10].map((width) => (
         <div key={width} className="app-inbox-row" aria-hidden="true">
           <span className="app-inbox-dot" />
@@ -93,14 +99,25 @@ export interface InboxProps {
 }
 
 export function Inbox({ query, onOpenRow, onMarkAllRead, markingAll, now = new Date() }: InboxProps) {
+  const headingId = useId();
+  const list = useRef<HTMLDivElement>(null);
   const page = query.data;
   const unread = page?.unread_count ?? 0;
+
+  const markAllRead = () => {
+    // The button goes away once nothing is unread: hand focus to the newest row first, so it isn't dropped.
+    list.current?.querySelector<HTMLElement>('[role="option"]')?.focus();
+    onMarkAllRead();
+  };
 
   let body;
   if (page === undefined) {
     body = query.isError ? (
       <div className="app-inbox-error" role="alert">
-        <span>Notifications didn’t load. {errorMessage(query.error, 'Try again in a moment.')}</span>
+        <Icon name="feedback.error" size={14} />
+        <span className="app-inbox-error-text">
+          {errorMessage(query.error, 'Couldn’t load notifications. Try again in a moment.')}
+        </span>
         <Button size="sm" icon="action.reload" onPress={() => void query.refetch()}>
           Retry
         </Button>
@@ -111,14 +128,17 @@ export function Inbox({ query, onOpenRow, onMarkAllRead, markingAll, now = new D
   } else if (page.rows.length === 0) {
     body = (
       <EmptyState icon="nav.notifications" title="No notifications">
-        Assignments, decisions, re-reviews and @mentions on your items show up here.
+        Assignments, decisions, re-reviews, mentions, expiring approvals and partner-page findings show up
+        here.
       </EmptyState>
     );
   } else {
     const byId = new Map(page.rows.map((row) => [row.id, row]));
     body = (
       <ListBox
-        aria-label="Notifications"
+        ref={list}
+        aria-labelledby={headingId}
+        autoFocus="first"
         className="app-inbox-body"
         selectionMode="none"
         onAction={(key) => {
@@ -141,18 +161,24 @@ export function Inbox({ query, onOpenRow, onMarkAllRead, markingAll, now = new D
   return (
     <>
       <div className="app-inbox-head">
-        <h2 className="app-inbox-heading">Notifications</h2>
-        {unread > 0 && <span className="app-inbox-unread">{String(unread)} unread</span>}
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="action.mark_all_read"
-          className="ml-auto"
-          isDisabled={unread === 0 || markingAll}
-          onPress={onMarkAllRead}
-        >
-          Mark all read
-        </Button>
+        <Heading slot="title" id={headingId} className="app-inbox-heading">
+          Notifications
+        </Heading>
+        {unread > 0 && (
+          <>
+            <span className="app-inbox-unread">{String(unread)} unread</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="action.mark_all_read"
+              className="ml-auto"
+              isDisabled={markingAll}
+              onPress={markAllRead}
+            >
+              Mark all read
+            </Button>
+          </>
+        )}
       </div>
       {body}
       {page !== undefined && query.isError && (
@@ -162,7 +188,9 @@ export function Inbox({ query, onOpenRow, onMarkAllRead, markingAll, now = new D
         </p>
       )}
       {page !== undefined && !query.isError && page.rows.length >= LIMIT && (
-        <p className="app-inbox-foot">Showing the latest {LIMIT}.</p>
+        <p className="app-inbox-foot">
+          Showing the latest {LIMIT}. Older activity is on each item’s History tab.
+        </p>
       )}
     </>
   );

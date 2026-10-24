@@ -12,7 +12,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NotificationOut, NotificationPageOut } from '../../api/generated/model';
-import { INBOX_ROWS, EMPTY_PAGE, pageOf } from '../../test/fixtures/notifications';
+import { INBOX_ROWS, EMPTY_PAGE, notificationFixture, pageOf } from '../../test/fixtures/notifications';
 import { renderWithQuery } from '../../test/render';
 import { server } from '../../test/server';
 import { ToastHost } from '../../ui/toast';
@@ -121,10 +121,16 @@ describe('NotificationBell', () => {
     });
   });
 
-  it('caps the count at 99+', () => {
+  it('caps the pill at 9+ and keeps the exact count in the name', async () => {
     expect(countLabel(7)).toBe('7');
-    expect(countLabel(99)).toBe('99');
-    expect(countLabel(140)).toBe('99+');
+    expect(countLabel(9)).toBe('9');
+    expect(countLabel(140)).toBe('9+');
+    const many = Array.from({ length: 12 }, (_, i) => notificationFixture({ id: 100 + i }));
+    serveInbox(pageOf(many));
+    renderBell();
+
+    const bell = await screen.findByRole('button', { name: 'Notifications, 12 unread' });
+    expect(bell).toHaveTextContent('9+');
   });
 
   it('lists notifications newest first, grouped Today and Earlier, in domain language', async () => {
@@ -173,7 +179,7 @@ describe('NotificationBell', () => {
     expect(await screen.findByRole('button', { name: 'Notifications, 2 unread' })).toBeInTheDocument();
   });
 
-  it('opens a row from the keyboard', async () => {
+  it('opens a row from the keyboard, starting on the newest', async () => {
     const user = userEvent.setup();
     const api = serveInbox(pageOf(ROWS));
     const { router } = renderBell();
@@ -181,10 +187,11 @@ describe('NotificationBell', () => {
     await screen.findByRole('button', { name: 'Notifications, 3 unread' });
     await user.tab();
     await user.keyboard('{Enter}');
-    await screen.findByRole('dialog', { name: 'Notifications' });
-    // Into the list (past Mark all read), then down to the assignment and open it.
-    await user.tab();
-    await user.tab();
+    // Focus starts on the newest row, not on Mark all read.
+    const newest = await screen.findByRole('option', { name: /Dana Reyes requested changes/ });
+    await waitFor(() => {
+      expect(newest).toHaveFocus();
+    });
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
 
     await waitFor(() => {
@@ -216,7 +223,9 @@ describe('NotificationBell', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Notifications' });
     await user.click(within(dialog).getByRole('button', { name: 'Mark all read' }));
 
-    expect(within(dialog).getByRole('button', { name: 'Mark all read' })).toBeDisabled();
+    // Nothing left to mark: the button goes, and focus moves to the newest row instead of being dropped.
+    expect(within(dialog).queryByRole('button', { name: 'Mark all read' })).not.toBeInTheDocument();
+    expect(within(dialog).getAllByRole('option')[0]).toHaveFocus();
     expect(within(dialog).queryByText(/Unread:/)).not.toBeInTheDocument();
     expect(api.posted).toEqual(['read-all']);
     // The open popover hides the page from assistive tech; the bell is still there underneath.
@@ -252,10 +261,10 @@ describe('NotificationBell', () => {
     expect(await within(dialog).findByRole('heading', { name: 'No notifications' })).toBeInTheDocument();
     expect(
       within(dialog).getByText(
-        'Assignments, decisions, re-reviews and @mentions on your items show up here.',
+        'Assignments, decisions, re-reviews, mentions, expiring approvals and partner-page findings show up here.',
       ),
     ).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Mark all read' })).toBeDisabled();
+    expect(within(dialog).queryByRole('button', { name: 'Mark all read' })).not.toBeInTheDocument();
   });
 
   it('shows a loading placeholder until the first page arrives', async () => {
@@ -288,7 +297,7 @@ describe('NotificationBell', () => {
     const bell = await screen.findByRole('button', { name: 'Notifications' });
     await user.click(bell);
     const alert = await within(await screen.findByRole('dialog')).findByRole('alert');
-    expect(alert).toHaveTextContent('Notifications didn’t load. Server error.');
+    expect(alert).toHaveTextContent('Server error.');
     expect(bell.textContent).toBe('');
 
     fail = false;
