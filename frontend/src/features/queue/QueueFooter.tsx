@@ -52,10 +52,14 @@ export function QueueFooter({ query, count }: { query: QueueItemsQuery; count: n
     );
   }
 
+  // The latest page's total: the filtered set as of the most recent request.
+  const total = query.data?.pages.at(-1)?.total ?? count;
   return (
     <div className="app-table-footer">
       <span className="app-figure">
-        {hasNextPage ? `${plural(count, 'item')} loaded` : `All ${plural(count, 'item')} loaded`}
+        {hasNextPage
+          ? `${String(count)} of ${plural(total, 'item')} loaded`
+          : `All ${plural(total, 'item')} loaded`}
       </span>
       {hasNextPage && (
         <Button

@@ -29,7 +29,7 @@ export function stubApi({ me = ME_REVIEWER, rows = queueRows() }: { me?: MeOut; 
     if (path === '/api/me') return Promise.resolve(json(me));
     if (path === '/api/health') return Promise.resolve(json({ status: 'ok', database: true }));
     if (path === '/api/items/stats') return Promise.resolve(json(STATS));
-    if (path === '/api/items') return Promise.resolve(json({ rows, next_cursor: null }));
+    if (path === '/api/items') return Promise.resolve(json({ rows, next_cursor: null, total: rows.length }));
     if (path === '/api/views') return Promise.resolve(json([]));
     if (path === '/api/users') return Promise.resolve(json(USERS));
     if (path === '/api/partners') return Promise.resolve(json(PARTNERS));

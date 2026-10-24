@@ -83,10 +83,11 @@ export function useItemPatch() {
           [detailKey, qc.getQueryData(detailKey)],
         ];
         const changes = toChanges(data);
-        // Rows carry no notes (ItemRowOut), so only tags and risk tier patch the lists.
+        // Rows carry tags, notes, and risk tier, so every field this edits patches the lists too.
         const rowChanges: Partial<ItemRowOut> = {};
         if (changes.tags !== undefined) rowChanges.tags = changes.tags;
         if (changes.risk_tier !== undefined) rowChanges.risk_tier = changes.risk_tier;
+        if (changes.notes !== undefined) rowChanges.notes = changes.notes;
         updateCachedRows(qc, itemId, (row) => ({ ...row, ...rowChanges }));
         qc.setQueryData<ItemDetailOut>(detailKey, (old) =>
           old === undefined ? old : { ...old, ...changes },
@@ -128,6 +129,7 @@ export function useQueueCells(viewer: Viewer): Omit<QueueCellContextValue, 'now'
     () => ({
       canEditRisk: () => canEditRisk(viewer),
       canEditTags: (row: ItemRowOut) => canEditFields(viewer, row),
+      canEditNotes: (row: ItemRowOut) => canEditFields(viewer, row),
       save: (row: ItemRowOut, patch: ItemUpdateIn) => {
         mutate({ itemId: row.id, data: patch });
       },

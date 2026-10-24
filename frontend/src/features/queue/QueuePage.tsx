@@ -121,6 +121,7 @@ function EmptyQueue({
       'No re-reviews',
       'Approved content comes back here when offer terms change, an approval expires, or drift is found.',
     ],
+    queue: ['Nothing in the queue', 'Nothing is submitted, in review, or up for re-review.'],
     active: ['No active items', 'Nothing is submitted, in review, waiting on changes, or up for re-review.'],
   };
   const [title, detail] = (view.kind === 'builtin' ? copy[view.id] : undefined) ?? [
@@ -337,12 +338,7 @@ export function QueuePage() {
         <h1 id="queue-title" className="app-queue-title">
           Queue
         </h1>
-        <StatsStrip
-          active={view.kind === 'builtin' && !view.modified ? view.id : undefined}
-          onPick={(id) => {
-            go(viewSearch(id));
-          }}
-        />
+        <StatsStrip active={view.kind === 'builtin' && !view.modified ? view.id : undefined} onPick={go} />
       </div>
       <div className="app-view-bar">
         <ViewBar

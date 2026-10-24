@@ -89,18 +89,6 @@ describe('QueueTable', () => {
     expect(r.getByText('R2')).toBeInTheDocument();
   });
 
-  it('sorts by title through the server sort and back to queue order', async () => {
-    const onSortChange = vi.fn();
-    const { rerender } = render(<Harness onSortChange={onSortChange} />);
-    await userEvent.click(screen.getByRole('button', { name: /Title/ }));
-    expect(onSortChange).toHaveBeenLastCalledWith('title');
-
-    rerender(<Harness sort="title" onSortChange={onSortChange} />);
-    expect(screen.getByRole('columnheader', { name: /Title/ })).toHaveAttribute('aria-sort', 'ascending');
-    await userEvent.click(screen.getByRole('button', { name: /Title/ }));
-    expect(onSortChange).toHaveBeenLastCalledWith('queue');
-  });
-
   it('cycles Age through oldest, newest, and queue order', async () => {
     const onSortChange = vi.fn();
     const { rerender } = render(<Harness onSortChange={onSortChange} />);
@@ -117,11 +105,37 @@ describe('QueueTable', () => {
     expect(onSortChange).toHaveBeenLastCalledWith('queue');
   });
 
+  it.each([
+    ['Title', 'title', 'title_desc'],
+    ['Status', 'status', 'status_desc'],
+    ['Risk', 'risk_tier', 'risk_tier_desc'],
+    ['Partner', 'partner', 'partner_desc'],
+    ['Assignee', 'assignee', 'assignee_desc'],
+    ['Findings', 'open_findings', 'open_findings_desc'],
+    ['Round', 'round', 'round_desc'],
+  ] as const)('cycles %s ascending, descending, then queue order', async (header, asc, desc) => {
+    const onSortChange = vi.fn();
+    const { rerender } = render(<Harness onSortChange={onSortChange} />);
+    const button = () => within(screen.getByRole('columnheader', { name: header })).getByRole('button');
+    await userEvent.click(button());
+    expect(onSortChange).toHaveBeenLastCalledWith(asc);
+
+    rerender(<Harness sort={asc} onSortChange={onSortChange} />);
+    expect(screen.getByRole('columnheader', { name: header })).toHaveAttribute('aria-sort', 'ascending');
+    await userEvent.click(button());
+    expect(onSortChange).toHaveBeenLastCalledWith(desc);
+
+    rerender(<Harness sort={desc} onSortChange={onSortChange} />);
+    expect(screen.getByRole('columnheader', { name: header })).toHaveAttribute('aria-sort', 'descending');
+    await userEvent.click(button());
+    expect(onSortChange).toHaveBeenLastCalledWith('queue');
+  });
+
   it('offers no sort control on columns the server cannot sort', () => {
     render(<Harness />);
-    const status = screen.getByRole('columnheader', { name: 'Status' });
-    expect(within(status).queryByRole('button')).toBeNull();
-    expect(status).not.toHaveAttribute('aria-sort');
+    const key = screen.getByRole('columnheader', { name: 'Item' });
+    expect(within(key).queryByRole('button')).toBeNull();
+    expect(key).not.toHaveAttribute('aria-sort');
   });
 
   it('hides columns turned off in visibility', () => {

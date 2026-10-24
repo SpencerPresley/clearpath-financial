@@ -1,8 +1,7 @@
 /*
- * Views: the five built-ins (client constants) and the viewer's saved views (GET/POST/DELETE /views). The
- * active view is derived from the URL; "Modified" appears when the filters or sort have moved off it, and
- * "Save view" stores the current filters, sort, and visible columns. There is no update endpoint, so saving a
- * modified saved view creates a new one.
+ * Views: the built-ins (client constants; In queue has no tab, its stat opens it) and the viewer's saved views
+ * (GET/POST/DELETE /views). The active view is derived from the URL; "Modified" appears when the filters or
+ * sort have moved off it, and "Save view" stores the current filters, sort, and visible columns as a new view.
  */
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -123,7 +122,7 @@ export function ViewBar({ search, columns, onSelect }: ViewBarProps) {
   return (
     <div className="app-view-group">
       <div className="app-view-tabs" role="group" aria-label="Views">
-        {BUILT_IN_VIEWS.map((view) => (
+        {BUILT_IN_VIEWS.filter((view) => view.tab !== false).map((view) => (
           <ToggleButton
             key={view.id}
             className="app-view-tab"

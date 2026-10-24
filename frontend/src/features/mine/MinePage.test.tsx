@@ -10,20 +10,33 @@ import { MinePage } from './MinePage';
 import { renderAtRoute } from '../../test/router';
 
 const ROWS: ItemRowOut[] = [
-  itemRowFixture({ id: 1, key: 'CP-1', title: 'PL promo — email', status: 'changes_requested' }),
+  itemRowFixture({
+    id: 1,
+    key: 'CP-1',
+    title: 'PL promo — email',
+    status: 'changes_requested',
+    latest_decision: DECISION_CHANGES,
+  }),
   itemRowFixture({ id: 2, key: 'CP-2', title: 'Card launch', status: 'in_review', assignee: REVIEWER }),
-  itemRowFixture({ id: 3, key: 'CP-3', title: 'Spring PL', status: 'approved' }),
+  itemRowFixture({
+    id: 3,
+    key: 'CP-3',
+    title: 'Spring PL',
+    status: 'approved',
+    approval_expires_at: '2027-04-24T12:00:00Z',
+  }),
   itemRowFixture({ id: 4, key: 'CP-4', title: 'Affiliate page', status: 'withdrawn' }),
 ];
 
 function listHandler(rows: ItemRowOut[], seen: URLSearchParams[] = []) {
   return http.get('*/api/items', ({ request }) => {
     seen.push(new URL(request.url).searchParams);
-    const page: ItemPageOut = { rows, next_cursor: null };
+    const page: ItemPageOut = { rows, next_cursor: null, total: rows.length };
     return HttpResponse.json(page);
   });
 }
 
+/** Records any per-item request, which the page should no longer make. */
 function detailHandler(fetched: number[] = []) {
   return http.get('*/api/items/:itemId', ({ params }) => {
     const id = Number(params.itemId);
@@ -78,14 +91,17 @@ describe('MinePage', () => {
       'href',
       '/mine/4/resubmit',
     );
-    expect(await you.findByText('Dana Reyes: Add the California license line.')).toBeInTheDocument();
+    expect(you.getByText('Dana Reyes: Add the California license line.')).toBeInTheDocument();
 
     const compliance = within(complianceSection);
     expect(compliance.getByText('Dana Reyes is reviewing')).toBeInTheDocument();
     expect(compliance.queryByRole('link', { name: /Resubmit/ })).toBeNull();
 
-    // Details only for the rows whose why line needs the decision.
-    expect(fetched).toEqual([1]);
+    const approved = within(sections[2] ?? document.body);
+    expect(approved.getByText(/^Approved · expires Apr 24, 2027$/)).toBeInTheDocument();
+
+    // One request for the page: the rows carry the decision and the expiry.
+    expect(fetched).toEqual([]);
   });
 
   it('offers a first submission when there is nothing yet', async () => {
@@ -102,7 +118,7 @@ describe('MinePage', () => {
         calls += 1;
         return calls === 1
           ? HttpResponse.json({ code: 'internal', message: 'Boom.' }, { status: 500 })
-          : HttpResponse.json({ rows: [ROWS[1]], next_cursor: null });
+          : HttpResponse.json({ rows: [ROWS[1]], next_cursor: null, total: 1 });
       }),
     );
     const user = userEvent.setup();
@@ -117,7 +133,7 @@ describe('MinePage', () => {
     server.use(
       http.get('*/api/items', async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
-        return HttpResponse.json({ rows: [], next_cursor: null });
+        return HttpResponse.json({ rows: [], next_cursor: null, total: 0 });
       }),
     );
     await renderMine();

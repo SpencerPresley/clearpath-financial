@@ -151,10 +151,18 @@ const ROW_KEYS = [
   'planned_first_run',
   'planned_last_run',
   'current_version_n',
+  'notes',
+  'approval_expires_at',
+  'latest_decision',
   'partner',
   'owner',
   'assignee',
 ] as const satisfies readonly (keyof ItemRowOut)[];
+
+/** Fails to compile when ItemRowOut gains a field ROW_KEYS doesn't list (the cast below would hide it). */
+export const ROW_KEYS_COMPLETE: [Exclude<keyof ItemRowOut, (typeof ROW_KEYS)[number]>] extends [never]
+  ? true
+  : never = true;
 
 /** The queue-row projection of an item fixture. */
 export function itemRowFixture(overrides: Partial<ItemDetailOut> = {}): ItemRowOut {

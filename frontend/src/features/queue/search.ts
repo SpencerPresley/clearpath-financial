@@ -8,7 +8,13 @@
 import { z } from 'zod';
 
 import { Channel, ItemSort, ItemStatus, Product, ReopenReason, RiskTier } from '../../api/generated/model';
-import type { ItemFilter, ListItemsParams, SavedViewIn, SavedViewOut } from '../../api/generated/model';
+import type {
+  ItemFilter,
+  ListItemsParams,
+  QueueStatFiltersOut,
+  SavedViewIn,
+  SavedViewOut,
+} from '../../api/generated/model';
 
 function enumList<T extends string>(values: readonly T[]) {
   const allowed = new Set<string>(values);
@@ -47,6 +53,8 @@ export const queueSearchSchema = z.object({
   mine: flag,
   unassigned: flag,
   has_open_findings: flag,
+  /** Tri-state: false is a real filter (no legacy imports), unlike mine/unassigned where false means "any". */
+  is_legacy: flag,
   /** Submitted more than N days ago. */
   waiting: z.number().int().min(0).max(3650).optional().catch(undefined),
   sort: z.enum(Object.values(ItemSort)).default('queue').catch('queue'),
@@ -69,37 +77,56 @@ export const FILTER_KEYS = [
   'mine',
   'unassigned',
   'has_open_findings',
+  'is_legacy',
   'waiting',
 ] as const satisfies readonly (keyof QueueSearch)[];
+
+/** Keys where `false` narrows the result (so it is kept, not dropped as "no constraint"). */
+const TRI_STATE_KEYS: ReadonlySet<FilterKey> = new Set(['has_open_findings', 'is_legacy']);
 
 export type FilterKey = (typeof FILTER_KEYS)[number];
 export type QueueFilters = Partial<Pick<QueueSearch, FilterKey>>;
 
-export type BuiltInViewId = 'mine' | 'unassigned' | 'waiting' | 'rereview' | 'active';
+export type BuiltInViewId = 'mine' | 'unassigned' | 'waiting' | 'rereview' | 'queue' | 'active';
 
 export interface BuiltInView {
   id: BuiltInViewId;
   label: string;
   filters: QueueFilters;
+  /** False: no tab in the view row (opened from its stat); 1280px fits five tabs plus Modified/Save view. */
+  tab?: false;
 }
 
+/** The review queue's statuses (backend reviews.models.QUEUE_STATUSES). */
+const QUEUED: ItemStatus[] = ['submitted', 'in_review', 'needs_rereview'];
+
+/*
+ * Each view that has a stat is that stat's filter, exactly (GET /items/stats `filters`; the ledger ruling that a
+ * number must equal the list it links to). Every one names its statuses and leaves out legacy imports, so the
+ * set is the same under any sort; search.test.ts checks them against the server's definitions.
+ */
 export const BUILT_IN_VIEWS: readonly BuiltInView[] = [
-  { id: 'mine', label: 'My queue', filters: { mine: true } },
-  { id: 'unassigned', label: 'Unassigned', filters: { unassigned: true } },
-  { id: 'waiting', label: 'Waiting >3 days', filters: { waiting: 3 } },
-  {
-    id: 'rereview',
-    label: 'Needs re-review',
-    // reopen_reason, not status=needs_rereview: a re-review the reviewer has opened is in_review but is still
-    // a re-review of live content (and still ranks first in queue order).
-    filters: { reopen_reason: ['terms_changed', 'approval_expired', 'drift_detected'] },
-  },
+  { id: 'mine', label: 'My queue', filters: { status: QUEUED, is_legacy: false, mine: true } },
+  { id: 'unassigned', label: 'Unassigned', filters: { status: QUEUED, is_legacy: false, unassigned: true } },
+  { id: 'waiting', label: 'Waiting >3 days', filters: { status: QUEUED, is_legacy: false, waiting: 3 } },
+  // By status: a re-review a reviewer has opened is in review, and counts in My queue instead.
+  { id: 'rereview', label: 'Needs re-review', filters: { status: ['needs_rereview'], is_legacy: false } },
+  { id: 'queue', label: 'In queue', filters: { status: QUEUED, is_legacy: false }, tab: false },
   {
     id: 'active',
     label: 'All active',
-    filters: { status: ['submitted', 'in_review', 'changes_requested', 'needs_rereview'] },
+    filters: { status: ['submitted', 'in_review', 'changes_requested', 'needs_rereview'], is_legacy: false },
   },
 ];
+
+/** Which built-in view each queue stat is the total of. */
+export const STAT_VIEWS = {
+  open: 'queue',
+  mine: 'mine',
+  unassigned: 'unassigned',
+  waiting_over_3_days: 'waiting',
+  needs_rereview: 'rereview',
+} as const satisfies Record<keyof QueueStatFiltersOut, BuiltInViewId>;
 
 const BASE: Pick<QueueSearch, 'sort' | 'layout'> = { sort: 'queue', layout: 'table' };
 
@@ -117,7 +144,7 @@ export function filtersOf(search: QueueFilters): QueueFilters {
   const out: Record<string, unknown> = {};
   for (const key of FILTER_KEYS) {
     const value = search[key];
-    if (value === undefined || value === false) continue;
+    if (value === undefined || (value === false && !TRI_STATE_KEYS.has(key))) continue;
     if (Array.isArray(value) && value.length === 0) continue;
     if (typeof value === 'string' && value.trim() === '') continue;
     out[key] = typeof value === 'string' ? value.trim() : value;
@@ -179,6 +206,7 @@ export function toListParams(
   if (f.mine) params.mine = true;
   if (f.unassigned) params.unassigned = true;
   if (f.has_open_findings !== undefined) params.has_open_findings = f.has_open_findings;
+  if (f.is_legacy !== undefined) params.is_legacy = f.is_legacy;
   if (f.waiting !== undefined) params.waiting_more_than_days = f.waiting;
   params.sort = search.sort;
   if (extra.cursor !== undefined && extra.cursor !== null) params.cursor = extra.cursor;
@@ -194,7 +222,8 @@ export function savedViewKey(id: number): string {
   return `${SAVED_PREFIX}${String(id)}`;
 }
 
-function filterFromItemFilter(f: ItemFilter): QueueFilters {
+/** The queue filters an API ItemFilter expresses (fields the queue has no control for are dropped). */
+export function filtersFromItemFilter(f: ItemFilter): QueueFilters {
   return queueSearchSchema.partial().parse({
     q: f.q ?? undefined,
     status: f.status,
@@ -207,14 +236,23 @@ function filterFromItemFilter(f: ItemFilter): QueueFilters {
     mine: f.mine,
     unassigned: f.unassigned,
     has_open_findings: f.has_open_findings ?? undefined,
+    is_legacy: f.is_legacy ?? undefined,
     waiting: f.waiting_more_than_days ?? undefined,
   });
+}
+
+/**
+ * The search a stat opens: its built-in view, with the filters the server counted it with (so the list's
+ * total is the number that was clicked, even if a client definition ever drifts; it would show as Modified).
+ */
+export function statSearch(stat: keyof QueueStatFiltersOut, filters: ItemFilter): QueueSearch {
+  return { ...BASE, view: STAT_VIEWS[stat], ...filtersOf(filtersFromItemFilter(filters)) };
 }
 
 export function savedViewToSearch(view: SavedViewOut): QueueSearch {
   return {
     ...BASE,
-    ...filtersOf(filterFromItemFilter(view.filters)),
+    ...filtersOf(filtersFromItemFilter(view.filters)),
     view: savedViewKey(view.id),
     sort: view.sort ?? 'queue',
   };

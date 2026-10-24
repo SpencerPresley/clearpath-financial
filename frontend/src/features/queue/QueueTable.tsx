@@ -218,7 +218,6 @@ export function QueueTable({
                         }
                         size={12}
                         className="app-th-sort-icon"
-                        data-idle={ariaSort === undefined ? 'true' : undefined}
                       />
                     </button>
                   ) : (

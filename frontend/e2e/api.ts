@@ -424,12 +424,16 @@ export async function stubApi(page: Page, opts: StubOptions = {}) {
     }
     if (path === '/api/items') {
       const statuses = url.searchParams.getAll('status');
-      if (statuses.includes('approved')) return fulfill(route, { rows: approvedRows(), next_cursor: null });
+      if (statuses.includes('approved')) {
+        const approved = approvedRows();
+        return fulfill(route, { rows: approved, next_cursor: null, total: approved.length });
+      }
       if (statuses.length === 4) {
         const board = boardRows();
         return fulfill(route, {
           rows: url.searchParams.get('sort') === 'queue' ? queueOrder(board) : board,
           next_cursor: null,
+          total: board.length,
         });
       }
       if (opts.items === 'hang') return;
@@ -443,6 +447,7 @@ export async function stubApi(page: Page, opts: StubOptions = {}) {
       return fulfill(route, {
         rows: url.searchParams.get('sort') === 'queue' ? queueOrder(rows) : rows,
         next_cursor: null,
+        total: rows.length,
       });
     }
     if (path === '/api/views') {

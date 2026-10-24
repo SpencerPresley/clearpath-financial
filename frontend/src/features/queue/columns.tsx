@@ -2,8 +2,8 @@
  * Queue columns (TanStack Table v9). Module-scope and stable: features and column defs are model inputs, and
  * recreating them per render invalidates the row model (bundled table-core skill, "stable inputs").
  *
- * Sorting is server-owned and limited to the orders `GET /items` supports (queue, oldest, newest, updated,
- * title; backend/reviews/selectors.py _SORTS). Only Title and Age have a header sort; see SORT_CYCLES.
+ * Sorting is server-owned: every header sort is a `GET /items` order (ItemSort; backend/reviews/selectors.py
+ * _SORTS). Product, channel, re-review reason, and tags have no server order, so no header sort; see SORT_CYCLES.
  */
 import {
   columnResizingFeature,
@@ -25,6 +25,7 @@ import { FindingsCount } from './FindingsCount';
 import { CHANNEL_LABEL, PRODUCT_LABEL, REOPEN_REASON_LABEL, roundLabel } from './labels';
 import { RiskCell } from './RiskCell';
 import { stopRowClick } from './stopRowClick';
+import { NotesCell } from './NotesCell';
 import { TagsCell } from './TagsCell';
 
 export const queueFeatures = tableFeatures({
@@ -54,6 +55,7 @@ export const COLUMN_IDS = [
   'round',
   'reopen_reason',
   'tags',
+  'notes',
 ] as const;
 export type ColumnId = (typeof COLUMN_IDS)[number];
 
@@ -72,6 +74,7 @@ export const COLUMN_LABELS: Record<Exclude<ColumnId, 'select'>, string> = {
   round: 'Round',
   reopen_reason: 'Re-review reason',
   tags: 'Tags',
+  notes: 'Notes',
 };
 
 /**
@@ -83,23 +86,59 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   channel: false,
   reopen_reason: false,
   tags: false,
+  notes: false,
 };
 
 /** Title takes whatever width the other columns leave (never below this), so it isn't resizable itself. */
 export const TITLE_MIN_WIDTH = 180;
 
-/** Clicking a sortable header moves to the next server order; the last step returns to queue order. */
-export const SORT_CYCLES: Partial<Record<ColumnId, readonly ItemSort[]>> = {
-  title: ['title', 'queue'],
-  age: ['oldest', 'newest', 'queue'],
+type Direction = 'ascending' | 'descending';
+
+/**
+ * The column and direction each server order sorts by (backend reviews.filters.ItemSort). Status ascends in
+ * board order, risk from low to high, names A to Z with blanks last. Oldest first is Age descending. Queue
+ * order and Updated aren't a column's order.
+ */
+const SORT_COLUMN: Record<ItemSort, readonly [ColumnId, Direction] | null> = {
+  queue: null,
+  updated: null,
+  oldest: ['age', 'descending'],
+  newest: ['age', 'ascending'],
+  title: ['title', 'ascending'],
+  title_desc: ['title', 'descending'],
+  status: ['status', 'ascending'],
+  status_desc: ['status', 'descending'],
+  risk_tier: ['risk_tier', 'ascending'],
+  risk_tier_desc: ['risk_tier', 'descending'],
+  partner: ['partner', 'ascending'],
+  partner_desc: ['partner', 'descending'],
+  assignee: ['assignee', 'ascending'],
+  assignee_desc: ['assignee', 'descending'],
+  open_findings: ['open_findings', 'ascending'],
+  open_findings_desc: ['open_findings', 'descending'],
+  round: ['round', 'ascending'],
+  round_desc: ['round', 'descending'],
 };
 
-/** aria-sort for a header under the current server sort. Oldest first = age descending. */
-export function ariaSortFor(id: ColumnId, sort: ItemSort): 'ascending' | 'descending' | undefined {
-  if (id === 'title' && sort === 'title') return 'ascending';
-  if (id === 'age' && sort === 'oldest') return 'descending';
-  if (id === 'age' && sort === 'newest') return 'ascending';
-  return undefined;
+/**
+ * Clicking a sortable header moves to the next server order; the last step returns to queue order. Columns go
+ * ascending then descending. Age starts at oldest first (what a reviewer looks for), then newest.
+ */
+export const SORT_CYCLES: Partial<Record<ColumnId, readonly ItemSort[]>> = {
+  title: ['title', 'title_desc', 'queue'],
+  status: ['status', 'status_desc', 'queue'],
+  risk_tier: ['risk_tier', 'risk_tier_desc', 'queue'],
+  partner: ['partner', 'partner_desc', 'queue'],
+  assignee: ['assignee', 'assignee_desc', 'queue'],
+  open_findings: ['open_findings', 'open_findings_desc', 'queue'],
+  age: ['oldest', 'newest', 'queue'],
+  round: ['round', 'round_desc', 'queue'],
+};
+
+/** aria-sort for a header under the current server sort. */
+export function ariaSortFor(id: ColumnId, sort: ItemSort): Direction | undefined {
+  const by = SORT_COLUMN[sort];
+  return by !== null && by[0] === id ? by[1] : undefined;
 }
 
 export function nextSort(id: ColumnId, sort: ItemSort): ItemSort {
@@ -242,8 +281,8 @@ export const queueColumns = helper.columns([
   helper.accessor('round', {
     id: 'round',
     header: COLUMN_LABELS.round,
-    size: 56,
-    minSize: 52,
+    size: 72, // label plus the sort glyph
+    minSize: 68,
     cell: ({ row }) => <span className="app-figure">{roundLabel(row.original.round)}</span>,
   }),
   helper.accessor('reopen_reason', {
@@ -260,5 +299,12 @@ export const queueColumns = helper.columns([
     size: 180,
     minSize: 96,
     cell: ({ row }) => <TagsCell row={row.original} />,
+  }),
+  helper.accessor('notes', {
+    id: 'notes',
+    header: COLUMN_LABELS.notes,
+    size: 200,
+    minSize: 96,
+    cell: ({ row }) => <NotesCell row={row.original} />,
   }),
 ]);

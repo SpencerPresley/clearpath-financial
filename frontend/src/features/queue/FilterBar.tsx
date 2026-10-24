@@ -36,12 +36,26 @@ export interface ChipOption {
   label: string;
 }
 
+/** Exhaustive on purpose: a new server sort doesn't compile until someone names it. Menu order is this order. */
 export const SORT_LABEL: Record<ItemSort, string> = {
   queue: 'Queue order',
   oldest: 'Oldest first',
   newest: 'Newest first',
   updated: 'Recently updated',
   title: 'Title A–Z',
+  title_desc: 'Title Z–A',
+  status: 'Status, submitted first',
+  status_desc: 'Status, closed first',
+  risk_tier: 'Risk, low to high',
+  risk_tier_desc: 'Risk, high to low',
+  assignee: 'Assignee A–Z',
+  assignee_desc: 'Assignee Z–A',
+  partner: 'Partner A–Z',
+  partner_desc: 'Partner Z–A',
+  open_findings: 'Fewest findings first',
+  open_findings_desc: 'Most findings first',
+  round: 'Round, first to latest',
+  round_desc: 'Round, latest first',
 };
 
 const SORT_HINT: Partial<Record<ItemSort, string>> = {

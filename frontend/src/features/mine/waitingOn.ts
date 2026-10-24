@@ -2,7 +2,7 @@
  * "What's waiting on me, and why" (product-spec, My submissions): which section an item sits in, the one
  * line that replaces an "any update?" email, and the marketer's next action when there is one.
  */
-import type { ItemDetailOut, ItemRowOut, ItemStatus } from '../../api/generated/model';
+import type { ItemRowOut } from '../../api/generated/model';
 import { REOPEN_REASON_LABELS, formatDate } from '../../ui/labels';
 
 export type WaitingBucket = 'you' | 'compliance' | 'approved' | 'closed';
@@ -21,9 +21,6 @@ export const BUCKETS: readonly { id: WaitingBucket; label: string }[] = [
   { id: 'closed', label: 'Closed' },
 ];
 
-/** Statuses whose why line needs the item detail (the decision behind it). */
-export const NEEDS_DETAIL: ReadonlySet<ItemStatus> = new Set(['changes_requested']);
-
 function firstLine(text: string): string {
   return (
     text
@@ -33,12 +30,12 @@ function firstLine(text: string): string {
   );
 }
 
-/** `detail` is optional: rows render before (or without) it and fill in when it arrives. */
-export function waitingOn(row: ItemRowOut, detail?: ItemDetailOut): WaitingOn {
+/** Everything comes from the row (its latest decision and approval expiry), so the page makes one request. */
+export function waitingOn(row: ItemRowOut): WaitingOn {
   const assignee = row.assignee?.name;
   switch (row.status) {
     case 'changes_requested': {
-      const decision = detail?.latest_decision;
+      const decision = row.latest_decision;
       const reason = decision?.outcome === 'changes_requested' ? firstLine(decision.reason) : '';
       return {
         bucket: 'you',
@@ -81,8 +78,8 @@ export function waitingOn(row: ItemRowOut, detail?: ItemDetailOut): WaitingOn {
             : `Back in review: ${REOPEN_REASON_LABELS[row.reopen_reason]}`,
       };
     case 'approved': {
-      // ItemRowOut has no expiry; it shows only when the detail is at hand.
-      const expires = detail?.approval_expires_at ?? detail?.latest_decision?.expires_at ?? null;
+      // Approved, so this is the expiry of the approval in force.
+      const expires = row.approval_expires_at;
       return {
         bucket: 'approved',
         why: expires === null ? 'Approved' : `Approved · expires ${formatDate(expires)}`,
