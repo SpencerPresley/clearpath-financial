@@ -233,6 +233,10 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
   - `config/tests/test_contract.py`: E's stubs removed. `test_stub_still_validates_input_first` now uses the
     fast-track stub.
   - `config/tests/test_query_counts.py`: one new case.
+  - `config/urls.py`: wraps `admin.site.login` with `secure_admin_login` (#18). `config/tests/test_security_settings.py`
+    is new.
+  - `reviews/selectors.py` merged with G's change: the queue default `is_legacy=False` is kept, inside E's
+    `list_items`/`_page` split.
   - `docs/decisions.md`: the IMDS note (#18).
 - **Redis client:** `redis` comes in through `celery[redis]`, so `pyproject.toml` is unchanged. That avoids a
   `uv.lock` conflict with D's branch. Tests use LocMem because CI has no Redis.
@@ -242,18 +246,19 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
 
 ## Verification
 
-Run at the branch head after the review fix pass, with test DB suffix `wsE`, Postgres from compose on 55432, and
-Redis on 56379. That is 807 backend tests: Foundation's and C's 622 plus 185 new.
+Run at the branch head after the review fix pass and the rebase onto `origin/main` (`ff5a938`, which has G's
+import/export and D's LLM core), with test DB suffix `wsE`, Postgres from compose on 55432, and Redis on 56379.
+Before the rebase the backend count was 807. This branch adds 185 tests.
 
 ```
 $ uv run pytest -q
-807 passed in 13.76s
+1201 passed, 1 deselected in 24.03s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group lint ruff format --check .
-196 files already formatted
+249 files already formatted
 $ uv run --group typecheck pyrefly check
- INFO 0 errors (139 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
+ INFO 0 errors (177 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
 $ manage.py makemigrations --check --dry-run
 No changes detected
 $ manage.py check --fail-level WARNING
