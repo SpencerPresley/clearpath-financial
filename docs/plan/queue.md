@@ -51,7 +51,7 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
   the URL's filter state against each view's definition; a mismatch reads "Modified".
   - My queue `{ mine: true }` · Unassigned `{ unassigned: true }` · Waiting >3 days `{ waiting: 3 }` ·
     Needs re-review `{ reopen_reason: all three }` · All active `{ status: submitted, in_review,
-    changes_requested, needs_rereview }`.
+changes_requested, needs_rereview }`.
   - Needs re-review keys on `reopen_reason`, not `status=needs_rereview`: the foundation report shows a
     status key drops the item as soon as a reviewer opens it (in_review). Cost: the stats strip's
     `needs_rereview` counts status only, so the two numbers can differ (API gap).
@@ -86,6 +86,7 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
 **Files:** Create `frontend/src/features/queue/search.ts`, `search.test.ts`.
 
 **Interfaces — produces:**
+
 - `queueSearchSchema` (zod object, every field `.catch()`-guarded): `view?: string`, `q?: string`,
   `status?: ItemStatus[]`, `product?: Product[]`, `channel?: Channel[]`, `risk_tier?: RiskTier[]`,
   `reopen_reason?: ReopenReason[]`, `partner_id?: number[]`, `assignee_id?: number[]`, `mine?: boolean`,
@@ -94,7 +95,7 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
 - `type QueueSearch = z.output<typeof queueSearchSchema>`; `type QueueFilters` = the filter subset.
 - `DEFAULT_SEARCH: QueueSearch` = My queue.
 - `BUILT_IN_VIEWS: readonly BuiltInView[]` (`{ id, label, filters: QueueFilters }`), ids `mine | unassigned |
-  waiting | rereview | active`.
+waiting | rereview | active`.
 - `toListParams(search, extra?: { cursor?, limit? }): ListItemsParams`.
 - `filtersOf(search): QueueFilters`; `sameFilters(a, b): boolean` (order-insensitive arrays, absent = empty).
 - `activeView(search, saved: SavedViewOut[]): { kind: 'builtin' | 'saved' | 'custom', id?, label, modified }`.
@@ -115,8 +116,9 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
 `src/theme/theme.css` (append Queue block). Create `src/features/queue/labels.ts` (+ test).
 
 **Interfaces — produces:**
+
 - `StatusMark({ status })`: icon-only status for dense cells: `<span role="img" aria-label="In review"
-  title="In review" class="app-status-mark" data-tone>`; no tab stop (rows are the tab stop).
+title="In review" class="app-status-mark" data-tone>`; no tab stop (rows are the tab stop).
 - Icon keys: `view.table` (Table), `view.board` (Kanban), `action.columns` (Columns), `action.save_view`
   (BookmarkSimple), `action.keyboard` (Keyboard), `action.select` (CheckSquare), `entity.user` (User),
   `action.reload` (ArrowClockwise).
@@ -135,16 +137,17 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
 (add generated items, me, users, findings, decisions, partners mocks as defaults).
 
 **Interfaces — produces:**
+
 - `useQueueItems(search)`: `useInfiniteQuery({ queryKey: getListItemsQueryKey(toListParams(search)),
-  queryFn: ({ pageParam, signal }) => listItems(toListParams(search, { cursor: pageParam }), { signal }),
-  initialPageParam: null, getNextPageParam: p => p.next_cursor })` → `{ rows, query }`; `rows` memoized,
+queryFn: ({ pageParam, signal }) => listItems(toListParams(search, { cursor: pageParam }), { signal }),
+initialPageParam: null, getNextPageParam: p => p.next_cursor })` → `{ rows, query }`; `rows` memoized,
   module-level `EMPTY_ROWS`.
 - `QUEUE_COLUMNS` ids: `select, key, title, status, risk_tier, product, channel, partner, assignee,
-  open_findings, age, round, reopen_reason, tags`; `DEFAULT_HIDDEN = { channel: false, tags: false }`; sizes in px.
+open_findings, age, round, reopen_reason, tags`; `DEFAULT_HIDDEN = { channel: false, tags: false }`; sizes in px.
 - `QueueTable({ rows, search, onSearch, activeId, onActiveChange, onOpen, selection, onSelectionChange,
-  columnVisibility, onColumnVisibilityChange, canEdit })`. Features: `columnSizingFeature,
-  columnResizingFeature, columnVisibilityFeature, rowSelectionFeature, rowSortingFeature`; `getRowId: r =>
-  String(r.id)`; `manualSorting: true`; sizes persisted in `localStorage['clearpath.queue.sizes']`.
+columnVisibility, onColumnVisibilityChange, canEdit })`. Features: `columnSizingFeature,
+columnResizingFeature, columnVisibilityFeature, rowSelectionFeature, rowSortingFeature`; `getRowId: r =>
+String(r.id)`; `manualSorting: true`; sizes persisted in `localStorage['clearpath.queue.sizes']`.
 - Native `<table>` with `table-layout: fixed` and widths from `header.getSize()` as CSS vars; resize handle on
   `mousedown` + `touchstart` (`header.getResizeHandler()`), double-click resets; rows roving `tabIndex`.
 
@@ -166,7 +169,7 @@ view); `docs/decisions.md` "Ergonomics", "Queue views", "Reviewer assignment"; `
 Permissions: `canEditRisk = viewer.roles ∋ reviewer|lead`; `canEditTags = canEditRisk || row.owner?.id === viewer.id`.
 
 - [ ] Tests: risk change shows the new tier before the server answers; `rolls back and toasts the server message
-      on error` (PATCH → 403 `{code:'not_permitted', message:'Only reviewers can change risk tier.'}`); marketer
+    on error` (PATCH → 403 `{code:'not_permitted', message:'Only reviewers can change risk tier.'}`); marketer
       sees risk as plain badge (no picker); tags editor adds a tag on Enter and removes with its × button.
 - [ ] Implement (RAC `Select` for risk, RAC `DialogTrigger`+`Popover` with a `TextField` for tags); commit.
 
@@ -175,6 +178,7 @@ Permissions: `canEditRisk = viewer.roles ∋ reviewer|lead`; `canEditTags = canE
 **Files:** Create `FilterBar.tsx`, `ViewBar.tsx`, `StatsStrip.tsx` + tests.
 
 **Interfaces — produces:**
+
 - `FilterBar({ search, onSearch })`: search field (`q`, debounced 250ms), chips: Status, Risk, Product, Channel,
   Assignee (Me / Unassigned / people from `useListUsers({ role: 'reviewer' })`), Partner (`useListPartners`),
   Open findings (Has open findings / None), Re-review reason; each chip is a RAC `MenuTrigger` with a
