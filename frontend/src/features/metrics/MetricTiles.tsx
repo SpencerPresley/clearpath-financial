@@ -151,7 +151,7 @@ export function MetricTiles({
                   onDrill(figure.metric, true);
                 }}
               >
-                <Icon name="status.needs_rereview" size={13} />
+                <Icon name="status.needs_rereview" size={13} className="shrink-0" />
                 {`${String(open.count)} ${open.count === 1 ? 're-review' : 're-reviews'} open · oldest ${formatHours(open.oldest_hours)}`}
               </button>
             )}

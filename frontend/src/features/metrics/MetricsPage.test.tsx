@@ -212,6 +212,12 @@ describe('MetricsPage', () => {
     expect(requests.filter((url) => url.pathname.endsWith('/metrics/summary'))).toHaveLength(0);
   });
 
+  it('leaves focus alone when the page loads with a list open', async () => {
+    table({ drill: 'throughput' });
+    const drill = await screen.findByRole('region', { name: /Throughput/ });
+    expect(within(drill).getByRole('heading')).not.toHaveFocus();
+  });
+
   it('returns focus to the tile that opened the list when it closes', async () => {
     table();
     const tile = await screen.findByRole('button', { name: /Throughput/ });

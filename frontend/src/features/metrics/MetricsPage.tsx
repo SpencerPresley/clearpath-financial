@@ -114,6 +114,8 @@ export function MetricsPage() {
   const summary = useGetMetricsSummary(params, { query: { enabled: ordered } });
   const partners = useListPartners();
   const importedIncluded = search.imported !== false;
+  // The list takes focus only when the user opens it here, never when the page loads with it open.
+  const [drillOpened, setDrillOpened] = useState(false);
 
   function update(change: Partial<MetricsSearch>, { keepDrill = false, replace = false } = {}) {
     const reset = keepDrill ? {} : { drill: undefined, dfrom: undefined, dto: undefined, open: undefined };
@@ -121,10 +123,12 @@ export function MetricsPage() {
   }
 
   function drill(metric: MetricName, open = false) {
+    setDrillOpened(true);
     void update({ drill: metric, dfrom: undefined, dto: undefined, open: open || undefined });
   }
 
   function drillPoint(point: MetricPointOut) {
+    setDrillOpened(true);
     void update({ drill: search.chart, dfrom: point.from_date, dto: point.to_date, open: undefined });
   }
 
@@ -355,6 +359,7 @@ export function MetricsPage() {
           metric={search.drill}
           range={{ from: search.dfrom ?? period.from, to: search.dto ?? period.to }}
           openOnly={search.open === true}
+          takeFocus={drillOpened}
           onClose={closeDrill}
         />
       )}

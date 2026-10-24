@@ -2171,7 +2171,7 @@
     @apply whitespace-nowrap;
   }
   .app-metric-open {
-    @apply mx-3.5 mb-3 flex h-7 items-center gap-1.5 self-start rounded-md bg-status-alert-soft px-2 text-meta font-medium text-status-alert-soft-content tabular-nums;
+    @apply mx-3.5 mb-3 flex min-h-7 items-center gap-1.5 self-start rounded-md bg-status-alert-soft px-2 py-1 text-left text-meta font-medium text-status-alert-soft-content tabular-nums;
     transition-property: box-shadow;
     transition-duration: 120ms;
   }
@@ -2219,8 +2219,10 @@
   .app-metric-drill-heading {
     @apply rounded-xs;
   }
+  /* A custom tooltip body gets no chrome from the chart (customTooltipCardStyle is transparent), so it is the
+     overlay surface itself. */
   .app-metric-tooltip {
-    @apply flex flex-col gap-0.5 text-meta tabular-nums;
+    @apply flex flex-col gap-0.5 rounded-lg bg-base-100 px-2.5 py-1.5 text-meta whitespace-nowrap text-base-content tabular-nums shadow-overlay;
   }
   .app-metric-tooltip-title {
     @apply font-medium;

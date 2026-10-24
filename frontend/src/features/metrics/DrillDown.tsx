@@ -25,7 +25,7 @@ import { METRIC_META } from './labels';
 import { DRILL_ID } from './MetricTiles';
 import { isServerError } from './retry';
 
-const COLUMNS = ['7rem', '1fr', '9.5rem', '11rem', '7rem', '7rem', '6rem'] as const;
+const COLUMNS = ['7rem', '1fr', '9.5rem', '11rem', '7rem', '10rem', '6rem'] as const;
 
 function value(metric: MetricName, row: MetricItemOut): string {
   const unit = METRIC_META[metric].unit;
@@ -74,6 +74,7 @@ export function DrillDown({
   metric,
   range,
   openOnly,
+  takeFocus,
   onClose,
 }: {
   params: GetMetricsSummaryParams;
@@ -81,6 +82,8 @@ export function DrillDown({
   /** A bucket's range, or the whole period. */
   range: { from: string; to: string };
   openOnly: boolean;
+  /** Opened by the user just now (not by loading a URL): move focus to the list. */
+  takeFocus: boolean;
   onClose: () => void;
 }) {
   const meta = METRIC_META[metric];
@@ -93,9 +96,10 @@ export function DrillDown({
   });
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    if (!takeFocus) return;
     heading.current?.scrollIntoView({ block: 'nearest' });
     heading.current?.focus({ preventScroll: true });
-  }, [metric, openOnly, range.from, range.to]);
+  }, [takeFocus, metric, openOnly, range.from, range.to]);
   const title = openOnly
     ? `${meta.label} · re-reviews open now`
     : `${meta.label} · ${rangeLabel(range.from, range.to)}`;
