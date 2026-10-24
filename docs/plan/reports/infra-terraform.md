@@ -168,6 +168,12 @@ Data sources resolved at plan time:
   configure-aws-credentials v6.3.0 `e1253824e5c10ff9df46874f81ed3ec929e19cfd`, checkout v7.0.1, and
   setup-node v7.1.0 (the same SHAs existing CI uses).
 - **Compose v5.6.1 checksum:** the release asset digest matches the published `.sha256` file.
+- **`aws_cloudfront_vpc_origin` default timeouts are 15 min** (`internal/service/cloudfront/vpc_origin.go`
+  at v6.70.0), the same as AWS's "up to 15 minutes". I raised them to 30 min.
+- **Managed-CachingDisabled has gzip/brotli off** (read from the plan's data source), so CloudFront
+  can't compress on the API behaviors. `compress = false` there says so explicitly.
+- **The CloudFront prefix list counts as 55 rules** against the 60-rule SG quota (VPC User Guide,
+  "AWS-managed prefix list weight"). That leaves 5 inbound rules of headroom on the app SG.
 
 ## Cost
 

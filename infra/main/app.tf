@@ -24,7 +24,8 @@ resource "aws_security_group" "app" {
 # Option 1 in the VPC-origin docs. Option 2 (the service-managed
 # CloudFront-VPCOrigins-Service-SG) is tighter but only exists after the VPC
 # origin is created, which would make the first apply two-phase.
-# The prefix list (49 entries today) counts against the 60-rules-per-SG quota.
+# AWS weights this prefix list at 55 rules against the 60-rules-per-SG quota
+# (regardless of its current 49 entries): room for only 5 more inbound rules.
 resource "aws_vpc_security_group_ingress_rule" "app_from_cloudfront" {
   security_group_id = aws_security_group.app.id
   description       = "CloudFront VPC origin"

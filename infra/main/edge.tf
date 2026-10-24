@@ -60,6 +60,14 @@ resource "aws_cloudfront_vpc_origin" "app" {
       quantity = 1
     }
   }
+
+  # Provider default is 15m, the same as AWS's "up to 15 minutes"; leave headroom
+  # so a slow deployment doesn't fail the apply with the origin half-created.
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
 }
 
 resource "aws_cloudfront_function" "spa_rewrite" {
@@ -144,10 +152,12 @@ resource "aws_cloudfront_distribution" "main" {
       path_pattern     = ordered_cache_behavior.value
       target_origin_id = local.app_origin_id
       # https-only rather than redirect: a redirected POST loses its body.
-      viewer_protocol_policy   = "https-only"
-      allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-      cached_methods           = ["GET", "HEAD"]
-      compress                 = true
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+      cached_methods         = ["GET", "HEAD"]
+      # CloudFront only compresses when the cache policy enables gzip/brotli,
+      # and Managed-CachingDisabled doesn't, so compress = true would do nothing.
+      compress                 = false
       cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
       origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_and_cloudfront.id
     }
