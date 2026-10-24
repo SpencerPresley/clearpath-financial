@@ -182,10 +182,12 @@ latency > 0. Test settings blank the key, so it reads it from `env`. Run it from
 ## For other workstreams
 
 - **I (frontend):**
-  - The failure reason isn't on the item row. It's in history, under LLM_CHECK_FAILED's `error` and `code`.
-  - Show the Retry action (`retryLlmCheck`) when `llm_check_status == failed`.
-  - `code == not_configured` deserves its own copy: retrying won't help until a key exists.
-  - `running` and `pending` both mean "wait".
+  - `features/review/LlmStatus.tsx` (merged in #27) already calls `retryLlmCheck`, and the call now returns 202
+    instead of 501.
+  - Follow-up 1: nothing polls the item while it's `pending` or `running` (no `refetchInterval`), so the status
+    only updates on reload or on another mutation. A dispatch plus one call takes a few seconds.
+  - Follow-up 2: the failure reason isn't on the item row. It's in history, under LLM_CHECK_FAILED's `error` and
+    `code`. `code == not_configured` deserves its own copy, because retrying won't help until a key exists.
   - Code-point offsets still need UTF-16 conversion.
 - **Ops:** beat must run `checks.reconcile_llm_checks`. It's in `CELERY_BEAT_SCHEDULE`. Without it, a worker
   death leaves the item `running` until someone notices.
