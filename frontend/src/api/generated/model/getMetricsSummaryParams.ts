@@ -9,7 +9,7 @@ import type { GetMetricsSummaryProductItem } from './getMetricsSummaryProductIte
 
 export type GetMetricsSummaryParams = {
 /**
- * Defaults to 90 days ago.
+ * Defaults to 89 days before `period_to`.
  */
 period_from?: string | null;
 /**
@@ -18,5 +18,9 @@ period_from?: string | null;
 period_to?: string | null;
 product?: GetMetricsSummaryProductItem[];
 channel?: GetMetricsSummaryChannelItem[];
+partner_id?: number[];
+/**
+ * Count imported tracker history.
+ */
 include_legacy?: boolean;
 };

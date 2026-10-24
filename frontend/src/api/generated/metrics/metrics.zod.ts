@@ -8,74 +8,152 @@ import * as zod from 'zod';
 
 
 /**
- * [metrics owner: see ledger]
+ * The measurements behind a number: same computation, so `total` equals the number. `open_only` with
+ * `time_to_fix_live` lists the clocks still running.
+ * @summary Items
+ */
+export const listMetricItemsQueryIncludeLegacyDefault = true;
+export const listMetricItemsQueryOpenOnlyDefault = false;
+
+export const ListMetricItemsQueryParams = zod.object({
+  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'throughput']),
+  "period_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to 89 days before `period_to`.'),
+  "period_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to today.'),
+  "product": zod.array(zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal'])).optional(),
+  "channel": zod.array(zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script'])).optional(),
+  "partner_id": zod.array(zod.int()).optional(),
+  "include_legacy": zod.boolean().default(listMetricItemsQueryIncludeLegacyDefault).describe('Count imported tracker history.'),
+  "open_only": zod.boolean().default(listMetricItemsQueryOpenOnlyDefault)
+})
+
+export const ListMetricItemsResponse = zod.object({
+  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'throughput']),
+  "rows": zod.array(zod.object({
+  "end": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('Null for a fix-live clock still running.'),
+  "item": zod.object({
+  "channel": zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script']),
+  "id": zod.int(),
+  "is_legacy": zod.boolean(),
+  "key": zod.string(),
+  "legacy_ref": zod.union([zod.string(),zod.null()]),
+  "partner_name": zod.union([zod.string(),zod.null()]),
+  "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
+  "title": zod.string()
+}),
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "source": zod.enum(['native', 'imported']).describe('Where a measurement came from: this app\'s event log, or a legacy tracker row\'s own dates.'),
+  "start": zod.iso.datetime({"offset":true}),
+  "value": zod.number()
+})),
+  "total": zod.int().describe('Equals the number it was opened from; `rows` holds at most 200.')
+})
+
+/**
+ * One metric per week or month, empty buckets included; each point's `from_date`/`to_date` open its items.
  * @summary Series
  */
 export const getMetricSeriesQueryIncludeLegacyDefault = true;
 export const getMetricSeriesQueryBucketDefault = `week`;
 
 export const GetMetricSeriesQueryParams = zod.object({
-  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'aged_items']),
-  "period_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to 90 days ago.'),
+  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'throughput']),
+  "period_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to 89 days before `period_to`.'),
   "period_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to today.'),
   "product": zod.array(zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal'])).optional(),
   "channel": zod.array(zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script'])).optional(),
-  "include_legacy": zod.boolean().default(getMetricSeriesQueryIncludeLegacyDefault),
+  "partner_id": zod.array(zod.int()).optional(),
+  "include_legacy": zod.boolean().default(getMetricSeriesQueryIncludeLegacyDefault).describe('Count imported tracker history.'),
   "bucket": zod.enum(['week', 'month']).default(getMetricSeriesQueryBucketDefault)
 })
 
 export const GetMetricSeriesResponse = zod.object({
   "bucket": zod.enum(['week', 'month']),
-  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'aged_items']),
+  "metric": zod.enum(['time_to_first_review', 'time_per_round', 'rounds_per_item', 'time_to_fix_live', 'throughput']),
+  "period_from": zod.iso.date(),
+  "period_to": zod.iso.date(),
   "points": zod.array(zod.object({
   "count": zod.int(),
+  "from_date": zod.iso.date().describe('The bucket clipped to the period; pass as the drill-down period.'),
+  "imported_count": zod.int(),
+  "imported_value": zod.union([zod.number(),zod.null()]).describe('The same over imported measurements only.'),
+  "native_count": zod.int(),
+  "native_value": zod.union([zod.number(),zod.null()]).describe('The same over native measurements only.'),
   "period_start": zod.iso.date(),
-  "value": zod.union([zod.number(),zod.null()])
+  "to_date": zod.iso.date(),
+  "value": zod.union([zod.number(),zod.null()]).describe('Median hours (durations), mean rounds, or the decision count.')
 }))
 })
 
 /**
- * The stats strip and metrics page headline numbers. [metrics owner: see ledger]
+ * Headline numbers for the period. Reviewers, leads, admins.
  * @summary Summary
  */
 export const getMetricsSummaryQueryIncludeLegacyDefault = true;
 
 export const GetMetricsSummaryQueryParams = zod.object({
-  "period_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to 90 days ago.'),
+  "period_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to 89 days before `period_to`.'),
   "period_to": zod.union([zod.iso.date(),zod.null()]).optional().describe('Defaults to today.'),
   "product": zod.array(zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal'])).optional(),
   "channel": zod.array(zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script'])).optional(),
-  "include_legacy": zod.boolean().default(getMetricsSummaryQueryIncludeLegacyDefault)
+  "partner_id": zod.array(zod.int()).optional(),
+  "include_legacy": zod.boolean().default(getMetricsSummaryQueryIncludeLegacyDefault).describe('Count imported tracker history.')
 })
 
 export const GetMetricsSummaryResponse = zod.object({
-  "aged_items": zod.array(zod.object({
-  "count": zod.int(),
-  "label": zod.string(),
-  "max_days": zod.union([zod.int(),zod.null()]),
-  "min_days": zod.int()
-})),
+  "imported_from": zod.union([zod.iso.date(),zod.null()]).describe('First date of imported history under these filters, any period.'),
+  "imported_to": zod.union([zod.iso.date(),zod.null()]),
+  "open_fix_live": zod.object({
+  "count": zod.int().describe('Live content sent back for re-review and not yet fixed, now.'),
+  "oldest_hours": zod.union([zod.number(),zod.null()])
+}),
   "period_from": zod.iso.date(),
   "period_to": zod.iso.date(),
   "rounds_per_item": zod.object({
   "count": zod.int(),
-  "mean": zod.union([zod.number(),zod.null()]),
-  "median": zod.union([zod.number(),zod.null()])
+  "imported_count": zod.int(),
+  "imported_mean": zod.union([zod.number(),zod.null()]),
+  "mean": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
+  "median": zod.union([zod.number(),zod.null()]),
+  "native_count": zod.int(),
+  "native_mean": zod.union([zod.number(),zod.null()])
+}),
+  "throughput": zod.object({
+  "count": zod.int().describe('Decisions recorded in the period (imported rows: the final decision only).'),
+  "imported_count": zod.int(),
+  "native_count": zod.int(),
+  "per_week": zod.number()
 }),
   "time_per_round": zod.object({
   "count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_count": zod.int(),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
+  "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
-}),
+}).describe('Native only: the tracker has no per-round dates.'),
   "time_to_first_review": zod.object({
   "count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_count": zod.int(),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
+  "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
 }),
   "time_to_fix_live": zod.object({
   "count": zod.int(),
-  "median_hours": zod.union([zod.number(),zod.null()]),
+  "imported_count": zod.int(),
+  "imported_median_hours": zod.union([zod.number(),zod.null()]),
+  "median_hours": zod.union([zod.number(),zod.null()]).describe('Across both sources.'),
+  "native_count": zod.int(),
+  "native_median_hours": zod.union([zod.number(),zod.null()]),
   "p90_hours": zod.union([zod.number(),zod.null()])
-})
+}).describe('Native only: imported items are never reopened.'),
+  "waiting": zod.array(zod.object({
+  "count": zod.int().describe('Equals the queue\'s `waiting_more_than_days` view under the same filters, now.'),
+  "more_than_days": zod.int()
+}))
 })
 

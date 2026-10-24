@@ -49,7 +49,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   { id: 'library', label: 'Library', icon: 'nav.library', group: 'reference', roles: 'everyone' },
   { id: 'offer-terms', label: 'Offer terms', icon: 'nav.offer_terms', group: 'reference', roles: ['lead'] },
   { id: 'partners', label: 'Partners', icon: 'nav.partners', group: 'reference', roles: ['lead'] },
-  { id: 'metrics', label: 'Metrics', icon: 'nav.metrics', group: 'operations', roles: ['lead'] },
+  {
+    id: 'metrics',
+    label: 'Metrics',
+    icon: 'nav.metrics',
+    group: 'operations',
+    roles: ['lead'],
+    to: '/metrics',
+  },
   { id: 'import', label: 'Import', icon: 'nav.import', group: 'operations', roles: ['admin'] },
   { id: 'outbox', label: 'Outbox', icon: 'nav.outbox', group: 'operations', roles: 'everyone' },
 ];

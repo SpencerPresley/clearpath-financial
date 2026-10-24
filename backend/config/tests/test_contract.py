@@ -105,8 +105,6 @@ def test_no_operation_returns_a_raw_dict() -> None:
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
-    ("get", "/api/metrics/summary", None),
-    ("get", "/api/metrics/series?metric=rounds_per_item", None),
     ("post", "/api/assistant/threads", None),
     ("get", "/api/assistant/threads/t1", None),
     ("post", "/api/assistant/threads/t1/messages", {"content": "What's waiting on me?"}),

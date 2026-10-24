@@ -2067,3 +2067,239 @@
     @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
   }
 }
+
+/* ---- Metrics (workstream J) --------------------------------------------------------------------------- */
+@theme static {
+  /* Chart series. Native = brand navy; imported = a lighter navy (3.6:1 on base-100, WCAG 1.4.11), so the two
+     read as one family that differs in provenance, never as a status (§5.2). The legend and the table view say
+     which is which in words. */
+  --color-chart-native: oklch(30% 0.085 262);
+  --color-chart-imported: oklch(62% 0.07 262);
+}
+
+@layer components {
+  .app-metrics {
+    @apply flex max-w-[90rem] flex-col gap-4;
+  }
+  .app-metrics .app-num {
+    @apply text-right tabular-nums;
+  }
+  .app-metrics-header {
+    @apply flex flex-wrap items-center justify-between gap-x-6 gap-y-2;
+  }
+  .app-metrics-header .app-page-title {
+    @apply mb-0;
+  }
+  .app-metrics-filters {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-metrics-filters .app-field {
+    @apply min-w-36;
+  }
+  .app-metrics-date {
+    @apply flex-row items-center gap-1.5;
+  }
+  .app-metrics-date .app-field-label {
+    @apply mb-0;
+  }
+  .app-metrics-date .app-input {
+    @apply h-7 w-36;
+  }
+  /* Always present (empty or not) so the tiles below never move when it fills in (§5.3). */
+  .app-metrics-provenance {
+    @apply flex min-h-7 items-center gap-2 text-meta text-muted;
+  }
+  .app-metrics-range {
+    @apply flex items-start gap-2;
+  }
+
+  /* Headline numbers: one row of tiles on rules, no cards (§5.6); figures in tabular nums (§5.3). */
+  .app-metric-tiles {
+    @apply grid grid-cols-5 rounded-lg border border-base-300 bg-base-100;
+  }
+  /* The tile, not its button, holds the minimum height (it includes the fix-live re-review button), so the
+     skeleton and every loaded state are the same height (§5.3). */
+  .app-metric-tile {
+    @apply flex min-h-42 min-w-0 flex-col;
+  }
+  .app-metric-tile + .app-metric-tile {
+    box-shadow: -1px 0 0 var(--color-base-300);
+  }
+  .app-metric-tile-btn {
+    @apply flex flex-1 cursor-default flex-col items-start gap-1 px-3.5 py-3 text-left;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  /* Concentric with the 1px-bordered row: inner radius = outer - 1px. */
+  .app-metric-tile:first-child .app-metric-tile-btn {
+    border-top-left-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+  }
+  .app-metric-tile:last-child .app-metric-tile-btn {
+    border-top-right-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+  }
+  .app-metric-tile-btn:hover {
+    @apply bg-hover;
+  }
+  .app-metric-tile-btn[data-active] {
+    @apply bg-selected;
+    box-shadow: inset 0 -2px 0 var(--color-primary);
+  }
+  .app-metric-tile-label {
+    @apply text-meta font-medium text-muted;
+  }
+  /* One figure, or one per source at equal weight (never a blend of two differently measured sources). */
+  .app-metric-figures {
+    @apply flex flex-wrap items-baseline gap-x-4;
+  }
+  .app-metric-figure {
+    @apply text-xl leading-7 font-semibold whitespace-nowrap text-base-content tabular-nums;
+  }
+  .app-metric-figure-source {
+    @apply text-meta font-normal text-muted;
+  }
+  /* Same four lines in every tile: label, figure, how it's computed, what it rests on. */
+  .app-metric-tile-detail {
+    @apply text-meta text-muted;
+  }
+  /* Counts wrap rather than truncate, a whole segment at a time ("· 151 imported" never splits). */
+  .app-metric-tile-meta {
+    @apply flex flex-wrap gap-x-1 text-meta text-muted tabular-nums;
+  }
+  .app-metric-segment {
+    @apply whitespace-nowrap;
+  }
+  .app-metric-open {
+    @apply mx-3.5 mb-3 flex min-h-7 items-center gap-1.5 self-start rounded-md bg-status-alert-soft px-2 py-1 text-left text-meta font-medium text-status-alert-soft-content tabular-nums;
+    transition-property: box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-metric-open:hover,
+  .app-metric-open[data-active] {
+    box-shadow: inset 0 0 0 1px var(--color-status-alert-line);
+  }
+  .app-metric-error-icon {
+    @apply text-status-error-soft-content;
+  }
+  .app-metric-error {
+    @apply flex min-h-42 items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-3.5 text-ui text-base-content;
+  }
+
+  /* Waiting now: each count is its queue view. */
+  .app-metric-waiting {
+    @apply flex flex-wrap items-center gap-1 text-ui;
+  }
+  .app-metric-waiting-label {
+    @apply mr-2 text-meta font-medium text-muted;
+  }
+  .app-metric-waiting-link {
+    @apply flex items-baseline gap-1 rounded-md px-2 py-1 text-base-content;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-metric-waiting-link:hover {
+    @apply bg-hover;
+  }
+  .app-metric-waiting-figure {
+    @apply font-semibold tabular-nums;
+  }
+  .app-metric-waiting-note {
+    @apply ml-2 text-meta text-muted;
+  }
+
+  /* Drill-down: the items behind a number. */
+  .app-metric-drill {
+    @apply flex flex-col gap-2;
+  }
+  .app-metric-drill-header {
+    @apply flex items-center justify-between gap-4;
+  }
+  /* Takes focus when the list opens (the global ring shows for keyboard users). */
+  .app-metric-drill-heading {
+    @apply rounded-xs;
+  }
+  /* A custom tooltip body gets no chrome from the chart (customTooltipCardStyle is transparent), so it is the
+     overlay surface itself. */
+  .app-metric-tooltip {
+    @apply flex flex-col gap-0.5 rounded-lg bg-base-100 px-2.5 py-1.5 text-meta whitespace-nowrap text-base-content tabular-nums shadow-overlay;
+  }
+  .app-metric-tooltip-title {
+    @apply font-medium;
+  }
+  .app-metric-drill-table thead th {
+    @apply h-8 border-b border-base-300 px-3 text-left text-meta font-medium text-muted;
+  }
+  .app-metric-drill-row > td {
+    @apply h-row border-b border-base-300 px-3 align-middle text-ui;
+  }
+  .app-metric-drill-row:last-child > td {
+    @apply border-b-0;
+  }
+  .app-metric-drill-row:hover {
+    @apply bg-hover;
+  }
+  .app-metric-drill-title {
+    @apply truncate;
+  }
+  .app-metric-drill-value {
+    @apply font-medium text-base-content;
+  }
+
+  /* Trend: metric switch, bucket and view toggles, then the chart or its table. */
+  .app-metric-trend {
+    @apply flex flex-col gap-2 rounded-lg border border-base-300 bg-base-100 p-3.5;
+  }
+  .app-metric-trend-bar {
+    @apply flex flex-wrap items-center justify-between gap-2;
+  }
+  .app-metric-trend-controls {
+    @apply flex items-center gap-2;
+  }
+  .app-metric-trend-caption {
+    @apply flex flex-wrap items-center gap-x-3 text-meta text-muted;
+  }
+  .app-metric-legend {
+    @apply ml-auto flex items-center gap-3 text-base-content;
+  }
+  .app-metric-legend-item {
+    @apply flex items-center gap-1.5;
+  }
+  .app-metric-swatch {
+    @apply inline-block size-2.5 rounded-xs;
+  }
+  .app-metric-swatch[data-series='native'] {
+    background: var(--color-chart-native);
+  }
+  .app-metric-swatch[data-series='imported'] {
+    background: var(--color-chart-imported);
+  }
+  .app-metric-chart {
+    @apply text-meta text-muted;
+    --ts-chart-1: var(--color-chart-native);
+    --ts-chart-2: var(--color-chart-imported);
+  }
+  .app-metric-chart-skeleton {
+    @apply h-60 w-full rounded-md;
+  }
+  .app-metric-chart-error,
+  .app-metric-chart-empty {
+    @apply flex h-60 items-center gap-2 text-ui text-muted;
+  }
+  .app-metric-table {
+    @apply w-full border-separate border-spacing-0 text-ui;
+  }
+  .app-metric-table th,
+  .app-metric-table td {
+    @apply h-row border-b border-base-300 px-3 text-left align-middle;
+  }
+  .app-metric-table thead th {
+    @apply h-8 text-meta font-medium text-muted;
+  }
+  .app-metric-table tbody th {
+    @apply font-medium text-base-content;
+  }
+  .app-metric-table tbody tr:last-child > * {
+    @apply border-b-0;
+  }
+}

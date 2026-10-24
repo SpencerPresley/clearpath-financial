@@ -7,6 +7,11 @@
 
 export interface DurationStatOut {
   count: number;
+  imported_count: number;
+  imported_median_hours: number | null;
+  /** Across both sources. */
   median_hours: number | null;
+  native_count: number;
+  native_median_hours: number | null;
   p90_hours: number | null;
 }

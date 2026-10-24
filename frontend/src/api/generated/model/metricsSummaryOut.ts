@@ -4,16 +4,25 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgedBucketOut } from './agedBucketOut';
 import type { CountStatOut } from './countStatOut';
 import type { DurationStatOut } from './durationStatOut';
+import type { OpenFixLiveOut } from './openFixLiveOut';
+import type { ThroughputOut } from './throughputOut';
+import type { WaitingCountOut } from './waitingCountOut';
 
 export interface MetricsSummaryOut {
-  aged_items: AgedBucketOut[];
+  /** First date of imported history under these filters, any period. */
+  imported_from: string | null;
+  imported_to: string | null;
+  open_fix_live: OpenFixLiveOut;
   period_from: string;
   period_to: string;
   rounds_per_item: CountStatOut;
+  throughput: ThroughputOut;
+  /** Native only: the tracker has no per-round dates. */
   time_per_round: DurationStatOut;
   time_to_first_review: DurationStatOut;
+  /** Native only: imported items are never reopened. */
   time_to_fix_live: DurationStatOut;
+  waiting: WaitingCountOut[];
 }

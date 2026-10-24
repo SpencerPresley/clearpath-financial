@@ -7,6 +7,11 @@
 
 export interface CountStatOut {
   count: number;
+  imported_count: number;
+  imported_mean: number | null;
+  /** Across both sources. */
   mean: number | null;
   median: number | null;
+  native_count: number;
+  native_mean: number | null;
 }

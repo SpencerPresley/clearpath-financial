@@ -59,44 +59,6 @@
         "title": "AffectedPartnerOut",
         "type": "object"
       },
-      "AgedBucketOut": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "label": {
-            "examples": [
-              "3-7 days"
-            ],
-            "title": "Label",
-            "type": "string"
-          },
-          "max_days": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Days"
-          },
-          "min_days": {
-            "title": "Min Days",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "label",
-          "min_days",
-          "max_days",
-          "count"
-        ],
-        "title": "AgedBucketOut",
-        "type": "object"
-      },
       "ApprovalDecision": {
         "enum": [
           "approve",
@@ -1145,6 +1107,21 @@
             "title": "Count",
             "type": "integer"
           },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "imported_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported Mean"
+          },
           "mean": {
             "anyOf": [
               {
@@ -1154,6 +1131,7 @@
                 "type": "null"
               }
             ],
+            "description": "Across both sources.",
             "title": "Mean"
           },
           "median": {
@@ -1166,12 +1144,31 @@
               }
             ],
             "title": "Median"
+          },
+          "native_count": {
+            "title": "Native Count",
+            "type": "integer"
+          },
+          "native_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Mean"
           }
         },
         "required": [
           "count",
           "mean",
-          "median"
+          "median",
+          "native_count",
+          "imported_count",
+          "native_mean",
+          "imported_mean"
         ],
         "title": "CountStatOut",
         "type": "object"
@@ -1782,6 +1779,21 @@
             "title": "Count",
             "type": "integer"
           },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "imported_median_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported Median Hours"
+          },
           "median_hours": {
             "anyOf": [
               {
@@ -1791,7 +1803,23 @@
                 "type": "null"
               }
             ],
+            "description": "Across both sources.",
             "title": "Median Hours"
+          },
+          "native_count": {
+            "title": "Native Count",
+            "type": "integer"
+          },
+          "native_median_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Median Hours"
           },
           "p90_hours": {
             "anyOf": [
@@ -1808,7 +1836,11 @@
         "required": [
           "count",
           "median_hours",
-          "p90_hours"
+          "p90_hours",
+          "native_count",
+          "imported_count",
+          "native_median_hours",
+          "imported_median_hours"
         ],
         "title": "DurationStatOut",
         "type": "object"
@@ -6941,13 +6973,158 @@
         "title": "MetricBucket",
         "type": "string"
       },
+      "MetricItemOut": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for a fix-live clock still running.",
+            "title": "End"
+          },
+          "item": {
+            "$ref": "#/components/schemas/MetricItemRefOut"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/MetricSource"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "item",
+          "source",
+          "start",
+          "end",
+          "value",
+          "outcome"
+        ],
+        "title": "MetricItemOut",
+        "type": "object"
+      },
+      "MetricItemRefOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_legacy": {
+            "title": "Is Legacy",
+            "type": "boolean"
+          },
+          "key": {
+            "examples": [
+              "CP-1042"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "legacy_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Ref"
+          },
+          "partner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Name"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "title",
+          "status",
+          "product",
+          "channel",
+          "is_legacy",
+          "legacy_ref",
+          "partner_name"
+        ],
+        "title": "MetricItemRefOut",
+        "type": "object"
+      },
+      "MetricItemsOut": {
+        "properties": {
+          "metric": {
+            "$ref": "#/components/schemas/MetricName"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MetricItemOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "description": "Equals the number it was opened from; `rows` holds at most 200.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metric",
+          "total",
+          "rows"
+        ],
+        "title": "MetricItemsOut",
+        "type": "object"
+      },
       "MetricName": {
         "enum": [
           "time_to_first_review",
           "time_per_round",
           "rounds_per_item",
           "time_to_fix_live",
-          "aged_items"
+          "throughput"
         ],
         "title": "MetricName",
         "type": "string"
@@ -6958,9 +7135,52 @@
             "title": "Count",
             "type": "integer"
           },
+          "from_date": {
+            "description": "The bucket clipped to the period; pass as the drill-down period.",
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "imported_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same over imported measurements only.",
+            "title": "Imported Value"
+          },
+          "native_count": {
+            "title": "Native Count",
+            "type": "integer"
+          },
+          "native_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same over native measurements only.",
+            "title": "Native Value"
+          },
           "period_start": {
             "format": "date",
             "title": "Period Start",
+            "type": "string"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
             "type": "string"
           },
           "value": {
@@ -6972,13 +7192,20 @@
                 "type": "null"
               }
             ],
+            "description": "Median hours (durations), mean rounds, or the decision count.",
             "title": "Value"
           }
         },
         "required": [
           "period_start",
+          "from_date",
+          "to_date",
           "value",
-          "count"
+          "native_value",
+          "imported_value",
+          "count",
+          "native_count",
+          "imported_count"
         ],
         "title": "MetricPointOut",
         "type": "object"
@@ -6991,6 +7218,16 @@
           "metric": {
             "$ref": "#/components/schemas/MetricName"
           },
+          "period_from": {
+            "format": "date",
+            "title": "Period From",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "title": "Period To",
+            "type": "string"
+          },
           "points": {
             "items": {
               "$ref": "#/components/schemas/MetricPointOut"
@@ -7002,10 +7239,21 @@
         "required": [
           "metric",
           "bucket",
+          "period_from",
+          "period_to",
           "points"
         ],
         "title": "MetricSeriesOut",
         "type": "object"
+      },
+      "MetricSource": {
+        "description": "Where a measurement came from: this app's event log, or a legacy tracker row's own dates.",
+        "enum": [
+          "native",
+          "imported"
+        ],
+        "title": "MetricSource",
+        "type": "string"
       },
       "MetricsQuery": {
         "properties": {
@@ -7030,8 +7278,16 @@
           },
           "include_legacy": {
             "default": true,
+            "description": "Count imported tracker history.",
             "title": "Include Legacy",
             "type": "boolean"
+          },
+          "partner_id": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Partner Id",
+            "type": "array"
           },
           "period_from": {
             "anyOf": [
@@ -7043,7 +7299,7 @@
                 "type": "null"
               }
             ],
-            "description": "Defaults to 90 days ago.",
+            "description": "Defaults to 89 days before `period_to`.",
             "title": "Period From"
           },
           "period_to": {
@@ -7078,12 +7334,33 @@
       },
       "MetricsSummaryOut": {
         "properties": {
-          "aged_items": {
-            "items": {
-              "$ref": "#/components/schemas/AgedBucketOut"
-            },
-            "title": "Aged Items",
-            "type": "array"
+          "imported_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First date of imported history under these filters, any period.",
+            "title": "Imported From"
+          },
+          "imported_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported To"
+          },
+          "open_fix_live": {
+            "$ref": "#/components/schemas/OpenFixLiveOut"
           },
           "period_from": {
             "format": "date",
@@ -7098,14 +7375,26 @@
           "rounds_per_item": {
             "$ref": "#/components/schemas/CountStatOut"
           },
+          "throughput": {
+            "$ref": "#/components/schemas/ThroughputOut"
+          },
           "time_per_round": {
-            "$ref": "#/components/schemas/DurationStatOut"
+            "$ref": "#/components/schemas/DurationStatOut",
+            "description": "Native only: the tracker has no per-round dates."
           },
           "time_to_first_review": {
             "$ref": "#/components/schemas/DurationStatOut"
           },
           "time_to_fix_live": {
-            "$ref": "#/components/schemas/DurationStatOut"
+            "$ref": "#/components/schemas/DurationStatOut",
+            "description": "Native only: imported items are never reopened."
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingCountOut"
+            },
+            "title": "Waiting",
+            "type": "array"
           }
         },
         "required": [
@@ -7115,7 +7404,11 @@
           "time_per_round",
           "rounds_per_item",
           "time_to_fix_live",
-          "aged_items"
+          "open_fix_live",
+          "throughput",
+          "waiting",
+          "imported_from",
+          "imported_to"
         ],
         "title": "MetricsSummaryOut",
         "type": "object"
@@ -7394,6 +7687,32 @@
           "version"
         ],
         "title": "OfferTermsRefOut",
+        "type": "object"
+      },
+      "OpenFixLiveOut": {
+        "properties": {
+          "count": {
+            "description": "Live content sent back for re-review and not yet fixed, now.",
+            "title": "Count",
+            "type": "integer"
+          },
+          "oldest_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Hours"
+          }
+        },
+        "required": [
+          "count",
+          "oldest_hours"
+        ],
+        "title": "OpenFixLiveOut",
         "type": "object"
       },
       "OutboxEmailOut": {
@@ -9618,6 +9937,35 @@
         "title": "TermsRefOut",
         "type": "object"
       },
+      "ThroughputOut": {
+        "properties": {
+          "count": {
+            "description": "Decisions recorded in the period (imported rows: the final decision only).",
+            "title": "Count",
+            "type": "integer"
+          },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "native_count": {
+            "title": "Native Count",
+            "type": "integer"
+          },
+          "per_week": {
+            "title": "Per Week",
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "native_count",
+          "imported_count",
+          "per_week"
+        ],
+        "title": "ThroughputOut",
+        "type": "object"
+      },
       "TokenEventOut": {
         "properties": {
           "text": {
@@ -10535,6 +10883,25 @@
           "based_on_n"
         ],
         "title": "VersionSummaryOut",
+        "type": "object"
+      },
+      "WaitingCountOut": {
+        "properties": {
+          "count": {
+            "description": "Equals the queue's `waiting_more_than_days` view under the same filters, now.",
+            "title": "Count",
+            "type": "integer"
+          },
+          "more_than_days": {
+            "title": "More Than Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "more_than_days",
+          "count"
+        ],
+        "title": "WaitingCountOut",
         "type": "object"
       }
     },
@@ -17889,10 +18256,10 @@
         ]
       }
     },
-    "/api/metrics/series": {
+    "/api/metrics/items": {
       "get": {
-        "description": "[metrics owner: see ledger]",
-        "operationId": "getMetricSeries",
+        "description": "The measurements behind a number: same computation, so `total` equals the number. `open_only` with\n`time_to_fix_live` lists the clocks still running.",
+        "operationId": "listMetricItems",
         "parameters": [
           {
             "in": "query",
@@ -17904,14 +18271,14 @@
                 "time_per_round",
                 "rounds_per_item",
                 "time_to_fix_live",
-                "aged_items"
+                "throughput"
               ],
               "title": "MetricName",
               "type": "string"
             }
           },
           {
-            "description": "Defaults to 90 days ago.",
+            "description": "Defaults to 89 days before `period_to`.",
             "in": "query",
             "name": "period_from",
             "required": false,
@@ -17925,7 +18292,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Defaults to 90 days ago.",
+              "description": "Defaults to 89 days before `period_to`.",
               "title": "Period From"
             }
           },
@@ -17992,10 +18359,243 @@
           },
           {
             "in": "query",
+            "name": "partner_id",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Partner Id",
+              "type": "array"
+            }
+          },
+          {
+            "description": "Count imported tracker history.",
+            "in": "query",
             "name": "include_legacy",
             "required": false,
             "schema": {
               "default": true,
+              "description": "Count imported tracker history.",
+              "title": "Include Legacy",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricItemsOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Items",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/metrics/series": {
+      "get": {
+        "description": "One metric per week or month, empty buckets included; each point's `from_date`/`to_date` open its items.",
+        "operationId": "getMetricSeries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "metric",
+            "required": true,
+            "schema": {
+              "enum": [
+                "time_to_first_review",
+                "time_per_round",
+                "rounds_per_item",
+                "time_to_fix_live",
+                "throughput"
+              ],
+              "title": "MetricName",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Defaults to 89 days before `period_to`.",
+            "in": "query",
+            "name": "period_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to 89 days before `period_to`.",
+              "title": "Period From"
+            }
+          },
+          {
+            "description": "Defaults to today.",
+            "in": "query",
+            "name": "period_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to today.",
+              "title": "Period To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product",
+            "required": false,
+            "schema": {
+              "items": {
+                "enum": [
+                  "personal_loan",
+                  "credit_card",
+                  "mortgage_prequal"
+                ],
+                "title": "Product",
+                "type": "string"
+              },
+              "title": "Product",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "items": {
+                "enum": [
+                  "email",
+                  "sms",
+                  "paid_social",
+                  "paid_search",
+                  "display",
+                  "direct_mail",
+                  "landing_page",
+                  "affiliate_page",
+                  "call_script"
+                ],
+                "title": "Channel",
+                "type": "string"
+              },
+              "title": "Channel",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "partner_id",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Partner Id",
+              "type": "array"
+            }
+          },
+          {
+            "description": "Count imported tracker history.",
+            "in": "query",
+            "name": "include_legacy",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Count imported tracker history.",
               "title": "Include Legacy",
               "type": "boolean"
             }
@@ -18089,16 +18689,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -18114,11 +18704,11 @@
     },
     "/api/metrics/summary": {
       "get": {
-        "description": "The stats strip and metrics page headline numbers. [metrics owner: see ledger]",
+        "description": "Headline numbers for the period. Reviewers, leads, admins.",
         "operationId": "getMetricsSummary",
         "parameters": [
           {
-            "description": "Defaults to 90 days ago.",
+            "description": "Defaults to 89 days before `period_to`.",
             "in": "query",
             "name": "period_from",
             "required": false,
@@ -18132,7 +18722,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Defaults to 90 days ago.",
+              "description": "Defaults to 89 days before `period_to`.",
               "title": "Period From"
             }
           },
@@ -18199,10 +18789,24 @@
           },
           {
             "in": "query",
+            "name": "partner_id",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "title": "Partner Id",
+              "type": "array"
+            }
+          },
+          {
+            "description": "Count imported tracker history.",
+            "in": "query",
             "name": "include_legacy",
             "required": false,
             "schema": {
               "default": true,
+              "description": "Count imported tracker history.",
               "title": "Include Legacy",
               "type": "boolean"
             }
@@ -18278,16 +18882,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
