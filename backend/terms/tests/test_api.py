@@ -49,3 +49,22 @@ def test_terms_list_current_and_detail(lead: User, reviewer: User) -> None:
     assert detail["effective_to"] is not None
     assert detail["values"]["apr_min"] == "7.49"
     assert next(t for t in listed if t["id"] == current.pk)["is_current"] is True
+
+
+@pytest.mark.django_db
+def test_publish_api_lead_only(pl_terms: OfferTerms, lead: User, reviewer: User) -> None:
+    body = {"product": "personal_loan", "values": {**PL.model_dump(mode="json"), "apr_min": "12.99"}, "note": "Q4"}
+    client = Client()
+    client.force_login(reviewer)
+
+    refused = client.post("/api/terms", body, content_type="application/json")
+    client.force_login(lead)
+    created = client.post("/api/terms", body, content_type="application/json")
+    unchanged = client.post("/api/terms", body, content_type="application/json")
+
+    assert refused.status_code == 403
+    assert created.status_code == 201, created.content
+    assert (created.json()["version"], created.json()["is_current"], created.json()["note"]) == (2, True, "Q4")
+    assert created.json()["values"]["apr_min"] == "12.99"
+    assert unchanged.status_code == 422
+    assert unchanged.json()["fields"][0]["loc"] == ["body", "values"]

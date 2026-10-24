@@ -107,7 +107,6 @@ STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
     ("post", "/api/items/bulk/fast-track-approve", {"item_ids": [1], "reason": "Numbers only"}),
     ("post", "/api/terms/impact-preview", None),
-    ("post", "/api/terms", None),
     ("get", "/api/metrics/summary", None),
     ("get", "/api/metrics/series?metric=rounds_per_item", None),
     ("post", "/api/assistant/threads", None),

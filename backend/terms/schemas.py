@@ -22,12 +22,11 @@ class OfferTermsOut(Schema):
 
 
 class OfferTermsPublishIn(Schema):
-    """A new version of a product's terms. It takes effect at `effective_from` (default: now) and closes the
-    current version's range at the same instant."""
+    """A new version of a product's terms. It takes effect now and closes the current version's range at the same
+    instant. Values identical to the version in effect are refused (422 on `values`)."""
 
     product: Product
     values: OfferTermsValues
-    effective_from: datetime | None = None
     note: str = Field(default="", max_length=2000)
 
 

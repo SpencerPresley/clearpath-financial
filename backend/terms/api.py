@@ -1,10 +1,11 @@
 from django.http import HttpRequest
 from ninja import Router, Status
 
+from accounts.api import current_user
 from core.domain import Product
 from core.errors import NotImplementedYet
 from core.schemas import ERRORS, STUB_ERRORS
-from terms import selectors
+from terms import selectors, services
 from terms.schemas import ImpactPreviewIn, ImpactPreviewOut, OfferTermsOut, OfferTermsPublishIn
 
 router = Router(tags=["terms"])
@@ -34,8 +35,13 @@ def impact_preview(request: HttpRequest, body: ImpactPreviewIn) -> ImpactPreview
     raise NotImplementedYet("terms impact preview")
 
 
-@router.post("/terms", response={201: OfferTermsOut, **STUB_ERRORS}, operation_id="publishOfferTerms")
-def publish_terms(request: HttpRequest, body: OfferTermsPublishIn) -> Status[OfferTermsOut]:
-    """Save a new version: generates fast-track versions and moves affected items to needs_rereview or expired.
-    Overlapping ranges fail with 409 terms_range_overlap. Leads only. [workstream F]"""
-    raise NotImplementedYet("publishing offer terms")
+@router.post("/terms", response={201: OfferTermsOut, **ERRORS}, operation_id="publishOfferTerms")
+def publish_terms(request: HttpRequest, body: OfferTermsPublishIn) -> Status[selectors.OfferTermsRow]:
+    """Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
+    generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
+    the rest to expired(terms_changed). Unchanged values are 422 on `values`."""
+    terms_id = services.publish_terms(
+        actor=current_user(request),
+        data=services.PublishTermsInput(product=body.product, values=body.values, note=body.note),
+    )
+    return Status(201, selectors.get_offer_terms(terms_id=terms_id))
