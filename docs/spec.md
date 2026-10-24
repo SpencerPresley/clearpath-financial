@@ -272,6 +272,20 @@ Every color has one job. Status and severity are never decorative, and decoratio
 **Color is never the only signal.** Status always pairs with a label and an icon or shape, because about
 8% of men have red-green color vision deficiency. Contrast meets WCAG 2.2 AA.
 
+### 5.2a Icons: one meaning per glyph
+- **Library:** Phosphor (`@phosphor-icons/react`), a single family. Its weights (regular, bold, fill) let the
+  same glyph carry emphasis without switching style. For example, finding source: code check = `fill`, AI
+  suggestion = `regular`, as specified in §5.2.
+- **Every icon is used through one registry,** `frontend/src/ui/icons.ts`, which maps semantic names to
+  glyphs: `status.approved`, `entity.partner`, `action.reject`, `source.ai`, and so on.
+- **Two rules, both enforced:**
+  - **Same meaning, same glyph everywhere.** ESLint `no-restricted-imports` bans importing
+    `@phosphor-icons/react` outside the registry.
+  - **Different meanings, different glyphs.** A unit test fails if two registry keys resolve to the same
+    glyph, unless an allowlist says why.
+- **Icons accompany labels.** They don't replace them, except in dense table cells, where they get a tooltip
+  and an `aria-label`.
+
 ### 5.3 Layout and density
 - **Tables are first-class.** The queue is a dense table:
   - resizable, sortable, filterable columns
