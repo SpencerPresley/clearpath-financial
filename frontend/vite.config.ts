@@ -28,6 +28,8 @@ export default defineConfig({
           setupFiles: ['vitest-canvas-mock', './src/test/setup.ts'],
           include: ['src/**/*.test.{ts,tsx}'],
           exclude: ['src/**/*.browser.test.{ts,tsx}'],
+          // Vitest replaces CSS with "" by default; the contrast test reads theme.css?raw.
+          css: { include: [/src\/theme\/theme\.css/] },
         },
       },
       {
