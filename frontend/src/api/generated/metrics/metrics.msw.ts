@@ -17,19 +17,39 @@ import type {
 } from 'msw';
 
 import {
+  Channel,
+  DecisionOutcome,
+  ItemStatus,
   MetricBucket,
-  MetricName
+  MetricName,
+  MetricSource,
+  Product
 } from '../model';
 import type {
+  MetricItemsOut,
   MetricSeriesOut,
   MetricsSummaryOut
 } from '../model';
 
 
-export const getGetMetricSeriesResponseMock = (overrideResponse: Partial<Extract<MetricSeriesOut, object>> = {}): MetricSeriesOut => ({bucket: faker.helpers.arrayElement(Object.values(MetricBucket)), metric: faker.helpers.arrayElement(Object.values(MetricName)), points: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({count: faker.number.int(), period_start: faker.date.past().toISOString().slice(0, 10), value: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])})), ...overrideResponse})
+export const getListMetricItemsResponseMock = (overrideResponse: Partial<Extract<MetricItemsOut, object>> = {}): MetricItemsOut => ({metric: faker.helpers.arrayElement(Object.values(MetricName)), rows: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({end: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), item: {channel: faker.helpers.arrayElement(Object.values(Channel)), id: faker.number.int(), is_legacy: faker.datatype.boolean(), key: faker.string.alpha({length: {min: 10, max: 20}}), legacy_ref: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), partner_name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), product: faker.helpers.arrayElement(Object.values(Product)), status: faker.helpers.arrayElement(Object.values(ItemStatus)), title: faker.string.alpha({length: {min: 10, max: 20}})}, outcome: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(DecisionOutcome)),null,]), source: faker.helpers.arrayElement(Object.values(MetricSource)), start: faker.date.past().toISOString().slice(0, 19) + 'Z', value: faker.number.float({fractionDigits: 2})})), total: faker.number.int(), ...overrideResponse})
 
-export const getGetMetricsSummaryResponseMock = (overrideResponse: Partial<Extract<MetricsSummaryOut, object>> = {}): MetricsSummaryOut => ({aged_items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({count: faker.number.int(), label: faker.string.alpha({length: {min: 10, max: 20}}), max_days: faker.helpers.arrayElement([faker.number.int(),null,]), min_days: faker.number.int()})), period_from: faker.date.past().toISOString().slice(0, 10), period_to: faker.date.past().toISOString().slice(0, 10), rounds_per_item: {count: faker.number.int(), mean: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), median: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, time_per_round: {count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, time_to_first_review: {count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, time_to_fix_live: {count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, ...overrideResponse})
+export const getGetMetricSeriesResponseMock = (overrideResponse: Partial<Extract<MetricSeriesOut, object>> = {}): MetricSeriesOut => ({bucket: faker.helpers.arrayElement(Object.values(MetricBucket)), metric: faker.helpers.arrayElement(Object.values(MetricName)), period_from: faker.date.past().toISOString().slice(0, 10), period_to: faker.date.past().toISOString().slice(0, 10), points: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({count: faker.number.int(), from_date: faker.date.past().toISOString().slice(0, 10), imported_count: faker.number.int(), native_count: faker.number.int(), period_start: faker.date.past().toISOString().slice(0, 10), to_date: faker.date.past().toISOString().slice(0, 10), value: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])})), ...overrideResponse})
 
+export const getGetMetricsSummaryResponseMock = (overrideResponse: Partial<Extract<MetricsSummaryOut, object>> = {}): MetricsSummaryOut => ({imported_from: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10),null,]), imported_to: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10),null,]), open_fix_live: {count: faker.number.int(), oldest_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, period_from: faker.date.past().toISOString().slice(0, 10), period_to: faker.date.past().toISOString().slice(0, 10), rounds_per_item: {count: faker.number.int(), imported_count: faker.number.int(), mean: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), median: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), native_count: faker.number.int()}, throughput: {count: faker.number.int(), imported_count: faker.number.int(), native_count: faker.number.int(), per_week: faker.number.float({fractionDigits: 2})}, time_per_round: {count: faker.number.int(), imported_count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), native_count: faker.number.int(), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, time_to_first_review: {count: faker.number.int(), imported_count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), native_count: faker.number.int(), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, time_to_fix_live: {count: faker.number.int(), imported_count: faker.number.int(), median_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,]), native_count: faker.number.int(), p90_hours: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}),null,])}, waiting: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({count: faker.number.int(), more_than_days: faker.number.int()})), ...overrideResponse})
+
+
+export const getListMetricItemsMockHandler = (overrideResponse?: MetricItemsOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<MetricItemsOut> | MetricItemsOut), options?: RequestHandlerOptions) => {
+  return http.get('*/api/metrics/items', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListMetricItemsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 
 export const getGetMetricSeriesMockHandler = (overrideResponse?: MetricSeriesOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<MetricSeriesOut> | MetricSeriesOut), options?: RequestHandlerOptions) => {
   return http.get('*/api/metrics/series', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
@@ -55,6 +75,7 @@ export const getGetMetricsSummaryMockHandler = (overrideResponse?: MetricsSummar
   }, options)
 }
 export const getMetricsMock = () => [
+  getListMetricItemsMockHandler(),
   getGetMetricSeriesMockHandler(),
   getGetMetricsSummaryMockHandler()
 ]

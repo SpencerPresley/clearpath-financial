@@ -5,9 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AgedBucketOut {
+export interface OpenFixLiveOut {
+  /** Live content sent back for re-review and not yet fixed, now. */
   count: number;
-  label: string;
-  max_days: number | null;
-  min_days: number;
+  oldest_hours: number | null;
 }

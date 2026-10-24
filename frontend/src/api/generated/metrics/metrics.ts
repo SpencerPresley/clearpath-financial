@@ -23,6 +23,8 @@ import type {
   ErrorOut,
   GetMetricSeriesParams,
   GetMetricsSummaryParams,
+  ListMetricItemsParams,
+  MetricItemsOut,
   MetricSeriesOut,
   MetricsSummaryOut
 } from '../model';
@@ -49,11 +51,128 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getListMetricItemsUrl = (params: ListMetricItemsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["product","channel","partner_id"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/metrics/items?${stringifiedParams}` : `/api/metrics/items`
+}
+
+/**
+ * The measurements behind a number: same computation, so `total` equals the number. `open_only` with
+ * `time_to_fix_live` lists the clocks still running.
+ * @summary Items
+ */
+export const listMetricItems = async (params: ListMetricItemsParams, options?: Parameters<typeof customFetch>[1]): Promise<MetricItemsOut> => {
+
+  return customFetch<MetricItemsOut>(getListMetricItemsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMetricItemsQueryKey = (params?: ListMetricItemsParams,) => {
+    return [
+    `/api/metrics/items`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMetricItemsQueryOptions = <TData = Awaited<ReturnType<typeof listMetricItems>>, TError = ErrorOut>(params: ListMetricItemsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMetricItemsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMetricItems>>> = ({ signal }) => listMetricItems(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListMetricItemsQueryResult = NonNullable<Awaited<ReturnType<typeof listMetricItems>>>
+export type ListMetricItemsQueryError = ErrorOut
+
+
+export function useListMetricItems<TData = Awaited<ReturnType<typeof listMetricItems>>, TError = ErrorOut>(
+ params: ListMetricItemsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMetricItems>>,
+          TError,
+          Awaited<ReturnType<typeof listMetricItems>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMetricItems<TData = Awaited<ReturnType<typeof listMetricItems>>, TError = ErrorOut>(
+ params: ListMetricItemsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMetricItems>>,
+          TError,
+          Awaited<ReturnType<typeof listMetricItems>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMetricItems<TData = Awaited<ReturnType<typeof listMetricItems>>, TError = ErrorOut>(
+ params: ListMetricItemsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Items
+ */
+
+export function useListMetricItems<TData = Awaited<ReturnType<typeof listMetricItems>>, TError = ErrorOut>(
+ params: ListMetricItemsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMetricItems>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListMetricItemsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export const getGetMetricSeriesUrl = (params: GetMetricSeriesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-    const explodeParameters = ["product","channel"];
+    const explodeParameters = ["product","channel","partner_id"];
 
     if (Array.isArray(value) && explodeParameters.includes(key)) {
       value.forEach((v) => {
@@ -73,7 +192,7 @@ export const getGetMetricSeriesUrl = (params: GetMetricSeriesParams,) => {
 }
 
 /**
- * [metrics owner: see ledger]
+ * One metric per week or month, empty buckets included; each point's `from_date`/`to_date` open its items.
  * @summary Series
  */
 export const getMetricSeries = async (params: GetMetricSeriesParams, options?: Parameters<typeof customFetch>[1]): Promise<MetricSeriesOut> => {
@@ -169,7 +288,7 @@ export const getGetMetricsSummaryUrl = (params?: GetMetricsSummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-    const explodeParameters = ["product","channel"];
+    const explodeParameters = ["product","channel","partner_id"];
 
     if (Array.isArray(value) && explodeParameters.includes(key)) {
       value.forEach((v) => {
@@ -189,7 +308,7 @@ export const getGetMetricsSummaryUrl = (params?: GetMetricsSummaryParams,) => {
 }
 
 /**
- * The stats strip and metrics page headline numbers. [metrics owner: see ledger]
+ * Headline numbers for the period. Reviewers, leads, admins.
  * @summary Summary
  */
 export const getMetricsSummary = async (params?: GetMetricsSummaryParams, options?: Parameters<typeof customFetch>[1]): Promise<MetricsSummaryOut> => {

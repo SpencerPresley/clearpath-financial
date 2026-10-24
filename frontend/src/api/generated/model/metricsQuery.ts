@@ -9,8 +9,10 @@ import type { MetricsQueryProductItem } from './metricsQueryProductItem';
 
 export interface MetricsQuery {
   channel?: MetricsQueryChannelItem[];
+  /** Count imported tracker history. */
   include_legacy?: boolean;
-  /** Defaults to 90 days ago. */
+  partner_id?: number[];
+  /** Defaults to 89 days before `period_to`. */
   period_from?: string | null;
   /** Defaults to today. */
   period_to?: string | null;

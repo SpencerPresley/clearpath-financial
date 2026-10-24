@@ -7,6 +7,8 @@
 
 export interface DurationStatOut {
   count: number;
+  imported_count: number;
   median_hours: number | null;
+  native_count: number;
   p90_hours: number | null;
 }

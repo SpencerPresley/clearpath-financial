@@ -13,5 +13,5 @@ export const GetMetricSeriesMetric = {
   time_per_round: 'time_per_round',
   rounds_per_item: 'rounds_per_item',
   time_to_fix_live: 'time_to_fix_live',
-  aged_items: 'aged_items',
+  throughput: 'throughput',
 } as const;
