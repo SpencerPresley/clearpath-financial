@@ -34,8 +34,18 @@ class ExpiryWarningDetailOut(Schema):
     expires_at: datetime
 
 
+class PageFindingsDetailOut(Schema):
+    kind: Literal["page_findings"]
+    new_blocking_count: int = Field(description="Blocking rules on the partner page that don't fire on the copy.")
+
+
 NotificationDetailOut = Annotated[
-    AssignmentDetailOut | DecisionDetailOut | RereviewDetailOut | MentionDetailOut | ExpiryWarningDetailOut,
+    AssignmentDetailOut
+    | DecisionDetailOut
+    | RereviewDetailOut
+    | MentionDetailOut
+    | ExpiryWarningDetailOut
+    | PageFindingsDetailOut,
     Field(discriminator="kind"),
 ]
 

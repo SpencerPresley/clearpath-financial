@@ -8093,6 +8093,7 @@
                     "decision": "#/components/schemas/DecisionDetailOut",
                     "expiry_warning": "#/components/schemas/ExpiryWarningDetailOut",
                     "mention": "#/components/schemas/MentionDetailOut",
+                    "page_findings": "#/components/schemas/PageFindingsDetailOut",
                     "rereview": "#/components/schemas/RereviewDetailOut"
                   },
                   "propertyName": "kind"
@@ -8112,6 +8113,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ExpiryWarningDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PageFindingsDetailOut"
                   }
                 ]
               },
@@ -8556,6 +8560,26 @@
           "new"
         ],
         "title": "PageFindingOut",
+        "type": "object"
+      },
+      "PageFindingsDetailOut": {
+        "properties": {
+          "kind": {
+            "const": "page_findings",
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_blocking_count": {
+            "description": "Blocking rules on the partner page that don't fire on the copy.",
+            "title": "New Blocking Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "new_blocking_count"
+        ],
+        "title": "PageFindingsDetailOut",
         "type": "object"
       },
       "PageFindingsFlaggedEventOut": {

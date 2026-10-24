@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { NotificationKind } from '../../api/generated/model';
+import type { NotificationOut } from '../../api/generated/model';
 import { DANA, SAM, notificationFixture } from '../../test/fixtures/notifications';
 import { KIND_ICONS, describeNotification, notificationLink } from './text';
 
@@ -57,8 +58,15 @@ describe('describeNotification', () => {
     ).toBe('Approval for CP-42 · Fall personal loan promo expires Nov 23');
   });
 
-  it('phrases blocking findings on a partner page without a payload', () => {
-    expect(text({ kind: 'page_findings' as NotificationKind, actor: null, detail: null })).toBe(
+  it('phrases blocking findings on a partner page, with the count when the event has it', () => {
+    const page = (detail: NotificationOut['detail']) => text({ kind: 'page_findings', actor: null, detail });
+    expect(page({ kind: 'page_findings', new_blocking_count: 2 })).toBe(
+      'Partner page carrying CP-42 · Fall personal loan promo has 2 new blocking findings',
+    );
+    expect(page({ kind: 'page_findings', new_blocking_count: 1 })).toBe(
+      'Partner page carrying CP-42 · Fall personal loan promo has 1 new blocking finding',
+    );
+    expect(page(null)).toBe(
       'Partner page carrying CP-42 · Fall personal loan promo has new blocking findings',
     );
   });
@@ -85,10 +93,9 @@ describe('describeNotification', () => {
     );
   });
 
-  it('has an icon for every kind the API sends, plus page findings from the drift monitor', () => {
-    for (const kind of [...Object.values(NotificationKind), 'page_findings']) {
-      expect(KIND_ICONS[kind], kind).toBeDefined();
-    }
+  it('gives each kind its own glyph', () => {
+    const glyphs = Object.values(NotificationKind).map((kind) => KIND_ICONS[kind]);
+    expect(new Set(glyphs).size).toBe(glyphs.length);
   });
 });
 
@@ -103,6 +110,13 @@ describe('notificationLink', () => {
     expect(notificationLink(notificationFixture({ kind: 'mention', actor: DANA, detail: null }))).toEqual({
       itemId: '42',
       search: { tab: 'comments' },
+    });
+  });
+
+  it('opens Details, where the placement is flagged, for page findings', () => {
+    expect(notificationLink(notificationFixture({ kind: 'page_findings', detail: null }))).toEqual({
+      itemId: '42',
+      search: { tab: 'details' },
     });
   });
 

@@ -3,7 +3,7 @@
  * review.ts's NOW (2026-10-24 15:00Z). The viewer is Priya Natarajan (CP-1042's owner, review.ts MARKETER), so
  * no row names her as the actor; CP-1042 matches the review fixture, so a row can open it in e2e.
  */
-import type { NotificationKind, NotificationOut, NotificationPageOut } from '../../api/generated/model';
+import type { NotificationOut, NotificationPageOut } from '../../api/generated/model';
 
 export const DANA = { id: 21, name: 'Dana Reyes' };
 export const SAM = { id: 22, name: 'Sam Okafor' };
@@ -106,12 +106,12 @@ export const MANY_ROWS: NotificationOut[] = [
   ...INBOX_ROWS.slice(0, 3),
   notificationFixture({
     id: 30,
-    kind: 'page_findings' as NotificationKind, // the drift monitor's alert (PR #40)
+    kind: 'page_findings', // the drift monitor's alert
     actor: null,
     item_id: 1012,
     item_key: 'CP-1012',
-    item_title: 'LendRight partner page — personal loans',
-    detail: null,
+    item_title: 'Personal loan rates, LendRight placement',
+    detail: { kind: 'page_findings', new_blocking_count: 2 },
     created_at: '2026-10-24T08:10:00Z',
   }),
   notificationFixture({

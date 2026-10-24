@@ -233,6 +233,7 @@ export * from './openFixLiveOut';
 export * from './outboxEmailOut';
 export * from './outboxSource';
 export * from './pageFindingOut';
+export * from './pageFindingsDetailOut';
 export * from './pageFindingsFlaggedEventOut';
 export * from './pageFindingsFlaggedPayload';
 export * from './partnerCreatedEventOut';

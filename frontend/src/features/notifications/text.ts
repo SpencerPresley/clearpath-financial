@@ -6,9 +6,14 @@
  * The line is split around the item so the inbox can truncate only the title: whatever comes after the item
  * ("with edits", a re-review reason, an expiry date) stays visible.
  */
-import type { AssignmentMode, DecisionOutcome, NotificationOut } from '../../api/generated/model';
+import type {
+  AssignmentMode,
+  DecisionOutcome,
+  NotificationKind,
+  NotificationOut,
+} from '../../api/generated/model';
 import type { IconKey } from '../../ui/icons';
-import { REOPEN_REASON_LABELS } from '../../ui/labels';
+import { REOPEN_REASON_LABELS, plural } from '../../ui/labels';
 
 export type Tone = 'success' | 'warning' | 'error' | 'alert';
 
@@ -23,11 +28,8 @@ export interface NotificationText {
   text: string;
 }
 
-/**
- * Glyph per kind. Keyed by string, not `Record<NotificationKind, …>`, so a kind added on the backend (the drift
- * monitor's page findings) renders before the client is regenerated; text.test.ts checks every generated kind.
- */
-export const KIND_ICONS: Readonly<Record<string, IconKey>> = {
+/** Glyph per kind; a decision row uses its outcome's status glyph instead (OUTCOME_ICONS). */
+export const KIND_ICONS: Readonly<Record<NotificationKind, IconKey>> = {
   assignment: 'action.assign',
   decision: 'entity.decision',
   rereview: 'status.needs_rereview',
@@ -36,7 +38,7 @@ export const KIND_ICONS: Readonly<Record<string, IconKey>> = {
   page_findings: 'severity.blocking',
 };
 
-const KIND_TONES: Readonly<Record<string, Tone>> = {
+const KIND_TONES: Readonly<Partial<Record<NotificationKind, Tone>>> = {
   rereview: 'alert',
   page_findings: 'error',
 };
@@ -101,17 +103,17 @@ function words(n: NotificationOut): [string, string] | null {
       return detail?.kind === 'expiry_warning'
         ? ['Approval for ', ` expires ${expiryFormat.format(new Date(detail.expires_at))}`]
         : null;
-    default:
-      // The drift monitor's alert (PR #40) needs nothing from the payload.
-      return (n.kind as string) === 'page_findings'
-        ? ['Partner page carrying ', ' has new blocking findings']
-        : null;
+    case 'page_findings':
+      // The drift monitor: the approved copy is intact, but partner text beside it trips blocking rules.
+      return detail?.kind === 'page_findings'
+        ? ['Partner page carrying ', ` has ${plural(detail.new_blocking_count, 'new blocking finding')}`]
+        : ['Partner page carrying ', ' has new blocking findings'];
   }
 }
 
 function iconFor(n: NotificationOut): { icon: IconKey; tone: Tone | undefined } {
   if (n.detail?.kind === 'decision') return OUTCOME_ICONS[n.detail.outcome];
-  return { icon: KIND_ICONS[n.kind] ?? 'feedback.info', tone: KIND_TONES[n.kind] };
+  return { icon: KIND_ICONS[n.kind], tone: KIND_TONES[n.kind] };
 }
 
 export function describeNotification(n: NotificationOut): NotificationText {
@@ -127,13 +129,17 @@ export function describeNotification(n: NotificationOut): NotificationText {
 
 export interface NotificationLink {
   itemId: string;
-  search: { tab?: 'comments'; v?: number };
+  search: { tab?: 'comments' | 'details'; v?: number };
 }
 
-/** Where a row goes: the item's review screen; for a mention, its Comments tab on the comment's version. */
+/**
+ * Where a row goes: the item's review screen. A mention opens Comments on the comment's version; page findings
+ * open Details, where the placement shows its attention state.
+ */
 export function notificationLink(n: NotificationOut): NotificationLink | null {
   if (n.item_id === null) return null;
   const itemId = String(n.item_id);
+  if (n.kind === 'page_findings') return { itemId, search: { tab: 'details' } };
   if (n.kind !== 'mention') return { itemId, search: {} };
   return n.detail?.kind === 'mention'
     ? { itemId, search: { tab: 'comments', v: n.detail.version_n } }

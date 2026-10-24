@@ -44,6 +44,9 @@ export const ListNotificationsResponse = zod.object({
 }),zod.object({
   "expires_at": zod.iso.datetime({"offset":true}),
   "kind": zod.literal("expiry_warning").meta({ title: 'Kind' })
+}),zod.object({
+  "kind": zod.literal("page_findings").meta({ title: 'Kind' }),
+  "new_blocking_count": zod.int().describe('Blocking rules on the partner page that don\'t fire on the copy.')
 })]),zod.null()]).describe('What the source event says, for phrasing the row; null when there\'s no event to read.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),

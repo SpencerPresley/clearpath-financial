@@ -16,6 +16,7 @@ from audit.payloads import (
     DecisionRecordedPayload,
     ItemAssignedPayload,
     ItemReopenedPayload,
+    PageFindingsFlaggedPayload,
 )
 from audit.services import record_event
 from core.clock import FixedClock
@@ -35,6 +36,7 @@ from notifications.selectors import (
     ExpiryWarningDetail,
     MentionDetail,
     NotificationRow,
+    PageFindingsDetail,
     RereviewDetail,
     list_notifications,
 )
@@ -127,6 +129,23 @@ def test_assignment_rereview_and_expiry_rows_carry_their_detail(
     assert by_kind[NotificationKind.REREVIEW].detail == RereviewDetail(reason=ReopenReason.TERMS_CHANGED)
     assert by_kind[NotificationKind.EXPIRY_WARNING].detail == ExpiryWarningDetail(expires_at=expires)
     assert by_kind[NotificationKind.EXPIRY_WARNING].actor is None  # the daily sweep
+
+
+@pytest.mark.django_db
+def test_page_findings_row_counts_the_new_blocking_rules(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    item = make_item(marketer, assignee=reviewer, title="LendRight partner page")
+    payload = PageFindingsFlaggedPayload(
+        placement_id=7, snapshot_id=9, rule_ids=["claims.guaranteed", "reg_z.trigger_terms"]
+    )
+    deliver(
+        event_id=_emit(item, None, EventType.PAGE_FINDINGS_FLAGGED, payload, clock),
+        handler_name="notifications.page_findings",
+    )
+
+    row = _only_row(reviewer)
+
+    assert (row.kind, row.actor, row.item_title) == (NotificationKind.PAGE_FINDINGS, None, "LendRight partner page")
+    assert row.detail == PageFindingsDetail(new_blocking_count=2)
 
 
 @pytest.mark.django_db

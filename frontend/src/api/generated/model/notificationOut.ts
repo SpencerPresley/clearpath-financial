@@ -9,6 +9,7 @@ import type { DecisionDetailOut } from './decisionDetailOut';
 import type { ExpiryWarningDetailOut } from './expiryWarningDetailOut';
 import type { MentionDetailOut } from './mentionDetailOut';
 import type { NotificationKind } from './notificationKind';
+import type { PageFindingsDetailOut } from './pageFindingsDetailOut';
 import type { PartyRefOut } from './partyRefOut';
 import type { RereviewDetailOut } from './rereviewDetailOut';
 
@@ -17,7 +18,7 @@ export interface NotificationOut {
   actor: PartyRefOut | null;
   created_at: string;
   /** What the source event says, for phrasing the row; null when there's no event to read. */
-  detail: AssignmentDetailOut | DecisionDetailOut | RereviewDetailOut | MentionDetailOut | ExpiryWarningDetailOut | null;
+  detail: AssignmentDetailOut | DecisionDetailOut | RereviewDetailOut | MentionDetailOut | ExpiryWarningDetailOut | PageFindingsDetailOut | null;
   id: number;
   item_id: number | null;
   item_key: string | null;

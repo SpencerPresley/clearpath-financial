@@ -13,6 +13,7 @@ from audit.payloads import (
     EventPayload,
     ItemAssignedPayload,
     ItemReopenedPayload,
+    PageFindingsFlaggedPayload,
     parse_payload,
 )
 from core.domain import AssignmentMode, DecisionOutcome, EventType, NotificationKind, OutboxSource, ReopenReason, Role
@@ -57,7 +58,15 @@ class ExpiryWarningDetail:
     kind: Literal["expiry_warning"] = "expiry_warning"
 
 
-type NotificationDetail = AssignmentDetail | DecisionDetail | RereviewDetail | MentionDetail | ExpiryWarningDetail
+@dataclass(frozen=True)
+class PageFindingsDetail:
+    new_blocking_count: int  # blocking rules on the partner page that don't fire on the approved copy
+    kind: Literal["page_findings"] = "page_findings"
+
+
+type NotificationDetail = (
+    AssignmentDetail | DecisionDetail | RereviewDetail | MentionDetail | ExpiryWarningDetail | PageFindingsDetail
+)
 
 
 @dataclass(frozen=True)
@@ -81,19 +90,21 @@ class NotificationPage:
 
 
 def _detail(payload: EventPayload | None, version_ns: dict[int, int]) -> NotificationDetail | None:
+    detail: NotificationDetail | None = None
     match payload:
         case ItemAssignedPayload(mode=mode):
-            return AssignmentDetail(mode=mode)
+            detail = AssignmentDetail(mode=mode)
         case DecisionRecordedPayload(outcome=outcome):
-            return DecisionDetail(outcome=outcome)
+            detail = DecisionDetail(outcome=outcome)
         case ItemReopenedPayload(reason=reason):
-            return RereviewDetail(reason=reason)
+            detail = RereviewDetail(reason=reason)
         case CommentAddedPayload(comment_id=comment_id, version_id=version_id) if version_id in version_ns:
-            return MentionDetail(comment_id=comment_id, version_n=version_ns[version_id])
+            detail = MentionDetail(comment_id=comment_id, version_n=version_ns[version_id])
         case ApprovalExpiringPayload(expires_at=expires_at):
-            return ExpiryWarningDetail(expires_at=expires_at)
-        case _:
-            return None
+            detail = ExpiryWarningDetail(expires_at=expires_at)
+        case PageFindingsFlaggedPayload(rule_ids=rule_ids):
+            detail = PageFindingsDetail(new_blocking_count=len(rule_ids))
+    return detail
 
 
 def _payload(event: Event | None) -> EventPayload | None:
