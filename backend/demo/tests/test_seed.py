@@ -25,7 +25,7 @@ from core.domain import (
     VersionOrigin,
 )
 from demo.content import CATALOG
-from demo.reset import reset_demo
+from demo.reset import domain_tables, reset_demo
 from demo.runner import SeedError
 from demo.tests.conftest import NOW, Seeded
 from drift.compare import compare
@@ -206,6 +206,13 @@ def test_reset_restores_the_same_state(seeded: Seeded, snapshot: dict[str, tuple
     ReviewItem.objects.filter(title="Display banner: one payment, one plan").update(notes="scribbled on by a visitor")
     reset_demo(now=NOW)
     assert _state() == snapshot
+
+
+def test_a_reset_empties_the_assistant_checkpointer_but_keeps_its_schema_record(seeded: Seeded) -> None:
+    """Assistant threads are truncated with the domain; their LangGraph state (not Django models) has to go too."""
+    tables = set(domain_tables())
+    assert {"assistant_assistantthread", "checkpoints", "checkpoint_blobs", "checkpoint_writes"} <= tables
+    assert "checkpoint_migrations" not in tables
 
 
 def _pages() -> dict[str, bool]:

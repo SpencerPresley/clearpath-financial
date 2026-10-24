@@ -48,14 +48,14 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 
 ## Verification
 
-- Backend, after rebasing on `da41224` (drift merged):
-  - `pytest`: 1653 passed;
+- Backend, after rebasing on `2f91e1d` (drift and assistant merged):
+  - `pytest`: 1765 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
   - the exported schema matches the committed one;
   - `make semgrep` reports 0 findings.
 - Frontend, after the rebase:
-  - `npm run test:run`: 578 passed;
+  - `npm run test:run`: 636 passed;
   - `typecheck`, `lint`, `format:check` and `build` are clean.
 - Demo tests (`backend/demo/tests/`, 37 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
@@ -128,9 +128,10 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 - **Orphaned files on reset.** TRUNCATE doesn't delete attachment, import and export files from storage (local
   media or S3). Each reset leaves 14 small attachment files plus the import's xlsx. That's negligible for
   a demo, but a sweep would be a follow-up.
-- **Only Django-model tables are wiped.** `domain_tables()` comes from `apps.get_models()`. If K's LangGraph
-  checkpointer keeps its own non-model tables, a reset leaves old assistant threads behind; those would need
-  adding to the TRUNCATE list.
+- **The assistant's checkpointer tables are wiped explicitly.** K's LangGraph state lives in non-model tables
+  (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, from `assistant/0002_checkpointer`) keyed by the
+  `AssistantThread` rows a reset truncates. `domain_tables()` now adds them, but keeps `checkpoint_migrations`
+  (the library's schema record); a test pins both. A future non-model table would need the same treatment.
 - **The reset holds an advisory lock and truncates every domain table for ~10 s.** Requests in that window wait
   on the lock. Fine for a demo, and the reason it's admin-only.
 

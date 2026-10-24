@@ -62,6 +62,9 @@ KEPT_APPS: Final = frozenset(
 )
 # Configuration rows seeded by migrations, not demo data.
 KEPT_TABLES: Final = frozenset({"reviews_expirypolicy"})
+# Not models: the LangGraph checkpointer's conversation state (assistant/0002_checkpointer), keyed by the
+# AssistantThread rows a reset empties. `checkpoint_migrations` stays: it's the library's record of its own schema.
+CHECKPOINTER_TABLES: Final = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 # Notifications older than this are marked read: a reviewer coming back to the demo sees this week's, not ten weeks'.
 UNREAD_WINDOW: Final = timedelta(days=2)
 
@@ -74,9 +77,12 @@ class SeedResult:
 
 
 def domain_tables() -> tuple[str, ...]:
-    """Every table a reset empties: all models (and their M2M tables) outside KEPT_APPS, minus KEPT_TABLES."""
+    """Every table a reset empties: all models (and their M2M tables) outside KEPT_APPS, minus KEPT_TABLES, plus
+    the assistant checkpointer's tables where they exist."""
     metas = [model._meta for model in apps.get_models(include_auto_created=True)]  # noqa: SLF001  # Django's API
     tables = {m.db_table for m in metas if m.app_label not in KEPT_APPS and m.managed and not m.proxy}
+    existing = set(connection.introspection.table_names())
+    tables |= {t for t in CHECKPOINTER_TABLES if t in existing}
     return tuple(sorted(tables - KEPT_TABLES))
 
 
