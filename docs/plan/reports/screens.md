@@ -78,3 +78,88 @@ measurements on four endpoints.
   week X", so the list comes from `GET /metrics/items` with the same function; it can't disagree with the number.
   Waiting counts are the exception: they are queue views, so they link to the queue.
 - **Readers include reviewers.** Reversible in one `require_role`.
+
+## Library + Import (PR 2)
+
+Branch `wsJ/library-import`, stacked on `wsJ/screens` (PR #34). Built by a subagent in its own worktree; UI review
+fixes in `reviews/ui-screens.md` (Library, Import).
+
+### What's built
+
+**Library (`/library`)**, for every role; Export only for reviewer, lead and admin (the server refuses marketers).
+- *Approved to run*: `GET /library?scope=approved_to_run`, keyset pages of 50 with Load more. Title/key search,
+  Product, Channel, Partner, Approved (date range), Placement running, Legacy chips; all state in the URL
+  (`features/library/search.ts`, zod `validateSearch` with defaults stripped). Columns: item, title (+ Legacy
+  badge), product, channel, partner, planned run, evidence pack. Fits 1280 without sideways scroll.
+- *Precedents*: `GET /library/search?mode=phrase|text`, one hit per item: matched version, its outcome and date,
+  the item's status now, and the snippet with matched words as `<mark>` text nodes (never HTML).
+- *Export*: the approved view as xlsx, or a zip with an evidence pack per approved item (≤200). `POST /exports`,
+  poll `GET /exports/{id}` every second, then a download link. The status shows on both tabs; Retry re-sends the
+  failed request.
+- *Evidence pack* per item (table and precedent hits): `POST /items/{id}/evidence-pack` → job → download. Legacy
+  items say why there's none, in the server's own 409 sentence.
+
+**Import (`/import`)**, admin only. Upload an xlsx or load the bundled sample → map columns (guesses pre-filled) →
+map unknown values (status, partner, product…; 422s land on their row) → preview (counts; problems grouped by
+severity with row, column, value, outcome) → commit (202, poll) → summary: created items with links, skipped rows
+and warnings, a link to the approved legacy items. Recent imports list, polling while one commits. Steps before
+commit stay one click away.
+
+### Backend change
+
+`ImportPreviewRowOut.item_id` (imports/, G's app): after commit each created row carries the item it became, read
+in the same query as the rows (`values_list("parsed", "item")`; `django_assert_max_num_queries(3)` test). The
+summary links every imported item without a second lookup. `make schema` regenerated `ninja.json` and the client.
+
+### API gaps (not built here)
+
+- **Approved and Expires columns (L6).** `ItemRowOut` has no `approved_at` or `approval_expires_at`. The
+  approved-date filter exists (`approved_after/before`, on the item's latest approval), so on Precedents the chip
+  says "Item last approved". reviews/ belongs to the API-gaps worker.
+- **Tracker IDs aren't searchable (L7).** `q` doesn't match `legacy_ref`, and `ItemRowOut` has no `legacy_ref`, so
+  `MCR-26-045` can't be found from the library.
+- **Precedent search has no paging.** `GET /library/search` takes `limit` only; the UI asks for 50 and says "Top 50
+  precedents · narrow the filters" when it gets 50.
+- **Downloads are plain links.** `api/mutator.ts` reads non-JSON bodies with `response.text()`, which corrupts xlsx
+  and zip, so downloads are `<a href download>` from `ExportOut.download_url`, not a generated hook.
+- **Partner names that exist only in the workbook.** The value step's partner options come from `GET /partners`. A
+  tracker spelling of a partner the app doesn't have can be mapped to an existing partner or left for commit to
+  create (8 created on the sample); nothing lists or pre-creates them from the mapping screen.
+- **Stuck commit jobs (G's known gap).** A commit whose worker dies stays `committing` for ever: the UI keeps
+  polling and nothing times it out or lets an admin retry. Seen in the real-backend check when Celery's prefork pool
+  crashed on macOS (`--pool solo` worked).
+- **Placement vs. planned run (L5).** The "Placement running" chip filters on Placement records; the "Planned run"
+  column shows the submitter's intake dates. They can disagree, and the table has no placement column showing the
+  filter's basis.
+
+### Deviations
+
+- **Export and pack jobs are page state, not sessionStorage** (the review offered either). Tab switches and
+  filtering keep them; a reload loses the status line (the export still finishes server-side).
+- **Product's extra width came from Channel** (7.5→7rem), not Partner or Evidence pack: the pack cell's Download
+  link needs 7.5rem.
+- **"Approved legacy items (n)"** counts this import's approved rows; the link shows every approved legacy item, so
+  after a second, different import it lists more than n.
+- **An import's finished badge is neutral, not success green** (green means approved, §5.2).
+
+### Shared files touched
+
+- `ui/layout/nav.ts`: `to` on Library and Import (kept alongside Metrics' entries in the rebase).
+- `ui/layout/AppShell.test.tsx`: its "unbuilt section shows Soon" example used Library and now uses Outbox. **This
+  collides with K's Outbox work**: when Outbox lands, that test needs another unbuilt section.
+- `ui/FilterChip.tsx`: a copy of the queue's chip (features can't import features), with the `action.check` glyph.
+  The queue keeps its own; folding the queue onto this one is a follow-up for the queue's owner.
+- **Queue chip focus bug.** The queue's `.app-chip-btn` lost its focus ring the same way (L1). J's section adds
+  `.app-chip-btn[data-focus-visible]`, a class rule, so it restores the queue chip's ring too; queue files weren't
+  touched.
+- `ui/badges.tsx`: `Badge` and `BadgeMeta` exported; `OUTCOME_META`/`OutcomeBadge` added. `ui/icons.ts`:
+  `action.download`, `action.check`, `job.pending|running|done|failed`. New `ui/SnippetText.tsx`,
+  `ui/DownloadLink.tsx`, `ui/search/params.ts`.
+- `theme.css`: one appended "Library and Import" section, after Metrics'.
+
+### Verified against the real backend (before the review fixes)
+
+Private database, migrated and seeded, then dropped. Sample import: preview 178 ready, 1 duplicate, 1 not-data;
+commit created 178, skipped 2, made 8 partners. `/library?legacy=only` loaded 50 + Load more. Export: 145 items, a
+17 KB xlsx (`PK` magic). No API response ≥400. Not exercised live: upload, the values step, building an evidence
+pack, precedent hits, export with packs, 422 paths, non-admin roles.
