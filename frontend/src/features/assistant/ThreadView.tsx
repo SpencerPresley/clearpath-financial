@@ -59,6 +59,8 @@ export function ThreadView({
     onCompleted: onSettled,
   });
   const [draft, setDraft] = useState<{ text: string } | undefined>(undefined);
+  // A run you started in this view: an approval it ends on takes focus (a hydrated one doesn't).
+  const [ranHere, setRanHere] = useState(false);
   const sentPending = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const lastText = stream.messages.at(-1)?.text.length ?? 0;
@@ -70,6 +72,7 @@ export function ThreadView({
   }, [stream.messages.length, lastText, stream.interrupt]);
 
   const send = (text: string) => {
+    setRanHere(true);
     void stream.submit(
       { messages: [new HumanMessage({ id: crypto.randomUUID(), content: text })] },
       { config: { configurable: itemId === undefined ? {} : { item_id: itemId } } },
@@ -118,7 +121,12 @@ export function ThreadView({
             }}
           >
             {approval !== undefined && interruptId !== undefined && (
-              <ApprovalCard key={interruptId} approval={approval} onRespond={respond} />
+              <ApprovalCard
+                key={interruptId}
+                approval={approval}
+                onRespond={respond}
+                focusOnMount={ranHere}
+              />
             )}
           </MessageList>
         )}

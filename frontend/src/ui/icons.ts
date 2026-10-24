@@ -67,6 +67,7 @@ import {
   MapPinIcon,
   MinusCircleIcon,
   NotePencilIcon,
+  PaperPlaneRightIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
   PercentIcon,
@@ -186,6 +187,11 @@ export const icons = {
   'job.failed': regular(XSquareIcon),
   /** Start something new in place (a new assistant thread). */
   'action.new': regular(PlusIcon),
+  /**
+   * Send an email the assistant drafted. Filled and level, so it reads apart from status.submitted (an outline,
+   * tilted plane) at 16px; the button always carries the label "Send email".
+   */
+  'action.send': fill(PaperPlaneRightIcon),
   /** Stop a running operation (the assistant's reply). */
   'action.stop': fill(StopIcon),
   // Column sort state (server-sorted columns only).

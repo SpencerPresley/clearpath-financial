@@ -24,7 +24,7 @@ test('the assistant drafts an email, a person approves it, and it lands in the O
   await expect(box).toBeDisabled();
   expect(assistant.outbox).toHaveLength(0);
 
-  await card.getByRole('button', { name: 'Approve' }).click();
+  await card.getByRole('button', { name: 'Send email' }).click();
   await expect(panel.getByText('Sent. It is in the Outbox.')).toBeVisible();
   await expect(card).toBeHidden();
   // The SDK also POSTs .../history on hydrate (AssistantTransport.apiUrl keeps it on our origin); not a write.

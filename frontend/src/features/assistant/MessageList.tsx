@@ -73,7 +73,9 @@ function Chip({ chip }: { chip: ToolChip }) {
         <Icon name={icon} size={14} className={chip.status === 'running' ? 'app-spin' : undefined} />
       )}
       <span>{chip.label}</span>
-      <span className="sr-only">, {STATUS_TEXT[chip.status]}</span>
+      {chip.status !== 'awaiting' && chip.status !== 'stopped' && (
+        <span className="sr-only">, {STATUS_TEXT[chip.status]}</span>
+      )}
       {chip.itemKeys
         .filter((key) => !chip.label.includes(key))
         .slice(0, 6)

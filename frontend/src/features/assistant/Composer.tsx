@@ -63,7 +63,9 @@ export function Composer({
       <TextField
         value={text}
         onChange={setText}
-        isDisabled={locked}
+        // Read-only while a reply runs, so focus stays put; disabled only while something else needs you.
+        isDisabled={lockedReason !== undefined}
+        isReadOnly={running}
         aria-describedby={lockedReason === undefined ? undefined : 'assistant-composer-locked'}
         className="app-assistant-composer-field"
       >

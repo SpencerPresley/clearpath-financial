@@ -19,7 +19,7 @@ import { NAV_COLLAPSED_KEY } from '../../ui/layout/AppShell';
 import { assistantHandlers, threadFixture } from './fixtures/handlers';
 import type { RunScript, ScriptedRun } from './fixtures/handlers';
 import { aiText, echoRun, EMPTY_STATE, lifecycle, values } from './fixtures/sse';
-import { INTERRUPT_ID, RUN2, STATE1, STATE2 } from './fixtures/wire';
+import { INTERRUPT_ID, RUN1, RUN2, STATE1, STATE2 } from './fixtures/wire';
 import { ASSISTANT_OPEN_KEY, threadKey } from './storage';
 
 const VIEWER_ID = 5;
@@ -298,11 +298,13 @@ describe('assistant conversation', () => {
     await user.type(box, 'hi{Enter}');
 
     const stop = await within(region).findByRole('button', { name: 'Stop' });
-    expect(box).toBeDisabled();
+    // Read-only, not disabled: focus stays in the box while the reply streams.
+    expect(box).toHaveAttribute('readonly');
+    expect(box).toHaveFocus();
     await user.click(stop);
 
     expect(await within(region).findByRole('button', { name: 'Send' })).toBeInTheDocument();
-    expect(box).toBeEnabled();
+    expect(box).not.toHaveAttribute('readonly');
     // Whatever the server still sends after Stop is dropped (closing the stream cancels the run server-side).
     for (const event of aiText('a2', ['Too late.'])) server_?.enqueue(frame(event));
     server_?.enqueue(frame(lifecycle('completed')));
@@ -350,7 +352,7 @@ describe('email approval', () => {
     expect(screen.getByRole('textbox', { name: 'Message the assistant' })).toBeDisabled();
     expect(within(await panel()).getByText('Email waiting for your approval')).toBeInTheDocument();
 
-    await user.click(within(draft).getByRole('button', { name: 'Approve' }));
+    await user.click(within(draft).getByRole('button', { name: 'Send email' }));
 
     expect(await within(await panel()).findByText('Sent it.')).toBeInTheDocument();
     expect(fake.posted).toEqual([
@@ -417,14 +419,58 @@ describe('email approval', () => {
     });
   });
 
+  it('says what the buttons do in email terms, not item-decision terms', async () => {
+    pendingThread();
+    const draft = await card();
+    const buttons = within(draft)
+      .getAllByRole('button')
+      .map((button) => button.textContent);
+    expect(buttons).toEqual(['Send email', 'Edit', "Don't send"]);
+  });
+
+  it('focuses To when editing, keeps the item in view, and Escape cancels', async () => {
+    const user = userEvent.setup();
+    const withItem = structuredClone(STATE1);
+    const value = withItem.tasks[0]?.interrupts[0]?.value;
+    if (value === undefined) throw new Error('fixture has no approval');
+    value.args.item_key = 'CP-1042';
+    const { fake } = setup({ state: withItem, threads: [threadFixture()], activeThread: 't-1' });
+    const draft = await card();
+    await user.click(within(draft).getByRole('button', { name: 'Edit' }));
+
+    const form = within(draft).getByRole('form', { name: 'Edit email' });
+    expect(within(form).getByRole('textbox', { name: 'To' })).toHaveFocus();
+    expect(within(draft).getByRole('link', { name: 'CP-1042' })).toHaveAttribute('href', '/items/1042');
+
+    await user.keyboard('{Escape}');
+    expect(within(draft).queryByRole('form', { name: 'Edit email' })).toBeNull();
+    expect(within(draft).getByRole('button', { name: 'Edit' })).toHaveFocus();
+    expect(fake.posted).toEqual([]);
+  });
+
+  it('moves focus to the card when a draft arrives while you are in the panel', async () => {
+    const user = userEvent.setup();
+    setup({ runs: [{ events: RUN1, state: STATE1 }], threads: [threadFixture()], activeThread: 't-1' });
+    const box = await within(await panel()).findByRole('textbox', { name: 'Message the assistant' });
+    await user.type(box, 'hi{Enter}');
+    const draft = await card();
+    await waitFor(() => {
+      expect(within(draft).getByRole('heading', { name: 'Email draft — needs your approval' })).toHaveFocus();
+    });
+    await user.tab();
+    expect(within(draft).getByRole('button', { name: 'Send email' })).toHaveFocus();
+  });
+
   it('rejects with an optional reason', async () => {
     const user = userEvent.setup();
     const { fake } = pendingThread();
     const draft = await card();
-    await user.click(within(draft).getByRole('button', { name: 'Reject' }));
-    await user.type(within(draft).getByRole('textbox', { name: /Reason/ }), 'Wrong team');
+    await user.click(within(draft).getByRole('button', { name: "Don't send" }));
+    const reason = within(draft).getByRole('textbox', { name: /Reason/ });
+    expect(reason).toHaveFocus();
+    await user.type(reason, 'Wrong team');
     await act(async () => {
-      await user.click(within(draft).getByRole('button', { name: 'Reject' }));
+      await user.click(within(draft).getByRole('button', { name: "Don't send" }));
     });
     await waitFor(() => {
       expect(fake.posted).toHaveLength(1);

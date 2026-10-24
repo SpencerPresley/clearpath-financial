@@ -6,7 +6,7 @@
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import { Button } from '../../ui/Button';
@@ -37,9 +37,23 @@ function itemIdOf(key: string | null | undefined): string | undefined {
   return match?.[1];
 }
 
+function ItemRow({ itemKey }: { itemKey: string | null | undefined }) {
+  const itemId = itemIdOf(itemKey);
+  if (itemId === undefined) return null;
+  return (
+    <div className="app-assistant-draft-row">
+      <dt>Item</dt>
+      <dd>
+        <Link to="/items/$itemId" params={{ itemId }} className="app-assistant-item-link">
+          {itemKey}
+        </Link>
+      </dd>
+    </div>
+  );
+}
+
 function Draft({ approval }: { approval: ToolApproval }) {
   const { to, subject, body, item_key: itemKey } = approval.args;
-  const itemId = itemIdOf(itemKey);
   return (
     <dl className="app-assistant-draft">
       <div className="app-assistant-draft-row">
@@ -58,16 +72,7 @@ function Draft({ approval }: { approval: ToolApproval }) {
         <dt>Subject</dt>
         <dd>{subject}</dd>
       </div>
-      {itemId !== undefined && (
-        <div className="app-assistant-draft-row">
-          <dt>Item</dt>
-          <dd>
-            <Link to="/items/$itemId" params={{ itemId }} className="app-assistant-item-link">
-              {itemKey}
-            </Link>
-          </dd>
-        </div>
-      )}
+      <ItemRow itemKey={itemKey} />
       <div className="app-assistant-draft-body">
         <dt className="sr-only">Body</dt>
         <dd>{body}</dd>
@@ -142,12 +147,19 @@ function EditForm({
         void form.handleSubmit();
       }}
     >
+      {itemIdOf(approval.args.item_key) !== undefined && (
+        <dl className="app-assistant-draft">
+          <ItemRow itemKey={approval.args.item_key} />
+        </dl>
+      )}
       <form.Field name="to">
         {(field) => (
           <TextAreaField
             label="To"
             description="Comma-separated or one per line"
             rows={2}
+            // Edit was just pressed and unmounted itself: focus follows to the first field.
+            autoFocus
             name={field.name}
             value={field.state.value}
             onChange={field.handleChange}
@@ -204,25 +216,69 @@ function EditForm({
 export function ApprovalCard({
   approval,
   onRespond,
+  focusOnMount = false,
 }: {
   approval: ToolApproval;
   onRespond: (response: ApprovalResponse) => Promise<void>;
+  /** The draft arrived while you were in the panel: take focus so the next Tab is Send email. */
+  focusOnMount?: boolean;
 }) {
   const [mode, setMode] = useState<'review' | 'edit' | 'reject'>('review');
   const [reason, setReason] = useState('');
   const respond = useMutation({ mutationFn: onRespond });
   const pending = respond.isPending;
-  // Edit failures are shown on the form; approve/reject failures (e.g. 409 already handled) on the card.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const declineButton = useRef<HTMLButtonElement>(null);
+  // Which button gets focus back when an edit or a decline is cancelled.
+  const returnTo = useRef<'edit' | 'reject' | null>(null);
+
+  useEffect(() => {
+    if (!focusOnMount) return;
+    // Only from inside the panel (the composer just locked) or nowhere; never out of the page.
+    const active = document.activeElement;
+    const panel = heading.current?.closest('aside');
+    if (active === null || active === document.body || (panel?.contains(active) ?? false)) {
+      heading.current?.focus();
+    }
+  }, [focusOnMount]);
+  useEffect(() => {
+    if (mode !== 'review' || returnTo.current === null) return;
+    (returnTo.current === 'edit' ? editButton : declineButton).current?.focus();
+    returnTo.current = null;
+  }, [mode]);
+
+  const cancel = () => {
+    if (mode === 'review' || pending) return;
+    respond.reset();
+    returnTo.current = mode;
+    setMode('review');
+  };
+  // Edit and decline failures are shown on the card unless the edit form owns them (field errors).
   const cardError =
     mode !== 'edit' && respond.isError
       ? (apiErrorBody(respond.error)?.message ?? "Couldn't send your answer. Try again.")
       : null;
 
   return (
-    <section className="app-assistant-approval" aria-labelledby="assistant-approval-title">
+    <section
+      className="app-assistant-approval"
+      aria-labelledby="assistant-approval-title"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && mode !== 'review') {
+          event.preventDefault();
+          cancel();
+        }
+      }}
+    >
       <header className="app-assistant-approval-head">
         <Icon name="feedback.awaiting" />
-        <h3 id="assistant-approval-title" className="app-assistant-approval-title">
+        <h3
+          id="assistant-approval-title"
+          ref={heading}
+          tabIndex={-1}
+          className="app-assistant-approval-title"
+        >
           Email draft — needs your approval
         </h3>
       </header>
@@ -235,10 +291,7 @@ export function ApprovalCard({
           onSend={(response, onError) => {
             respond.mutate(response, { onError });
           }}
-          onCancel={() => {
-            respond.reset();
-            setMode('review');
-          }}
+          onCancel={cancel}
         />
       ) : (
         <Draft approval={approval} />
@@ -267,15 +320,16 @@ export function ApprovalCard({
           <Button
             variant="primary"
             size="sm"
-            icon="action.approve"
+            icon="action.send"
             isDisabled={pending}
             onPress={() => {
               respond.mutate({ type: 'approve' });
             }}
           >
-            Approve
+            Send email
           </Button>
           <Button
+            ref={editButton}
             size="sm"
             icon="action.edit"
             isDisabled={pending}
@@ -287,42 +341,33 @@ export function ApprovalCard({
             Edit
           </Button>
           <Button
+            ref={declineButton}
             size="sm"
-            variant="ghost"
-            icon="action.reject"
+            icon="action.close"
             isDisabled={pending}
             onPress={() => {
               respond.reset();
               setMode('reject');
             }}
           >
-            Reject
+            Don&apos;t send
           </Button>
         </div>
       )}
       {mode === 'reject' && (
         <div className="app-assistant-approval-actions">
           <Button
-            variant="danger"
             size="sm"
-            icon="action.reject"
+            icon="action.close"
             isDisabled={pending}
             onPress={() => {
               const message = reason.trim();
               respond.mutate(message === '' ? { type: 'reject' } : { type: 'reject', message });
             }}
           >
-            Reject
+            Don&apos;t send
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            isDisabled={pending}
-            onPress={() => {
-              respond.reset();
-              setMode('review');
-            }}
-          >
+          <Button size="sm" variant="ghost" isDisabled={pending} onPress={cancel}>
             Cancel
           </Button>
         </div>

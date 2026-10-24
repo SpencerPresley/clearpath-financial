@@ -3504,7 +3504,7 @@
     @apply col-start-2 row-start-1 text-meta text-muted;
   }
   .app-assistant-thread-pending {
-    @apply col-span-2 inline-flex items-center gap-1 text-meta font-medium text-status-warning-soft-content;
+    @apply col-span-2 inline-flex items-center gap-1 text-meta font-medium text-base-content;
   }
   .app-assistant-body {
     @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3;
@@ -3590,7 +3590,7 @@
     @apply text-status-error-soft-content;
   }
   .app-assistant-tool[data-status='awaiting'] {
-    @apply font-medium text-status-warning-soft-content;
+    @apply font-medium text-base-content;
   }
   .app-assistant-thinking {
     @apply flex flex-col gap-1.5 py-1;
@@ -3621,14 +3621,19 @@
   .app-assistant-context {
     @apply truncate text-meta text-muted;
   }
+  /* Neutral: amber is the marketer's court and warning findings (§5.2); the heading says it needs you. */
   .app-assistant-approval {
-    @apply flex flex-col gap-2.5 rounded-md border border-status-warning-line px-3 py-2.5;
+    @apply flex flex-col gap-2.5 rounded-md border border-base-300 px-3 py-2.5;
   }
   .app-assistant-approval-head {
-    @apply flex items-center gap-1.5 text-status-warning-soft-content;
+    @apply flex items-center gap-1.5 text-base-content;
   }
   .app-assistant-approval-title {
-    @apply text-ui font-semibold text-base-content;
+    @apply rounded-xs text-ui font-semibold text-base-content outline-none;
+  }
+  .app-assistant-approval-title:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
   .app-assistant-approval-note {
     @apply text-meta text-muted;
