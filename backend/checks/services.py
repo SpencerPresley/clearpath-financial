@@ -9,9 +9,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final, Self
 
+from django.db import transaction
 from django.db.models import Q
 
-from audit.payloads import ChecksCompletedPayload, FindingDismissedPayload
+from accounts.models import User
+from audit.payloads import (
+    ChecksCompletedPayload,
+    FindingAcceptedPayload,
+    FindingDismissedPayload,
+    FindingReopenedPayload,
+)
 from audit.services import record_event
 from checks.engine import (
     ENGINE_VERSION,
@@ -34,6 +41,7 @@ from core.domain import (
     EventType,
     FindingSource,
     FindingState,
+    ItemStatus,
     Market,
     PartnerType,
     PersonalLoanTerms,
@@ -41,9 +49,12 @@ from core.domain import (
     Severity,
     TermsField,
 )
-from core.errors import NotFound
+from core.errors import InvalidInput, InvalidTransition, NotFound
 from partners.models import Partner
+from reviews.assignment import locked_item, require_reviewer_of
+from reviews.errors import FindingStateConflict, StaleVersion
 from reviews.models import Attachment, ReviewItem, Version
+from reviews.transitions import start_review
 from terms.models import OfferTerms
 
 # What a check result was computed with: the law's date and the engine's behavior (ledger ruling: cache keys
@@ -323,3 +334,83 @@ def preview_checks(*, data: PreviewInput, clock: Clock = SYSTEM_CLOCK) -> Previe
     )
     result = run_engine(ctx)
     return PreviewResult(findings=result.findings, terms_refs=result.terms_refs, ruleset_key=RULESET_KEY)
+
+
+# --- triage ----------------------------------------------------------------------------------------------------
+
+# Where findings can be triaged: the item is waiting for, or in, review. needs_rereview included: a fast-track
+# version's findings are triaged there before a fast-track approve (ruling 4).
+TRIAGEABLE: Final = frozenset({ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.NEEDS_REREVIEW})
+
+# action -> the states it moves a finding from; the target is the action's own state.
+_FINDING_SOURCES: Final = {
+    FindingState.ACCEPTED: frozenset({FindingState.OPEN, FindingState.DISMISSED}),
+    FindingState.DISMISSED: frozenset({FindingState.OPEN, FindingState.ACCEPTED}),
+    FindingState.OPEN: frozenset({FindingState.ACCEPTED, FindingState.DISMISSED}),
+}
+_ACTION_WORD: Final = {FindingState.ACCEPTED: "accept", FindingState.DISMISSED: "dismiss", FindingState.OPEN: "reopen"}
+
+
+def _triage(*, actor: User, finding_id: int, to: FindingState, text: str, clock: Clock) -> None:
+    """Move one finding on the item's current version, then recount. Only the assignee or a lead, never the
+    owner. A first triage on a `submitted` item starts the review (submitted -> in_review)."""
+    action = _ACTION_WORD[to]
+    finding = Finding.objects.select_related("version").filter(pk=finding_id).first()
+    if finding is None:
+        raise NotFound.entity("finding", finding_id)
+    now = clock.now()
+    with transaction.atomic():
+        item = locked_item(finding.version.item.pk)
+        require_reviewer_of(actor, item)
+        status = ItemStatus(item.status)
+        if status not in TRIAGEABLE:
+            raise InvalidTransition(action=f"{action}_finding", from_status=status)
+        current = item.current_version
+        if current is None or current.pk != finding.version.pk:
+            raise StaleVersion(version_n=finding.version.n, current_n=current.n if current else None)
+        finding = Finding.objects.select_for_update().get(pk=finding_id)
+        state = FindingState(finding.state)
+        if state not in _FINDING_SOURCES[to]:
+            raise FindingStateConflict(action=action, state=state)
+        if status is ItemStatus.SUBMITTED:
+            start_review(item, reviewer=actor, at=now)
+        finding.state = to
+        finding.carried_from = None
+        if to is FindingState.OPEN:
+            finding.reason, finding.resolved_by, finding.resolved_at = "", None, None
+        else:
+            finding.reason, finding.resolved_by, finding.resolved_at = text, actor, now
+        finding.save(update_fields=["state", "carried_from", "reason", "resolved_by", "resolved_at"])
+        common = {"finding_id": finding.pk, "version_id": current.pk, "rule_id": finding.rule_id}
+        if to is FindingState.ACCEPTED:
+            event_type, payload = EventType.FINDING_ACCEPTED, FindingAcceptedPayload(**common, note=text)
+        elif to is FindingState.DISMISSED:
+            event_type, payload = EventType.FINDING_DISMISSED, FindingDismissedPayload(**common, reason=text)
+        else:
+            event_type, payload = EventType.FINDING_REOPENED, FindingReopenedPayload(**common)
+        record_event(
+            type=event_type,
+            entity=EntityType.FINDING,
+            entity_id=finding.pk,
+            item_id=item.pk,
+            payload=payload,
+            actor=actor,
+            at=now,
+        )
+        recount_open_findings(item_id=item.pk)
+
+
+def accept_finding(*, actor: User, finding_id: int, note: str = "", clock: Clock = SYSTEM_CLOCK) -> None:
+    """The problem is real: it becomes a required change (product-spec "Automation")."""
+    _triage(actor=actor, finding_id=finding_id, to=FindingState.ACCEPTED, text=note.strip(), clock=clock)
+
+
+def dismiss_finding(*, actor: User, finding_id: int, reason: str, clock: Clock = SYSTEM_CLOCK) -> None:
+    """Not a problem here, and why. The reason is required (the DB check is the backstop)."""
+    if not reason.strip():
+        raise InvalidInput.for_field("reason", "Say why this isn't a problem.")
+    _triage(actor=actor, finding_id=finding_id, to=FindingState.DISMISSED, text=reason.strip(), clock=clock)
+
+
+def reopen_finding(*, actor: User, finding_id: int, clock: Clock = SYSTEM_CLOCK) -> None:
+    _triage(actor=actor, finding_id=finding_id, to=FindingState.OPEN, text="", clock=clock)

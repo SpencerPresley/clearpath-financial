@@ -262,9 +262,7 @@ def test_preview_uses_the_attachment_kinds(clock: FixedClock) -> None:
     )
 
     without = preview_checks(data=base, clock=clock)
-    with_consent = preview_checks(
-        data=replace(base, attachment_kinds=(AttachmentKind.CONSENT_RECORD,)), clock=clock
-    )
+    with_consent = preview_checks(data=replace(base, attachment_kinds=(AttachmentKind.CONSENT_RECORD,)), clock=clock)
 
     assert "sms.consent_record" in {f.rule_id for f in without.findings}
     assert "sms.consent_record" not in {f.rule_id for f in with_consent.findings}

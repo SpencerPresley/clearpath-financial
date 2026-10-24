@@ -54,6 +54,7 @@ class ItemResubmittedPayload(EventPayload):
     version_n: int
     round: int
     previous_version_id: int
+    note: str = ""  # the marketer's "what changed", for the reviewer
 
 
 class ItemAssignedPayload(EventPayload):
@@ -205,6 +206,10 @@ class DecisionRecordedPayload(EventPayload):
     expires_at: datetime | None
     terms_version_ids: tuple[int, ...] = ()
     evidence_attachment_ids: tuple[int, ...] = ()
+    ruleset_date: date | None = None
+    engine_version: str = ""
+    ai_review_carried_from_version_id: int | None = None
+    llm_override_reason: str = ""
 
 
 class PlacementRecordedPayload(EventPayload):

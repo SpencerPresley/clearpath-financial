@@ -9,7 +9,8 @@ from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 
 from accounts.models import User
 from core.clock import FixedClock
-from core.domain import Channel, CreditCardTerms, Market, PersonalLoanTerms, Product
+from core.domain import Channel, CheckStatus, CreditCardTerms, Market, PersonalLoanTerms, Product
+from reviews.models import ReviewItem
 from reviews.services import SubmitItemInput, SubmitItemResult, submit_item
 from terms.models import OfferTerms
 
@@ -49,6 +50,23 @@ def pl_terms(lead: User, clock: FixedClock) -> OfferTerms:
         created_by=lead,
         created_at=clock.now() - timedelta(days=30),
     )
+
+
+def dismiss_all(item_id: int, actor: User, clock: FixedClock, reason: str = "Checked: fine") -> None:
+    """Dismiss every open finding on the item's current version, through the triage service."""
+    from checks.models import Finding
+    from checks.services import dismiss_finding
+
+    item = ReviewItem.objects.get(pk=item_id)
+    for finding_id in Finding.objects.filter(version_id=item.current_version_id, state="open").values_list(  # pyrefly: ignore[missing-attribute]
+        "pk", flat=True
+    ):
+        dismiss_finding(actor=actor, finding_id=finding_id, reason=reason, clock=clock)
+
+
+def ai_done(item_id: int, status: CheckStatus = CheckStatus.SUCCEEDED) -> None:
+    """Stand-in for workstream D's handler finishing the AI check."""
+    ReviewItem.objects.filter(pk=item_id).update(llm_check_status=status)
 
 
 @pytest.fixture
