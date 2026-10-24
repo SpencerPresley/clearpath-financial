@@ -10,7 +10,10 @@ import * as zod from 'zod';
 /**
  * @summary Me
  */
+export const getMeResponseAssistantConfiguredDefault = true;
+
 export const GetMeResponse = zod.object({
+  "assistant_configured": zod.boolean().default(getMeResponseAssistantConfiguredDefault).describe('This server has an assistant model key; false means every assistant run would fail.'),
   "display_name": zod.string(),
   "effective_roles": zod.array(zod.enum(['marketer', 'reviewer', 'lead', 'admin'])).describe('Granted roles plus implied ones (a lead is also a reviewer).'),
   "email": zod.string(),
@@ -32,7 +35,10 @@ export const UpdateMeBody = zod.object({
   "is_available": zod.union([zod.boolean(),zod.null()]).optional()
 })
 
+export const updateMeResponseAssistantConfiguredDefault = true;
+
 export const UpdateMeResponse = zod.object({
+  "assistant_configured": zod.boolean().default(updateMeResponseAssistantConfiguredDefault).describe('This server has an assistant model key; false means every assistant run would fail.'),
   "display_name": zod.string(),
   "effective_roles": zod.array(zod.enum(['marketer', 'reviewer', 'lead', 'admin'])).describe('Granted roles plus implied ones (a lead is also a reviewer).'),
   "email": zod.string(),

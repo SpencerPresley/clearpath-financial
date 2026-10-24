@@ -16,6 +16,11 @@ class MeOut(Schema):
     roles: list[Role] = Field(description="Roles as granted.")
     effective_roles: list[Role] = Field(description="Granted roles plus implied ones (a lead is also a reviewer).")
     is_available: bool
+    # Defaulted (so optional in the client) only to keep older MeOut fixtures valid; the server always sends it.
+    assistant_configured: bool = Field(
+        default=True,
+        description="This server has an assistant model key; false means every assistant run would fail.",
+    )
 
 
 class MeUpdateIn(Schema):

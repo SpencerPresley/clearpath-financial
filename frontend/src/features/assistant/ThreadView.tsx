@@ -47,6 +47,8 @@ export interface ThreadViewProps {
   autoFocus?: boolean;
   /** Shown instead of the conversation while it's empty. */
   empty: (pick: (text: string) => void) => ReactNode;
+  /** Why nothing can be sent on this server at all (no model key); the thread stays readable. */
+  unavailable?: string;
 }
 
 export function ThreadView({
@@ -57,6 +59,7 @@ export function ThreadView({
   onSettled,
   autoFocus,
   empty,
+  unavailable,
 }: ThreadViewProps) {
   const [transport] = useState(() => new AssistantTransport({ threadId }));
   const stream = useStream<AssistantState, ToolApproval, AssistantConfigurable>({
@@ -116,9 +119,11 @@ export function ThreadView({
   const interruptId = interrupt?.id;
   const errorLine = streamErrorLine(stream.error);
 
-  let lockedReason: string | undefined;
-  if (stream.isThreadLoading) lockedReason = 'Loading the thread…';
-  else if (approval !== undefined) lockedReason = 'Decide on the email draft first';
+  // Without a model key no run can start, so that reason wins over the transient ones.
+  let lockedReason = unavailable;
+  if (lockedReason === undefined && stream.isThreadLoading) lockedReason = 'Loading the thread…';
+  else if (lockedReason === undefined && approval !== undefined)
+    lockedReason = 'Decide on the email draft first';
 
   const respond = async (response: ApprovalResponse) => {
     if (interruptId === undefined) return;

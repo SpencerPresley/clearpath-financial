@@ -22,6 +22,11 @@ class AssistantNotConfigured(Exception):  # noqa: N818  # reads as a state, like
         super().__init__("The assistant isn't configured (no API key).")
 
 
+def assistant_configured() -> bool:
+    """Whether a run can reach the model at all (GET /api/me tells the panel, so it can say so before a send)."""
+    return bool(settings.ASSISTANT_ANTHROPIC_API_KEY)
+
+
 def get_assistant_model() -> ChatAnthropic:
     key = settings.ASSISTANT_ANTHROPIC_API_KEY
     if not key:

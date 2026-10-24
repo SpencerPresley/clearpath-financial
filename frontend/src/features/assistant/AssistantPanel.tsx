@@ -13,6 +13,7 @@ import {
   getListAssistantThreadsQueryKey,
   useListAssistantThreads,
 } from '../../api/generated/assistant/assistant';
+import { useGetMe } from '../../api/generated/me/me';
 import type { AssistantThreadOut } from '../../api/generated/model';
 import { getListOutboxEmailsQueryKey } from '../../api/generated/notifications/notifications';
 import { Icon } from '../../ui/Icon';
@@ -25,6 +26,7 @@ import { ASSISTANT_OPEN_EVENT, ASSISTANT_PANEL_ID, readActiveThread, writeActive
 import { streamErrorLine, ThreadView } from './ThreadView';
 
 const UNTITLED = 'Untitled thread';
+export const UNAVAILABLE = "Assistant isn't available on this server";
 
 /** Three short asks for an empty thread, by what the viewer does all day. */
 export function exampleAsks(roles: readonly Role[], itemKey: string | undefined): string[] {
@@ -43,7 +45,24 @@ export function exampleAsks(roles: readonly Role[], itemKey: string | undefined)
   return ['What does the queue look like today?', precedent, email];
 }
 
-function EmptyThread({ asks, onPick }: { asks: readonly string[]; onPick: (text: string) => void }) {
+function EmptyThread({
+  asks,
+  onPick,
+  unavailable,
+}: {
+  asks: readonly string[];
+  onPick: (text: string) => void;
+  unavailable?: string;
+}) {
+  if (unavailable !== undefined) {
+    // Said before anyone types, instead of as an error after the first send (and no thread is saved).
+    return (
+      <div className="app-assistant-empty">
+        <p className="app-assistant-empty-title">{unavailable}</p>
+        <p className="app-muted">It has no AI model key here. Saved threads can still be read.</p>
+      </div>
+    );
+  }
   return (
     <div className="app-assistant-empty">
       <p className="app-assistant-empty-title">Ask about items, findings, precedents or offer terms.</p>
@@ -128,6 +147,9 @@ export function AssistantPanel({ onClose, autoFocus }: { onClose: () => void; au
   const itemKey = itemId === undefined ? undefined : `CP-${String(itemId)}`;
 
   const threads = useListAssistantThreads();
+  // SessionGate has already loaded /api/me; this reads the cache. An older server omits the flag: assume yes.
+  const me = useGetMe({ query: { staleTime: 5 * 60_000 } });
+  const unavailable = me.data?.assistant_configured === false ? UNAVAILABLE : undefined;
   const [activeId, setActiveId] = useState<string | null>(() => readActiveThread(viewer.id));
   const [pending, setPending] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState<{ text: string } | undefined>(undefined);
@@ -218,6 +240,7 @@ export function AssistantPanel({ onClose, autoFocus }: { onClose: () => void; au
           <div className="app-assistant-body">
             <EmptyThread
               asks={asks}
+              unavailable={unavailable}
               onPick={(text) => {
                 setDraft({ text });
               }}
@@ -231,7 +254,7 @@ export function AssistantPanel({ onClose, autoFocus }: { onClose: () => void; au
           <Composer
             onSend={startThread}
             running={false}
-            lockedReason={create.isPending ? 'Starting a thread…' : undefined}
+            lockedReason={unavailable ?? (create.isPending ? 'Starting a thread…' : undefined)}
             contextKey={itemKey}
             autoFocus={autoFocus}
             draft={draft}
@@ -248,7 +271,8 @@ export function AssistantPanel({ onClose, autoFocus }: { onClose: () => void; au
           }}
           onSettled={settled}
           autoFocus={autoFocus}
-          empty={(pick) => <EmptyThread asks={asks} onPick={pick} />}
+          unavailable={unavailable}
+          empty={(pick) => <EmptyThread asks={asks} onPick={pick} unavailable={unavailable} />}
         />
       )}
     </aside>

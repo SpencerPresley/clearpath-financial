@@ -32,6 +32,7 @@ function setup({
   open = true,
   activeThread,
   path = '/',
+  configured,
 }: {
   runs?: RunScript[];
   state?: unknown;
@@ -40,6 +41,7 @@ function setup({
   open?: boolean;
   activeThread?: string;
   path?: string;
+  configured?: boolean;
 } = {}) {
   if (open) window.localStorage.setItem(ASSISTANT_OPEN_KEY, 'true');
   if (activeThread !== undefined) window.localStorage.setItem(threadKey(VIEWER_ID), activeThread);
@@ -56,6 +58,7 @@ function setup({
       roles,
       effective_roles: roles,
       is_available: true,
+      assistant_configured: configured,
     }),
     ...assistant.handlers,
   );
@@ -197,6 +200,31 @@ describe('assistant panel beside narrow pages', () => {
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
     await panel();
     expect(nav).not.toHaveAttribute('data-collapsed');
+  });
+});
+
+describe('assistant without a model key on the server', () => {
+  it('says so up front, with the box disabled and no example asks', async () => {
+    setup({ configured: false });
+    const region = await panel();
+
+    expect(
+      within(region).getByText("Assistant isn't available on this server", { selector: 'p' }),
+    ).toBeInTheDocument();
+    const box = within(region).getByRole('textbox', { name: 'Message the assistant' });
+    expect(box).toBeDisabled();
+    expect(box).toHaveAccessibleDescription("Assistant isn't available on this server");
+    expect(within(region).queryByRole('list', { name: 'Example questions' })).toBeNull();
+    expect(within(region).getByRole('button', { name: 'Send' })).toBeDisabled();
+  });
+
+  it('still opens a saved thread read-only', async () => {
+    const thread = threadFixture({ title: 'Earlier thread' });
+    setup({ configured: false, threads: [thread], activeThread: thread.id, state: STATE2 });
+    const region = await panel();
+
+    expect(await within(region).findByRole('heading', { name: 'Earlier thread' })).toBeInTheDocument();
+    expect(within(region).getByRole('textbox', { name: 'Message the assistant' })).toBeDisabled();
   });
 });
 

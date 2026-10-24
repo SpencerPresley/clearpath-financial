@@ -32,6 +32,7 @@ class SearchMode(StrEnum):
 
 _START, _STOP = "\x02", "\x03"  # highlight markers: control characters ordinary copy never contains
 _CONTEXT: Final = 80
+_ELLIPSIS: Final = "…"
 
 
 @dataclass(frozen=True)
@@ -94,17 +95,43 @@ def _hit(version: Version, snippet: tuple[SnippetPart, ...], score: float) -> Se
     )
 
 
+def _mark_cuts(parts: tuple[SnippetPart, ...], *, before: bool, after: bool) -> tuple[SnippetPart, ...]:
+    """A "…" on each side where the snippet stops short of the version text."""
+    lead = (SnippetPart(_ELLIPSIS, highlighted=False),) if parts and before else ()
+    tail = (SnippetPart(_ELLIPSIS, highlighted=False),) if parts and after else ()
+    return lead + parts + tail
+
+
+def _elide_headline(parts: tuple[SnippetPart, ...], text: str) -> tuple[SnippetPart, ...]:
+    # ts_headline returns a contiguous excerpt of whole words; find where it sits to know which ends were cut.
+    shown = "".join(p.text for p in parts)
+    at = text.find(shown)
+    if at < 0:
+        return parts
+    return _mark_cuts(parts, before=at > 0, after=at + len(shown) < len(text))
+
+
 def _window(text: str, phrase: str) -> tuple[SnippetPart, ...]:
     at = text.lower().find(phrase.lower())
-    if at < 0:
-        return (SnippetPart(text[: _CONTEXT * 2], highlighted=False),)
-    start, end = max(at - _CONTEXT, 0), min(at + len(phrase) + _CONTEXT, len(text))
-    parts = [
-        SnippetPart(text[start:at], highlighted=False),
-        SnippetPart(text[at : at + len(phrase)], highlighted=True),
-        SnippetPart(text[at + len(phrase) : end], highlighted=False),
-    ]
-    return tuple(p for p in parts if p.text)
+    if at < 0:  # icontains and str.lower() can disagree on a few characters: show the opening instead
+        at = end_of_phrase = 0
+        context = _CONTEXT * 2
+    else:
+        end_of_phrase, context = at + len(phrase), _CONTEXT
+    start, end = max(at - _CONTEXT, 0), min(end_of_phrase + context, len(text))
+    # Snap the cuts to word boundaries, never into the phrase itself.
+    if start > 0 and not text[start - 1].isspace():
+        space = text.find(" ", start, at)
+        start = at if space < 0 else space + 1
+    if end < len(text) and not text[end].isspace():
+        space = text.rfind(" ", end_of_phrase, end)
+        end = end_of_phrase if space < 0 else space
+    parts = (
+        SnippetPart(text[start:at].lstrip(), highlighted=False),
+        SnippetPart(text[at:end_of_phrase], highlighted=True),
+        SnippetPart(text[end_of_phrase:end].rstrip(), highlighted=False),
+    )
+    return _mark_cuts(tuple(p for p in parts if p.text), before=start > 0, after=end < len(text))
 
 
 def _parse_headline(headline: str) -> tuple[SnippetPart, ...]:
@@ -149,7 +176,7 @@ def search_text(
         .order_by("-score", "-item_id")[:limit]
     )
     return tuple(
-        _hit(v, _parse_headline(v.headline), float(v.score))  # pyrefly: ignore[missing-attribute]
+        _hit(v, _elide_headline(_parse_headline(v.headline), v.content_text), float(v.score))  # pyrefly: ignore[missing-attribute]
         for v in versions
     )
 
