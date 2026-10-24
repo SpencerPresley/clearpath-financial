@@ -4,7 +4,8 @@
  * matrices), then WCAG relative luminance on the linear channels.
  */
 
-const OKLCH = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)\s*\)$/;
+// Alpha is accepted and ignored: translucent tokens (hover overlays) are gamut-checked, not ratio-checked.
+const OKLCH = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*[\d.]+%?\s*)?\)$/;
 
 /** Linear-light sRGB channels for an `oklch(L% C H)` string. Out-of-gamut values fall outside [0, 1]. */
 export function oklchToSrgb(value: string): [number, number, number] {

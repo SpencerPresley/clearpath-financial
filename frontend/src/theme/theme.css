@@ -84,6 +84,10 @@
   --color-focus: oklch(45% 0.16 262); /* focus ring on light surfaces */
   --color-focus-on-brand: oklch(98.5% 0.005 262); /* focus ring on navy chrome */
   --color-skeleton: oklch(93% 0.006 252);
+  --color-hover: oklch(25% 0.025 258 / 0.06); /* translucent, so hover reads on any light surface */
+  --color-primary-hover: oklch(37% 0.095 262);
+  --color-brand-field: oklch(37% 0.07 262); /* inputs on navy chrome */
+  --color-brand-hover: oklch(98.5% 0.005 262 / 0.1);
 
   /*
    * Status tones (spec §5.2). Each has:
@@ -127,6 +131,7 @@
   --color-status-error-soft: oklch(95.5% 0.022 22);
   --color-status-error-soft-content: oklch(45% 0.17 26);
   --color-status-error-line: oklch(86% 0.06 22);
+  --color-status-error-hover: oklch(45% 0.17 26);
 
   /*
    * Alert red-orange: live content at risk, act now (needs re-review, drift). Hue sits between error
@@ -186,5 +191,376 @@
   [data-focus-visible] {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+  /* React Aria handles focus rings for its components; suppress the browser's for mouse focus. */
+  [data-rac]:focus:not([data-focus-visible]) {
+    outline: none;
+  }
+}
+
+@layer components {
+  /* ---- Icons ------------------------------------------------------------------------------------ */
+  .app-icon {
+    @apply shrink-0;
+  }
+
+  /* ---- Badges: tone = spec §5.2 meaning. Soft fill + hue border; alert alone is solid (act now). - */
+  .app-badge {
+    @apply inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-meta font-medium whitespace-nowrap;
+  }
+  .app-badge[data-tone='neutral'] {
+    @apply border-status-neutral-line bg-status-neutral-soft text-status-neutral-soft-content;
+  }
+  .app-badge[data-tone='info'] {
+    @apply border-status-info-line bg-status-info-soft text-status-info-soft-content;
+  }
+  .app-badge[data-tone='warning'] {
+    @apply border-status-warning-line bg-status-warning-soft text-status-warning-soft-content;
+  }
+  .app-badge[data-tone='success'] {
+    @apply border-status-success-line bg-status-success-soft text-status-success-soft-content;
+  }
+  .app-badge[data-tone='error'] {
+    @apply border-status-error-line bg-status-error-soft text-status-error-soft-content;
+  }
+  .app-badge[data-tone='alert'] {
+    @apply border-status-alert bg-status-alert text-status-alert-content;
+  }
+  /* Attributes (risk tier): outline only, so they never read as a workflow state. */
+  .app-badge.app-badge-outline {
+    @apply border-base-300 bg-transparent text-base-content;
+  }
+
+  /* Finding source: shape + label, no color (spec §5.2). */
+  .app-source {
+    @apply inline-flex items-center gap-1 text-meta font-medium text-muted;
+  }
+
+  /* ---- Buttons: 32px default, 28px small (WCAG 2.5.8 target >= 24px; dense by design, §5.3). ---- */
+  .app-btn {
+    @apply inline-flex h-8 cursor-default items-center justify-center gap-1.5 rounded-md border px-3 text-ui font-medium whitespace-nowrap select-none;
+    transition-property: background-color, border-color, color, scale;
+    transition-duration: 120ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-btn[data-pressed] {
+    scale: 0.96;
+  }
+  .app-btn[data-size='sm'] {
+    @apply h-7 gap-1 px-2;
+  }
+  .app-btn[data-variant='primary'] {
+    @apply border-primary bg-primary text-primary-content;
+  }
+  .app-btn[data-variant='primary'][data-hovered] {
+    @apply border-primary-hover bg-primary-hover;
+  }
+  .app-btn[data-variant='secondary'] {
+    @apply border-base-300 bg-base-100 text-base-content;
+  }
+  .app-btn[data-variant='secondary'][data-hovered] {
+    @apply bg-base-200;
+  }
+  .app-btn[data-variant='ghost'] {
+    @apply border-transparent bg-transparent text-base-content;
+  }
+  .app-btn[data-variant='ghost'][data-hovered] {
+    @apply bg-hover;
+  }
+  .app-btn[data-variant='danger'] {
+    @apply border-status-error bg-status-error text-status-error-content;
+  }
+  .app-btn[data-variant='danger'][data-hovered] {
+    @apply border-status-error-hover bg-status-error-hover;
+  }
+  .app-btn[data-disabled] {
+    @apply border-base-300 bg-base-200 text-muted;
+  }
+  .app-btn[data-variant='ghost'][data-disabled] {
+    @apply border-transparent bg-transparent;
+  }
+  .app-btn.app-btn-icon {
+    @apply w-8 px-0;
+  }
+  .app-btn.app-btn-icon[data-size='sm'] {
+    @apply w-7;
+  }
+
+  /* ---- Overlays: the only things that float. --------------------------------------------------- */
+  .app-tooltip {
+    @apply max-w-xs rounded-md bg-neutral px-2 py-1 text-meta text-neutral-content shadow-overlay;
+    transition-property: opacity, translate;
+    transition-duration: 120ms;
+  }
+  .app-tooltip[data-entering],
+  .app-tooltip[data-exiting] {
+    opacity: 0;
+  }
+  .app-tooltip[data-placement='top'][data-entering] {
+    translate: 0 2px;
+  }
+  .app-tooltip[data-placement='bottom'][data-entering] {
+    translate: 0 -2px;
+  }
+
+  .app-popover {
+    @apply min-w-56 rounded-lg border border-base-300 bg-base-100 p-1 text-base-content shadow-overlay outline-none;
+    transition-property: opacity;
+    transition-duration: 100ms;
+  }
+  .app-popover[data-entering],
+  .app-popover[data-exiting] {
+    opacity: 0;
+  }
+  .app-menu {
+    @apply outline-none;
+  }
+  .app-menu-item {
+    @apply flex h-8 cursor-default items-center gap-2 rounded-md px-2 text-ui outline-none;
+  }
+  .app-menu-item[data-focused] {
+    @apply bg-hover;
+  }
+  .app-menu-item[data-disabled] {
+    @apply text-muted;
+  }
+  .app-menu-header {
+    @apply px-2 pt-1.5 pb-2;
+  }
+  .app-menu-separator {
+    @apply mx-1 my-1 h-px bg-base-300;
+  }
+
+  /* ---- Small primitives ------------------------------------------------------------------------ */
+  .app-kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-sm border border-base-300 bg-base-100 px-1 font-sans text-meta font-medium text-muted;
+  }
+  .app-kbd-group {
+    @apply inline-flex items-center gap-0.5;
+  }
+
+  .app-item-key {
+    @apply inline-flex items-center gap-0.5 font-mono text-meta font-medium text-base-content tabular-nums;
+  }
+  .app-item-key-copy {
+    @apply inline-flex size-6 cursor-default items-center justify-center rounded-sm text-muted opacity-0;
+    transition-property: opacity, background-color;
+    transition-duration: 120ms;
+  }
+  .app-item-key:hover .app-item-key-copy,
+  .app-item-key-copy[data-focus-visible],
+  .app-item-key-copy[data-copied] {
+    @apply opacity-100;
+  }
+  .app-item-key-copy[data-hovered] {
+    @apply bg-hover text-base-content;
+  }
+
+  .app-figure {
+    @apply tabular-nums;
+  }
+  .app-age {
+    @apply cursor-default rounded-xs text-muted tabular-nums;
+  }
+
+  /* ---- Toasts ---------------------------------------------------------------------------------- */
+  .app-toast-region {
+    @apply fixed right-4 bottom-4 z-50 flex flex-col-reverse gap-2 outline-none;
+  }
+  .app-toast {
+    @apply flex w-88 items-start gap-2.5 rounded-lg bg-neutral py-2.5 pr-1.5 pl-3 text-ui text-neutral-content shadow-overlay outline-none;
+    transition-property: opacity, translate;
+    transition-duration: 160ms;
+  }
+  .app-toast[data-tone='error'] {
+    @apply bg-status-error text-status-error-content;
+  }
+  .app-toast[data-entering] {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  .app-toast[data-exiting] {
+    opacity: 0;
+    translate: 0 2px;
+  }
+  .app-toast-body {
+    @apply flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5;
+  }
+  .app-toast-title {
+    @apply font-medium;
+  }
+  .app-toast-close {
+    @apply inline-flex size-7 shrink-0 cursor-default items-center justify-center rounded-md;
+  }
+  .app-toast-close[data-hovered] {
+    @apply bg-brand-hover;
+  }
+  .app-toast .app-toast-close[data-focus-visible] {
+    outline-color: var(--color-focus-on-brand);
+  }
+
+  /* ---- States: empty and loading (spec §5.5). Left-aligned in the data region, never a hero. ---- */
+  .app-empty {
+    @apply flex items-start gap-3 px-4 py-6;
+  }
+  .app-empty-icon {
+    @apply mt-0.5 text-muted;
+  }
+  .app-empty-title {
+    @apply text-sm font-medium text-base-content;
+  }
+  .app-empty-detail {
+    @apply mt-0.5 max-w-prose text-muted;
+  }
+  .app-empty-action {
+    @apply mt-3 flex gap-2;
+  }
+
+  .app-skeleton {
+    @apply block h-3 rounded-sm bg-skeleton motion-safe:animate-pulse;
+  }
+  .app-skeleton-badge {
+    @apply block h-5 w-20 rounded-sm bg-skeleton motion-safe:animate-pulse;
+  }
+  .app-skeleton-table {
+    @apply w-full border-t border-base-300;
+  }
+  .app-skeleton-row {
+    @apply flex h-row items-center gap-4 border-b border-base-300 px-3;
+  }
+
+  /* ---- App shell ------------------------------------------------------------------------------- */
+  .app-shell {
+    @apply grid h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
+  }
+  .app-topbar {
+    @apply col-span-2 flex h-topbar items-center gap-3 bg-primary pr-3 pl-2 text-primary-content;
+  }
+  .app-topbar [data-focus-visible],
+  .app-topbar :focus-visible {
+    outline-color: var(--color-focus-on-brand);
+  }
+  .app-topbar-btn {
+    @apply inline-flex size-8 cursor-default items-center justify-center rounded-md text-brand-muted;
+  }
+  .app-topbar-btn[data-hovered],
+  .app-topbar-btn[data-pressed] {
+    @apply bg-brand-hover text-primary-content;
+  }
+  .app-wordmark {
+    @apply flex items-center gap-2 pr-2 text-sm font-semibold tracking-tight whitespace-nowrap;
+  }
+  .app-wordmark-mark {
+    @apply size-2.5 rotate-45 rounded-xs bg-brand-accent;
+  }
+  .app-wordmark-product {
+    @apply font-normal text-brand-muted;
+  }
+
+  .app-search {
+    @apply flex h-8 w-full max-w-md cursor-not-allowed items-center gap-2 rounded-md border border-dashed border-brand-muted/40 bg-brand-field px-2.5 text-brand-muted;
+  }
+  .app-search input {
+    @apply min-w-0 flex-1 cursor-not-allowed bg-transparent text-ui outline-none placeholder:text-brand-muted;
+  }
+
+  .app-topbar-end {
+    @apply ml-auto flex items-center gap-1;
+  }
+  .app-api-quiet {
+    @apply inline-flex size-8 items-center justify-center rounded-md text-brand-muted;
+  }
+  .app-api-down {
+    @apply inline-flex h-7 items-center gap-1.5 rounded-md bg-status-error px-2.5 text-ui font-medium text-status-error-content;
+  }
+  .app-user-btn {
+    @apply inline-flex h-8 cursor-default items-center gap-2 rounded-md pr-1.5 pl-1 text-ui text-primary-content;
+  }
+  .app-user-btn[data-hovered],
+  .app-user-btn[data-pressed] {
+    @apply bg-brand-hover;
+  }
+  .app-avatar {
+    @apply inline-flex size-6 items-center justify-center rounded-full bg-brand-field text-meta font-semibold text-primary-content;
+  }
+
+  .app-nav {
+    @apply flex w-nav flex-col overflow-y-auto border-r border-base-300 bg-base-100 py-2;
+    transition-property: width;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-nav[data-collapsed] {
+    @apply w-nav-collapsed;
+  }
+  .app-nav-group {
+    @apply flex flex-col gap-px px-2 pb-2;
+  }
+  .app-nav-group-label {
+    @apply px-2 pt-2 pb-1 text-meta font-medium text-muted;
+  }
+  .app-nav[data-collapsed] .app-nav-group + .app-nav-group {
+    @apply mx-3 border-t border-base-300 px-0 pt-2;
+  }
+  .app-nav-item {
+    @apply flex h-8 items-center gap-2.5 rounded-md px-2 text-ui whitespace-nowrap text-base-content;
+  }
+  .app-nav-item[data-hovered]:not([aria-disabled]),
+  a.app-nav-item:hover {
+    @apply bg-hover;
+  }
+  .app-nav-item[aria-current='page'] {
+    @apply bg-nav-active font-medium text-primary;
+  }
+  .app-nav-item[aria-disabled='true'] {
+    @apply cursor-default text-muted;
+  }
+  .app-nav-item-label {
+    @apply min-w-0 flex-1 truncate;
+  }
+  .app-nav-item-note {
+    @apply text-meta text-muted;
+  }
+  .app-nav[data-collapsed] .app-nav-item {
+    @apply justify-center px-0;
+  }
+
+  .app-main {
+    @apply overflow-auto px-6 py-5;
+  }
+  .app-page-title {
+    @apply mb-1 text-lg font-semibold text-base-content;
+  }
+  .app-muted {
+    @apply text-muted;
+  }
+  .app-sr-only {
+    @apply sr-only;
+  }
+
+  /* ---- Design gallery (/dev/design) ------------------------------------------------------------- */
+  .app-gallery {
+    @apply flex max-w-6xl flex-col gap-8 pb-16;
+  }
+  .app-gallery-section {
+    @apply flex flex-col gap-3;
+  }
+  .app-gallery-heading {
+    @apply border-b border-base-300 pb-1.5 text-sm font-semibold;
+  }
+  .app-gallery-grid {
+    @apply grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2;
+  }
+  .app-gallery-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-gallery-panel {
+    @apply rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-gallery-label {
+    @apply text-meta text-muted;
+  }
+  .app-swatch {
+    @apply flex h-14 flex-col justify-between rounded-md border border-base-300 px-2 py-1.5 text-meta;
   }
 }
