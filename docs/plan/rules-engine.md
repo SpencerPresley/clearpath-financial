@@ -8,6 +8,15 @@
 > lines each, so parallelism buys little. One fresh reviewer subagent over the whole diff before the PR
 > (mandated) supplies the independent read.
 
+> **Deviations after review** (detail in `docs/plan/reviews/rules-engine.md`):
+> - Unversioned sources use the 2017-01-01 eCFR baseline, not the adoption date, so `RULESET_VERSION` is
+>   2026-07-21. `ENGINE_VERSION` is added for cache keys.
+> - `render_fast_track` raises `StaleTermsRef`, a `ValueError` subclass.
+> - `term_months` range ends always move to the new min/max. Listed lengths ("24, 36, or 60") are checked but
+>   not refs.
+> - Example parts bind to their own payment rather than to the nearest number in the paragraph.
+> - Reg N leads the claims citations only for mortgages.
+
 **Goal:** A pure-Python, deterministic compliance check engine for ad copy: code rules for the text-checkable
 rows of the regulations table (federal + California), a human checklist, offer-terms claim extraction
 (`TermsRefDraft`), and fast-track re-rendering with recomputed example payments.

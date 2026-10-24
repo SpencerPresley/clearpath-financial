@@ -161,7 +161,7 @@ database is touched:
 
 ```
 $ CLEARPATH_ENV_FILE="" DJANGO_SECRET_KEY=t POSTGRES_PASSWORD=x uv run pytest checks/engine -q
-262 passed in 0.25s
+316 passed in 0.28s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group typecheck pyrefly check

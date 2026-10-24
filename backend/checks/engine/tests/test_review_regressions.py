@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from checks.engine import RULES, Span, StaleTermsRef, TermsRefDraft, render_fast_track, run_code_checks
+from checks.engine import RULES, Span, StaleTermsRef, TermsRefDraft, human_checklist, render_fast_track, run_code_checks
 from checks.engine.registry import ENGINE_VERSION
 from core.domain import AttachmentKind, Channel, Product
 
@@ -208,6 +208,16 @@ def test_no_rule_drops_out_for_a_back_dated_context() -> None:
 def test_engine_version_is_exported_for_cache_keys() -> None:
     assert isinstance(ENGINE_VERSION, str)
     assert ENGINE_VERSION
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n\n", "%", "$", "-"])
+@pytest.mark.parametrize("product", list(Product))
+@pytest.mark.parametrize("channel", [Channel.EMAIL, Channel.SMS, Channel.AFFILIATE_PAGE])
+def test_first_keystroke_states_never_raise(text: str, product: Product, channel: Channel) -> None:
+    result = run_code_checks(make_ctx(text, product=product, channel=channel))
+    assert human_checklist(make_ctx(text, product=product, channel=channel))
+    assert all(f.span is None or f.quote == text[f.span.start : f.span.end] for f in result.findings)
+    assert result.terms_refs == ()
 
 
 def test_unused_attachment_kinds_do_not_change_results() -> None:

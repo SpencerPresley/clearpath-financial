@@ -8,7 +8,8 @@
 
 It probed the engine with its own ad copy, using scripts in the session scratchpad.
 
-**Resolution status.** The fixes are in `a5757a1` plus one follow-up. Every reproduced bug now has a
+**Resolution status.** The fixes are in `a5757a1`. The follow-up commit adds a first-keystroke guard test:
+empty, whitespace and lone-symbol text across every product and channel. Every reproduced bug now has a
 regression test, named for its finding id, in `backend/checks/engine/tests/test_review_regressions.py`. All of
 those tests failed before the fix. Re-running the reviewer's probe scripts afterwards gave the expected output
 for every case.
