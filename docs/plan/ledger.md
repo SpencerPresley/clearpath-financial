@@ -21,7 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
 | J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
-| Fast-track/review polish | agent (worktree `fix/fast-track-polish`) | — | in progress | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
+| Fast-track/review polish | agent (worktree `fix/fast-track-polish`) | PR #33 | final change (required seen_versions) | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
@@ -32,7 +32,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 ## Rulings
 
-- Ruling: bulk fast-track is Lead-only (spec: bulk actions are Lead); single `POST /items/{id}/fast-track-approve` is open to the assignee reviewer or a lead; the review screen uses the single endpoint with the version it showed — F follow-up (one line) + frontend follow-up.
+- Ruling: bulk fast-track is Lead-only (spec: bulk actions are Lead); single `POST /items/{id}/fast-track-approve` is open to the assignee reviewer or a lead; the review screen uses the single endpoint with the version it showed; bulk requires `seen_versions` for every item (422 otherwise). Supersedes F's ruling that opened bulk to reviewers. Implemented in PR #33.
 - Ruling: items whose quoted numbers didn't change still go to re-review (approval must point at terms in effect); the UI labels them "Numbers unchanged" so fast-track is a confirm, not a review.
 - Ruling: in-flight items (submitted/in_review) aren't regenerated on a terms change; the rate-value code check flags stale numbers against current terms, and the reviewer requests changes or approves with edits.
 - Ruling: publish takes effect immediately (no future-dated terms); identical values refused (F's calls, accepted).
@@ -97,7 +97,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
-- Frontend follow-ups queue: items 1–5 taken by the fast-track/polish agent; remaining: adopt API-gaps contract in queue and /mine. Original list: PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
+- Frontend follow-ups queue: items 1–5 done in PR #33; API-gaps adoption folded into PR #32. Original list: PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
 - Deploy wave: prod settings require ANTHROPIC_API_KEY.
 
 - UI glossary nit for the wave walkthrough: status badge says "Re-review" while lane/view/stat say "Needs re-review"; pick one label (spec §5.4).
