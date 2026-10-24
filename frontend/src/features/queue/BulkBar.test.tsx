@@ -39,7 +39,6 @@ beforeEach(() => {
 });
 
 describe('BulkBar', () => {
-<<<<<<< HEAD
   it('turns fast-track off, and says why, when no selected re-review can take it (nit 16)', () => {
     const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
     setup(LEAD, [1, 16], [ROWS[0] ?? expiry, expiry]);
