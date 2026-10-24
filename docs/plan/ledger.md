@@ -19,10 +19,10 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | F offer terms (#7) | agent (worktree) | PR #31 merged | done | worked example end to end; per-item transactions (deadlock control test); optimistic publish (based_on_terms_id); seen_versions on bulk |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
-| L demo seed (#13) | agent (worktree `wsL/demo-seed`) | — | in progress | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| L demo seed (#13) | agent (worktree) | PR #39 | follow-ups (hosted password, seed on start, tracker go-live split, role landing) | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree `wsM/drift`) | — | in progress | SSRF-guarded fetch, drift snapshots/reopen, self-hosted demo partner pages |
 | K assistant (#12) | agent (worktree) | PR #38 | rebasing + system mail in Outbox | live smoke passed (orchestrator); request-scoped runs, custom useStream adapter; injection test; duplicate-send bug found via real-server test and fixed |
-| J screens + metrics (#11) | agent (worktree) | #34 merged (metrics); #35 library+import, #36 terms+partners restacking | in progress | per-source metric figures (no blended numbers); every number drills to its items |
+| J screens + metrics (#11) | agent (worktree) | #34, #35, #36 merged | done | per-source metric figures (no blended numbers); every number drills to its items |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree) | PR #32 merged | done (CI failure root-caused: MoreFilters removed the focused submenu mid-selection; fixed in product code) | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
@@ -33,6 +33,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: hosted demo password comes from SSM (`DEMO_USER_PASSWORD`), never the repo default; Spencer shares it with evaluators — the repo default would let anyone with repo access reset the hosted demo.
+- Ruling: the sample tracker ends the day before the tool's go-live (start of native history), so metrics read as spreadsheet era → tool era; one shared go-live constant relative to the seed clock.
+- Ruling: landing route by role — reviewer/lead /queue, marketer /mine, admin /import.
+- Ruling: seed_demo runs after migrate on container start (no-op when data exists).
 
 - Ruling: assistant runs are request-scoped (disconnect cancels); useStream consumes our SSE through a custom adapter, not the Agent Server protocol — server-held runs would need a replay buffer across uvicorn workers.
 - Ruling: all Django mail lands in the Outbox (assistant mail + system mail such as password reset, admin-visible); real delivery is a later EMAIL_BACKEND swap.
@@ -103,7 +108,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 Resurface these when Spencer is back. Each has what I did meanwhile.
 
-- (none open)
+- (none blocking) FYI at deploy: the hosted demo password will be generated and stored in SSM
+  (`/clearpath/prod/DEMO_USER_PASSWORD`); Spencer should copy it into 1Password and share it with evaluators.
 
 
 ## Orchestrator notes
