@@ -7,7 +7,7 @@ missing required variable is reported together.
 
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BeforeValidator, Field, SecretStr
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -55,6 +55,12 @@ class Env(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
 
+    # Demo logins (seed_demo_users); optional so environments without demo users still boot.
+    demo_user_password: SecretStr | None = None
+
+    # Parallel worktrees share one Postgres; each gets its own test database.
+    clearpath_test_db_suffix: str = ""
+
 
 env = Env()  # pyrefly: ignore[missing-argument]  # populated from the environment
 
@@ -73,12 +79,24 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
+    # Before ninja: core overrides its export_openapi_schema command (core/management/commands).
+    "core",
     "ninja",
     "allauth",
     "allauth.account",
     "allauth.headless",
     "allauth.mfa",
-    "core",
+    "accounts",
+    "partners",
+    "terms",
+    "reviews",
+    "checks",
+    "audit",
+    "notifications",
+    "imports",
+    "exports",
+    "metrics",
+    "assistant",
 ]
 
 MIDDLEWARE = [
@@ -110,7 +128,7 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
+DATABASES: dict[str, dict[str, Any]] = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": env.postgres_host,
@@ -124,6 +142,8 @@ DATABASES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+AUTH_USER_MODEL = "accounts.User"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -144,6 +164,7 @@ HEADLESS_FRONTEND_URLS = {
     "account_reset_password_from_key": f"{env.frontend_base_url}/account/password/reset/{{key}}",
 }
 ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
@@ -155,12 +176,21 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Evidence attachments. Local filesystem in dev; production overrides STORAGES with S3 (workstream A).
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # --- Celery ---
 CELERY_BROKER_URL = env.redis_url
 CELERY_RESULT_BACKEND = None
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = 300
+CELERY_BEAT_SCHEDULE = {
+    # The event log is the outbox (decisions.md "Data"): poll it often; Redis is disposable.
+    "dispatch-outbox": {"task": "audit.dispatch_outbox", "schedule": 2.0},
+    "redeliver-stale-events": {"task": "audit.redeliver_stale_events", "schedule": 300.0},
+}
 
 LOGGING = {
     "version": 1,
