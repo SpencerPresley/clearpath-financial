@@ -49,7 +49,7 @@ describe('FilterBar', () => {
 
   it("shows a queue view's statuses on its Status chip", () => {
     renderWithQuery(<Harness initial={viewSearch('rereview')} spy={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Status: Re-review' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Status: Needs re-review' })).toBeInTheDocument();
   });
 
   it('clears one chip without touching the others', async () => {

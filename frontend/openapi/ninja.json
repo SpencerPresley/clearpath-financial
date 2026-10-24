@@ -630,18 +630,20 @@
             "type": "string"
           },
           "seen_versions": {
-            "description": "The generated version each item showed when the reviewer chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.",
+            "description": "The generated version each item showed when the lead chose it, one entry per item in item_ids (else 422 on seen_versions, nothing approved). An item is approved only at that version, else skipped as stale_version.",
             "items": {
               "$ref": "#/components/schemas/SeenVersionIn"
             },
             "maxItems": 500,
+            "minItems": 1,
             "title": "Seen Versions",
             "type": "array"
           }
         },
         "required": [
           "item_ids",
-          "reason"
+          "reason",
+          "seen_versions"
         ],
         "title": "BulkFastTrackIn",
         "type": "object"
@@ -4205,6 +4207,29 @@
             "title": "Live Placements Count",
             "type": "integer"
           },
+          "llm_check_failure_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LlmFailureCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the current version's AI check failed; null unless llm_check_status is failed. not_configured: no API key on this server, so Retry won't help."
+          },
+          "llm_check_failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The failure as a plain sentence; null unless llm_check_status is failed.",
+            "title": "Llm Check Failure Reason"
+          },
           "llm_check_status": {
             "$ref": "#/components/schemas/CheckStatus"
           },
@@ -4218,6 +4243,18 @@
           "notes": {
             "title": "Notes",
             "type": "string"
+          },
+          "numbers_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Generated (fast-track) current version only: false when none of the numbers the copy quotes changed (no diff from the approved version; fast-track confirms it against the new terms). Null otherwise.",
+            "title": "Numbers Change"
           },
           "open_findings_count": {
             "title": "Open Findings Count",
@@ -4384,7 +4421,10 @@
           "retention_until",
           "current_version",
           "versions",
-          "live_placements_count"
+          "live_placements_count",
+          "numbers_change",
+          "llm_check_failure_code",
+          "llm_check_failure_reason"
         ],
         "title": "ItemDetailOut",
         "type": "object"
@@ -13628,7 +13668,7 @@
     },
     "/api/items/bulk/fast-track-approve": {
       "post": {
-        "description": "Reviewers and leads. Approve each item's current generated version, one item at a time, with the single\nfast-track's checks (a reviewer only their own items). Anything that can't be fast-tracked (open findings, not\nin needs_rereview, a newer version, someone else's item) is listed in `skipped` with its error code and stays in\nthe normal lane (ruling 4).",
+        "description": "Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the\nsingle fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything\nthat can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in\n`skipped` with its error code and stays in the normal lane (ruling 4).",
         "operationId": "bulkFastTrackApprove",
         "parameters": [],
         "requestBody": {
