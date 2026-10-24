@@ -26,7 +26,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | Fixes: shell/global | agent (worktree `fix/walkthrough-shell`) | — | in progress | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
 | Fixes: import + users | agent (worktree `fix/walkthrough-import-users`) | — | in progress | S15 import demo, S16 users screen + availability + workload |
 | Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
-| Deploy (apply + first deploy) | orchestrator | live | https://d1qhgfjuad1hh0.cloudfront.net — smoke 10/10; CloudFront overwrites spoofed viewer IP (verified); max_connections 79; seed 44 items + 178 tracker + 11 people. First deploy failed on a first-boot NAT race (compose download), box fixed via SSM, PR #46 prevents it on rebuild | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| Deploy (apply + first deploy) | orchestrator | live | https://clearpath.spencerpresley.com (and d1qhgfjuad1hh0.cloudfront.net) — smoke 10/10; CloudFront overwrites spoofed viewer IP (verified); max_connections 79; seed 44 items + 178 tracker + 11 people. First deploy failed on a first-boot NAT race (compose download), box fixed via SSM, PR #46 prevents it on rebuild | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree) | PR #42 merged | done | bell + popover, typed detail per kind, 3 queries per page |
@@ -139,11 +139,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 Resurface these when Spencer is back. Each has what I did meanwhile.
 
-- **For Spencer (not blocking): custom domain DNS at Squarespace, record 1 of 2.** Add CNAME
-  host `_a19188f223dbe68c9c9fb197121b0907.clearpath` → `_f8b970183b87503436fcf121334e9e61.wzccmgtwzk.acm-validations.aws.`
-  Meanwhile: certificate requested (phase 1 applied, branch infra/custom-domain). After ACM shows Issued, I
-  apply phase 2 and hand over record 2 (`clearpath` → the CloudFront domain), then redeploy.
-  Demo password: Spencer has it in the 1Password env as PROD_DEMO_PASSWORD (verified equal to SSM).
+- Resolved: custom domain live at https://clearpath.spencerpresley.com (both Squarespace CNAMEs added by Spencer; ACM issued; smoke 10/10 + sign-in verified). cloudfront.net still works. Demo password: Spencer's 1Password env PROD_DEMO_PASSWORD (= SSM).
+- (none open)
 
 
 ## Orchestrator notes
