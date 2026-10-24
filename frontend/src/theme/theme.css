@@ -857,7 +857,7 @@
    * checklist = dotted.
    */
   .app-mark {
-    @apply rounded-xs bg-transparent text-inherit;
+    @apply bg-transparent text-inherit;
     text-decoration-line: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 3px;
@@ -878,6 +878,15 @@
     text-decoration-color: var(--color-muted);
     text-decoration-thickness: 1px;
   }
+  /* Accepted = must change: quiet like any triaged span, but the line keeps its severity color. */
+  .app-mark[data-resolved][data-accepted][data-severity='blocking'] {
+    text-decoration-color: var(--color-status-error-soft-content);
+    text-decoration-thickness: 1.5px;
+  }
+  .app-mark[data-resolved][data-accepted][data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+    text-decoration-thickness: 1.5px;
+  }
   .app-mark[data-source='code'] {
     text-decoration-style: solid;
   }
@@ -895,6 +904,30 @@
   }
   .app-mark[data-clickable] {
     cursor: pointer;
+  }
+  /* A second finding on the same text: its own line, below the first (decorations of nested inlines
+     both paint). Same vocabulary: severity color, source style, muted when triaged. */
+  .app-mark-under {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 7px;
+    text-decoration-skip-ink: none;
+  }
+  .app-mark-under[data-severity='blocking'] {
+    text-decoration-color: var(--color-status-error-soft-content);
+  }
+  .app-mark-under[data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+  }
+  .app-mark-under[data-resolved]:not([data-accepted]) {
+    text-decoration-color: var(--color-muted);
+    text-decoration-thickness: 1px;
+  }
+  .app-mark-under[data-source='llm'] {
+    text-decoration-style: dashed;
+  }
+  .app-mark-under[data-source='human'] {
+    text-decoration-style: dotted;
   }
 
   .app-copy-editor {
@@ -948,6 +981,10 @@
   .app-finding-summary {
     @apply flex min-w-0 flex-col gap-1.5;
   }
+  /* Triaged: red/amber means "still open", so the pill goes outline-only (glyph + word keep severity). */
+  .app-finding-summary[data-quiet] .app-badge {
+    @apply border-base-300 bg-transparent text-muted;
+  }
   .app-finding-tags {
     @apply flex flex-wrap items-center gap-x-2.5 gap-y-1;
   }
@@ -990,7 +1027,7 @@
     @apply min-w-0 truncate text-sm font-semibold text-base-content;
   }
   .app-decision-bar-meta {
-    @apply flex min-w-0 items-center gap-2 whitespace-nowrap;
+    @apply flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap;
   }
   .app-decision-bar-meta > * {
     @apply shrink-0;
@@ -1004,8 +1041,15 @@
   .app-meta-text {
     @apply text-meta whitespace-nowrap text-muted;
   }
+  /* Buttons on one row; why Approve is off sits under them, right-aligned, never over the identity. */
   .app-decision-bar-actions {
-    @apply ml-auto flex shrink-0 items-center justify-end gap-2;
+    @apply ml-auto flex shrink-0 flex-col items-end gap-1;
+  }
+  .app-decision-bar-buttons {
+    @apply flex items-center justify-end gap-2;
+  }
+  .app-decision-bar-note {
+    @apply text-meta text-muted tabular-nums;
   }
   .app-btn[aria-pressed='true'][data-variant='secondary'] {
     @apply border-base-content/30 bg-base-200;
@@ -1067,6 +1111,9 @@
   }
   .app-legend-line[data-source='llm'] {
     text-decoration-style: dashed;
+  }
+  .app-legend-line[data-source='human'] {
+    text-decoration-style: dotted;
   }
   /* The copy reads as the document under review: a flat sheet on the canvas, measure capped for reading. */
   .app-copy-sheet {

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   getListDecisionsQueryKey,
@@ -24,6 +24,7 @@ import { CheckboxField, TextAreaField } from '../../ui/forms/fields';
 import { apiErrorBody, apiErrorMessage } from '../../ui/forms/apiErrors';
 import type { IconKey } from '../../ui/icons';
 import { ItemKey } from '../../ui/ItemKey';
+import { Kbd } from '../../ui/Kbd';
 import { ATTACHMENT_KIND_LABELS, formatDate } from '../../ui/labels';
 import { showToast } from '../../ui/toast';
 import { APPROVE_MODES, changesRequestedDraft } from './decisionModes';
@@ -87,7 +88,7 @@ const MODES: Record<DecisionMode, ModeCopy> = {
     done: 'Fast-track approved',
   },
   reaffirm: {
-    title: () => 'Reaffirm the approval',
+    title: (n) => `Reaffirm the approval of v${String(n)}`,
     submit: 'Reaffirm',
     icon: 'action.approve',
     variant: 'primary',
@@ -295,6 +296,25 @@ export function DecisionPanel({
     send();
   };
 
+  // ⌘/Ctrl+Enter submits from anywhere in the decision form or the Approve-with-edits editor, so the
+  // keyboard path doesn't run backwards from the editor to the button (spec §5.7).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || event.defaultPrevented) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const editable = target?.closest('input, textarea, select, [contenteditable="true"]') ?? null;
+      if (editable !== null && editable.closest('.app-decision-panel, .app-edit-pane') === null) return;
+      if (confirming || document.querySelector('[aria-modal="true"]') !== null) return;
+      if (pending || blocked || noEdits) return;
+      event.preventDefault();
+      submit();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  });
+
   const nextN = currentN + 1;
   const titleN = mode === 'reaffirm' || mode === 'pull' ? approvedN : currentN;
 
@@ -349,6 +369,12 @@ export function DecisionPanel({
               isRequired
             />
           )}
+          {mode === 'reaffirm' && item.reopen_reason === 'terms_changed' && (
+            <p className="app-note" data-tone="alert">
+              v{approvedN} quotes the offer terms that changed. Reaffirm only if those numbers are still
+              offered; otherwise fast-track the updated version or pull it.
+            </p>
+          )}
           {mode === 'pull' && (
             <div className="app-field">
               <span className="app-field-label">Live placements to take down</span>
@@ -393,6 +419,9 @@ export function DecisionPanel({
               {errors.form}
             </span>
           )}
+          <span className="app-finding-keys" aria-hidden="true">
+            <Kbd keys={['⌘/Ctrl', 'Enter']} />
+          </span>
         </div>
       </form>
       <ModalDialog

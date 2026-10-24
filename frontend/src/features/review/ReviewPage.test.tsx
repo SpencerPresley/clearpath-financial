@@ -249,7 +249,10 @@ describe('ReviewPage', () => {
 
   it('keeps plain Approve off while accepted findings need a change', async () => {
     renderReview({ findings: triaged(FINDINGS_OPEN) });
-    expect(await screen.findByText('2 accepted findings need a change')).toBeInTheDocument();
+    // The note names the way forward, under the buttons.
+    expect(
+      await screen.findByText('2 accepted findings need a change · Approve with edits or Request changes'),
+    ).toBeInTheDocument();
     expect(approveButton()).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Approve with edits' })).toBeEnabled();
   });
@@ -274,6 +277,17 @@ describe('ReviewPage', () => {
       await screen.findByText('v3 has 1 new finding. Triage it, then approve again.'),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Edited copy (v3)')).not.toBeInTheDocument();
+  });
+
+  it('submits the open decision with Mod+Enter from the reason field', async () => {
+    const { posted } = renderReview({ findings: dismissedAll(FINDINGS_OPEN) });
+    await screen.findByRole('heading', { name: /Fall personal loan/ });
+    await userEvent.click(approveButton());
+    await userEvent.type(screen.getByLabelText(/^Reason/), 'All clear.');
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => {
+      expect(posted[0]?.body).toMatchObject({ outcome: 'approved', reason: 'All clear.' });
+    });
   });
 
   it('re-approves a reviewer-edit version without sending text again', async () => {
@@ -362,7 +376,7 @@ describe('ReviewPage', () => {
     });
     expect(await screen.findByText(/Re-review: Offer terms changed\./)).toBeInTheDocument();
     expect(screen.getByText('AI review carried from v1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reaffirm' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reaffirm v1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Fast-track approve v2' }));
     await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');

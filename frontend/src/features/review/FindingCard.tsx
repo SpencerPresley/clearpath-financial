@@ -148,7 +148,9 @@ export function FindingCard({
         message={finding.message}
         citation={finding.citation}
         quote={finding.quote}
-        suggestedFix={finding.state === 'open' ? finding.suggested_fix : undefined}
+        // Accepted = must change: the fix is still the point. Dismissed: no longer relevant.
+        suggestedFix={finding.state === 'dismissed' ? undefined : finding.suggested_fix}
+        quiet={finding.state !== 'open'}
       />
       <StateLine finding={finding} />
       {canTriage && finding.state === 'open' && !dismissing && (

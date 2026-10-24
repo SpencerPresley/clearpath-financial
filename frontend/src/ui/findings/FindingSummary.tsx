@@ -10,6 +10,8 @@ export interface FindingSummaryProps {
   suggestedFix?: string;
   /** id for the message line, so copy marks can point at it with aria-describedby. */
   id?: string;
+  /** Triaged: the severity pill drops its alarm color (red/amber means "still open"). */
+  quiet?: boolean;
 }
 
 /**
@@ -25,9 +27,10 @@ export function FindingSummary({
   quote,
   suggestedFix,
   id,
+  quiet = false,
 }: FindingSummaryProps) {
   return (
-    <div className="app-finding-summary">
+    <div className="app-finding-summary" data-quiet={quiet ? 'true' : undefined}>
       <div className="app-finding-tags">
         <SeverityBadge severity={severity} />
         <SourceTag source={source} />

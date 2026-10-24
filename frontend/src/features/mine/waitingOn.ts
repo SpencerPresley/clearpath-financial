@@ -44,7 +44,9 @@ export function waitingOn(row: ItemRowOut, detail?: ItemDetailOut): WaitingOn {
         bucket: 'you',
         why:
           decision?.outcome === 'changes_requested'
-            ? `Changes requested by ${decision.approver.name}${reason === '' ? '' : `: ${reason}`}`
+            ? reason === ''
+              ? `Changes requested by ${decision.approver.name}`
+              : `${decision.approver.name}: ${reason}`
             : 'Changes requested',
         action: 'resubmit',
       };

@@ -339,7 +339,7 @@ export function SubmitPage() {
         )}
         {confirming && openCount > 0 ? (
           <div className="app-confirm-strip" role="group" aria-label="Submit with open findings">
-            <p className="app-confirm-text">
+            <p className="app-confirm-text" role="status">
               <span data-severity={blockingCount > 0 ? 'blocking' : 'warning'} className="inline-flex">
                 <Icon name={blockingCount > 0 ? 'severity.blocking' : 'severity.warning'} />
               </span>
@@ -348,6 +348,8 @@ export function SubmitPage() {
             </p>
             <Button
               variant="primary"
+              // The Submit button it replaces had focus; keep the keyboard user on the next step.
+              autoFocus
               isPending={create.isPending}
               onPress={() => {
                 void form.handleSubmit({ confirmed: true });

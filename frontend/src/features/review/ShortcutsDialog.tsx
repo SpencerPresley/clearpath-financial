@@ -7,6 +7,7 @@ export const REVIEW_SHORTCUTS: readonly { keys: readonly string[]; label: string
   { keys: ['A'], label: 'Accept the selected finding' },
   { keys: ['D'], label: 'Dismiss the selected finding (asks for a reason)' },
   { keys: ['E'], label: 'Approve with edits (edit the copy)' },
+  { keys: ['⌘/Ctrl', 'Enter'], label: 'Submit the open decision (also from the editor)' },
   { keys: ['Esc'], label: 'Close the decision form or reason' },
   { keys: ['?'], label: 'Show these shortcuts' },
 ];

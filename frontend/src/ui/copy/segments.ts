@@ -22,6 +22,8 @@ export interface SpanMark {
   label: string;
   /** Accepted or dismissed: drawn quieter so open findings stand out. */
   resolved?: boolean;
+  /** Accepted (must change): keeps its severity color on the quieter line, unlike a dismissal. */
+  accepted?: boolean;
 }
 
 export interface Segment {

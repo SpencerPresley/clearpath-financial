@@ -15,7 +15,7 @@ describe('waitingOn', () => {
     const detail = itemFixture({ status: 'changes_requested', latest_decision: DECISION_CHANGES });
     expect(waitingOn(row, detail)).toEqual({
       bucket: 'you',
-      why: 'Changes requested by Dana Reyes: Add the California license line.',
+      why: 'Dana Reyes: Add the California license line.',
       action: 'resubmit',
     });
   });

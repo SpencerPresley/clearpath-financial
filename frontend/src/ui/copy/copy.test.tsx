@@ -46,6 +46,30 @@ describe('HighlightedText', () => {
     expect(marks[1]).toHaveAttribute('data-source', 'llm');
   });
 
+  it('draws the second finding on shared text as its own line, so the AI layer stays visible', () => {
+    const { container } = render(<HighlightedText text={TEXT} marks={MARKS} />);
+    const under = container.querySelector('mark .app-mark-under');
+    expect(under).toHaveTextContent('as low as');
+    expect(under).toHaveAttribute('data-source', 'llm');
+    expect(under).toHaveAttribute('data-severity', 'warning');
+  });
+
+  it('tells an accepted span (must change) from a dismissed one', () => {
+    const { container } = render(
+      <HighlightedText
+        text={TEXT}
+        marks={[
+          { ...MARKS[0], resolved: true, accepted: true } as SpanMark,
+          { id: 'f3', start: 16, end: 21, severity: 'blocking', source: 'code', label: 'x', resolved: true },
+        ]}
+      />,
+    );
+    const [accepted, dismissed] = container.querySelectorAll('mark');
+    expect(accepted).toHaveAttribute('data-accepted', 'true');
+    expect(dismissed).not.toHaveAttribute('data-accepted');
+    expect(dismissed).toHaveAttribute('data-resolved', 'true');
+  });
+
   it('cycles through overlapping marks on repeated clicks', async () => {
     const onMarkPress = vi.fn();
     const { container, rerender } = render(

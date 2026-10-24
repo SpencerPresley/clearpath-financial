@@ -7,6 +7,7 @@ import type { Page, Route } from '@playwright/test';
 
 import type {
   AttachmentOut,
+  ItemHistoryOut,
   CheckPreviewIn,
   CheckPreviewOut,
   DecisionIn,
@@ -48,6 +49,8 @@ export interface StubOptions {
   findings?: FindingOut[];
   placements?: PlacementOut[];
   rows?: ItemRowOut[];
+  /** Item history; defaults to the four-event fixture. */
+  history?: ItemHistoryOut;
   /** Item attachments; defaults to the rate sheet. */
   attachments?: AttachmentOut[];
   /** Delay for POST /checks/preview, to capture the "checking" state. */
@@ -274,7 +277,7 @@ export async function stubApi(page: Page, options: StubOptions = {}): Promise<St
       return json(route, itemRowFixture({ llm_check_status: 'running' }), 202);
     }
     if ((m = /^\/items\/\d+\/comments$/.exec(path))) return json(route, COMMENTS);
-    if ((m = /^\/items\/\d+\/history$/.exec(path))) return json(route, HISTORY);
+    if ((m = /^\/items\/\d+\/history$/.exec(path))) return json(route, options.history ?? HISTORY);
     if ((m = /^\/items\/\d+\/placements$/.exec(path))) return json(route, state.placements);
     if ((m = /^\/items\/\d+\/versions$/.exec(path))) return json(route, state.item.versions);
     if ((m = /^\/items\/\d+\/versions\/(\d+)$/.exec(path))) {

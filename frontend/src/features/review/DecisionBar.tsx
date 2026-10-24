@@ -29,9 +29,12 @@ function LatestDecision({ item }: { item: ItemDetailOut }) {
   if (decision === null) {
     return null;
   }
+  // A pulled or expired item's last decision is history, not its state ("Withdrawn" beside "Approved v2").
+  const past = item.status === 'withdrawn' || item.status === 'expired';
+  const outcome = OUTCOME_LABELS[decision.outcome];
   return (
     <span className="app-decision-summary">
-      {OUTCOME_LABELS[decision.outcome]} v{decision.version_n} by {decision.approver.name}{' '}
+      {past ? `Was ${outcome.toLowerCase()}` : outcome} v{decision.version_n} by {decision.approver.name}{' '}
       <RelativeAge at={decision.decided_at} />
       {decision.expires_at !== null && item.status === 'approved' && (
         <> · expires {formatDate(decision.expires_at)}</>
@@ -40,14 +43,25 @@ function LatestDecision({ item }: { item: ItemDetailOut }) {
   );
 }
 
+/** Why Approve is off, and the way forward when only accepted findings stand in the way. */
+export function approveNote(gate: DecisionGate): string | null {
+  if (gate.approve.enabled) {
+    return gate.overrideRequired ? 'AI check failed · approving needs an override reason' : null;
+  }
+  const why = gate.approve.blockers.join(' · ');
+  return gate.approveWithEdits.enabled ? `${why} · Approve with edits or Request changes` : why;
+}
+
 /**
  * The sticky bar (spec §5.3): which item, its state, and the decisions. Approve stays visible but disabled
- * with the reason beside it, so "why can't I approve" is never a mystery.
+ * with the reason under the buttons, so "why can't I approve" is never a mystery.
  */
 export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }: DecisionBarProps) {
   const pressed = (m: DecisionMode) => (mode === m ? true : undefined);
   const showDecisions = isDecider && gate.canDecide;
   const showRereview = isDecider && item.status === 'needs_rereview';
+  const note = showDecisions ? approveNote(gate) : null;
+  const approvedN = item.latest_decision?.version_n;
   // Only the assignee (or a lead) may decide; an unassigned item is claimed first (decisions.md, assignment).
   const showClaim =
     isDecider && item.assignee === null && (item.status === 'submitted' || item.status === 'needs_rereview');
@@ -82,104 +96,103 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
         </div>
       </div>
       <div className="app-decision-bar-actions">
-        {showClaim && (
-          <Button
-            icon="action.assign"
-            isDisabled={claim.isPending}
-            onPress={() => {
-              claim.mutate({ itemId: item.id });
-            }}
-          >
-            Claim
-          </Button>
-        )}
-        {showDecisions && (
-          <>
-            {!gate.approve.enabled && (
-              <span className="app-gate-note" id="approve-blockers">
-                {gate.approve.blockers.join(' · ')}
-              </span>
-            )}
-            {gate.approve.enabled && gate.overrideRequired && (
-              <span className="app-gate-note">AI check failed · approving needs an override reason</span>
-            )}
+        <div className="app-decision-bar-buttons">
+          {showClaim && (
             <Button
-              variant="primary"
-              icon="action.approve"
-              isDisabled={!gate.approve.enabled}
-              aria-describedby={gate.approve.enabled ? undefined : 'approve-blockers'}
-              aria-pressed={pressed('approved')}
+              icon="action.assign"
+              isDisabled={claim.isPending}
               onPress={() => {
-                onMode('approved');
+                claim.mutate({ itemId: item.id });
               }}
             >
-              Approve
+              Claim
             </Button>
-            <Button
-              icon="action.edit"
-              aria-pressed={pressed('approved_with_edits')}
-              onPress={() => {
-                onMode('approved_with_edits');
-              }}
-            >
-              Approve with edits
-            </Button>
-            <Button
-              icon="action.request_changes"
-              aria-pressed={pressed('changes_requested')}
-              onPress={() => {
-                onMode('changes_requested');
-              }}
-            >
-              Request changes
-            </Button>
-            <Button
-              icon="action.reject"
-              aria-pressed={pressed('rejected')}
-              onPress={() => {
-                onMode('rejected');
-              }}
-            >
-              Reject
-            </Button>
-          </>
-        )}
-        {showRereview && (
-          <>
-            {fastTrackAvailable(item) && (
+          )}
+          {showDecisions && (
+            <>
               <Button
-                variant="primary"
+                variant={mode === 'approved' ? 'secondary' : 'primary'}
                 icon="action.approve"
-                aria-pressed={pressed('fast_track')}
+                isDisabled={!gate.approve.enabled}
+                aria-describedby={gate.approve.enabled ? undefined : 'approve-blockers'}
+                aria-pressed={pressed('approved')}
                 onPress={() => {
-                  onMode('fast_track');
+                  onMode('approved');
                 }}
               >
-                Fast-track approve v{item.current_version_n}
+                Approve
               </Button>
-            )}
-            <Button
-              icon="action.approve"
-              aria-pressed={pressed('reaffirm')}
-              onPress={() => {
-                onMode('reaffirm');
-              }}
-            >
-              Reaffirm
-            </Button>
-            <Button
-              icon="action.pull"
-              aria-pressed={pressed('pull')}
-              onPress={() => {
-                onMode('pull');
-              }}
-            >
-              Pull
-            </Button>
-          </>
+              <Button
+                icon="action.edit"
+                aria-pressed={pressed('approved_with_edits')}
+                onPress={() => {
+                  onMode('approved_with_edits');
+                }}
+              >
+                Approve with edits
+              </Button>
+              <Button
+                icon="action.request_changes"
+                aria-pressed={pressed('changes_requested')}
+                onPress={() => {
+                  onMode('changes_requested');
+                }}
+              >
+                Request changes
+              </Button>
+              <Button
+                icon="action.reject"
+                aria-pressed={pressed('rejected')}
+                onPress={() => {
+                  onMode('rejected');
+                }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+          {showRereview && (
+            <>
+              {fastTrackAvailable(item) && (
+                <Button
+                  variant={mode === 'fast_track' ? 'secondary' : 'primary'}
+                  icon="action.approve"
+                  aria-pressed={pressed('fast_track')}
+                  onPress={() => {
+                    onMode('fast_track');
+                  }}
+                >
+                  Fast-track approve v{item.current_version_n}
+                </Button>
+              )}
+              <Button
+                icon="action.approve"
+                aria-pressed={pressed('reaffirm')}
+                onPress={() => {
+                  onMode('reaffirm');
+                }}
+              >
+                {approvedN === undefined ? 'Reaffirm' : `Reaffirm v${String(approvedN)}`}
+              </Button>
+              <Button
+                icon="action.pull"
+                aria-pressed={pressed('pull')}
+                onPress={() => {
+                  onMode('pull');
+                }}
+              >
+                Pull
+              </Button>
+            </>
+          )}
+          {!showDecisions && !showRereview && <LatestDecision item={item} />}
+          <IconButton icon="action.shortcuts" aria-label="Keyboard shortcuts (?)" onPress={onShortcuts} />
+        </div>
+        {note !== null && (
+          <p className="app-decision-bar-note" id="approve-blockers">
+            {note}
+          </p>
         )}
-        {!showDecisions && !showRereview && <LatestDecision item={item} />}
-        <IconButton icon="action.shortcuts" aria-label="Keyboard shortcuts (?)" onPress={onShortcuts} />
       </div>
     </header>
   );

@@ -43,7 +43,7 @@ export function LlmStatus({
           <Icon name="source.ai" />
           <span>
             {item.llm_check_status === 'pending' ? 'AI check queued.' : 'AI check running…'}
-            <span className="app-llm-status-note"> Approve unlocks when it finishes.</span>
+            <span className="app-llm-status-note"> Approving waits for it.</span>
           </span>
           <span className="app-llm-progress" aria-hidden="true" />
         </div>
@@ -54,7 +54,7 @@ export function LlmStatus({
           <Icon name="feedback.error" />
           <span>
             AI check failed.
-            <span className="app-llm-status-note"> Retry, or approve with an override reason.</span>
+            <span className="app-llm-status-note"> Retry, or give an override reason when you approve.</span>
           </span>
           {canRetry && (
             <Button

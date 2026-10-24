@@ -19,7 +19,20 @@ function nextMark(segment: Segment, activeId: string | null | undefined): SpanMa
   return segment.marks[index === -1 ? 0 : (index + 1) % segment.marks.length];
 }
 
-/** Read-only copy with flagged spans. Severity sets the fill, source sets the underline style. */
+function markAttrs(mark: SpanMark) {
+  return {
+    'data-severity': mark.severity,
+    'data-source': mark.source,
+    'data-resolved': mark.resolved === true ? 'true' : undefined,
+    'data-accepted': mark.accepted === true ? 'true' : undefined,
+  };
+}
+
+/**
+ * Read-only copy with flagged spans. Severity sets the fill, source sets the underline style. Where two
+ * findings cover the same text, the second draws its own line under the first, so a dashed AI line on
+ * a blocking code span isn't hidden.
+ */
 export function HighlightedText({
   text,
   marks,
@@ -36,14 +49,15 @@ export function HighlightedText({
           return <span key={segment.start}>{segment.text}</span>;
         }
         const active = segment.marks.some((m) => m.id === activeId);
+        const under = segment.marks[1];
+        const resolved = segment.marks.every((m) => m.resolved === true);
         return (
           <mark
             key={segment.start}
             className="app-mark"
-            data-severity={top.severity}
-            data-source={top.source}
+            {...markAttrs(top)}
+            data-resolved={resolved ? 'true' : undefined}
             data-active={active ? 'true' : undefined}
-            data-resolved={segment.marks.every((m) => m.resolved === true) ? 'true' : undefined}
             data-clickable={onMarkPress === undefined ? undefined : 'true'}
             data-mark-ids={segment.marks.map((m) => m.id).join(' ')}
             title={segment.marks.map((m) => m.label).join('\n')}
@@ -63,7 +77,13 @@ export function HighlightedText({
                   }
             }
           >
-            {segment.text}
+            {under === undefined ? (
+              segment.text
+            ) : (
+              <span className="app-mark-under" {...markAttrs(under)}>
+                {segment.text}
+              </span>
+            )}
           </mark>
         );
       })}

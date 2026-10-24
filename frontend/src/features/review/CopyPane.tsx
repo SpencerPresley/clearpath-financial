@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 
 import { useGetVersionDiff } from '../../api/generated/items/items';
 import type {
@@ -8,7 +9,6 @@ import type {
   ItemDetailOut,
   VersionOut,
 } from '../../api/generated/model';
-import { Button } from '../../ui/Button';
 import { CopyEditor } from '../../ui/copy/CopyEditor';
 import { DiffText, countChanges } from '../../ui/copy/DiffText';
 import { HighlightedText } from '../../ui/copy/HighlightedText';
@@ -147,15 +147,23 @@ export function CopyPane({
             <Icon name="action.edit" size={14} /> Your edit becomes v{(item.current_version_n ?? 0) + 1},
             authored by you, and is the version approved.
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={() => {
-              edit.onShowDiffChange(!edit.showDiff);
+          <ToggleButtonGroup
+            aria-label="View"
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[edit.showDiff ? 'diff' : 'edit']}
+            onSelectionChange={(keys) => {
+              edit.onShowDiffChange([...keys][0] === 'diff');
             }}
+            className="app-segmented ml-auto"
           >
-            {edit.showDiff ? 'Back to editing' : `Changes vs v${String(shownN)}`}
-          </Button>
+            <ToggleButton id="edit" className="app-segment">
+              Edit
+            </ToggleButton>
+            <ToggleButton id="diff" className="app-segment">
+              Changes vs v{shownN}
+            </ToggleButton>
+          </ToggleButtonGroup>
         </div>
         {segments === null ? (
           <>
@@ -174,7 +182,7 @@ export function CopyPane({
                   {plural(edit.findings.length, 'code finding')} in your edit
                   <span className="app-muted">
                     {' '}
-                    · findings not dismissed before come back open on v{(item.current_version_n ?? 0) + 1}
+                    · findings you haven&apos;t dismissed reopen on v{(item.current_version_n ?? 0) + 1}
                   </span>
                 </h3>
                 {edit.findings.map((finding) => (
@@ -185,6 +193,7 @@ export function CopyPane({
                     message={finding.message}
                     citation={finding.citation}
                     quote={finding.quote}
+                    suggestedFix={finding.suggested_fix}
                   />
                 ))}
               </section>
@@ -261,10 +270,13 @@ export function CopyPane({
               </span>
               <span className="app-legend-sep">·</span>
               <span className="app-legend-line" data-source="code">
-                Code
+                Code check
               </span>
               <span className="app-legend-line" data-source="llm">
-                AI
+                AI suggestion
+              </span>
+              <span className="app-legend-line" data-source="human">
+                Checklist
               </span>
             </span>
           )}

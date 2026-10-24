@@ -31,6 +31,7 @@ export function marksFromFindings(text: string, findings: readonly MarkableFindi
       quote: finding.quote,
       label: `${SEVERITY_META[finding.severity].label} · ${SOURCE_META[finding.source].label}: ${finding.message}`,
       resolved: finding.state !== undefined && finding.state !== 'open',
+      accepted: finding.state === 'accepted',
     });
   });
   return marks;

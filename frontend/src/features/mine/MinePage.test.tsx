@@ -78,9 +78,7 @@ describe('MinePage', () => {
       'href',
       '/mine/4/resubmit',
     );
-    expect(
-      await you.findByText('Changes requested by Dana Reyes: Add the California license line.'),
-    ).toBeInTheDocument();
+    expect(await you.findByText('Dana Reyes: Add the California license line.')).toBeInTheDocument();
 
     const compliance = within(complianceSection);
     expect(compliance.getByText('Dana Reyes is reviewing')).toBeInTheDocument();
