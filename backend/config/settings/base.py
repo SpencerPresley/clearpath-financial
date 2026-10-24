@@ -102,6 +102,7 @@ INSTALLED_APPS = [
     "metrics",
     "assistant",
     "drift",
+    "demo",
 ]
 
 MIDDLEWARE = [

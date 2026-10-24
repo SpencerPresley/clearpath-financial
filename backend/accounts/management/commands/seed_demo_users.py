@@ -1,53 +1,26 @@
-"""Create or reset the demo logins: one user per role, all with DEMO_USER_PASSWORD.
+"""Create or reset the demo logins without touching any other data: every demo persona (one documented login per
+role plus the rest of the team), all with the demo password (DEMO_USER_PASSWORD, or the documented default).
 
-Idempotent: re-running resets each demo user's roles, name, availability, and password. Evaluators get app
-roles only; none of these accounts can reach django-admin.
+Idempotent: re-running resets each persona's roles, name, availability and password. Evaluators get app roles
+only; none of these accounts can reach django-admin. `seed_demo` does this too, along with the demo data.
 """
 
-from typing import Any, Final
+from typing import Any
 
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 
-from accounts.models import User
-from config.settings.base import env
-from core.domain import Role
-
-DEMO_USERS: Final[dict[Role, str]] = {
-    Role.MARKETER: "Morgan Marketer",
-    Role.REVIEWER: "Riley Reviewer",
-    Role.LEAD: "Lee Lead",
-    Role.ADMIN: "Avery Admin",
-}
-
-
-def demo_email(role: Role) -> str:
-    return f"{role.value}@clearpath.demo"
+from core.errors import InvalidInput
+from demo.content.people import PERSONAS
+from demo.users import demo_password, upsert_personas
 
 
 class Command(BaseCommand):
-    help = "Create or reset one demo user per role (password from DEMO_USER_PASSWORD)."
+    help = "Create or reset the demo personas' logins (password from DEMO_USER_PASSWORD, or the documented default)."
 
     def handle(self, *args: Any, **options: Any) -> None:  # noqa: ANN401, ARG002  # BaseCommand.handle signature
-        secret = env.demo_user_password
-        if secret is None or not secret.get_secret_value():
-            raise CommandError("Set DEMO_USER_PASSWORD to seed the demo users.")
-        password = secret.get_secret_value()
         try:
-            validate_password(password)
-        except ValidationError as exc:
-            raise CommandError(f"DEMO_USER_PASSWORD is too weak: {' '.join(exc.messages)}") from exc
-        with transaction.atomic():
-            for role, name in DEMO_USERS.items():
-                user, created = User.objects.get_or_create(email=demo_email(role), defaults={"display_name": name})
-                user.display_name = name
-                user.roles = [role.value]
-                user.is_active = True
-                user.is_available = True
-                user.is_staff = False
-                user.is_superuser = False
-                user.set_password(password)
-                user.save()
-                self.stdout.write(f"{'created' if created else 'reset'} {user.email} ({role.value})")
+            users = upsert_personas(PERSONAS, password=demo_password())
+        except InvalidInput as exc:
+            raise CommandError(exc.message) from exc
+        for persona in PERSONAS:
+            self.stdout.write(f"{users[persona.key].email} ({', '.join(r.value for r in persona.roles)})")

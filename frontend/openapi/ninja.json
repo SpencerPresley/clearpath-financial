@@ -1865,23 +1865,68 @@
         "type": "object"
       },
       "DemoResetOut": {
+        "description": "A Reset demo job. `seeded_items` is set once it's done; `error` says what happened if it failed.",
         "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
           "seeded_items": {
             "title": "Seeded Items",
             "type": "integer"
           },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
           "status": {
             "enum": [
-              "started",
-              "done"
+              "queued",
+              "running",
+              "done",
+              "failed"
             ],
             "title": "Status",
             "type": "string"
           }
         },
         "required": [
+          "id",
           "status",
-          "seeded_items"
+          "requested_at",
+          "started_at",
+          "finished_at",
+          "seeded_items",
+          "error"
         ],
         "title": "DemoResetOut",
         "type": "object"
@@ -12363,7 +12408,7 @@
   "paths": {
     "/api/admin/demo/reset": {
       "post": {
-        "description": "Wipe and re-seed the demo data. Admins only; the UI confirms first. [workstream L]",
+        "description": "Wipe the demo data and seed it again, as a background job (poll `getDemoReset`). Admins only; the UI\nconfirms first. While a reset is queued or running, this returns that one instead of starting another. People\nand sessions are kept, so you stay signed in.",
         "operationId": "resetDemo",
         "parameters": [],
         "responses": {
@@ -12436,16 +12481,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12454,6 +12489,104 @@
           }
         ],
         "summary": "Reset Demo",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/demo/resets/{reset_id}": {
+      "get": {
+        "description": "How a Reset demo job is going. Admins only.",
+        "operationId": "getDemoReset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reset_id",
+            "required": true,
+            "schema": {
+              "title": "Reset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoResetOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Get Demo Reset",
         "tags": [
           "admin"
         ]

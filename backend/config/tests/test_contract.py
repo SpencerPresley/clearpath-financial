@@ -112,7 +112,6 @@ STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
         {"email": "new@clearpath.demo", "display_name": "New", "roles": ["reviewer"], "password": "x" * 12},
     ),
     ("patch", "/api/admin/users/1", {"is_active": False}),
-    ("post", "/api/admin/demo/reset", None),
 ]
 
 

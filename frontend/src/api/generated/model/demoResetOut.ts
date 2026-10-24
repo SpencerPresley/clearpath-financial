@@ -6,7 +6,15 @@
  */
 import type { DemoResetOutStatus } from './demoResetOutStatus';
 
+/**
+ * A Reset demo job. `seeded_items` is set once it's done; `error` says what happened if it failed.
+ */
 export interface DemoResetOut {
+  error: string;
+  finished_at: string | null;
+  id: number;
+  requested_at: string;
   seeded_items: number;
+  started_at: string | null;
   status: DemoResetOutStatus;
 }

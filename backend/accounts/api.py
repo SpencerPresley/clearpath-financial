@@ -7,6 +7,7 @@ from accounts.schemas import DemoResetOut, MeOut, MeUpdateIn, UserCreateIn, User
 from core.domain import Role
 from core.errors import NotImplementedYet
 from core.schemas import ERRORS, STUB_ERRORS
+from demo.services import DemoResetJob, get_reset, request_reset
 
 me_router = Router(tags=["me"])
 admin_router = Router(tags=["admin"])
@@ -55,7 +56,17 @@ def update_user(request: HttpRequest, user_id: int, body: UserUpdateIn) -> UserO
     raise NotImplementedYet("user management")
 
 
-@admin_router.post("/admin/demo/reset", response={202: DemoResetOut, **STUB_ERRORS}, operation_id="resetDemo")
-def reset_demo(request: HttpRequest) -> Status[DemoResetOut]:
-    """Wipe and re-seed the demo data. Admins only; the UI confirms first. [workstream L]"""
-    raise NotImplementedYet("demo reset")
+@admin_router.post("/admin/demo/reset", response={202: DemoResetOut, **ERRORS}, operation_id="resetDemo")
+def reset_demo(request: HttpRequest) -> Status[DemoResetJob]:
+    """Wipe the demo data and seed it again, as a background job (poll `getDemoReset`). Admins only; the UI
+    confirms first. While a reset is queued or running, this returns that one instead of starting another. People
+    and sessions are kept, so you stay signed in."""
+    return Status(202, request_reset(actor=current_user(request)))
+
+
+@admin_router.get(
+    "/admin/demo/resets/{int:reset_id}", response={200: DemoResetOut, **ERRORS}, operation_id="getDemoReset"
+)
+def get_demo_reset(request: HttpRequest, reset_id: int) -> DemoResetJob:
+    """How a Reset demo job is going. Admins only."""
+    return get_reset(viewer=current_user(request), reset_id=reset_id)
