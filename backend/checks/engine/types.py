@@ -37,7 +37,7 @@ class RuleSpec:
     citation: str
     url: str
     severity: Severity
-    kind: Literal["code", "human"]
+    kind: Literal["code", "human", "llm"]  # "llm": judged by the LLM pre-review (checks.llm), never by the engine
     products: frozenset[Product]
     channels: frozenset[Channel] | None  # None = all channels
     markets: frozenset[Market]
