@@ -18,7 +18,6 @@ from reviews.schemas import (
     AssignIn,
     AttachmentOut,
     BulkAssignIn,
-    BulkFastTrackIn,
     BulkResultOut,
     CommentIn,
     CommentOut,
@@ -408,14 +407,6 @@ def pull_item(request: HttpRequest, item_id: int, body: PullIn) -> selectors.Ite
         actor=current_user(request), item_id=item_id, reason=body.reason, placement_ids=tuple(body.placement_ids)
     )
     return selectors.get_item_row(item_id=item_id)
-
-
-@decisions_router.post(
-    "/items/bulk/fast-track-approve", response={200: BulkResultOut, **STUB_ERRORS}, operation_id="bulkFastTrackApprove"
-)
-def bulk_fast_track(request: HttpRequest, body: BulkFastTrackIn) -> BulkResultOut:
-    """Approve generated terms-change versions; items with open findings are skipped (ruling 4). [workstream F]"""
-    raise NotImplementedYet("fast-track approval")
 
 
 # --- library ---------------------------------------------------------------------------------------------------

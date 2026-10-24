@@ -8,18 +8,27 @@ import * as zod from 'zod';
 
 
 /**
- * Approve generated terms-change versions; items with open findings are skipped (ruling 4). [workstream F]
+ * Reviewers and leads. Approve each item's current generated version, one item at a time, with the single
+ * fast-track's checks (a reviewer only their own items). Anything that can't be fast-tracked (open findings, not
+ * in needs_rereview, a newer version, someone else's item) is listed in `skipped` with its error code and stays in
+ * the normal lane (ruling 4).
  * @summary Bulk Fast Track
  */
 export const bulkFastTrackApproveBodyItemIdsMax = 500;
 
 export const bulkFastTrackApproveBodyReasonMax = 2000;
 
+export const bulkFastTrackApproveBodySeenVersionsMax = 500;
+
 
 
 export const BulkFastTrackApproveBody = zod.object({
   "item_ids": zod.array(zod.int()).min(1).max(bulkFastTrackApproveBodyItemIdsMax),
-  "reason": zod.string().min(1).max(bulkFastTrackApproveBodyReasonMax)
+  "reason": zod.string().min(1).max(bulkFastTrackApproveBodyReasonMax),
+  "seen_versions": zod.array(zod.object({
+  "item_id": zod.int(),
+  "version_n": zod.int()
+})).max(bulkFastTrackApproveBodySeenVersionsMax).optional().describe('The generated version each item showed when the reviewer chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.')
 })
 
 export const BulkFastTrackApproveResponse = zod.object({
@@ -100,6 +109,55 @@ export const RecordDecisionBody = zod.object({
 })
 
 export const RecordDecisionResponse = zod.object({
+  "ai_review_carried_from_n": zod.union([zod.int(),zod.null()]),
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
+  "evidence": zod.array(zod.object({
+  "attachment_id": zod.int(),
+  "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
+  "original_name": zod.string(),
+  "sha256": zod.string()
+})),
+  "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "id": zod.int(),
+  "lane": zod.enum(['standard', 'fast_track', 'reaffirm']).describe('How a decision was reached; metrics and the evidence pack distinguish them.'),
+  "llm_override_reason": zod.union([zod.string(),zod.null()]),
+  "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
+  "reason": zod.string(),
+  "ruleset_date": zod.iso.date(),
+  "terms_versions": zod.array(zod.object({
+  "id": zod.int(),
+  "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "version": zod.int()
+})),
+  "version_n": zod.int()
+})
+
+/**
+ * One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the
+ * reviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409
+ * open_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current
+ * version isn't a generated one; 409 invalid_transition unless the item is in needs_rereview.
+ * @summary Fast Track Approve
+ */
+export const FastTrackApproveParams = zod.object({
+  "item_id": zod.int()
+})
+
+export const fastTrackApproveBodyReasonMax = 2000;
+
+
+
+export const FastTrackApproveBody = zod.object({
+  "reason": zod.string().min(1).max(fastTrackApproveBodyReasonMax),
+  "version_n": zod.int().describe('The generated version the reviewer looked at; stale if a newer one exists.')
+})
+
+export const FastTrackApproveResponse = zod.object({
   "ai_review_carried_from_n": zod.union([zod.int(),zod.null()]),
   "approver": zod.object({
   "id": zod.int(),

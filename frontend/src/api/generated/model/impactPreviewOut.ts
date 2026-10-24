@@ -9,14 +9,24 @@ import type { AffectedPartnerOut } from './affectedPartnerOut';
 import type { TermsField } from './termsField';
 
 /**
- * '14 approved items quote v12; 9 will need re-review' before the lead confirms.
+ * '14 approved items quote v12; 9 will need re-review, 5 will expire.' before the lead confirms.
  */
 export interface ImpactPreviewOut {
+  /** Already in needs_rereview; they get a generated version too. */
+  already_in_rereview: number;
   approved_items_quoting: number;
   changed_fields: TermsField[];
   current_terms_id: number | null;
+  /** The version in effect now; null for a product's first terms. */
+  current_version: number | null;
   items: AffectedItemOut[];
+  next_version: number;
+  /** Affected items that can't be fast-tracked (lane normal). */
+  normal_lane: number;
   partners: AffectedPartnerOut[];
+  summary: string;
+  /** Approved, not live: expired; the next round starts from the new numbers. */
   will_expire: number;
+  /** Approved and live: back to the reviewer in the fast-track lane. */
   will_need_rereview: number;
 }

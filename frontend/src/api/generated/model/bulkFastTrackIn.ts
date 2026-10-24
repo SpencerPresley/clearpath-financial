@@ -4,6 +4,7 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { SeenVersionIn } from './seenVersionIn';
 
 export interface BulkFastTrackIn {
   /**
@@ -16,4 +17,9 @@ export interface BulkFastTrackIn {
      * @maxLength 2000
      */
   reason: string;
+  /**
+     * The generated version each item showed when the reviewer chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.
+     * @maxItems 500
+     */
+  seen_versions?: SeenVersionIn[];
 }

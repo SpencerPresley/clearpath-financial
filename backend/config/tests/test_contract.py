@@ -105,9 +105,6 @@ def test_no_operation_returns_a_raw_dict() -> None:
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
-    ("post", "/api/items/bulk/fast-track-approve", {"item_ids": [1], "reason": "Numbers only"}),
-    ("post", "/api/terms/impact-preview", None),
-    ("post", "/api/terms", None),
     ("get", "/api/metrics/summary", None),
     ("get", "/api/metrics/series?metric=rounds_per_item", None),
     ("post", "/api/assistant/threads", None),
@@ -123,17 +120,6 @@ STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/admin/demo/reset", None),
 ]
 
-PL_VALUES = {
-    "product": "personal_loan",
-    "apr_min": "7.49",
-    "apr_max": "35.99",
-    "amount_min": "1000",
-    "amount_max": "50000",
-    "term_months": [36],
-    "origination_fee_min_pct": "0",
-    "origination_fee_max_pct": "8",
-}
-
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(("method", "path", "body"), STUBS, ids=[f"{m} {p}" for m, p, _ in STUBS])
@@ -144,8 +130,6 @@ def test_stub_endpoints_validate_then_return_501(
 
     client = Client()
     client.force_login(marketer)
-    if path.startswith("/api/terms"):
-        body = {"product": "personal_loan", "values": PL_VALUES}
     url = path.replace("{item}", str(make_item(marketer).pk))
 
     response = (
@@ -163,9 +147,7 @@ def test_stub_still_validates_input_first(marketer: User) -> None:
     client = Client()
     client.force_login(marketer)
 
-    response = client.post(
-        "/api/items/bulk/fast-track-approve", {"item_ids": [], "reason": "x"}, content_type="application/json"
-    )
+    response = client.post("/api/items/fetch-url", {"url": "ftp://x"}, content_type="application/json")
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"

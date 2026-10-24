@@ -218,6 +218,8 @@ CELERY_BEAT_SCHEDULE = {
     "expiry-sweep": {"task": "reviews.expiry_sweep", "schedule": crontab(hour=6, minute=0)},
     # AI checks stuck `running` after a worker died flip to failed; pending ones whose message was lost re-enqueue.
     "reconcile-llm-checks": {"task": "checks.reconcile_llm_checks", "schedule": 120.0},
+    # Offer-terms fan-out safety net: approvals still quoting superseded terms (a lost on-commit enqueue).
+    "terms-fan-out-reconcile": {"task": "terms.reconcile_fan_out", "schedule": 900.0},
 }
 
 LOGGING = {
