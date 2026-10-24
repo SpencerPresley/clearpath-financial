@@ -55,10 +55,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 Resurface these when Spencer is back. Each has what I did meanwhile.
 
-- **Live LLM eval needs the Anthropic key.** It lives only in the 1Password-mounted `.env`, which unattended
-  agents must not read (a read may block on a 1Password prompt). Meanwhile: D builds and tests everything
-  against fake models; the live eval script exists but hasn't been run. Need from Spencer: run
-  `cd backend && uv run python -m checks.llm.eval` once (or OK me reading `.env` while he's present).
+- (none open)
+
 
 ## Orchestrator notes
 
+- Resolved: the backend's typed settings read the 1Password-mounted `.env` non-interactively (verified by
+  printing only a has-key boolean). The orchestrator runs the live LLM eval after the LLM-core PR merges;
+  it would only block if 1Password is locked.
