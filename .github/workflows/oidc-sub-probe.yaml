@@ -1,0 +1,24 @@
+# TEMPORARY: confirms the OIDC `sub` format for this repo; deleted before merge.
+name: OIDC sub probe (temporary)
+
+on:
+  push:
+    branches: [infra/terraform]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print only the decoded sub claim
+        run: |
+          token=$(curl -fsS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r .value)
+          echo "::add-mask::${token}"
+          payload=$(cut -d. -f2 <<<"$token" | tr '_-' '/+')
+          while (( ${#payload} % 4 )); do payload+="="; done
+          echo "sub=$(base64 -d <<<"$payload" | jq -r .sub)"
