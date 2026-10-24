@@ -14,7 +14,7 @@ from django.db.models import Max, Min
 from accounts.models import User
 from audit.models import Event, ProcessedEvent
 from audit.outbox import REGISTRY
-from checks.engine.registry import CODE_RULES
+from checks.engine.registry import CODE_RULES, ENGINE_VERSION
 from checks.models import CheckRun, Finding
 from core.clock import FixedClock
 from core.domain import (
@@ -196,6 +196,32 @@ def test_the_hosted_demo_pages_carry_the_approved_copy(seeded: Seeded) -> None:
         assert latest.compared_version is not None
         assert compare(latest.compared_version.content_text, page.copy).result is DriftResult.UNCHANGED, page.slug
     assert _pages() == {"lendcompare": True, "cardscout": False, "budgetbee": False}
+
+
+def test_monitored_demo_pages_were_checked_daily(seeded: Seeded) -> None:
+    """Walkthrough nit 9: a placement labelled "Checked daily" was last checked 8 days before the seed time. The seed
+    replays the daily drift sweep (07:00 UTC, as the beat schedule): every approved, live, monitored demo page was
+    checked within the last day, once a day since it went up."""
+    for page in PAGES:
+        placement = Placement.objects.select_related("item").get(url=page_url(page.slug))
+        checks = Snapshot.objects.filter(placement=placement, status=CheckStatus.SUCCEEDED.value)
+        if placement.item.status != ItemStatus.APPROVED.value:
+            continue  # the sweep checks approved items only; CP-7 is in re-review since its drift check
+        latest = checks.order_by("-requested_at").first()
+        assert latest is not None, page.slug
+        assert NOW - latest.requested_at < timedelta(days=1), page.slug
+        days = {(s.requested_at.date()) for s in checks}
+        assert len(days) == checks.count(), f"{page.slug}: more than one check on a day"
+        first = min(days)
+        assert len(days) >= (NOW.date() - first).days, page.slug  # no day skipped since its first check
+
+
+def test_seeded_decisions_record_the_engine_that_produced_their_findings(seeded: Seeded) -> None:
+    """Walkthrough nit 12. The engine keeps no version history (one ENGINE_VERSION per build), so there is no
+    "version as of" a backdated seed clock to look up, and inventing an older one would misstate which code
+    produced the findings. The seed ran today's engine on every seeded version, so that is what each
+    decision records, and the decision dates stay as the story tells them."""
+    assert set(Decision.objects.values_list("engine_version", flat=True)) == {ENGINE_VERSION}
 
 
 def test_the_drift_rereview_comes_from_a_real_check(seeded: Seeded) -> None:
