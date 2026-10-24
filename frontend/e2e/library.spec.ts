@@ -14,7 +14,7 @@ test('library: filter the approved view, export it, then find a precedent and it
   await expect(table.getByRole('link', { name: /Holiday personal loan email/ })).toBeVisible();
   const legacy = table.getByRole('row', { name: /CP-412/ });
   await legacy.getByRole('button', { name: "Why there's no evidence pack for CP-412" }).hover();
-  await expect(page.getByRole('tooltip')).toContainText('no decision record to pack');
+  await expect(page.getByRole('tooltip')).toContainText('legacy import with no decision record');
   await page.mouse.move(0, 0);
   await expect(page.getByRole('tooltip')).toBeHidden();
 

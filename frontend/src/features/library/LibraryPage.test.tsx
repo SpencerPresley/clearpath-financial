@@ -69,7 +69,7 @@ describe('Library: approved to run', () => {
     expect(
       within(legacy).getByRole('button', { name: "Why there's no evidence pack for CP-412" }),
     ).toBeInTheDocument();
-    expect(within(legacy).getByText(/no decision record to pack/)).toBeInTheDocument();
+    expect(within(legacy).getByText(/CP-412 is a legacy import with no decision record/)).toBeInTheDocument();
     expect(within(legacy).queryByRole('button', { name: /^Evidence pack for/ })).toBeNull();
   });
 

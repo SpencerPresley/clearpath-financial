@@ -13,8 +13,10 @@ import { Icon } from '../../ui/Icon';
 import { Tooltip } from '../../ui/Tooltip';
 import { useExportJob } from './useExportJob';
 
-export const LEGACY_PACK_REASON =
-  'Imported from the tracker: there is no decision record to pack. The approval is in the tracker history.';
+/** The server's 409 sentence for a legacy item (exports.evidence.latest_approval), so the two never disagree. */
+export function legacyPackReason(itemKey: string): string {
+  return `${itemKey} is a legacy import with no decision record; its approval is in the tracker history.`;
+}
 
 /**
  * Why there's no pack. In a dense table cell (`compact`) a short label plus an info button whose tooltip holds
@@ -63,7 +65,7 @@ export function EvidencePackAction({
   const job = useExportJob(create);
 
   if (isLegacy) {
-    return <Reason short="No pack" message={LEGACY_PACK_REASON} itemKey={itemKey} compact={compact} />;
+    return <Reason short="No pack" message={legacyPackReason(itemKey)} itemKey={itemKey} compact={compact} />;
   }
 
   const start = () => {
