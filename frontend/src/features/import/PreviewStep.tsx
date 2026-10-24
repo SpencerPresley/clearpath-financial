@@ -109,6 +109,16 @@ const GROUP_ICON: Record<ImportProblemOut['severity'], IconKey> = {
   info: 'feedback.info',
 };
 
+/**
+ * "Errors · 2", or "Errors · 6 in 5 rows" when a row has more than one problem, so the header agrees with the
+ * row counts ("5 rows with errors are skipped"). The table lists every problem, so every affected row appears.
+ */
+function groupTitle(title: string, problems: readonly ImportProblemOut[]): string {
+  const rows = new Set(problems.flatMap((p) => (p.row_number === null ? [] : [p.row_number]))).size;
+  const n = String(problems.length);
+  return rows > 0 && rows < problems.length ? `${title} · ${n} in ${plural(rows, 'row')}` : `${title} · ${n}`;
+}
+
 export function ProblemGroups({
   problems,
   rows,
@@ -146,9 +156,7 @@ export function ProblemGroups({
             <AriaButton slot="trigger" className="app-import-group-trigger">
               <Icon name="action.expand" size={14} className="app-import-group-caret" />
               <Icon name={GROUP_ICON[g.severity]} size={16} className="app-import-group-icon" />
-              <span className="app-import-group-title">
-                {g.title} · {g.problems.length}
-              </span>
+              <span className="app-import-group-title">{groupTitle(g.title, g.problems)}</span>
             </AriaButton>
           </Heading>
           <DisclosurePanel className="app-import-group-panel">

@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
+  CUSTOM_COUNTS,
   CUSTOM_PROBLEMS,
   CUSTOM_ROWS,
   CUSTOM_UNMAPPED,
@@ -285,7 +286,12 @@ const shots: Shot[] = [
     path: '/import?job=7',
     stub: {
       job: importJob({ status: 'mapped', filename: 'partner-tracker-2025.xlsx', row_count: 42 }),
-      preview: importPreview({ unmapped: CUSTOM_UNMAPPED, problems: CUSTOM_PROBLEMS }),
+      preview: importPreview({
+        unmapped: CUSTOM_UNMAPPED,
+        problems: CUSTOM_PROBLEMS,
+        rows: CUSTOM_ROWS,
+        counts: CUSTOM_COUNTS,
+      }),
     },
     ready: async (page) => {
       await expect(page.getByRole('table', { name: 'Values to map' })).toBeVisible();
@@ -308,7 +314,7 @@ const shots: Shot[] = [
         problems: CUSTOM_PROBLEMS,
         rows: CUSTOM_ROWS,
         unmapped: CUSTOM_UNMAPPED,
-        counts: { rows_total: 42, ready: 36, duplicates: 0, already_imported: 2, not_data: 0, blocked: 4 },
+        counts: CUSTOM_COUNTS,
       }),
     },
     ready: async (page) => {

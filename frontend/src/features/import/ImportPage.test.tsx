@@ -8,7 +8,9 @@ import { getListPartnersMockHandler } from '../../api/generated/partners/partner
 import type { ImportJobOut, ImportMappingIn, ImportPreviewOut } from '../../api/generated/model';
 import {
   committedPreview,
+  CUSTOM_COUNTS,
   CUSTOM_PROBLEMS,
+  CUSTOM_ROWS,
   CUSTOM_UNMAPPED,
   importJob,
   importPreview,
@@ -151,7 +153,12 @@ describe('Import: steps', () => {
   it('maps unmapped values, and puts a refused value on its own row', async () => {
     serveJob(
       importJob({ status: 'mapped' }),
-      importPreview({ unmapped: CUSTOM_UNMAPPED, problems: CUSTOM_PROBLEMS }),
+      importPreview({
+        unmapped: CUSTOM_UNMAPPED,
+        problems: CUSTOM_PROBLEMS,
+        rows: CUSTOM_ROWS,
+        counts: CUSTOM_COUNTS,
+      }),
     );
     server.use(
       http.put('*/api/imports/7/mapping', async ({ request }) => {
@@ -191,20 +198,37 @@ describe('Import: steps', () => {
   it('previews counts and problems grouped by severity, with row numbers', async () => {
     serveJob(
       importJob({ status: 'mapped' }),
-      importPreview({
-        problems: CUSTOM_PROBLEMS,
-        counts: { rows_total: 40, ready: 36, duplicates: 0, already_imported: 0, not_data: 0, blocked: 4 },
-      }),
+      importPreview({ problems: CUSTOM_PROBLEMS, rows: CUSTOM_ROWS, counts: CUSTOM_COUNTS }),
     );
     renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
 
     expect(await screen.findByRole('heading', { name: 'Preview' })).toBeInTheDocument();
-    expect(screen.getByText('36').closest('.app-import-count')).toHaveTextContent('Ready to import');
-    const errors = screen.getByRole('table', { name: 'Errors' });
-    expect(within(errors).getByRole('row', { name: /12.*Status.*On Hold/ })).toBeInTheDocument();
+    expect(screen.getByText('35').closest('.app-import-count')).toHaveTextContent('Ready to import');
+    expect(screen.getByText('Blocked by errors').closest('.app-import-count')?.textContent).toMatch(
+      /errors\s*5$/,
+    );
     expect(screen.getByRole('button', { name: /Warnings · 2/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import 36 items' })).toBeInTheDocument();
-    expect(screen.getByText(/4 rows with errors are skipped/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import 35 items' })).toBeInTheDocument();
+    expect(screen.getByText(/5 rows with errors are skipped/)).toBeInTheDocument();
+  });
+
+  it('lists every blocked row, and says so when a row has more than one error', async () => {
+    serveJob(
+      importJob({ status: 'mapped' }),
+      importPreview({ problems: CUSTOM_PROBLEMS, rows: CUSTOM_ROWS, counts: CUSTOM_COUNTS }),
+    );
+    renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
+
+    // 6 errors on 5 rows (row 31 has two): the header names both, and the rows listed are the 5 skipped.
+    expect(await screen.findByRole('button', { name: /Errors · 6 in 5 rows/ })).toBeInTheDocument();
+    const errors = screen.getByRole('table', { name: 'Errors' });
+    const listed = within(errors)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+    expect(new Set(listed)).toEqual(new Set(['12', '15', '18', '27', '31']));
+    expect(new Set(listed).size).toBe(CUSTOM_COUNTS.blocked);
+    expect(within(errors).getByRole('row', { name: /12.*Status.*On Hold/ })).toBeInTheDocument();
   });
 
   it('commits, shows progress while polling, then the summary with links to the imported items', async () => {
@@ -271,7 +295,12 @@ describe('Import: steps', () => {
   it('offers to map values from the preview while some are unmapped', async () => {
     serveJob(
       importJob({ status: 'mapped' }),
-      importPreview({ unmapped: CUSTOM_UNMAPPED, problems: CUSTOM_PROBLEMS }),
+      importPreview({
+        unmapped: CUSTOM_UNMAPPED,
+        problems: CUSTOM_PROBLEMS,
+        rows: CUSTOM_ROWS,
+        counts: CUSTOM_COUNTS,
+      }),
     );
     const { router } = renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
     await userEvent.click(await screen.findByRole('button', { name: 'Map 3 values' }));

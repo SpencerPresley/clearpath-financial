@@ -234,33 +234,72 @@ export const CUSTOM_UNMAPPED: ImportPreviewOut['unmapped'] = [
   { field: 'product', value: 'HELOC', rows: 1 },
 ];
 
-export const CUSTOM_PROBLEMS: ImportProblemOut[] = [
+const onHold = (row_number: number) =>
   problem({
-    row_number: 12,
+    row_number,
     column: 'Status',
     kind: 'unmapped_status',
     severity: 'error',
     value: 'On Hold',
     message: 'Status “On Hold” has no mapping; map it or the row is skipped.',
-  }),
+  });
+const lendCompare = (row_number: number) =>
   problem({
-    row_number: 15,
+    row_number,
     column: 'Affiliate / Partner',
     kind: 'unknown_partner',
     severity: 'error',
     value: 'LendCompare Inc.',
     message: 'No partner called “LendCompare Inc.”; map it to a partner or the row is skipped.',
+  });
+
+/**
+ * One problem per affected row, matching CUSTOM_UNMAPPED: "On Hold" in rows 12, 18, 31; "LendCompare Inc." in
+ * 15, 31; "HELOC" in 27. Row 31 has two errors, so 6 errors block 5 rows. Two warnings import with a note.
+ */
+export const CUSTOM_PROBLEMS: ImportProblemOut[] = [
+  onHold(12),
+  lendCompare(15),
+  onHold(18),
+  problem({
+    row_number: 27,
+    column: 'Product',
+    kind: 'unknown_value',
+    severity: 'error',
+    value: 'HELOC',
+    message: 'Product “HELOC” has no mapping; map it or the row is skipped.',
   }),
+  onHold(31),
+  lendCompare(31),
   ...SAMPLE_PROBLEMS.slice(3, 5),
 ];
 
-/** The custom file's rows behind CUSTOM_PROBLEMS: unmapped values block 12 and 15; 41 and 57 import with a note. */
+const ERROR_ROWS = [
+  ...new Set(CUSTOM_PROBLEMS.filter((p) => p.severity === 'error').map((p) => p.row_number ?? 0)),
+];
+
+/** The custom file's rows behind CUSTOM_PROBLEMS: the error rows are blocked; 41 and 57 import with a note. */
 export const CUSTOM_ROWS: ImportPreviewRowOut[] = [
-  previewRow({ row_number: 12, action: 'blocked', status: null, problem_count: 1 }),
-  previewRow({ row_number: 15, action: 'blocked', partner: null, problem_count: 1 }),
+  ...ERROR_ROWS.map((n) =>
+    previewRow({
+      row_number: n,
+      action: 'blocked',
+      problem_count: CUSTOM_PROBLEMS.filter((p) => p.row_number === n).length,
+    }),
+  ),
   previewRow({ row_number: 41, problem_count: 1 }),
   previewRow({ row_number: 57, problem_count: 1 }),
 ];
+
+/** Derived, not typed in: "blocked" is the number of rows the errors name (the backend's invariant). */
+export const CUSTOM_COUNTS: ImportPreviewOut['counts'] = {
+  rows_total: 42,
+  ready: 35,
+  duplicates: 0,
+  already_imported: 2,
+  not_data: 0,
+  blocked: ERROR_ROWS.length,
+};
 
 export function recentImports(): ImportJobSummaryOut[] {
   return [
