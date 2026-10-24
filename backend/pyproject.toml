@@ -56,11 +56,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "PLR2004", "ANN", "ARG", "PLC0415"]
+"**/tests/**" = ["S101", "PLR2004", "ANN", "ARG", "PLC0415", "SLF001"]
 "config/settings/*.py" = ["F405", "F403"]
 "**/api.py" = ["ARG001"]  # ninja passes request to every operation
+"core/errors.py" = ["N818"]  # domain error names are fixed by the spec (InvalidTransition, NotPermitted, ...)
 
 [tool.pyrefly]
-project-includes = ["config", "core", "checks"]
+project-includes = ["config", "core", "checks", "accounts", "conftest.py"]
 project-excludes = ["**/migrations/**", "**/.venv/**", "**/__pycache__/**"]
 python-version = "3.13"

@@ -7,7 +7,7 @@ missing required variable is reported together.
 
 import os
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BeforeValidator, Field, SecretStr
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     "allauth.headless",
     "allauth.mfa",
     "core",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -116,7 +117,7 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
+DATABASES: dict[str, dict[str, Any]] = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": env.postgres_host,
@@ -130,6 +131,8 @@ DATABASES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+AUTH_USER_MODEL = "accounts.User"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -150,6 +153,7 @@ HEADLESS_FRONTEND_URLS = {
     "account_reset_password_from_key": f"{env.frontend_base_url}/account/password/reset/{{key}}",
 }
 ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
