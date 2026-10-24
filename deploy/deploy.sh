@@ -21,6 +21,14 @@ compose=(docker compose -f compose.prod.yaml)
 
 "${compose[@]}" pull --quiet
 
+# Refuse the release before touching the schema if production configuration
+# is missing or wrong: the Anthropic key still Terraform's placeholder, no
+# documents bucket, non-https public URLs (backend/core/deploy_checks.py), or
+# any of Django's own deploy warnings not deliberately silenced in prod.py.
+# The old containers keep serving. Needs the database (Django's model checks
+# connect), which is why this runs here and not in CI's image build.
+"${compose[@]}" run --rm --no-deps web python manage.py check --deploy --fail-level WARNING
+
 # Migrate before swapping containers: until `up` replaces them, the old code
 # serves against the new schema, so migrations must stay backward-compatible
 # (expand, deploy, then contract). The reverse order would run new code

@@ -1,10 +1,15 @@
 """Fixtures shared by every app's tests."""
 
-from collections.abc import Callable, Iterable
+import importlib
+from collections.abc import Callable, Iterable, Iterator
 from datetime import UTC, datetime
 from itertools import count
+from typing import Any
 
+import boto3
 import pytest
+from moto import mock_aws
+from pytest_django import Settings
 
 from accounts.models import User
 from core.clock import FixedClock
@@ -61,3 +66,23 @@ def lead(user_factory: UserFactory) -> User:
 @pytest.fixture
 def admin_user(user_factory: UserFactory) -> User:
     return user_factory(roles=[Role.ADMIN], display_name="Avery Admin")
+
+
+S3_TEST_BUCKET = "clearpath-documents-test"
+
+
+@pytest.fixture
+def s3_bucket(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """Production's file storage (prod.py STORAGES, same options) against moto's in-memory S3, as a private bucket.
+    Overriding STORAGES resets `default_storage`, so every FileField reads and writes here. Yields the boto3 Bucket."""
+    for var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        monkeypatch.setenv(var, "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    with mock_aws():
+        bucket = boto3.resource("s3", region_name="us-east-1").create_bucket(Bucket=S3_TEST_BUCKET)
+        prod_default = importlib.import_module("config.settings.prod").STORAGES["default"]
+        settings.STORAGES = {
+            **settings.STORAGES,
+            "default": {**prod_default, "OPTIONS": {**prod_default["OPTIONS"], "bucket_name": S3_TEST_BUCKET}},
+        }
+        yield bucket

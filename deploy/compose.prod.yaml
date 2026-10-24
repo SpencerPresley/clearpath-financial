@@ -3,14 +3,27 @@
 # Postgres is RDS; Redis is local and disposable (the event log is the
 # outbox, so nothing is lost if Redis restarts empty).
 #
-# deploy.sh runs `migrate` and then `seed_demo` (a no-op once items exist) as
-# one-off containers before `up`, so no service here migrates or seeds on start.
+# deploy.sh runs `check --deploy`, `migrate` and then `seed_demo` (a no-op once
+# items exist) as one-off containers before `up`, so no service here migrates
+# or seeds on start. web, worker and beat also refuse to start without the
+# production configuration (backend/core/deploy_checks.py).
 #
 # .env next to this file is written by render-env.sh from SSM Parameter Store.
 # Compose reads it twice: for ${...} interpolation here (BACKEND_IMAGE,
 # FORWARDED_ALLOW_IPS) and as each backend container's environment.
+#
+# Logs: json-file, rotated, on the box (`docker compose logs`). Set per service
+# rather than relying on /etc/docker/daemon.json from user_data, which only
+# applies at first boot. No awslogs: the instance role has no CloudWatch Logs
+# permissions and Terraform creates no log group.
 
 name: clearpath
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: "5"
 
 x-backend: &backend
   image: ${BACKEND_IMAGE:?run render-env.sh first}
@@ -20,12 +33,14 @@ x-backend: &backend
     CLEARPATH_ENV_FILE: ""
     DJANGO_SETTINGS_MODULE: config.settings.prod
   restart: unless-stopped
+  logging: *logging
   depends_on:
     redis:
       condition: service_healthy
 
 services:
   redis:
+    logging: *logging
     # Pinned by multi-arch index digest (`docker buildx imagetools inspect
     # redis:7-alpine`, 2026-10-24) so a retag on Docker Hub can't change prod.
     image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
@@ -45,7 +60,9 @@ services:
     # origin-facing ranges (plus the VPC CIDR, in case the VPC-origin ENI's
     # private address is what the socket sees) yields the real viewer IP.
     # Not "*": uvicorn then takes the *leftmost* entry, which the client
-    # controls, and allauth's login rate limits key on that address.
+    # controls. This sets the address in uvicorn's access log (and Django's
+    # REMOTE_ADDR, which no app code reads). allauth's rate limits key on
+    # CloudFront-Viewer-Address instead (prod.py), independent of this flag.
     # (CloudFront sends no X-Forwarded-Proto; HTTPS detection is Django's
     # SECURE_PROXY_SSL_HEADER on CloudFront-Forwarded-Proto.)
     command:
@@ -66,13 +83,34 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    # SIGTERM lets in-flight requests finish; an assistant SSE stream still
+    # open after this is cut, which cancels its run like any disconnect.
+    stop_grace_period: 30s
 
   worker:
     <<: *backend
-    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
+    # Prefork, 2 children: each holds at most one DB connection (the Celery
+    # Django fixup closes the pool after every task), so 2 here.
+    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2", "--hostname=worker@%h"]
+    # Answers only once the worker is consuming from the broker, so `up --wait`
+    # proves the worker started (it exits instead without its configuration).
+    # $$HOSTNAME is the container's; %h above expands to the same.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --destination worker@$$HOSTNAME --timeout 10"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+      start_interval: 5s
+    # Warm shutdown waits for running tasks. Tasks are acks_late, so one cut
+    # off after this is redelivered, not lost; 90s covers everything but a
+    # task near CELERY_TASK_TIME_LIMIT (300s).
+    stop_grace_period: 90s
 
+  # Exactly one beat (a second would double every schedule): one service, no
+  # replicas, and deploy.sh's one-off containers never start it. No
+  # healthcheck: beat has no ping, and a crash is handled by the restart
+  # policy. The outbox dispatcher is beat's dispatch-outbox task (every 2s).
   beat:
     <<: *backend
     command: ["celery", "-A", "config", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
-
-  # The outbox dispatcher (docs/decisions.md) joins here once it exists.

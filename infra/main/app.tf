@@ -144,18 +144,27 @@ data "aws_iam_policy_document" "app" {
     resources = [data.aws_ec2_managed_prefix_list.cloudfront_origin_facing.arn]
   }
 
+  # django-storages S3Storage (backend/config/settings/prod.py). ListBucket so
+  # a HeadObject on a missing key (file_overwrite=False probes names before
+  # writing) answers 404 rather than 403.
   statement {
     sid       = "DocumentsList"
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.documents.arn]
   }
 
+  # Read, write, and abort a failed multipart upload (boto3 switches to
+  # multipart above 8 MB; Create/UploadPart/Complete are covered by PutObject).
+  # No DeleteObject: nothing in the app deletes a stored file (attachments
+  # are immutable evidence; Reset demo truncates rows only), so a compromised
+  # app can add files but can't remove them. No ACL actions: the bucket is
+  # BucketOwnerEnforced and the app never sends an ACL.
   statement {
     sid = "DocumentsReadWrite"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
-      "s3:DeleteObject",
+      "s3:AbortMultipartUpload",
     ]
     resources = ["${aws_s3_bucket.documents.arn}/*"]
   }

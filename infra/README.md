@@ -15,7 +15,8 @@ viewer ─▶ CloudFront (WAF, geo=US) ─┬─ default ───────�
                                     └─ /api /_allauth /accounts /django-admin
                                           ─▶ VPC origin ─▶ EC2 :8000 (private subnet, compose: web/worker/beat/redis)
                                                               ├─▶ RDS Postgres 17 (private)
-                                                              └─▶ NAT ─▶ ECR, SSM, Anthropic API
+                                                              ├─▶ S3 gateway endpoint ─▶ ECR image layers, documents bucket
+                                                              └─▶ NAT ─▶ ECR API, SSM, Anthropic API, Docker Hub
 ```
 
 ## Bootstrap (once; already done)
@@ -85,6 +86,11 @@ unset KEY
 It takes effect on the next deploy (render-env.sh re-reads SSM). To apply it without a code change,
 run the Deploy workflow manually from main (`gh workflow run deploy.yaml --ref main`).
 
+**Production refuses to run without it.** While the parameter still holds the placeholder (or anything
+not starting `sk-ant-`), `deploy.sh`'s `manage.py check --deploy` fails with `clearpath.E001` before
+migrating, and the previous release keeps serving; web, worker and beat also refuse to start
+(`backend/core/deploy_checks.py`). So set the key **before the first deploy**.
+
 ## Demo logins
 
 Terraform generates the hosted demo's password into `/clearpath/prod/DEMO_USER_PASSWORD` (a SecureString;
@@ -104,9 +110,14 @@ seed sets each demo account's password.
 
 ## Rollback
 
-`deploy.sh` stops with the new containers in place if `up --wait` or the health check fails, so prod
-stays down until you act. Migrations run first and aren't reversed, which is why they must be
-expand-only (backward-compatible with the previous release).
+`deploy.sh` runs `check --deploy`, `migrate` and `seed_demo` as one-off containers first; if any of them
+fails, the deploy stops and the previous containers keep serving. If `up --wait` or the health check
+fails, it stops with the new containers in place, so prod stays down until you act. Migrations aren't
+reversed, which is why they must be expand-only (backward-compatible with the previous release).
+
+After a deploy, `deploy/smoke.sh https://$(terraform output -raw cloudfront_domain)` checks health
+(database), the SPA, admin static files, a demo partner page, allauth's config (signup closed, Secure
+CSRF cookie) and CSRF from the public URL. Run it from the US (geo restriction).
 
 - **Preferred:** in GitHub Actions, open the last good Deploy run and click *Re-run all jobs*. It
   rebuilds that commit, reuses its image (still in ECR, which keeps the last 20), and redeploys that
@@ -168,7 +179,9 @@ state bucket survives (`prevent_destroy`); to remove it, delete that lifecycle b
 WAF request logs (every request, with `Cookie`, `Authorization`, `X-CSRFToken` and `X-Session-Token`
 redacted) go to `s3://aws-waf-logs-clearpath-381491937698/AWSLogs/…`. They arrive in 5-minute files
 and are kept 14 days (`waf_log_retention_days`). Container logs live on the box only
-(`docker compose -f compose.prod.yaml logs`, json-file driver, 5 × 20 MB per container).
+(`docker compose -f compose.prod.yaml logs`, json-file driver, 5 × 20 MB per container, set in the
+compose file). uvicorn's access log shows the viewer IP (taken from `X-Forwarded-For` only via the
+CloudFront ranges in `--forwarded-allow-ips`); Django's own log lines carry no client IP.
 
 ## Estimated monthly cost (us-east-1, always on, light traffic)
 
@@ -177,7 +190,8 @@ Unit prices from the AWS Price List API (`aws pricing get-products`, queried 202
 
 | Component | Basis | $/month |
 |---|---|---|
-| NAT gateway | $0.045/h + $0.045/GB processed (~5 GB of image pulls/API calls) | 33.10 |
+| NAT gateway | $0.045/h + $0.045/GB processed (~1 GB of API calls and Docker Hub; ECR layers and documents go through the S3 gateway endpoint) | 32.90 |
+| S3 gateway endpoint | no charge (AWS) | 0 |
 | EC2 t3.medium | $0.0416/h | 30.37 |
 | RDS db.t4g.micro, Single-AZ | $0.016/h | 11.68 |
 | WAF | $5/web ACL (AWS WAF pricing page, *not* from the API) + 4 rules × $1 + $0.60/M requests | ~9.00 |
@@ -190,6 +204,7 @@ Unit prices from the AWS Price List API (`aws pricing get-products`, queried 202
 | **Total** | | **≈ $93** |
 
 The NAT gateway is the largest line and is pure fixed cost. Cheaper options if this outlives the demo:
-VPC endpoints don't help (interface endpoints are ~$7.30/mo per endpoint per AZ, *estimate*, and we'd need ECR api+dkr, SSM ×3, S3
-gateway, plus egress to Anthropic still needs NAT); a NAT instance (t4g.nano, ~$3/mo) would.
+interface VPC endpoints don't help (~$7.30/mo per endpoint per AZ, *estimate*, and we'd need ECR api+dkr and SSM ×3,
+plus egress to Anthropic still needs NAT; the S3 gateway endpoint is already in place and free); a NAT instance
+(t4g.nano, ~$3/mo) would.
 Stopping the EC2 and RDS instances when idle saves ~$42/mo; RDS auto-restarts after 7 days stopped.

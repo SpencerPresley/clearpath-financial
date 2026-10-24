@@ -94,6 +94,32 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
+# S3 gateway endpoint (no charge) on the private route table: in-region S3
+# traffic skips the NAT's $0.045/GB processing. That is mostly ECR image
+# layers, which ECR serves from S3 (prod-<region>-starport-layer-bucket, per
+# the ECR VPC-endpoint docs), plus the documents bucket. Only one private
+# route table exists, shared by both private subnets.
+#
+# Endpoint policy left at the default (full access), deliberately:
+# - It can't contain exfiltration. It governs only in-region S3 reached via
+#   this route; the app SG allows all egress through the NAT, so any other
+#   host or an out-of-region bucket stays reachable. What limits the app is
+#   its IAM role (app.tf), which an endpoint policy can't widen.
+# - A bucket allowlist must name every AWS-managed bucket the box reads
+#   through it. ECR's layer bucket is documented, and so are SSM Agent's
+#   (amazon-ssm-<region>, aws-ssm-<region>). AL2023's dnf repos aren't
+#   confirmed for this AMI: the AMI's dnf vars build the repo hostname, and
+#   EMR's docs name al2023-repos-<region>-de612dc2. user_data runs
+#   `dnf install docker` once under set -e, so one miss leaves the server
+#   without Docker and needs a -replace.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+  tags              = { Name = "${local.name}-s3" }
+}
+
 # Strip the default security group's allow-all rules so nothing that lands
 # in it by accident gets connectivity.
 resource "aws_default_security_group" "main" {

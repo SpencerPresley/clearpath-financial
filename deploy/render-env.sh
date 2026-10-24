@@ -57,10 +57,13 @@ if ((count == 0)); then
   exit 1
 fi
 
-# Secrets the app can't run without. Fail here, naming the missing one, rather
+# Parameters the app can't run without. Fail here, naming the missing one, rather
 # than at boot or mid-deploy (prod refuses to seed demo logins with the
 # password published in the repo, so DEMO_USER_PASSWORD must come from SSM).
-for required in DJANGO_SECRET_KEY POSTGRES_PASSWORD DEMO_USER_PASSWORD; do
+# Presence only: whether ANTHROPIC_API_KEY is still Terraform's placeholder is
+# deploy.sh's `check --deploy`, which explains the fix.
+for required in DJANGO_SECRET_KEY POSTGRES_PASSWORD DEMO_USER_PASSWORD ANTHROPIC_API_KEY \
+  DOCUMENTS_BUCKET DJANGO_ALLOWED_HOSTS DJANGO_CSRF_TRUSTED_ORIGINS FRONTEND_BASE_URL; do
   if [[ -z "${seen[$required]:-}" ]]; then
     echo "render-env: ${prefix}/${required} is missing; refusing" >&2
     exit 1

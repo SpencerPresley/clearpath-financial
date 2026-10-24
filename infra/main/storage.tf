@@ -69,8 +69,9 @@ resource "aws_s3_bucket_policy" "frontend" {
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
-# --- Documents (uploads, image mockups). Served only via presigned URLs that
-# Django issues after its own permission check. ---
+# --- Documents (attachments, imports, exports). Private; never served from the
+# bucket. Django streams each file through its own permission-checked download
+# endpoints, so no presigned URL (a bearer link) ever leaves the app. ---
 
 resource "aws_s3_bucket" "documents" {
   bucket        = "clearpath-documents-${var.account_id}"
