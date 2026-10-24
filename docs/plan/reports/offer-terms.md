@@ -100,8 +100,11 @@ only at that version, else it is skipped as `stale_version`. An item without an 
 version. That version may be one a later terms change generated after the page loaded, so the reviewer would be
 recorded approving copy they never saw.
 
-**Action for I/J:** the review screen's Fast-track button (`DecisionPanel.tsx`) calls bulk without
-`seen_versions`. Either add `seen_versions: [{item_id, version_n: currentN}]`, or switch it to `fastTrackApprove`.
+**Action for I/J:** two merged callers send bulk without `seen_versions`. Neither is broken, but both are exposed
+to the unseen-version case:
+- The review screen's Fast-track button (`features/review/DecisionPanel.tsx`): add
+  `seen_versions: [{item_id, version_n: currentN}]`, or switch to `fastTrackApprove`.
+- The queue's bulk bar (`features/queue/BulkBar.tsx`): send each selected row's `current_version_n`.
 Each item gets the single endpoint's checks, so a reviewer's bulk skips other reviewers' items with
 `not_permitted`. Other skip codes: `open_findings_block_decision` (send these to the normal lane),
 `invalid_transition`, `stale_version`, `not_found`. The single endpoint gives a cleaner 409 on one item.
@@ -185,21 +188,21 @@ Outbox handler: terms.fan_out (TERMS_PUBLISHED)
 
 ## Verification
 
-At the branch head, rebased on `origin/main` (`1bcc3df`), test DB suffix `wsF`.
+At the branch head, rebased on `origin/main` (`cd966ba`), test DB suffix `wsF`.
 
 ```
 $ uv run pytest -q
-1244 passed, 1 deselected
+1250 passed, 1 deselected
 $ uv run --group lint ruff check . && uv run --group lint ruff format --check .
 All checks passed!
 $ uv run --group typecheck pyrefly check
  INFO 0 errors
 $ manage.py makemigrations --check --dry-run
 No changes detected
-$ make schema (export + generate:api) → committed; npm run typecheck / test:run (275 passed) / lint / format:check: ok
+$ make schema (export + generate:api) → committed; npm run typecheck / test:run (393 passed) / lint / format:check: ok
 ```
 
-Tests (52 in `terms/tests`):
+Tests (58 in `terms/tests`):
 - Worked example: through the services and through the outbox.
 - Live vs not live; the StaleTermsRef lane.
 - Idempotency under redelivery and re-run; an item the sweep moved first; renders against later terms;
