@@ -48,7 +48,8 @@ review_copy                       no transaction open
 | `output_valid=False` once | retry, countdown 0 | — |
 | `output_valid=False` twice | failed | `invalid_output` |
 | no API key | failed | `not_configured` |
-| `SoftTimeLimitExceeded` | failed | `timeout` |
+| `SoftTimeLimitExceeded` outside the SDK (defensive) | failed | `timeout` |
+| a truly slow call: the SDK wraps the soft limit as a connection error and retries; the 300 s hard limit kills the worker | failed by the reconciler 10 min later | `stuck` |
 | any other exception (task top level, logged) | failed | `error` |
 | reconciler: running > 10 min | failed | `stuck` |
 
@@ -153,7 +154,9 @@ synchronously. They cover:
   - A re-enqueued run continues its budget.
   - A lost retry message ends `failed`.
   - A pending item with no run gets one.
-  - The soft time limit ends in `timeout`.
+  - The soft time limit ends in `timeout`. This test raises it directly. In production the SDK swallows it
+    mid-send (`anthropic/_base_client.py`), so a slow call ends `stuck`. The test covers the defensive path
+    only.
   - A late result is dropped.
   - Concurrent claims (two threads) take the run once.
   - No transaction is open during the model call (transactional DB).

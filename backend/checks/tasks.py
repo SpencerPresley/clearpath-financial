@@ -20,7 +20,10 @@ from core.domain import LlmFailureCode
 
 logger = logging.getLogger(__name__)
 
-# One attempt is one call: at worst 4 x 60 s SDK attempts plus backoff (~255 s). Soft limit fails it visibly.
+# One attempt is one call: at worst 4 x 60 s SDK attempts plus backoff (~255 s). The soft limit is defensive:
+# fired inside the HTTP send, the Anthropic SDK wraps it as APIConnectionError and retries (anthropic
+# _base_client.py `except Exception` around `send`), so a truly slow call is killed at the hard limit and the
+# reconciler fails it as `stuck`. It only reaches the `timeout` branch when it fires outside the SDK.
 SOFT_TIME_LIMIT: Final = 280
 TIME_LIMIT: Final = 300
 

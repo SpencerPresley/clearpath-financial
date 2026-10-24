@@ -88,8 +88,8 @@ GIVE_UP_AFTER: Final = timedelta(minutes=30)
 type ModelFactory = Callable[[], BaseChatModel | None]
 
 _NOT_CONFIGURED: Final = "The AI check didn't run: no Anthropic API key is configured here."
-_INVALID_OUTPUT: Final = "The AI's answer couldn't be read, twice."
-_UNREADABLE_ONCE: Final = "The AI's answer couldn't be read."
+_INVALID_OUTPUT: Final = "The AI's answer couldn't be read."
+_UNREADABLE_ONCE: Final = "The AI's answer couldn't be read; asking again."
 STUCK_MESSAGE: Final = "The AI check stopped without finishing (its worker restarted)."
 GAVE_UP_MESSAGE: Final = "The AI check didn't finish within 30 minutes."
 TIMEOUT_MESSAGE: Final = "The AI check took too long and was stopped."

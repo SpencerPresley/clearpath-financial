@@ -7,6 +7,7 @@ CELERY_TASK_ALWAYS_EAGER = True
 # Never call the model provider from unit tests, even with a key in the environment: AI checks get their model
 # through the `checks.tasks.model_factory` seam. The live smoke test reads the key from `env` itself.
 ANTHROPIC_API_KEY = None
+ANTHROPIC_MODEL = "claude-haiku-5-5"  # pinned: tests assert on the ruleset key, which includes it
 # CI runs without Redis; tests that need the Redis cache override this.
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
