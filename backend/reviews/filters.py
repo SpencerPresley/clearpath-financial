@@ -44,5 +44,8 @@ class ItemFilter(Schema):
     submitted_after: datetime | None = None
     submitted_before: datetime | None = None
     waiting_more_than_days: int | None = Field(default=None, ge=0, description="Submitted more than N days ago.")
+    approved_after: datetime | None = None
+    approved_before: datetime | None = None
+    approved_within_days: int | None = Field(default=None, ge=0, description="Approved in the last N days.")
     run_from: date | None = Field(default=None, description="Has a placement running on or after this date.")
     run_to: date | None = Field(default=None, description="Has a placement running on or before this date.")

@@ -49,6 +49,17 @@ def live_placements_q(today: date, prefix: str = "") -> Q:
 # --- filtering -------------------------------------------------------------------------------------------------
 
 
+def _in_range(
+    qs: QuerySet[ReviewItem], field: str, after: datetime | None, before: datetime | None
+) -> QuerySet[ReviewItem]:
+    """`after <= field < before`, each bound optional."""
+    if after:
+        qs = qs.filter(**{f"{field}__gte": after})
+    if before:
+        qs = qs.filter(**{f"{field}__lt": before})
+    return qs
+
+
 def filter_items(*, viewer: User, filters: ItemFilter, clock: Clock = SYSTEM_CLOCK) -> QuerySet[ReviewItem]:  # noqa: C901, PLR0912  # one branch per filter field
     qs = ReviewItem.objects.all()
     f = filters
@@ -85,12 +96,12 @@ def filter_items(*, viewer: User, filters: ItemFilter, clock: Clock = SYSTEM_CLO
         qs = qs.filter(open_findings_count__gt=0) if f.has_open_findings else qs.filter(open_findings_count=0)
     if f.reopen_reason:
         qs = qs.filter(reopen_reason__in=f.reopen_reason)
-    if f.submitted_after:
-        qs = qs.filter(submitted_at__gte=f.submitted_after)
-    if f.submitted_before:
-        qs = qs.filter(submitted_at__lt=f.submitted_before)
+    qs = _in_range(qs, "submitted_at", f.submitted_after, f.submitted_before)
     if f.waiting_more_than_days is not None:
         qs = qs.filter(submitted_at__lt=clock.now() - timedelta(days=f.waiting_more_than_days))
+    qs = _in_range(qs, "approved_at", f.approved_after, f.approved_before)
+    if f.approved_within_days is not None:
+        qs = qs.filter(approved_at__gte=clock.now() - timedelta(days=f.approved_within_days))
     if f.run_from or f.run_to:
         runs = Placement.objects.filter(item=OuterRef("pk"))
         if f.run_to:

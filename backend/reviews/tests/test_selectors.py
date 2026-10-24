@@ -21,6 +21,23 @@ def _ids(page_rows: tuple[object, ...]) -> list[int]:
 
 
 @pytest.mark.django_db
+def test_filter_by_approval_date(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    # The board's "Approved (last 14 days)" column, which a saved view must express relative to today.
+    now = clock.now()
+    recent = make_item(marketer, status=ItemStatus.APPROVED, approved_at=now - timedelta(days=3))
+    older = make_item(marketer, status=ItemStatus.APPROVED, approved_at=now - timedelta(days=20))
+    make_item(marketer, status=ItemStatus.SUBMITTED)
+
+    def ids(filters: ItemFilter) -> set[int]:
+        return set(filter_items(viewer=reviewer, filters=filters, clock=clock).values_list("pk", flat=True))
+
+    assert ids(ItemFilter(approved_within_days=14)) == {recent.pk}
+    assert ids(ItemFilter(approved_after=now - timedelta(days=30), approved_before=now - timedelta(days=10))) == {
+        older.pk
+    }
+
+
+@pytest.mark.django_db
 def test_queue_sort_without_status_means_the_queue(marketer: User, reviewer: User, clock: FixedClock) -> None:
     queued = make_item(marketer, status=ItemStatus.SUBMITTED)
     make_item(marketer, status=ItemStatus.DRAFT)
