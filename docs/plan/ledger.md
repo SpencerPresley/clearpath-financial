@@ -102,6 +102,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 ## Lessons
 
+- Merging with `gh pr merge --delete-branch` also deletes the local branch and the agent's worktree, so that agent can't be resumed. For PRs whose agent may get follow-ups, merge without `--delete-branch` and delete only the remote branch (`git push origin --delete <branch>`).
+
 - LangChain notes from K: `FetchStreamTransport` in #12 notes is outdated (current useStream takes an adapter); GenericFakeChatModel drops tool calls under v3 streaming (use ToolCallingFakeModel); `respond()` needs `interruptId` after reload.
 - Running live tests: export DB/env vars BEFORE importing settings (settings evaluate Env at import).
 
@@ -118,6 +120,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- Order after L + drift follow-ups merge: (1) deploy-prep agent (prod settings: required ANTHROPIC key, CONN_MAX_AGE/pool under ASGI, S3 storage for DOCUMENTS_BUCKET, FRONTEND_BASE_URL, CloudFront-Viewer-Address client IP, seed on start) then terraform apply + deploy; (2) full walkthrough per role on the hosted app (fresh UI reviewer); (3) N docs with screenshots from the hosted app.
 
 - J follow-ups for other owners: library search by tracker ID (legacy_ref) + search paging (reviews); terms impact API normal-lane count includes expired items (terms); import commit stuck "Importing" if worker dies (imports: add timeout/reconcile like D2's); AppShell.test uses Outbox as an unbuilt example (K must update).
 
