@@ -10,7 +10,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 |---|---|---|---|---|
 | scaffold | orchestrator | main `430486c` | done | backend, frontend, compose, CI, CLAUDE.md |
 | shared domain vocabulary | orchestrator | main `44e7264` | done | backend/core/domain.py enums + offer-terms schemas; per-worktree test DB suffix |
-| 0 foundation (#1) | agent (worktree `ws0/foundation`) | — | in progress | models, migrations, patterns, API contract |
+| 0 foundation (#1) | agent (worktree) | PR #22 merged `1da02c7` | done | 296 tests; Interfaces in reports/foundation.md; dev DBs recreated (custom user model) |
 | C rules engine (#4) | agent (worktree) | PR #21 merged | done | 42 code rules + 4 human items; 326 tests; ENGINE_VERSION in cache keys; ~3 ms per 5 KB ad |
 | D llm core (#5, phase 1) | agent (worktree `wsD/llm-core`) | — | in progress | pure module: LLM rules, structured findings, span validation, eval corpus; phase 2 wiring after Foundation |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
@@ -19,6 +19,10 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: attachment reads — partner attachments (agreements) readable by reviewer/lead/admin, not marketers; item, version, and decision evidence readable by anyone who can read the item — reviewers check affiliate copy against the agreement — cost if wrong: one permission check to tighten. Owner: E.
+- Ruling: library has two views — "Approved to run" (current status approved; default) and precedent search across every version that ever received an approval decision, showing its current status as a badge — precedent value doesn't lapse, run-permission does — cost if wrong: a filter default. Owner: E (selector) + J (UI).
+- Ruling: E owns wiring C's engine into `checks.services.run_code_checks` and the `/checks/preview` endpoint (live as-you-type); J owns metrics endpoints + page; K revises the assistant stub contract to whatever useStream needs (#11).
 
 - Ruling: prescreen notices are checked twice — a blocking code check that the notice text is present, plus a human checklist item for layout — presence is text-checkable, layout isn't — cost if wrong: one extra triage click on prescreen items.
 - Ruling: "pre-approved" invitations on mortgage_prequal items are a warning — ClearPath offers prequalification, a materially different product — cost if wrong: occasional warning to dismiss.
