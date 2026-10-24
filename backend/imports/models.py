@@ -20,6 +20,7 @@ class ImportJob(models.Model):
     filename = models.CharField(max_length=255)
     file = models.FileField(upload_to="imports/%Y/%m/", max_length=500)
     sheet_name = models.CharField(max_length=100)
+    row_count = models.PositiveIntegerField(default=0)  # sheet rows below the header
     workbook = models.JSONField()
     column_mapping = models.JSONField(default=dict)  # {header: ImportTargetField}
     status_mapping = models.JSONField(default=list)  # [{source_value, status, outcome}]
@@ -54,8 +55,7 @@ class ImportRow(models.Model):
     legacy_ref = models.CharField(max_length=64, null=True, blank=True)  # noqa: DJ001  # null = not a data row
     action = models.CharField(max_length=30)
     item = models.ForeignKey("reviews.ReviewItem", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
-    problems = models.JSONField(default=list)
-    parsed = models.JSONField(null=True, blank=True)
+    parsed = models.JSONField()  # imports.normalize.ParsedRow, problems included
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["job", "row_number"], name="import_row_unique_per_job")]
