@@ -25,7 +25,9 @@ import type {
 } from '../model';
 
 
-export const getResetDemoResponseMock = (overrideResponse: Partial<Extract<DemoResetOut, object>> = {}): DemoResetOut => ({seeded_items: faker.number.int(), status: faker.helpers.arrayElement(['started','done'] as const), ...overrideResponse})
+export const getResetDemoResponseMock = (overrideResponse: Partial<Extract<DemoResetOut, object>> = {}): DemoResetOut => ({error: faker.string.alpha({length: {min: 10, max: 20}}), finished_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), id: faker.number.int(), requested_at: faker.date.past().toISOString().slice(0, 19) + 'Z', seeded_items: faker.number.int(), started_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), status: faker.helpers.arrayElement(['queued','running','done','failed'] as const), ...overrideResponse})
+
+export const getGetDemoResetResponseMock = (overrideResponse: Partial<Extract<DemoResetOut, object>> = {}): DemoResetOut => ({error: faker.string.alpha({length: {min: 10, max: 20}}), finished_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), id: faker.number.int(), requested_at: faker.date.past().toISOString().slice(0, 19) + 'Z', seeded_items: faker.number.int(), started_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), status: faker.helpers.arrayElement(['queued','running','done','failed'] as const), ...overrideResponse})
 
 export const getCreateUserResponseMock = (overrideResponse: Partial<Extract<UserOut, object>> = {}): UserOut => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_active: faker.datatype.boolean(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role)), ...overrideResponse})
 
@@ -40,6 +42,18 @@ export const getResetDemoMockHandler = (overrideResponse?: DemoResetOut | ((info
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
     : getResetDemoResponseMock(),
       { status: 202
+      })
+  }, options)
+}
+
+export const getGetDemoResetMockHandler = (overrideResponse?: DemoResetOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<DemoResetOut> | DemoResetOut), options?: RequestHandlerOptions) => {
+  return http.get('*/api/admin/demo/resets/:resetId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetDemoResetResponseMock(),
+      { status: 200
       })
   }, options)
 }
@@ -69,6 +83,7 @@ export const getUpdateUserMockHandler = (overrideResponse?: UserOut | ((info: Pa
 }
 export const getAdminMock = () => [
   getResetDemoMockHandler(),
+  getGetDemoResetMockHandler(),
   getCreateUserMockHandler(),
   getUpdateUserMockHandler()
 ]

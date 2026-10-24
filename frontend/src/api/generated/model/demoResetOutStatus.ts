@@ -9,6 +9,8 @@ export type DemoResetOutStatus = typeof DemoResetOutStatus[keyof typeof DemoRese
 
 
 export const DemoResetOutStatus = {
-  started: 'started',
+  queued: 'queued',
+  running: 'running',
   done: 'done',
+  failed: 'failed',
 } as const;

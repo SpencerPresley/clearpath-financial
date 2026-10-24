@@ -11,11 +11,14 @@ The pages are served at `<DEMO_PARTNERS_BASE_URL>/demo-partners/<slug>/`, the pu
 routes `/demo-partners/*` to the app), so the drift check fetches them through the same SSRF guard as any partner.
 """
 
+import hashlib
 from dataclasses import dataclass
+from datetime import date
 from typing import Final
 
 from django.conf import settings
 from django.core.cache import cache
+from django.template.loader import render_to_string
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
@@ -43,28 +46,44 @@ class DemoPage:
     expected: str  # the drift result the edit should produce
 
 
+# The demo pages carry the seeded world's offer (docs/demo.md): ClearPath Card issued by Harborview Bank, N.A.;
+# personal-loan APRs from today's offer terms. The demo seed's items for these pages are approved with exactly
+# `copy`, so the first check of each comes back unchanged.
+_LENDCOMPARE: Final = (
+    "Advertiser Disclosure: LendCompare receives compensation from the lenders listed on this page, which may affect "
+    "where and how they appear.\n\n"
+    "Best Debt Consolidation Loans This Year\n\n"
+    "ClearPath Financial: Editor's Pick\n"
+    "Fixed APRs from 9.99% to 35.99%. Your rate depends on your credit history, income and other factors; the lowest "
+    "rates go to the most creditworthy applicants. Loans from $1,000 to $50,000. Subject to credit approval.\n\n"
+    "Why we like it: fast funding, no prepayment penalty, and a simple online application.\n\n"
+    "See my rates"
+)
+_BUDGETBEE: Final = (
+    "Sponsored by ClearPath. BudgetBee earns a fee if you apply.\n\n"
+    "Consolidate high-interest debt with a ClearPath personal loan. Fixed APRs from 9.99% to 35.99%. Your rate "
+    "depends on your credit history, income and other factors; the lowest rates go to the most creditworthy "
+    "applicants. Borrow $1,000 to $50,000 with no prepayment penalty. Subject to credit approval.\n\n"
+    "Loans made or arranged pursuant to a California Financing Law license, #60DBO-184027."
+)
+
 PAGES: Final = (
     DemoPage(
         slug="lendcompare",
         partner="LendCompare",
-        title="Best personal loans of 2026 | LendCompare",
-        headline="The best personal loans for October",
-        item_title="LendCompare: best personal loans listing",
+        title="Best debt consolidation loans of 2026 | LendCompare",
+        headline="Debt consolidation loans: our top picks",
+        item_title="LendCompare: best debt consolidation loans listing",
         product=Product.PERSONAL_LOAN,
-        copy=(
-            "Advertiser disclosure: LendCompare receives compensation from ClearPath. ClearPath Personal Loans: "
-            "fixed rates from 7.49% to 35.99% APR. The lowest rates go to the most creditworthy applicants. Borrow "
-            "$1,000 to $50,000 with terms of 24 to 60 months. Example: a $10,000 loan for 36 months at 12.99% APR "
-            "has 36 monthly payments of $336.89. Loans made by ClearPath Financial, NMLS #2099761."
+        copy=_LENDCOMPARE,
+        edited_copy=_LENDCOMPARE.replace("from 9.99%", "from 7.99%").replace(
+            "Subject to credit approval.", "Guaranteed approval for most applicants."
         ),
-        edited_copy=(
-            "Advertiser disclosure: LendCompare receives compensation from ClearPath. ClearPath Personal Loans: "
-            "fixed rates from 5.99% to 35.99% APR. Guaranteed approval in minutes. Borrow $1,000 to $50,000 with "
-            "terms of 24 to 60 months. Example: a $10,000 loan for 36 months at 12.99% APR has 36 monthly payments "
-            "of $336.89. Loans made by ClearPath Financial, NMLS #2099761."
+        edited_headline="Top debt consolidation loans this week",
+        edit_summary=(
+            "The partner lowers the starting APR to 7.99% and swaps 'Subject to credit approval' for 'Guaranteed "
+            "approval for most applicants.'"
         ),
-        edited_headline="Top personal loans this week",
-        edit_summary="The partner lowers the starting APR to 5.99% and adds 'Guaranteed approval in minutes.'",
         expected="modified",
     ),
     DemoPage(
@@ -75,9 +94,11 @@ PAGES: Final = (
         item_title="CardScout: ClearPath Card review",
         product=Product.CREDIT_CARD,
         copy=(
-            "Advertisement. CardScout is paid by ClearPath for this listing. The ClearPath Card: 19.99% to 29.99% "
-            "variable purchase APR, based on your creditworthiness. $0 annual fee. 3% balance transfer fee. Issued "
-            "by Lakeside Bank."
+            "Advertiser disclosure: CardScout receives compensation from ClearPath for this listing.\n\n"
+            "The ClearPath Card: 0% intro APR on purchases for 15 months from account opening, then a variable APR "
+            "of 24.74% to 33.74% based on your creditworthiness. $0 annual fee. Balance transfer fee: 3% of each "
+            "transfer (min $5).\n\n"
+            "The ClearPath Card is issued by Harborview Bank, N.A., Member FDIC, pursuant to a license from Visa."
         ),
         edited_copy=None,
         edited_headline="Our favorite cards this month",
@@ -91,18 +112,9 @@ PAGES: Final = (
         headline="How to consolidate credit card debt",
         item_title="BudgetBee: debt consolidation article",
         product=Product.PERSONAL_LOAN,
-        copy=(
-            "Sponsored by ClearPath. BudgetBee earns a fee if you apply. Consolidate high-interest debt with a "
-            "ClearPath personal loan: fixed rates from 7.49% to 35.99% APR, terms of 24 to 60 months, and no "
-            "prepayment penalty. The lowest rates go to the most creditworthy applicants. Loans made by ClearPath "
-            "Financial, NMLS #2099761."
-        ),
-        edited_copy=(
-            "Sponsored by ClearPath.\nBudgetBee earns a fee if you apply.\n\nConsolidate high-interest debt with a "
-            "ClearPath personal loan: fixed rates from 7.49% to 35.99% APR, terms of 24 to 60 months, and no "
-            "prepayment penalty.\nThe lowest rates go to the most creditworthy applicants. Loans made by ClearPath "
-            "Financial, NMLS #2099761."
-        ),
+        copy=_BUDGETBEE,
+        # Same words, new layout: every sentence on its own line.
+        edited_copy=_BUDGETBEE.replace(". ", ".\n"),
         edited_headline="Debt consolidation: a step-by-step guide (updated)",
         edit_summary=(
             "The partner redesigns the article (new headline, layout and sidebar) but keeps the approved copy word "
@@ -135,6 +147,21 @@ def slug_for_url(url: str) -> str | None:
     return slug if slug in _BY_SLUG else None
 
 
+def render_page(page: DemoPage, *, edited: bool, today: date) -> str:
+    """The page's HTML as `/demo-partners/<slug>/` serves it. The demo seed renders the same HTML to record the
+    checks a fetch would have made, without a web server to fetch from."""
+    # Page noise that changes every day, like a real partner page: the date and a reader count.
+    reads = 1000 + int(hashlib.sha256(f"{page.slug}{today}".encode()).hexdigest()[:4], 16) % 9000
+    context = {
+        "page": page,
+        "edited": edited,
+        "copy": page.edited_copy if edited else page.copy,
+        "today": today,
+        "reads": f"{reads:,}",
+    }
+    return render_to_string("drift/partner_page.html", context)
+
+
 def is_edited(slug: str) -> bool:
     return bool(cache.get(_KEY.format(slug=slug), default=False))
 
@@ -162,6 +189,11 @@ def seed_placement(*, actor: User, item_id: int, slug: str, clock: Clock = SYSTE
     return record_placement(actor=actor, item_id=item_id, data=data, clock=clock)
 
 
-def reset_demo_pages() -> None:
-    """Every demo page back to its original (for the admin "Reset demo")."""
-    cache.delete_many([_KEY.format(slug=p.slug) for p in PAGES])
+def reset_demo_pages(*, edited: frozenset[str] = frozenset()) -> None:
+    """Every demo page back to its original, except the `edited` ones (for the admin "Reset demo": the seed can
+    start a page edited so a drift re-review exists out of the box)."""
+    cache.delete_many([_KEY.format(slug=p.slug) for p in PAGES if p.slug not in edited])
+    for slug in edited:
+        if slug not in _BY_SLUG:
+            raise NotFound.entity("demo page", slug)
+        cache.set(_KEY.format(slug=slug), value=True, timeout=None)

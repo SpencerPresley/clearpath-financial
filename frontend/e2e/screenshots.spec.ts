@@ -25,7 +25,7 @@ interface Shot {
 }
 
 const ACTIVE =
-  '/?view=active&status=%5B%22submitted%22%2C%22in_review%22%2C%22changes_requested%22%2C%22needs_rereview%22%5D&is_legacy=false';
+  '/queue?view=active&status=%5B%22submitted%22%2C%22in_review%22%2C%22changes_requested%22%2C%22needs_rereview%22%5D&is_legacy=false';
 
 const shots: Shot[] = [
   {
@@ -51,7 +51,7 @@ const shots: Shot[] = [
   },
   {
     name: 'empty-filtered',
-    path: '/?view=mine&mine=true&risk_tier=%5B%22high%22%5D&product=%5B%22mortgage_prequal%22%5D',
+    path: '/queue?view=mine&mine=true&risk_tier=%5B%22high%22%5D&product=%5B%22mortgage_prequal%22%5D',
     stub: { rows: [] },
     ready: async (page) => {
       await expect(page.getByRole('heading', { name: 'No items match these filters' })).toBeVisible();

@@ -62,7 +62,7 @@ def test_sample_flow_load_map_preview_commit(admin_user: User, django_capture_on
         "blocked": 0,
     }
     assert {p["kind"] for p in preview["problems"]} >= {"duplicate_row", "reused_ref", "not_data_row", "fuzzy_partner"}
-    assert {r["row_number"]: r["status"] for r in preview["rows"]}[172] == "in_review"  # MCR-26-151, "Pending"
+    assert {r["row_number"]: r["status"] for r in preview["rows"]}[171] == "in_review"  # MCR-26-126, "Pending"
 
     with django_capture_on_commit_callbacks(execute=True):
         committed = client.post(f"/api/imports/{job['id']}/commit", {}, content_type="application/json")
@@ -97,7 +97,7 @@ def test_imported_open_items_stay_out_of_the_review_queue(
     queue = client.get("/api/items").json()["rows"]
     assert [r["id"] for r in queue] == [real.pk]
     legacy_open = client.get("/api/items?is_legacy=true").json()["rows"]
-    assert len(legacy_open) == 16
+    assert len(legacy_open) == 20
     assert client.get("/api/items/stats").json()["open"] == 1
 
 

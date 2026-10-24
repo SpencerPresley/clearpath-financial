@@ -102,7 +102,7 @@ describe('MetricsPage', () => {
     table({ product: 'credit_card' });
     const link = await screen.findByRole('link', { name: 'More than 7 days: 4' });
     const href = new URL(link.getAttribute('href') ?? '', 'http://x');
-    expect(href.pathname).toBe('/');
+    expect(href.pathname).toBe('/queue');
     expect(href.searchParams.get('waiting')).toBe('7');
     expect(href.searchParams.get('product')).toBe('["credit_card"]');
   });

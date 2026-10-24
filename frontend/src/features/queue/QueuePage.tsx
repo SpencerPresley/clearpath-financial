@@ -137,8 +137,8 @@ function EmptyQueue({
 }
 
 export function QueuePage() {
-  const search = useSearch({ from: '/' });
-  const navigate = useNavigate({ from: '/' });
+  const search = useSearch({ from: '/queue' });
+  const navigate = useNavigate({ from: '/queue' });
   const viewer = useViewer();
   const cells = useQueueCells(viewer);
 

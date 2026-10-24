@@ -5,13 +5,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
-  useMutation
+  useMutation,
+  useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
-  UseMutationResult
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
@@ -29,6 +38,21 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
+const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+  const result = { queryKey } as T & { queryKey: K };
+  for (const key of Object.keys(query)) {
+    // The explicit queryKey always wins, matching the previous
+    // `{ ...query, queryKey }` spread where it was set last.
+    if (key === 'queryKey') continue;
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => (query as Record<string, unknown>)[key],
+    });
+  }
+  return result;
+};
+
 export const getResetDemoUrl = () => {
 
 
@@ -38,7 +62,9 @@ export const getResetDemoUrl = () => {
 }
 
 /**
- * Wipe and re-seed the demo data. Admins only; the UI confirms first. [workstream L]
+ * Wipe the demo data and seed it again, as a background job (poll `getDemoReset`). Admins only; the UI
+ * confirms first. While a reset is queued or running, this returns that one instead of starting another. People
+ * and sessions are kept, so you stay signed in.
  * @summary Reset Demo
  */
 export const resetDemo = async ( options?: Parameters<typeof customFetch>[1]): Promise<DemoResetOut> => {
@@ -103,7 +129,108 @@ export const useResetDemo = <TError = ErrorOut,
       > => {
       return useMutation(getResetDemoMutationOptions(options), queryClient);
     }
-    export const getCreateUserUrl = () => {
+    export const getGetDemoResetUrl = (resetId: number,) => {
+
+
+
+
+  return `/api/admin/demo/resets/${resetId}`
+}
+
+/**
+ * How a Reset demo job is going. Admins only.
+ * @summary Get Demo Reset
+ */
+export const getDemoReset = async (resetId: number, options?: Parameters<typeof customFetch>[1]): Promise<DemoResetOut> => {
+
+  return customFetch<DemoResetOut>(getGetDemoResetUrl(resetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDemoResetQueryKey = (resetId: number,) => {
+    return [
+    `/api/admin/demo/resets/${resetId}`
+    ] as const;
+    }
+
+
+export const getGetDemoResetQueryOptions = <TData = Awaited<ReturnType<typeof getDemoReset>>, TError = ErrorOut>(resetId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDemoResetQueryKey(resetId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDemoReset>>> = ({ signal }) => getDemoReset(resetId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: resetId !== null && resetId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDemoResetQueryResult = NonNullable<Awaited<ReturnType<typeof getDemoReset>>>
+export type GetDemoResetQueryError = ErrorOut
+
+
+export function useGetDemoReset<TData = Awaited<ReturnType<typeof getDemoReset>>, TError = ErrorOut>(
+ resetId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDemoReset>>,
+          TError,
+          Awaited<ReturnType<typeof getDemoReset>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDemoReset<TData = Awaited<ReturnType<typeof getDemoReset>>, TError = ErrorOut>(
+ resetId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDemoReset>>,
+          TError,
+          Awaited<ReturnType<typeof getDemoReset>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDemoReset<TData = Awaited<ReturnType<typeof getDemoReset>>, TError = ErrorOut>(
+ resetId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Demo Reset
+ */
+
+export function useGetDemoReset<TData = Awaited<ReturnType<typeof getDemoReset>>, TError = ErrorOut>(
+ resetId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDemoReset>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDemoResetQueryOptions(resetId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateUserUrl = () => {
 
 
 

@@ -11,3 +11,7 @@ SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+
+# The published demo password is refused where it's used (seed_demo, Reset demo, seed_demo_users), not at import:
+# collectstatic runs these settings at build time without any app secrets.
+DEMO_PASSWORD_DEFAULT_ALLOWED = False

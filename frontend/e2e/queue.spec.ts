@@ -45,7 +45,7 @@ test('board toggle shows the five columns and claims by drag', async ({ page }) 
     await route.fulfill({ json: { id: 1044 } });
   });
   await page.goto(
-    '/?view=active&status=%5B%22submitted%22%2C%22in_review%22%2C%22changes_requested%22%2C%22needs_rereview%22%5D',
+    '/queue?view=active&status=%5B%22submitted%22%2C%22in_review%22%2C%22changes_requested%22%2C%22needs_rereview%22%5D',
   );
 
   await page.getByRole('radio', { name: 'Board' }).click();

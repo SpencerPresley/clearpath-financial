@@ -27,6 +27,15 @@ compose=(docker compose -f compose.prod.yaml)
 # against the old schema until migrate finished.
 "${compose[@]}" run --rm --no-deps web python manage.py migrate --noinput
 
+# The demo's seeded data (docs/demo.md): a no-op once any items exist, so only
+# the first deploy onto an empty database seeds. Here rather than in the web
+# container's command: a failure stops the deploy while the old containers
+# still serve, and the first seed (~10 s locally, longer against RDS) doesn't
+# eat into the web healthcheck's window. With deps (unlike migrate): the seed
+# sets the demo partner pages' state in Redis, which on a first deploy isn't
+# running until this starts it.
+"${compose[@]}" run --rm web python manage.py seed_demo
+
 # --wait blocks until healthchecks pass and exits non-zero if they don't,
 # which fails the SSM command and therefore the workflow.
 "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 180

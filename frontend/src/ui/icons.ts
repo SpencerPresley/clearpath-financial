@@ -15,6 +15,7 @@
 import {
   ArrowBendUpLeftIcon,
   ArrowClockwiseIcon,
+  ArrowCounterClockwiseIcon,
   ArrowDownIcon,
   ArrowRightIcon,
   ArrowsCounterClockwiseIcon,
@@ -179,6 +180,7 @@ export const icons = {
   'action.columns': regular(ColumnsIcon),
   'action.save_view': regular(BookmarkSimpleIcon),
   'action.reload': regular(ArrowClockwiseIcon),
+  'action.reset_demo': regular(ArrowCounterClockwiseIcon),
   'action.drag': bold(DotsSixVerticalIcon),
   /** Save a built file (export, evidence pack) to disk; action.export starts building it. */
   'action.download': regular(DownloadSimpleIcon),

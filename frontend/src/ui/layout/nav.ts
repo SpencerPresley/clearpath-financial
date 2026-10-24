@@ -29,7 +29,14 @@ export const NAV_GROUPS: readonly { id: NavGroupId; label: string }[] = [
 ];
 
 export const NAV_SECTIONS: readonly NavSection[] = [
-  { id: 'queue', label: 'Queue', icon: 'nav.queue', group: 'work', roles: ['reviewer', 'lead'], to: '/' },
+  {
+    id: 'queue',
+    label: 'Queue',
+    icon: 'nav.queue',
+    group: 'work',
+    roles: ['reviewer', 'lead'],
+    to: '/queue',
+  },
   {
     id: 'my-submissions',
     label: 'My submissions',

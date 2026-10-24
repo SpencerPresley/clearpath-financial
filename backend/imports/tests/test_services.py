@@ -60,16 +60,16 @@ def test_sample_commit_matches_the_readme_totals(committed: int) -> None:
     assert (job.created_count, job.skipped_count, job.partners_created_count) == (178, 2, 8)
     assert items.count() == 178
     assert items.filter(is_legacy=True, owner__isnull=True, current_version__isnull=True).count() == 178
-    assert items.filter(legacy_ref="MCR-26-101-b").exists()
+    assert items.filter(legacy_ref="MCR-26-077-b").exists()
     assert Counter(items.values_list("status", flat=True)) == {
-        ItemStatus.APPROVED.value: 145,
-        ItemStatus.CHANGES_REQUESTED.value: 11,
-        ItemStatus.IN_REVIEW.value: 8,
-        ItemStatus.REJECTED.value: 6,
+        ItemStatus.APPROVED.value: 139,
+        ItemStatus.CHANGES_REQUESTED.value: 10,
+        ItemStatus.IN_REVIEW.value: 12,
+        ItemStatus.REJECTED.value: 9,
         ItemStatus.SUBMITTED.value: 8,
     }
     open_items = items.filter(status__in=[ItemStatus.SUBMITTED.value, ItemStatus.IN_REVIEW.value])
-    assert open_items.count() == 16
+    assert open_items.count() == 20
     assert open_items.filter(legacy_reviewer="").count() == 8
     assert ImportRow.objects.filter(job=job).count() == 180
     assert Partner.objects.count() == 8
@@ -84,45 +84,47 @@ def test_each_item_gets_an_imported_event_carrying_its_timeline(committed: int) 
     assert len(payloads) == 178
     assert {p.import_id for p in payloads} == {committed}
     assert outcomes == {
-        DecisionOutcome.APPROVED: 132,
-        DecisionOutcome.APPROVED_WITH_EDITS: 13,
-        DecisionOutcome.CHANGES_REQUESTED: 11,
-        DecisionOutcome.REJECTED: 6,
-        None: 16,
+        DecisionOutcome.APPROVED: 125,
+        DecisionOutcome.APPROVED_WITH_EDITS: 14,
+        DecisionOutcome.CHANGES_REQUESTED: 10,
+        DecisionOutcome.REJECTED: 9,
+        None: 20,
     }
     events = Event.objects.filter(type=EventType.ITEM_IMPORTED.value).values_list("item", "entity_id", "to_status")
     statuses = dict(ReviewItem.objects.values_list("pk", "status"))
     assert all(item == entity and to_status == statuses[item] for item, entity, to_status in events)
 
-    r13 = next(p for p in payloads if p.legacy_ref == "MCR-25-012")
-    assert r13.row_number == 13
-    assert r13.timeline.submitted_at == datetime(2025, 12, 5, tzinfo=UTC)
-    assert r13.timeline.first_reviewed_at == datetime(2025, 12, 17, tzinfo=UTC)
-    assert r13.timeline.decided_at == datetime(2026, 1, 15, tzinfo=UTC)
-    assert r13.timeline.rounds == 4
+    r150 = next(p for p in payloads if p.legacy_ref == "MCR-26-105")
+    assert r150.row_number == 150
+    assert r150.timeline.submitted_at == datetime(2026, 7, 15, tzinfo=UTC)
+    assert r150.timeline.first_reviewed_at == datetime(2026, 7, 30, tzinfo=UTC)
+    assert r150.timeline.decided_at == datetime(2026, 8, 7, tzinfo=UTC)
+    assert r150.timeline.rounds == 2
 
 
 def test_legacy_item_fields(committed: int) -> None:
     del committed
-    r13 = _item("MCR-25-012")  # approver only, blank expiry
-    r34 = _item("MCR-26-015")  # blank status, text expiry
-    r70 = _item("MCR-26-050")  # "CardPerks"
+    r5 = _item("MCR-25-004")  # approver only
+    r9 = _item("MCR-25-008")  # blank expiry
+    r153 = _item("MCR-26-108")  # blank status
+    r53 = _item("MCR-26-010")  # text expiry
+    r150 = _item("MCR-26-105")  # "CardPerks"
 
-    assert (r13.status, r13.product, r13.risk_tier) == ("approved", Product.MORTGAGE_PREQUAL.value, "high")
-    assert r13.approved_at == datetime(2026, 1, 15, tzinfo=UTC)
-    assert r13.approval_expires_at is None
-    assert "Approved by Leah Brandt (date from the last round)." in r13.notes
-    assert r13.legacy_submitter == "Elena Ruiz / Mortgage Marketing"
-    assert r13.legacy_reviewer == "Leah Brandt"
-    assert r13.legacy_history.startswith("R1 12/17 LB:")
-    assert r13.source_url.startswith("https://sharepoint.clearpath.example/")
-    assert r13.round == 4
-    assert r13.llm_check_status == "skipped"
-    assert r34.status == "approved"
-    assert r34.approval_expires_at == datetime(2026, 3, 12, tzinfo=UTC)
-    assert r70.partner is not None
-    assert r70.partner.name == "CardPerks Weekly"
-    assert r70.partner.type == PartnerType.AFFILIATE.value
+    assert (r5.status, r5.product, r5.risk_tier) == ("approved", Product.PERSONAL_LOAN.value, "high")
+    assert r5.approved_at == datetime(2025, 9, 26, tzinfo=UTC)
+    assert "Approved by Samuel Ortega (date from the last round)." in r5.notes
+    assert r5.legacy_submitter == "Jordan Whitfield / Partnerships & Affiliates"
+    assert r5.legacy_reviewer == "Samuel Ortega"
+    assert r5.legacy_history.startswith("R1 9/22 SO:")
+    assert r5.source_url.startswith("https://sharepoint.clearpath.example/")
+    assert r5.round == 2
+    assert r5.llm_check_status == "skipped"
+    assert r9.approval_expires_at is None
+    assert r153.status == "approved"
+    assert r53.approval_expires_at == datetime(2026, 2, 19, tzinfo=UTC)
+    assert r150.partner is not None
+    assert r150.partner.name == "CardPerks Weekly"
+    assert r150.partner.type == PartnerType.AFFILIATE.value
 
 
 def test_recommitting_a_committed_job_does_nothing(
@@ -156,7 +158,7 @@ def test_committed_preview_shows_what_commit_did(committed: int, admin_user: Use
 
     assert preview.status is ImportStatus.COMMITTED
     assert (preview.counts.rows_total, preview.counts.ready) == (180, 178)
-    assert {r.action for r in preview.rows if r.row_number in {19, 68}} == {
+    assert {r.action for r in preview.rows if r.row_number in {43, 68}} == {
         RowAction.SKIP_NOT_DATA,
         RowAction.SKIP_DUPLICATE,
     }
@@ -199,7 +201,7 @@ def test_existing_partners_are_reused_not_duplicated(
 
     assert Partner.objects.count() == 8
     assert ImportJob.objects.get(pk=job_id).partners_created_count == 7
-    for ref in ("MCR-26-022", "MCR-26-136"):  # "Lend Compare" in the sheet
+    for ref in ("MCR-25-019", "MCR-26-055"):  # "Lend Compare" in the sheet
         partner = _item(ref).partner
         assert partner is not None
         assert partner.pk == existing.pk

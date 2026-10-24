@@ -12,7 +12,7 @@ import { stubApi } from '../../test/browserApi';
 import { PREVIEW_HEADING_ID } from './PreviewDrawer';
 import { SIZES_KEY } from './QueueTable';
 
-async function renderApp(path = '/') {
+async function renderApp(path = '/queue') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createRouter({
     routeTree,
@@ -89,7 +89,7 @@ it('resizes a column by dragging its edge and remembers the width', async () => 
 
 it('keeps the page from scrolling sideways at 1280px with the drawer open', async () => {
   await page.viewport(1280, 800);
-  const { screen } = await renderApp('/?item=1047');
+  const { screen } = await renderApp('/queue?item=1047');
   await expect.element(screen.getByRole('complementary', { name: 'Preview CP-1047' })).toBeVisible();
   await expect.element(screen.getByTitle('RateRadar lead-gen form copy')).toBeVisible();
   const main = must(document.querySelector('main'), 'main');

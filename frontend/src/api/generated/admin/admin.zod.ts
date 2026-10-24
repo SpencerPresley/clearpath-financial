@@ -8,13 +8,38 @@ import * as zod from 'zod';
 
 
 /**
- * Wipe and re-seed the demo data. Admins only; the UI confirms first. [workstream L]
+ * Wipe the demo data and seed it again, as a background job (poll `getDemoReset`). Admins only; the UI
+ * confirms first. While a reset is queued or running, this returns that one instead of starting another. People
+ * and sessions are kept, so you stay signed in.
  * @summary Reset Demo
  */
 export const ResetDemoResponse = zod.object({
+  "error": zod.string(),
+  "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "id": zod.int(),
+  "requested_at": zod.iso.datetime({"offset":true}),
   "seeded_items": zod.int(),
-  "status": zod.enum(['started', 'done'])
+  "started_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "status": zod.enum(['queued', 'running', 'done', 'failed'])
+}).describe('A Reset demo job. `seeded_items` is set once it\'s done; `error` says what happened if it failed.')
+
+/**
+ * How a Reset demo job is going. Admins only.
+ * @summary Get Demo Reset
+ */
+export const GetDemoResetParams = zod.object({
+  "reset_id": zod.int()
 })
+
+export const GetDemoResetResponse = zod.object({
+  "error": zod.string(),
+  "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "id": zod.int(),
+  "requested_at": zod.iso.datetime({"offset":true}),
+  "seeded_items": zod.int(),
+  "started_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "status": zod.enum(['queued', 'running', 'done', 'failed'])
+}).describe('A Reset demo job. `seeded_items` is set once it\'s done; `error` says what happened if it failed.')
 
 /**
  * Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]

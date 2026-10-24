@@ -5,7 +5,8 @@
 #   render-env.sh <backend-image-ref>
 #
 # Every direct child of $SSM_PREFIX becomes KEY='value' (Terraform writes the
-# config values and secrets there; ANTHROPIC_API_KEY is set by hand).
+# config values and secrets there, DEMO_USER_PASSWORD included; ANTHROPIC_API_KEY
+# is set by hand).
 # $SSM_PREFIX/deploy/* are inputs to this script, not app settings.
 set -euo pipefail
 
@@ -44,8 +45,10 @@ emit() {
 params=$(aws ssm get-parameters-by-path --region "$region" --path "$prefix" \
   --with-decryption --output json)
 count=0
+declare -A seen=()
 while read -r key value_b64; do
   emit "$key" "$(base64 -d <<<"$value_b64")"
+  seen[$key]=1
   count=$((count + 1))
 done < <(jq -r '.Parameters[] | "\(.Name | split("/") | last) \(.Value | @base64)"' <<<"$params")
 
@@ -53,6 +56,16 @@ if ((count == 0)); then
   echo "render-env: no parameters under ${prefix}" >&2
   exit 1
 fi
+
+# Secrets the app can't run without. Fail here, naming the missing one, rather
+# than at boot or mid-deploy (prod refuses to seed demo logins with the
+# password published in the repo, so DEMO_USER_PASSWORD must come from SSM).
+for required in DJANGO_SECRET_KEY POSTGRES_PASSWORD DEMO_USER_PASSWORD; do
+  if [[ -z "${seen[$required]:-}" ]]; then
+    echo "render-env: ${prefix}/${required} is missing; refusing" >&2
+    exit 1
+  fi
+done
 
 deploy_param() {
   aws ssm get-parameter --region "$region" --name "${prefix}/deploy/$1" \

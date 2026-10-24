@@ -21,18 +21,19 @@ def test_reads_the_tracker_sheet_with_every_row_below_the_header(sample_workbook
 
 def test_cells_keep_hyperlink_targets_dates_numbers_and_stripped_text(sample_workbook: RawWorkbook) -> None:
     rows = {r.row_number: r for r in sample_workbook.tracker.rows}
-    r34 = rows[34].cells
+    r150 = rows[150].cells
 
-    assert r34[5].text == "CC_CashBackCard_EM_v1.pdf"
-    assert r34[5].hyperlink == (
-        "https://sharepoint.clearpath.example/sites/MarketingCompliance/Submissions/MCR-26-015/CC_CashBackCard_EM_v1.pdf"
+    assert r150[5].text == "CardperksWeekly_CC_NoAnnualFee_AFF_v2.pdf"
+    assert r150[5].hyperlink == (
+        "https://sharepoint.clearpath.example/sites/MarketingCompliance/Submissions/MCR-26-105/"
+        "CardperksWeekly_CC_NoAnnualFee_AFF_v2.pdf"
     )
-    assert r34[1].when == datetime(2026, 2, 4, tzinfo=UTC)
-    assert r34[10].number == 1
-    assert r34[12].is_empty  # blank Status
-    assert rows[150].cells[0].text == "MCR-26-129"  # "MCR-26-129 " stripped
-    assert rows[19].cells[0].text is not None
-    assert rows[19].cells[0].text.startswith("NOTE (R. Okafor 1/5/26)")
+    assert r150[1].when == datetime(2026, 7, 15, tzinfo=UTC)
+    assert r150[10].number == 2
+    assert rows[153].cells[12].is_empty  # blank Status
+    assert rows[63].cells[0].text == "MCR-26-020"  # "MCR-26-020 " stripped
+    assert rows[43].cells[0].text is not None
+    assert rows[43].cells[0].text.startswith("NOTE (R. Okafor 1/5/26)")
 
 
 def test_reads_the_partner_directory_and_reviewer_names(sample_workbook: RawWorkbook) -> None:

@@ -7,6 +7,7 @@ import { Button } from '../Button';
 import { Icon } from '../Icon';
 import { showToast } from '../toast';
 import { signOut } from './session';
+import { ResetDemoDialog } from './ResetDemo';
 import { initialsOf, useViewer } from './Viewer';
 
 const ROLE_LABELS = { marketer: 'Marketer', reviewer: 'Reviewer', lead: 'Compliance lead', admin: 'Admin' };
@@ -37,29 +38,48 @@ export function UserMenu() {
     );
   };
 
+  const isAdmin = viewer.roles.includes('admin');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+
   return (
-    <DialogTrigger>
-      <AriaButton className="app-user-btn" aria-label={`${viewer.name}, account`}>
-        <span className="app-avatar" aria-hidden="true">
-          {initialsOf(viewer.name)}
-        </span>
-        <span aria-hidden="true">{viewer.name}</span>
-        <Icon name="action.expand" size={14} className="text-brand-muted" />
-      </AriaButton>
-      <Popover className="app-popover" placement="bottom end" offset={6}>
-        <Dialog className="app-menu-header flex flex-col gap-0.5 outline-none" aria-label="Account">
-          <Heading slot="title" className="font-medium">
-            {viewer.name}
-          </Heading>
-          <p className="text-meta text-muted">{viewer.email}</p>
-          <p className="text-meta text-muted">{roles || 'No roles'}</p>
-          <div className="mt-2">
-            <Button size="sm" icon="action.sign_out" isDisabled={pending} onPress={doSignOut}>
-              Sign out
-            </Button>
-          </div>
-        </Dialog>
-      </Popover>
-    </DialogTrigger>
+    <>
+      <DialogTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
+        <AriaButton className="app-user-btn" aria-label={`${viewer.name}, account`}>
+          <span className="app-avatar" aria-hidden="true">
+            {initialsOf(viewer.name)}
+          </span>
+          <span aria-hidden="true">{viewer.name}</span>
+          <Icon name="action.expand" size={14} className="text-brand-muted" />
+        </AriaButton>
+        <Popover className="app-popover" placement="bottom end" offset={6}>
+          <Dialog className="app-menu-header flex flex-col gap-0.5 outline-none" aria-label="Account">
+            <Heading slot="title" className="font-medium">
+              {viewer.name}
+            </Heading>
+            <p className="text-meta text-muted">{viewer.email}</p>
+            <p className="text-meta text-muted">{roles || 'No roles'}</p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" icon="action.sign_out" isDisabled={pending} onPress={doSignOut}>
+                Sign out
+              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  icon="action.reset_demo"
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setResetOpen(true);
+                  }}
+                >
+                  Reset demo…
+                </Button>
+              )}
+            </div>
+          </Dialog>
+        </Popover>
+      </DialogTrigger>
+      {isAdmin && <ResetDemoDialog isOpen={resetOpen} onOpenChange={setResetOpen} />}
+    </>
   );
 }

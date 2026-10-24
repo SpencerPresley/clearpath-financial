@@ -34,34 +34,39 @@ from openpyxl.worksheet.worksheet import Worksheet
 # Knobs
 # ---------------------------------------------------------------------------------------------
 
-SEED = 20251101
-AS_OF = date(2026, 10, 23)  # the day the team last touched the tracker (a Friday)
-FIRST_SUBMISSION = date(2025, 11, 3)
-LAST_SUBMISSION = date(2026, 10, 20)
+SEED = 20250908
+# The tracker ends the Friday before ClearPath Compliance Review went live (Monday 2026-08-17), so the imported
+# history and the demo seed's native history meet without overlapping. The seed's go-live is
+# backend/demo/content/calendar.py `GO_LIVE`; demo/tests/test_seed.py fails if the two ever overlap.
+AS_OF = date(2026, 8, 14)  # the day the team last touched the tracker (a Friday)
+FIRST_SUBMISSION = date(2025, 9, 2)  # the Tuesday after Labor Day
+LAST_SUBMISSION = date(2026, 8, 12)
 FREEZE_START = date(2025, 12, 22)  # holiday review freeze: nothing reviewed in this window
 FREEZE_END = date(2026, 1, 2)
 RATE_SHEET_CHANGE = date(2026, 6, 1)  # PL APR floor moved 8.99% -> 9.49%
 REG_B_REWRITE = date(2026, 7, 21)
 NEW_REVIEWER_START = date(2026, 3, 2)
 
-# (year, month, submissions). Volume roughly doubles over the year; October stops at the 20th.
+# (year, month, submissions). Volume roughly doubles over the year (December is the holiday freeze); August
+# stops at the 12th, the rush before the cutover.
 MONTHLY_VOLUME: tuple[tuple[int, int, int], ...] = (
-    (2025, 11, 8),
+    (2025, 9, 9),
+    (2025, 10, 11),
+    (2025, 11, 12),
     (2025, 12, 9),
-    (2026, 1, 11),
-    (2026, 2, 12),
-    (2026, 3, 14),
-    (2026, 4, 14),
-    (2026, 5, 16),
-    (2026, 6, 17),
-    (2026, 7, 17),
-    (2026, 8, 18),
-    (2026, 9, 20),
-    (2026, 10, 22),
+    (2026, 1, 13),
+    (2026, 2, 15),
+    (2026, 3, 16),
+    (2026, 4, 17),
+    (2026, 5, 19),
+    (2026, 6, 20),
+    (2026, 7, 23),
+    (2026, 8, 14),
 )
 
 HOLIDAYS = frozenset(
     {
+        date(2025, 9, 1),
         date(2025, 11, 27),
         date(2025, 11, 28),
         date(2025, 12, 24),
@@ -107,7 +112,7 @@ UNASSIGNED_P = 0.7
 LOW_RISK_THEME_P = 0.15
 TRIGGER_WITHOUT_FINDING_P = 0.3
 RE_REVIEW_P = 0.25
-RE_REVIEW_WINDOW = (date(2026, 5, 1), date(2026, 8, 31))
+RE_REVIEW_WINDOW = (date(2026, 5, 1), date(2026, 8, 12))
 RE_REVIEW_LOOKAHEAD_DAYS = 30
 
 # Placement bookkeeping
@@ -154,7 +159,7 @@ XLSX_PATH = OUT_DIR / "clearpath_review_tracker.xlsx"
 README_PATH = OUT_DIR / "README.md"
 SHAREPOINT = "https://sharepoint.clearpath.example/sites/MarketingCompliance"
 CLEARPATH_SITE = "https://www.clearpathfinancial.example"
-FILE_CREATED = datetime(2025, 10, 30, 16, 12, tzinfo=UTC)
+FILE_CREATED = datetime(2025, 8, 28, 16, 12, tzinfo=UTC)
 
 # ---------------------------------------------------------------------------------------------
 # Domain vocabulary

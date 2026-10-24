@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from ninja import Schema
@@ -48,5 +49,12 @@ class UserUpdateIn(Schema):
 
 
 class DemoResetOut(Schema):
-    status: Literal["started", "done"]
+    """A Reset demo job. `seeded_items` is set once it's done; `error` says what happened if it failed."""
+
+    id: int
+    status: Literal["queued", "running", "done", "failed"]
+    requested_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
     seeded_items: int
+    error: str

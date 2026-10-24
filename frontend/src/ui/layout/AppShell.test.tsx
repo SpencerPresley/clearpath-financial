@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -63,6 +63,20 @@ describe('AppShell', () => {
     expect(within(nav).getByRole('link', { name: 'Outbox' })).toHaveAttribute('href', '/outbox');
   });
 
+  it.each<[Role[], string]>([
+    [['reviewer'], 'Queue'],
+    [['lead', 'reviewer'], 'Queue'],
+    [['marketer'], 'My submissions'],
+    [['admin'], 'Import'],
+  ])('sends %j from "/" to %s', async (roles, section) => {
+    renderApp({ roles });
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    const link = await within(nav).findByRole('link', { name: section });
+    await waitFor(() => {
+      expect(link).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
   it('filters sections by the viewer roles', async () => {
     renderApp({ roles: ['marketer'] });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
@@ -86,6 +100,16 @@ describe('AppShell', () => {
     expect(panel).toHaveTextContent('test@clearpath.test');
     expect(panel).toHaveTextContent('Compliance lead, Reviewer');
     expect(within(panel).getByRole('button', { name: 'Sign out' })).toBeEnabled();
+    expect(within(panel).queryByRole('button', { name: 'Reset demo…' })).not.toBeInTheDocument();
+  });
+
+  it('offers admins Reset demo behind a confirmation', async () => {
+    const user = userEvent.setup();
+    renderApp({ roles: ['admin'] });
+    await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
+    await user.click(await screen.findByRole('button', { name: 'Reset demo…' }));
+    expect(await screen.findByRole('alertdialog', { name: 'Reset the demo?' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument();
   });
 
   it('signs out and returns to the sign-in form', async () => {
