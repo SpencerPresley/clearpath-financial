@@ -1,0 +1,75 @@
+# Production stack on the app server (/srv/clearpath). Same backend image as
+# CI builds (Dockerfile `prod` target), pulled from ECR by git-SHA tag.
+# Postgres is RDS; Redis is local and disposable (the event log is the
+# outbox, so nothing is lost if Redis restarts empty).
+#
+# .env next to this file is written by render-env.sh from SSM Parameter Store.
+# Compose reads it twice: for ${...} interpolation here (BACKEND_IMAGE,
+# FORWARDED_ALLOW_IPS) and as each backend container's environment.
+
+name: clearpath
+
+x-backend: &backend
+  image: ${BACKEND_IMAGE:?run render-env.sh first}
+  env_file: [.env]
+  environment:
+    REDIS_URL: redis://redis:6379/0
+    CLEARPATH_ENV_FILE: ""
+    DJANGO_SETTINGS_MODULE: config.settings.prod
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    # Pinned by multi-arch index digest (`docker buildx imagetools inspect
+    # redis:7-alpine`, 2026-10-24) so a retag on Docker Hub can't change prod.
+    image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    <<: *backend
+    # --forwarded-allow-ips: uvicorn only honours X-Forwarded-For from these
+    # peers, walking the header right-to-left to the first untrusted hop.
+    # CloudFront appends the viewer IP, so trusting exactly the CloudFront
+    # origin-facing ranges (plus the VPC CIDR, in case the VPC-origin ENI's
+    # private address is what the socket sees) yields the real viewer IP.
+    # Not "*": uvicorn then takes the *leftmost* entry, which the client
+    # controls, and allauth's login rate limits key on that address.
+    # (CloudFront sends no X-Forwarded-Proto; HTTPS detection is Django's
+    # SECURE_PROXY_SSL_HEADER on CloudFront-Forwarded-Proto.)
+    command:
+      - uvicorn
+      - config.asgi:application
+      - --host=0.0.0.0
+      - --port=8000
+      - --workers=2
+      - --proxy-headers
+      - --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:?run render-env.sh first}
+    # Published on all interfaces: the CloudFront VPC origin connects to the
+    # instance's private IP. The security group admits only CloudFront.
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
+
+  beat:
+    <<: *backend
+    command: ["celery", "-A", "config", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+
+  # The outbox dispatcher (docs/decisions.md) joins here once it exists.

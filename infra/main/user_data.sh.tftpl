@@ -1,0 +1,26 @@
+#!/bin/bash
+# First-boot setup only. The app itself arrives later via the deploy
+# workflow (SSM Run Command), so nothing here depends on the image or secrets.
+set -euxo pipefail
+
+dnf install -y docker jq
+
+# Bounded container logs so a chatty worker can't fill the root volume.
+install -d -m 0755 /etc/docker
+cat > /etc/docker/daemon.json <<'JSON'
+{ "log-driver": "json-file", "log-opts": { "max-size": "20m", "max-file": "5" } }
+JSON
+systemctl enable --now docker
+
+# AL2023's repos ship the docker engine but not the compose v2 plugin.
+# Pinned version + checksum from the GitHub release.
+install -d -m 0755 /usr/local/lib/docker/cli-plugins
+curl -fsSL -o /tmp/docker-compose \
+  "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-x86_64"
+echo "${compose_sha256}  /tmp/docker-compose" | sha256sum -c -
+install -m 0755 /tmp/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+rm -f /tmp/docker-compose
+docker compose version
+
+# Deploy target: compose file, render-env.sh, and the rendered .env (0600).
+install -d -m 0750 /srv/clearpath
