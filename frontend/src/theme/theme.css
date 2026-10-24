@@ -2831,7 +2831,33 @@
     @apply flex h-10 items-center gap-3 text-meta;
   }
   .app-tp-legacy {
-    @apply ml-2 align-middle text-muted;
+    @apply text-muted;
+  }
+  /* Item key with its Legacy tag beside it, in the key column. */
+  .app-tp-key {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap;
+  }
+  .app-tp-rule-id {
+    @apply text-meta;
+  }
+  /* A narrowed findings history: what it's narrowed to, and the way back. */
+  .app-tp-filter {
+    @apply mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui text-muted;
+  }
+  .app-tp-filter-rule {
+    @apply font-medium text-base-content;
+  }
+  /* A tab count that hasn't loaded: holds the width, visible only while loading. */
+  .app-tp-count-slot {
+    @apply invisible w-6;
+  }
+  .app-tp-count-slot[data-loading] {
+    @apply visible;
+  }
+  /* A skeleton bar inside a real text element keeps that element's line-height. */
+  .app-tp-skel-line {
+    @apply flex items-center;
+    min-height: 1lh;
   }
 
   /* ---- Offer terms ----------------------------------------------------------------------------- */
@@ -2852,6 +2878,18 @@
   }
   .app-terms-panel {
     @apply outline-none;
+  }
+  /* The panel is focusable (RAC TabPanel) so a keyboard user landing on it needs the ring back. */
+  .app-terms-panel[data-focus-visible],
+  .app-partner-panel[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-terms-tabrow {
+    @apply flex flex-wrap items-end justify-between gap-x-4 gap-y-1;
+  }
+  .app-terms-tab-lock {
+    @apply pb-2 text-meta text-muted;
   }
   /* RAC marks the whole Tabs container focus-visible while anything inside has keyboard focus; the tab and
      the field show it instead. */
@@ -2920,9 +2958,13 @@
   .app-terms-skeleton-card {
     @apply mt-3 px-4 py-3;
   }
-  /* Holds the tab's width while the version loads, so the tabs don't shift. */
-  .app-terms-tab-pending {
-    @apply w-6;
+  /* Holds the version count's width in every state (loading, error, none yet), so the tabs don't shift; it
+     shows only while loading. */
+  .app-terms-tab-slot {
+    @apply invisible w-6;
+  }
+  .app-terms-tab-slot[data-loading] {
+    @apply visible;
   }
   .app-terms-history-note {
     @apply text-meta text-muted;
@@ -2956,6 +2998,22 @@
   .app-terms-edit-row .app-field-description,
   .app-terms-edit-row .app-field-error {
     @apply col-start-3;
+  }
+  /* % after a rate, $ before an amount, inside the input's box. */
+  .app-terms-unit {
+    @apply pointer-events-none col-start-3 row-start-1 px-2.5 text-ui text-muted;
+  }
+  .app-terms-edit-row[data-unit='percent'] .app-terms-unit {
+    @apply justify-self-end;
+  }
+  .app-terms-edit-row[data-unit='money'] .app-terms-unit {
+    @apply justify-self-start;
+  }
+  .app-terms-edit-row[data-unit='percent'] .app-input {
+    @apply pr-7;
+  }
+  .app-terms-edit-row[data-unit='money'] .app-input {
+    @apply pl-6;
   }
   /* A changed row: the old value is struck and the label carries weight. No status color (it isn't one). */
   .app-terms-edit-row[data-changed] .app-terms-edit-current {
@@ -2993,7 +3051,7 @@
     text-wrap: pretty;
   }
   .app-terms-counts {
-    @apply grid grid-cols-2 gap-px overflow-hidden rounded-md border border-base-300 bg-base-300;
+    @apply grid grid-cols-3 gap-px overflow-hidden rounded-md border border-base-300 bg-base-300;
   }
   .app-terms-count {
     @apply flex flex-col gap-0.5 bg-base-100 px-3 py-2;
@@ -3006,6 +3064,12 @@
   }
   .app-terms-count-label .app-status-mark {
     @apply size-4;
+  }
+  .app-terms-count-detail {
+    @apply text-meta text-muted;
+  }
+  .app-terms-confirm-counts {
+    @apply grid-cols-[10rem_minmax(0,1fr)];
   }
   .app-terms-impact-line {
     @apply text-ui;
@@ -3209,8 +3273,15 @@
   .app-tp-finding-state {
     @apply flex flex-col items-end text-meta text-base-content;
   }
-  /* Resolved findings recede; open ones keep full weight. */
+  /* Resolved findings recede; open ones keep full weight. The severity badge goes quiet too: an accepted or
+     dismissed blocker isn't blocking anything. */
   .app-tp-finding:not([data-state='open']) .app-tp-finding-message {
     @apply text-muted;
+  }
+  .app-tp-finding:not([data-state='open']) .app-tp-finding-head .app-badge {
+    @apply border-base-300 bg-transparent text-muted;
+  }
+  .app-tp-citation {
+    @apply whitespace-nowrap;
   }
 }

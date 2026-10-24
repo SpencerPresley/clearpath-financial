@@ -5,7 +5,7 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
 import type { AttachmentKind, PartnerDetailOut } from '../../api/generated/model';
@@ -35,16 +35,19 @@ import { SkeletonTable, SkeletonText } from '../../ui/Skeleton';
 import { showToast } from '../../ui/toast';
 import { partnerFormFrom, patchBody, websiteHref, websiteLabel } from './partnerValues';
 import { PartnerForm } from './PartnerForm';
+import { usePartnerFindings } from './pages';
 import type { PartnerTab } from './partnersSearch';
 import { FindingsHistory, PartnerItems, RepeatIssues } from './PartnerTabs';
 
 export interface PartnerDetailPageProps {
   partnerId: number;
   tab: PartnerTab;
+  /** Findings history narrowed to this rule id (from a repeat issue's link). */
+  rule?: string;
   onTabChange: (tab: PartnerTab) => void;
 }
 
-export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetailPageProps) {
+export function PartnerDetailPage({ partnerId, tab, rule, onTabChange }: PartnerDetailPageProps) {
   const partner = useGetPartner(partnerId);
 
   if (partner.isPending) return <DetailSkeleton />;
@@ -101,9 +104,10 @@ export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetail
           <Stat value={detail.item_count} label="Items" />
           <Stat value={detail.approved_count} label="Approved" />
           <Stat value={detail.open_findings_count} label="Open findings" />
+          {/* The list's format too: a date. Null only when the partner has no items at all. */}
           <div role="group" aria-label="Last submitted" className="app-partner-stat">
             <span className="app-partner-stat-figure">
-              {detail.last_submitted_at === null ? '—' : <RelativeAge at={detail.last_submitted_at} />}
+              {detail.last_submitted_at === null ? '—' : formatDate(detail.last_submitted_at)}
             </span>
             <span className="app-partner-stat-label">Last submitted</span>
           </div>
@@ -123,7 +127,7 @@ export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetail
               Items <span className="app-tab-count">{detail.item_count}</span>
             </Tab>
             <Tab id="findings" className="app-tab">
-              Findings history
+              Findings history <FindingsTabCount partnerId={detail.id} />
             </Tab>
             <Tab id="repeat" className="app-tab">
               Repeat issues <span className="app-tab-count">{detail.repeat_issues.length}</span>
@@ -133,7 +137,7 @@ export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetail
             <PartnerItems partner={detail} />
           </TabPanel>
           <TabPanel id="findings" className="app-partner-panel">
-            <FindingsHistory partner={detail} />
+            <FindingsHistory partner={detail} rule={rule} />
           </TabPanel>
           <TabPanel id="repeat" className="app-partner-panel">
             <RepeatIssues partner={detail} />
@@ -145,6 +149,29 @@ export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetail
         </aside>
       </div>
     </div>
+  );
+}
+
+/**
+ * The loaded count, "+" when there are more pages (the endpoint doesn't total). The slot keeps its width while
+ * loading so the tab doesn't shift; nothing shows if the history can't load. Shares the history's cache entry.
+ */
+function FindingsTabCount({ partnerId }: { partnerId: number }) {
+  const { query, rows } = usePartnerFindings(partnerId);
+  if (query.isSuccess) {
+    return (
+      <span className="app-tab-count">
+        {rows.length}
+        {query.hasNextPage ? '+' : ''}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="app-tab-count app-tp-count-slot"
+      data-loading={query.isPending || undefined}
+      aria-hidden="true"
+    />
   );
 }
 
@@ -161,18 +188,25 @@ function Stat({ value, label }: { value: number; label: string }) {
 function DetailSkeleton() {
   return (
     <div className="app-partner" role="status" aria-label="Loading partner">
+      {/* Each placeholder sits in the real element's type, so every line keeps its line-height. */}
       <div className="app-partner-header">
-        <SkeletonText width="4rem" />
+        <div className="app-partner-crumbs app-tp-skel-line">
+          <SkeletonText width="4rem" />
+        </div>
         <div className="app-partner-title-row">
-          <SkeletonText width="12rem" />
+          <span className="app-page-title app-tp-skel-line">
+            <SkeletonText width="12rem" />
+          </span>
         </div>
         <div className="app-partner-stats">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="app-partner-stat">
-              <span className="app-partner-stat-figure">
+              <span className="app-partner-stat-figure app-tp-skel-line">
                 <SkeletonText width="2rem" />
               </span>
-              <SkeletonText width="5rem" />
+              <span className="app-partner-stat-label app-tp-skel-line">
+                <SkeletonText width="5rem" />
+              </span>
             </div>
           ))}
         </div>
@@ -205,6 +239,20 @@ function PartnerFacts({ partner }: { partner: PartnerDetailOut }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const update = useUpdatePartner();
+  // Opening focuses the form's first field (autoFocus); closing returns focus to Edit details, which the
+  // form's unmount would otherwise drop to the page body.
+  const editId = `edit-partner-${String(partner.id)}`;
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (!editing && restoreFocus.current) {
+      restoreFocus.current = false;
+      document.getElementById(editId)?.focus();
+    }
+  }, [editing, editId]);
+  const close = () => {
+    restoreFocus.current = true;
+    setEditing(false);
+  };
 
   return (
     <section aria-label="Details" className="app-partner-section">
@@ -212,6 +260,7 @@ function PartnerFacts({ partner }: { partner: PartnerDetailOut }) {
         <h2 className="app-tp-section-title">Details</h2>
         {isLead && !editing && (
           <Button
+            id={editId}
             size="sm"
             variant="ghost"
             icon="action.edit"
@@ -231,13 +280,11 @@ function PartnerFacts({ partner }: { partner: PartnerDetailOut }) {
           initial={partnerFormFrom(partner)}
           submitLabel="Save"
           pending={update.isPending}
-          onCancel={() => {
-            setEditing(false);
-          }}
+          onCancel={close}
           onSubmit={(values, report) => {
             const data = patchBody(values, partner);
             if (Object.keys(data).length === 0) {
-              setEditing(false);
+              close();
               return;
             }
             update.mutate(
@@ -246,7 +293,7 @@ function PartnerFacts({ partner }: { partner: PartnerDetailOut }) {
                 onSuccess: (updated) => {
                   queryClient.setQueryData(getGetPartnerQueryKey(partner.id), updated);
                   void queryClient.invalidateQueries({ queryKey: getListPartnersQueryKey() });
-                  setEditing(false);
+                  close();
                 },
                 onError: report,
               },
@@ -320,7 +367,11 @@ const KIND_ORDER: AttachmentKind[] = [
 ];
 
 function PartnerAttachments({ partner }: { partner: PartnerDetailOut }) {
-  const isLead = useViewer().roles.includes('lead');
+  const { roles } = useViewer();
+  const isLead = roles.includes('lead');
+  // The API leaves attachments out for roles that can't read them (accounts.can_read_partner_attachments), so
+  // an empty list means "hidden", not "none on file".
+  const canRead = roles.some((r) => r === 'reviewer' || r === 'lead' || r === 'admin');
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<AttachmentKind | null>('agreement');
@@ -344,7 +395,9 @@ function PartnerAttachments({ partner }: { partner: PartnerDetailOut }) {
   return (
     <section aria-label="Agreement and evidence" className="app-partner-section">
       <h2 className="app-tp-section-title">Agreement and evidence</h2>
-      {partner.attachments.length === 0 ? (
+      {!canRead ? (
+        <p className="app-muted">Agreements are visible to reviewers and leads.</p>
+      ) : partner.attachments.length === 0 ? (
         <p className="app-muted">
           No agreement on file.{' '}
           {isLead ? 'Upload the signed agreement so reviewers can check copy against it.' : ''}

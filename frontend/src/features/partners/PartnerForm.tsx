@@ -81,8 +81,10 @@ export function PartnerForm({
     >
       <form.Field name="name">
         {(field) => (
+          // The form opens on demand (New partner, Edit details): focus starts in it.
           <TextInput
             label="Name"
+            autoFocus
             isRequired
             value={field.state.value}
             onChange={field.handleChange}

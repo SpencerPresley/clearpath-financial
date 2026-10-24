@@ -10,13 +10,15 @@ export const Route = createFileRoute('/partners/$partnerId')({
 
 function PartnerRoute() {
   const { partnerId } = Route.useParams();
-  const { tab } = Route.useSearch();
+  const { tab, rule } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
     <PartnerDetailPage
       partnerId={Number(partnerId)}
       tab={tab ?? 'items'}
+      rule={tab === 'findings' ? rule : undefined}
       onTabChange={(next) => {
+        // Switching tabs drops the rule filter: it belongs to the findings history.
         void navigate({ search: { tab: next === 'items' ? undefined : next }, replace: true });
       }}
     />

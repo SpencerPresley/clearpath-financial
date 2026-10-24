@@ -10,6 +10,7 @@ import type { PartnerDetailOut } from '../../api/generated/model';
 import { SeverityBadge, SourceTag, StatusBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
+import { isRetryable } from '../../ui/errorMessage';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { ItemKey } from '../../ui/ItemKey';
 import { CHANNEL_LABELS, FINDING_STATE_LABELS, formatDate, plural } from '../../ui/labels';
@@ -23,9 +24,12 @@ function SectionError({ what, error, onRetry }: { what: string; error: unknown; 
       <span>
         {what} didn&apos;t load. {apiErrorMessage(error)}
       </span>
-      <Button size="sm" onPress={onRetry}>
-        Retry
-      </Button>
+      {/* A 403 or 404 won't change on a second try; the reason is the message. */}
+      {isRetryable(error) && (
+        <Button size="sm" onPress={onRetry}>
+          Retry
+        </Button>
+      )}
     </div>
   );
 }
@@ -58,8 +62,9 @@ function LoadMore({
 
 // ---- Items -----------------------------------------------------------------------------------------
 
-/** Key, title, status, open findings, submitted. Channel rides under the title (partners are mostly one). */
-const ITEM_COLUMNS = ['6.5rem', 'auto', '9rem', '5rem', '7rem'] as const;
+/** Key (+ Legacy), title, status, open findings, submitted. Channel rides after the title (partners are mostly
+ * one). */
+const ITEM_COLUMNS = ['9.5rem', 'auto', '9rem', '7rem', '7rem'] as const;
 
 export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
   const { query, rows } = usePartnerItems(partner.id);
@@ -106,7 +111,7 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
               <th scope="col">Title</th>
               <th scope="col">Status</th>
               <th scope="col" className="app-tp-num">
-                Findings
+                Open findings
               </th>
               <th scope="col" className="app-tp-num">
                 Submitted
@@ -117,18 +122,23 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
             {rows.map((item) => (
               <tr key={item.id}>
                 <td>
-                  <ItemKey value={item.key} />
+                  <span className="app-tp-key">
+                    <ItemKey value={item.key} />
+                    {item.is_legacy && (
+                      <span
+                        className="app-tag app-tp-legacy"
+                        title="Imported from the tracker: metadata only"
+                      >
+                        Legacy
+                      </span>
+                    )}
+                  </span>
                 </td>
-                <td className="app-tp-cell-title">
+                <td className="app-tp-cell-title" title={`${item.title} · ${CHANNEL_LABELS[item.channel]}`}>
                   <Link to="/items/$itemId" params={{ itemId: String(item.id) }} className="app-tp-link">
                     {item.title}
                   </Link>
                   <span className="app-muted"> · {CHANNEL_LABELS[item.channel]}</span>
-                  {item.is_legacy && (
-                    <span className="app-tag app-tp-legacy" title="Imported from the tracker: metadata only">
-                      Legacy
-                    </span>
-                  )}
                 </td>
                 <td>
                   <StatusBadge status={item.status} />
@@ -155,33 +165,67 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
 
 // ---- Findings history ---------------------------------------------------------------------------------
 
-export function FindingsHistory({ partner }: { partner: PartnerDetailOut }) {
-  const { query, rows } = usePartnerFindings(partner.id);
+/** The rule's title when the registry knows it, else its id. */
+function ruleName(partner: PartnerDetailOut, ruleId: string): string {
+  return partner.repeat_issues.find((i) => i.rule_id === ruleId)?.rule_title ?? ruleId;
+}
+
+export function FindingsHistory({ partner, rule }: { partner: PartnerDetailOut; rule?: string }) {
+  const { query, rows } = usePartnerFindings(partner.id, rule);
+  const filter =
+    rule === undefined ? null : (
+      <p className="app-tp-filter" role="status">
+        <span>
+          Only <span className="app-tp-filter-rule">{ruleName(partner, rule)}</span>
+        </span>
+        <Link
+          to="/partners/$partnerId"
+          params={{ partnerId: String(partner.id) }}
+          search={{ tab: 'findings' }}
+          replace
+          className="app-tp-link"
+        >
+          Show all findings
+        </Link>
+      </p>
+    );
 
   if (query.isPending) {
-    return <SkeletonTable rows={5} columns={['1fr', '12rem', '6rem']} label="Loading findings history" />;
+    return (
+      <>
+        {filter}
+        <SkeletonTable rows={5} columns={['1fr', '12rem', '6rem']} label="Loading findings history" />
+      </>
+    );
   }
   if (query.isError && rows.length === 0) {
     return (
-      <SectionError
-        what="Findings history"
-        error={query.error}
-        onRetry={() => {
-          void query.refetch();
-        }}
-      />
+      <>
+        {filter}
+        <SectionError
+          what="Findings history"
+          error={query.error}
+          onRetry={() => {
+            void query.refetch();
+          }}
+        />
+      </>
     );
   }
   if (rows.length === 0) {
     return (
-      <EmptyState icon="entity.finding" title={`No findings on ${partner.name}'s items`}>
-        Code checks, AI suggestions, and checklist items on any version of this partner&apos;s content show
-        here.
-      </EmptyState>
+      <>
+        {filter}
+        <EmptyState icon="entity.finding" title={`No findings on ${partner.name}'s items`}>
+          Code checks, AI suggestions, and checklist items on any version of this partner&apos;s content show
+          here.
+        </EmptyState>
+      </>
     );
   }
   return (
     <>
+      {filter}
       <ol aria-label="Findings history, newest first" className="app-tp-findings">
         {rows.map((finding) => (
           <li key={finding.id} className="app-tp-finding" data-state={finding.state}>
@@ -189,7 +233,7 @@ export function FindingsHistory({ partner }: { partner: PartnerDetailOut }) {
               <p className="app-tp-finding-head">
                 <SeverityBadge severity={finding.severity} />
                 <span className="app-tp-finding-message">
-                  {finding.message} · {finding.citation}
+                  {finding.message} · <span className="app-tp-citation">{finding.citation}</span>
                 </span>
               </p>
               <p className="app-tp-finding-meta">
@@ -268,8 +312,22 @@ export function RepeatIssues({ partner }: { partner: PartnerDetailOut }): ReactN
         <tbody>
           {partner.repeat_issues.map((issue) => (
             <tr key={issue.rule_id}>
-              <td className="font-mono app-tp-cell-title">{issue.rule_id}</td>
-              <td>{issue.citation}</td>
+              <td className="app-tp-cell-title" title={issue.rule_title ?? issue.rule_id}>
+                <Link
+                  to="/partners/$partnerId"
+                  params={{ partnerId: String(partner.id) }}
+                  search={{ tab: 'findings', rule: issue.rule_id }}
+                  className="app-tp-link"
+                >
+                  {issue.rule_title ?? issue.rule_id}
+                </Link>
+                {issue.rule_title !== null && (
+                  <span className="app-muted font-mono app-tp-rule-id"> {issue.rule_id}</span>
+                )}
+              </td>
+              <td className="app-tp-cell-title" title={issue.citation}>
+                {issue.citation}
+              </td>
               <td className="app-tp-num">{issue.count}</td>
               <td className="app-tp-num">{issue.items}</td>
               <td className="app-tp-num app-muted">{formatDate(issue.last_seen_at)}</td>

@@ -54,9 +54,7 @@ export const partnerFormSchema = z.object({
     .trim()
     .max(254)
     .refine((v) => v === '' || EMAIL.test(v), 'Enter an email address, e.g. compliance@partner.com.'),
-  agreement_signed_on: z
-    .string()
-    .refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Enter a date, e.g. 2026-01-12.'),
+  agreement_signed_on: z.string().refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Pick a date.'),
   notes: z.string().max(10_000, 'Keep notes under 10,000 characters.'),
 });
 

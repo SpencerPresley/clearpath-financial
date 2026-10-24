@@ -34,8 +34,9 @@ export function usePartnerItems(partnerId: number) {
   return { query, rows };
 }
 
-export function usePartnerFindings(partnerId: number) {
-  const params = { limit: PAGE_SIZE };
+/** The partner's findings history, newest first; `ruleId` narrows it to one rule. */
+export function usePartnerFindings(partnerId: number, ruleId?: string) {
+  const params = ruleId === undefined ? { limit: PAGE_SIZE } : { limit: PAGE_SIZE, rule_id: ruleId };
   const query = useInfiniteQuery({
     queryKey: [...getListPartnerFindingsQueryKey(partnerId, params), 'pages'],
     queryFn: ({ pageParam, signal }) =>

@@ -57,7 +57,7 @@ describe('Partners list', () => {
         .getAllByRole('cell')
         .map((c) => c.textContent),
     ).toEqual(expect.arrayContaining(['24', '15', '5']));
-    expect(within(table).getByRole('row', { name: /RateRadar/ })).toHaveTextContent('No submissions');
+    expect(within(table).getByRole('row', { name: /RateRadar/ })).toHaveTextContent('—');
   });
 
   it('filters by status and name through the URL', async () => {

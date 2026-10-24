@@ -101,16 +101,80 @@ describe('Partner detail', () => {
     expect(within(history).getAllByRole('listitem')[3]).toHaveTextContent('Dismissed');
   });
 
-  it('shows repeat issues with counts', async () => {
-    renderApp('/partners/31?tab=repeat');
+  it('shows repeat issues with counts, each linking to its findings (P2)', async () => {
+    const ruleIds: (string | null)[] = [];
+    server.use(
+      getListPartnerFindingsMockHandler(({ request }) => {
+        const rule = new URL(request.url).searchParams.get('rule_id');
+        ruleIds.push(rule);
+        return {
+          rows: rule === null ? PARTNER_FINDINGS_PAGE_1 : PARTNER_FINDINGS_PAGE_1.slice(0, 1),
+          next_cursor: null,
+        };
+      }),
+    );
+    const { router } = renderApp('/partners/31?tab=repeat');
     const table = await screen.findByRole('table', { name: 'Repeat issues' });
-    const row = within(table).getByRole('row', { name: /ftc\.material_connection/ });
+    const row = within(table).getByRole('row', { name: /Partner content discloses the paid relationship/ });
+    expect(row).toHaveTextContent('endorsement.material_connection');
     expect(row).toHaveTextContent('16 CFR 255.5');
     expect(
       within(row)
         .getAllByRole('cell')
         .map((c) => c.textContent),
     ).toEqual(expect.arrayContaining(['7', '5']));
+
+    await userEvent.click(
+      within(row).getByRole('link', { name: 'Partner content discloses the paid relationship' }),
+    );
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({
+        tab: 'findings',
+        rule: 'endorsement.material_connection',
+      });
+    });
+    const history = await screen.findByRole('list', { name: 'Findings history, newest first' });
+    await waitFor(() => {
+      expect(within(history).getAllByRole('listitem')).toHaveLength(1);
+    });
+    expect(ruleIds).toContain('endorsement.material_connection');
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent(
+      'Only Partner content discloses the paid relationship',
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'Show all findings' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ tab: 'findings' });
+    });
+  });
+
+  it('counts the loaded findings on the tab, "+" when there are more pages (P10)', async () => {
+    renderApp('/partners/31');
+    expect(await screen.findByRole('tab', { name: 'Findings history 3+' })).toBeInTheDocument();
+  });
+
+  it("doesn't offer Retry on a 403: asking again won't change it (P6)", async () => {
+    server.use(
+      http.get('*/api/partners/31/findings', () =>
+        HttpResponse.json(
+          { code: 'not_permitted', message: 'Findings history is for reviewers and leads.' },
+          { status: 403 },
+        ),
+      ),
+    );
+    renderApp('/partners/31?tab=findings');
+    expect(await screen.findByText(/Findings history is for reviewers and leads\./)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('says agreements are hidden, not missing, for a role that cannot read them (P6)', async () => {
+    server.use(
+      getGetMeMockHandler({ ...REVIEWER_ME, roles: ['marketer'], effective_roles: ['marketer'] }),
+      getGetPartnerMockHandler({ ...PARTNER_DETAIL, attachments: [] }),
+    );
+    renderApp('/partners/31');
+    const files = await screen.findByRole('region', { name: 'Agreement and evidence' });
+    expect(within(files).getByText('Agreements are visible to reviewers and leads.')).toBeInTheDocument();
+    expect(within(files).queryByText(/No agreement on file/)).not.toBeInTheDocument();
   });
 
   it('keeps the page when the findings history fails, with Retry there', async () => {
@@ -169,6 +233,8 @@ describe('Partner detail', () => {
     const facts = await screen.findByRole('region', { name: 'Details' });
     await userEvent.click(within(facts).getByRole('button', { name: 'Edit details' }));
     const form = within(facts).getByRole('form', { name: 'Edit partner details' });
+    // Focus moves into the form (P9).
+    expect(within(form).getByRole('textbox', { name: /Name/ })).toHaveFocus();
     await userEvent.click(within(form).getByRole('button', { name: /Status/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Paused' }));
     await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
@@ -178,6 +244,8 @@ describe('Partner detail', () => {
     });
     expect(await screen.findByRole('heading', { name: 'LoanFinder', level: 1 })).toBeInTheDocument();
     expect(within(facts).queryByRole('form')).not.toBeInTheDocument();
+    // ... and back to the trigger when it closes.
+    expect(within(facts).getByRole('button', { name: 'Edit details' })).toHaveFocus();
   });
 
   it('is read-only for reviewers', async () => {

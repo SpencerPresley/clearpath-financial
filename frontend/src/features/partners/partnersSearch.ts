@@ -17,5 +17,7 @@ export type PartnerTab = (typeof PARTNER_TABS)[number];
 
 export const partnerSearchSchema = z.object({
   tab: z.enum(PARTNER_TABS).optional().catch(undefined),
+  /** Findings history narrowed to one rule (a repeat issue's link). */
+  rule: z.string().max(200).optional().catch(undefined),
 });
 export type PartnerSearch = z.infer<typeof partnerSearchSchema>;

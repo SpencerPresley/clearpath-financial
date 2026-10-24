@@ -335,14 +335,16 @@ export const PARTNER_DETAIL: PartnerDetailOut = {
   attachments: PARTNER_ATTACHMENTS,
   repeat_issues: [
     {
-      rule_id: 'ftc.material_connection',
+      rule_id: 'endorsement.material_connection',
+      rule_title: 'Partner content discloses the paid relationship',
       citation: '16 CFR 255.5',
       count: 7,
       items: 5,
       last_seen_at: '2026-10-22T15:00:00Z',
     },
     {
-      rule_id: 'reg_z.trigger_terms',
+      rule_id: 'closed_end.trigger_apr',
+      rule_title: 'Trigger terms need the APR',
       citation: 'Reg Z 1026.24(d)',
       count: 4,
       items: 3,
@@ -391,7 +393,7 @@ function finding(o: Partial<PartnerFindingOut> & { id: number }): PartnerFinding
     item_title: 'Spring personal loan comparison page',
     item_is_legacy: false,
     version_n: 2,
-    rule_id: 'ftc.material_connection',
+    rule_id: 'endorsement.material_connection',
     citation: '16 CFR 255.5',
     source: 'code',
     severity: 'blocking',
@@ -406,7 +408,7 @@ export const PARTNER_FINDINGS_PAGE_1: PartnerFindingOut[] = [
   finding({ id: 7001 }),
   finding({
     id: 7000,
-    rule_id: 'reg_z.trigger_terms',
+    rule_id: 'closed_end.trigger_apr',
     citation: 'Reg Z 1026.24(d)',
     source: 'llm',
     severity: 'warning',

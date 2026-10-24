@@ -5,7 +5,7 @@
  */
 import { keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input, Label, SearchField } from 'react-aria-components';
 
 import { PartnerStatus } from '../../api/generated/model';
@@ -44,10 +44,20 @@ const STATUS_OPTIONS: { id: StatusChoice; label: string }[] = [
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
+const NEW_HEADER_ID = 'new-partner';
+const NEW_EMPTY_ID = 'new-partner-empty';
 
 export function PartnersPage({ search, onSearchChange }: PartnersPageProps) {
   const isLead = useViewer().roles.includes('lead');
   const [creating, setCreating] = useState(false);
+  // Cancel returns focus to whichever New partner button opened the form (the form's unmount drops it).
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (!creating && restoreFocus.current) {
+      restoreFocus.current = false;
+      (document.getElementById(NEW_HEADER_ID) ?? document.getElementById(NEW_EMPTY_ID))?.focus();
+    }
+  }, [creating]);
   const [query, setQuery] = useState(search.q ?? '');
   const list = useListPartners(
     { status: search.status, q: search.q },
@@ -121,6 +131,7 @@ export function PartnersPage({ search, onSearchChange }: PartnersPageProps) {
         action={
           isLead && !creating ? (
             <Button
+              id={NEW_EMPTY_ID}
               variant="primary"
               size="sm"
               onPress={() => {
@@ -149,6 +160,7 @@ export function PartnersPage({ search, onSearchChange }: PartnersPageProps) {
         </div>
         {isLead && !creating && !(list.isSuccess && rows.length === 0 && !filtered) && (
           <Button
+            id={NEW_HEADER_ID}
             variant="primary"
             onPress={() => {
               setCreating(true);
@@ -160,7 +172,11 @@ export function PartnersPage({ search, onSearchChange }: PartnersPageProps) {
       </header>
       {creating && (
         <CreatePartner
-          onDone={() => {
+          onCancel={() => {
+            restoreFocus.current = true;
+            setCreating(false);
+          }}
+          onCreated={() => {
             setCreating(false);
           }}
         />
@@ -236,7 +252,8 @@ function PartnersTable({ rows, busy }: { rows: readonly PartnerRowOut[]; busy: b
               <td className="app-tp-num">{row.approved_count}</td>
               <td className="app-tp-num">{row.open_findings_count}</td>
               <td className="app-tp-num app-muted">
-                {row.last_submitted_at === null ? 'No submissions' : formatDate(row.last_submitted_at)}
+                {/* Null only when the partner has no items (every item has a submitted date). */}
+                {row.last_submitted_at === null ? '—' : formatDate(row.last_submitted_at)}
               </td>
             </tr>
           ))}
@@ -246,7 +263,7 @@ function PartnersTable({ rows, busy }: { rows: readonly PartnerRowOut[]; busy: b
   );
 }
 
-function CreatePartner({ onDone }: { onDone: () => void }) {
+function CreatePartner({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const create = useCreatePartner();
@@ -258,7 +275,7 @@ function CreatePartner({ onDone }: { onDone: () => void }) {
         initial={EMPTY_PARTNER_FORM}
         submitLabel="Add partner"
         pending={create.isPending}
-        onCancel={onDone}
+        onCancel={onCancel}
         onSubmit={(values, report) => {
           create.mutate(
             { data: createBody(values) },
@@ -266,7 +283,7 @@ function CreatePartner({ onDone }: { onDone: () => void }) {
               onSuccess: (partner) => {
                 showToast({ title: `Added ${partner.name}`, description: 'Attach the agreement next.' });
                 void queryClient.invalidateQueries({ queryKey: getListPartnersQueryKey() });
-                onDone();
+                onCreated();
                 void navigate({ to: '/partners/$partnerId', params: { partnerId: String(partner.id) } });
               },
               onError: report,
