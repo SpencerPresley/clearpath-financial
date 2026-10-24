@@ -1,8 +1,9 @@
 /*
  * Outbox (decisions.md "Assistant"): the demo's stand-in for real mail. Rows are emails the assistant drafted
  * and a person approved, plus, for admins only, the app's own mail (`source: 'system'`, e.g. password resets),
- * which has a recipient but no requester, approver or thread. The HTML part is rendered only inside a sandboxed iframe: `sandbox=""` turns
- * off scripts, forms, popups and same-origin access, so the message can't reach the app or the session.
+ * which has a recipient but no requester, approver or thread, and whose body the server never stores (it can
+ * hold a sign-in link). The HTML part is rendered only inside a sandboxed iframe: `sandbox=""` turns off
+ * scripts, forms, popups and same-origin access, so the message can't reach the app or the session.
  *
  * The open email is in the URL (`?email=<id>`), so the assistant's "Open in Outbox" lands on it. Columns are
  * sized in CSS and a container query on .app-outbox drops To and Requested by when the page is narrow (beside

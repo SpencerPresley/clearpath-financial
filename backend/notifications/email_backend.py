@@ -4,8 +4,9 @@
   call), attached only by `assistant.email.send_approved_email` after the recipient allowlist and the human
   approval. It becomes an `assistant` row, shown to everyone.
 - Anything else is the app's own mail, such as allauth's password reset (allauth renders it and sends it through
-  `django.core.mail` and this backend like any Django email). It becomes a `system` row with every recipient,
-  shown only to admins. Refusing it would turn the public reset endpoint into a 500.
+  `django.core.mail` and this backend like any Django email). It becomes a `system` row: every recipient, the
+  subject and the time, shown only to admins. The body is never stored, because it can hold a live sign-in link.
+  Refusing the mail instead would turn the public reset endpoint into a 500.
 """
 
 from collections.abc import Sequence
@@ -18,7 +19,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import OutboxSource
-from notifications.models import OutboxEmail
+from notifications.models import SYSTEM_MAIL_BODY, OutboxEmail
 
 
 @dataclass(frozen=True)
@@ -68,8 +69,7 @@ class OutboxEmailBackend(BaseEmailBackend):
                     source=OutboxSource.SYSTEM.value,
                     to=list(message.recipients()),
                     subject=message.subject,
-                    body=str(message.body),
-                    html_body=_html(message),
+                    body=SYSTEM_MAIL_BODY,
                     sent_at=self.clock.now(),
                 )
             message.outbox_id = row.pk  # pyrefly: ignore[missing-attribute]  # read back by the sender

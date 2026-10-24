@@ -243,6 +243,7 @@ LOGGING = {
 # (config/settings/dev.py), where the local stack fetches its own demo partner pages.
 DRIFT_FETCH_PRIVATE_ORIGINS: list[str] = []
 DEMO_PARTNERS_BASE_URL = env.demo_partners_base_url or env.frontend_base_url
+
 # --- Assistant (workstream K) ---
 ASSISTANT_MODEL = env.anthropic_model
 ASSISTANT_ANTHROPIC_API_KEY = env.anthropic_api_key.get_secret_value() if env.anthropic_api_key else None

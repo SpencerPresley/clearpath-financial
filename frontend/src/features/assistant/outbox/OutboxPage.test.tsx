@@ -157,13 +157,15 @@ describe('OutboxPage', () => {
     expect(within(detail).queryByRole('button', { name: 'Open thread' })).toBeNull();
   });
 
-  it('marks system mail (password resets, admins only) and shows its recipient, with no requester or approver', async () => {
+  it('marks system mail (password resets, admins only): recipient shown, body withheld, no requester or approver', async () => {
     const user = userEvent.setup();
     renderOutbox([
       email({
         id: 9,
         source: 'system',
         subject: 'Reset your password',
+        body: 'Body not stored: system mail can contain sign-in links.',
+        html_body: '',
         to: ['sam.okafor@clearpath.demo'],
         item_id: null,
         thread_id: '',
@@ -183,6 +185,10 @@ describe('OutboxPage', () => {
     expect(within(detail).getByText('Sent')).toBeInTheDocument();
     expect(within(detail).getByText('System mail, not drafted by the assistant')).toBeInTheDocument();
     expect(within(detail).getByText('sam.okafor@clearpath.demo')).toBeInTheDocument();
+    expect(
+      within(detail).getByText('Body not stored: system mail can contain sign-in links.'),
+    ).toBeInTheDocument();
+    expect(within(detail).queryByTitle('Email preview')).toBeNull();
     expect(within(detail).queryByText('Approved by')).toBeNull();
     expect(within(detail).queryByRole('button', { name: 'Open thread' })).toBeNull();
   });

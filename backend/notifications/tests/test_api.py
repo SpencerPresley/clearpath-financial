@@ -3,7 +3,7 @@ from django.test import Client
 
 from accounts.models import User
 from core.domain import NotificationKind, OutboxSource
-from notifications.models import Notification, OutboxEmail
+from notifications.models import SYSTEM_MAIL_BODY, Notification, OutboxEmail
 from reviews.tests.factories import AT, make_item
 
 
@@ -63,7 +63,11 @@ def test_outbox_lists_sent_emails(reviewer: User, lead: User) -> None:
 @pytest.mark.django_db
 def test_system_mail_is_only_visible_to_admins(reviewer: User, admin_user: User) -> None:
     system = OutboxEmail.objects.create(
-        source=OutboxSource.SYSTEM, to=["dana@clearpath.demo"], subject="Reset your password", body="link", sent_at=AT
+        source=OutboxSource.SYSTEM,
+        to=["dana@clearpath.demo"],
+        subject="Reset your password",
+        body=SYSTEM_MAIL_BODY,
+        sent_at=AT,
     )
     assistant = OutboxEmail.objects.create(
         to=["compliance@clearpath.demo"],

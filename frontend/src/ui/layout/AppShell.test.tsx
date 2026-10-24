@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/rea
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
 import { getItemsMock } from '../../api/generated/items/items.msw';
@@ -14,28 +14,6 @@ import { routeTree } from '../../routeTree.gen';
 import { server } from '../../test/server';
 import type { Role } from '../domain';
 import { NAV_COLLAPSED_KEY } from './AppShell';
-import type { NavSection } from './nav';
-
-// An unbuilt section, so the shell's "Soon" rendering stays covered now that every real section has a page.
-vi.mock('./nav', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./nav')>();
-  const reports: NavSection = {
-    id: 'reports',
-    label: 'Reports',
-    icon: 'nav.metrics',
-    group: 'operations',
-    roles: 'everyone',
-  };
-  return {
-    ...actual,
-    navGroupsFor: (roles: readonly Role[]) =>
-      actual
-        .navGroupsFor(roles)
-        .map((group) =>
-          group.id === 'operations' ? { ...group, sections: [...group.sections, reports] } : group,
-        ),
-  };
-});
 
 const ALL_ROLES: Role[] = ['marketer', 'reviewer', 'lead', 'admin'];
 
@@ -80,15 +58,8 @@ describe('AppShell', () => {
     expect(await screen.findByRole('link', { name: 'ClearPath Compliance Review' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     expect(within(nav).getByRole('link', { name: 'Queue' })).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('shows unbuilt sections as disabled, not as links to placeholder pages', async () => {
-    renderApp();
-    const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    // Every real section is built (the Outbox was the last), so these use the made-up one mocked in above.
-    const reports = within(nav).getByRole('link', { name: 'Reports, soon' });
-    expect(reports).toHaveAttribute('aria-disabled', 'true');
-    expect(reports.tagName).not.toBe('A');
+    // Every section is a real page: no placeholder links.
+    for (const link of within(nav).getAllByRole('link')) expect(link).toHaveAttribute('href');
     expect(within(nav).getByRole('link', { name: 'Outbox' })).toHaveAttribute('href', '/outbox');
   });
 
@@ -142,19 +113,6 @@ describe('AppShell', () => {
     await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-  });
-
-  it('keeps unbuilt sections reachable by keyboard and named in the collapsed rail', async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(NAV_COLLAPSED_KEY, 'true');
-    renderApp();
-    const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const reports = within(nav).getByRole('link', { name: 'Reports, soon' });
-    expect(reports).toHaveAttribute('aria-disabled', 'true');
-    expect(reports).not.toHaveAttribute('href');
-    for (let i = 0; i < 30 && document.activeElement !== reports; i += 1) await user.tab();
-    expect(reports).toHaveFocus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Reports · Soon');
   });
 
   it('collapses the nav, keeps every item named, and remembers the choice', async () => {

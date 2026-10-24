@@ -1475,7 +1475,7 @@
   .app-nav-item {
     @apply flex h-8 items-center gap-2.5 rounded-md px-2 text-ui whitespace-nowrap text-base-content;
   }
-  .app-nav-item[data-hovered]:not([aria-disabled]),
+  .app-nav-item[data-hovered],
   a.app-nav-item:hover {
     @apply bg-hover;
   }
@@ -1483,14 +1483,8 @@
     @apply bg-nav-active font-medium text-primary;
     box-shadow: inset 2px 0 0 var(--color-primary);
   }
-  .app-nav-item[aria-disabled='true'] {
-    @apply cursor-default text-muted;
-  }
   .app-nav-item-label {
     @apply min-w-0 flex-1 truncate;
-  }
-  .app-nav-item-note {
-    @apply text-meta text-muted;
   }
   .app-nav[data-collapsed] .app-nav-item {
     @apply justify-center px-0;

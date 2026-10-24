@@ -98,11 +98,18 @@ stored email, whatever the user answers on the re-shown card. The tool result's 
 **System mail (ruling 1).** `EMAIL_BACKEND` is global, so the Outbox backend also takes every other email the app
 sends. allauth's password reset renders through its adapter and goes out via `django.core.mail` and `EMAIL_BACKEND`
 like any Django email; there's no separate path. A message without the assistant's metadata becomes a
-`source=system` row: every recipient (to, cc, bcc), no requester, approver or thread. A check constraint pins both
-row shapes. Only admins see system rows (list and detail; to anyone else the detail is a 404). The page labels them
-System, and the detail says "System mail, not drafted by the assistant". Tests: a plain `EmailMultiAlternatives`,
-and `POST /_allauth/browser/v1/auth/password/request` returning 200 with the row in the Outbox (before this it
-was a 500).
+`source=system` row holding metadata only: every recipient (to, cc, bcc), the subject and the time, with no
+requester, approver or thread. The body is never stored. A reset email carries a live link, and storing it would
+let any admin take over the account. The row holds the placeholder "Body not stored: system mail can contain sign-in
+links." and an empty HTML part. A check constraint pins both row shapes, so the database refuses a system row with
+a real body. Only admins see system rows (list and detail; to anyone else the detail is a 404). The page labels them
+System and says "System mail, not drafted by the assistant".
+
+Tests:
+- `POST /_allauth/browser/v1/auth/password/request` returns 200 (it was a 500). A spy on the backend confirms the
+  real mail contained a reset link, and the stored subject and body contain no `http`, no reset path and no key.
+- A plain `EmailMultiAlternatives` with cc and HTML.
+- The constraint refuses a system row whose body is a link.
 
 ## Prompt design
 
@@ -155,19 +162,19 @@ has none (scratchpad `cache_check.py`). Whether the cache actually hits is only 
 
 ## Verification
 
-All of this was run at the branch head after rebasing onto `origin/main` (`78ed50f`, after #34, #35 and #36).
+All of this was run at the branch head after rebasing onto `origin/main` (after #34–#37; `uv lock` re-run, no change).
 
 ```
-backend$ uv run pytest -q                      1544 passed, 3 deselected
-backend$ ruff check . / ruff format --check .  All checks passed! / 306 files already formatted
+backend$ uv run pytest -q                      1719 passed, 3 deselected
+backend$ ruff check . / ruff format --check .  All checks passed! / 328 files already formatted
 backend$ pyrefly check                         0 errors
 backend$ manage.py makemigrations --check      No changes detected
 backend$ manage.py check --fail-level WARNING  no issues
 repo$    make schema                           no drift
 frontend$ typecheck / lint / format:check      clean
-frontend$ npm run test:run                     63 files, 612 passed
+frontend$ npm run test:run                     64 files, 621 passed
 frontend$ npm run build                        built
-frontend$ npx playwright test                  19 passed (incl. assistant e2e), screenshot specs skipped
+frontend$ CI=1 npx playwright test             19 passed (incl. assistant e2e), screenshot specs skipped
 ```
 
 **Real-server smoke** (scratchpad `asgi_smoke.py` + `smoke_run*.sh`: uvicorn, a scripted slow model, curl):
@@ -211,8 +218,9 @@ autocommit connections.
 | `frontend/src/theme/theme.css` | `app-assistant-*`, `app-outbox-*`; `.app-main` becomes a container for the layout beside the panel |
 | `frontend/src/features/queue/QueuePage.tsx` | one hook call: step columns aside while the panel is open, as with the drawer |
 | `frontend/src/routes/outbox.tsx`, `routeTree.gen.ts`, `src/test/server.ts`, `e2e/*` | Outbox route (`?email=`), default MSW handler, e2e + screenshot specs |
-| `frontend/src/ui/layout/AppShell.test.tsx` | Its "unbuilt section" example was Outbox. Every real section has a page now, so the test mocks in a made-up "Reports" section to keep the "Soon" rendering covered (ruling 2) |
-| `frontend/e2e/shell.spec.ts` | Already failing on main: #36 opened Offer terms to reviewers, and this spec still asserted reviewers don't see it. It now asserts Metrics (lead-only). CI doesn't run Playwright, which is why nobody saw it |
+| `frontend/src/ui/layout/AppShell.tsx`, `AppShell.test.tsx`, `nav.ts`, `theme.css` | The Outbox was the last unbuilt section, so the "Soon" nav rendering is gone (ruling): `NavSection.to` is required, the disabled-item CSS is removed, and the two tests for it became one assertion that every nav item is a real link |
+| `frontend/e2e/shell.spec.ts` | Already failing on main: #36 opened Offer terms to reviewers, and this spec still asserted reviewers don't see it. It now asserts Metrics (lead-only) |
+| `.github/workflows/frontend-ci.yaml` | New `E2E` job (ruling): the Playwright suite headless on Chromium, actions pinned by SHA, browsers cached under `~/.cache/ms-playwright` keyed by the locked Playwright version (a hit still installs system libraries), traces uploaded on failure |
 
 ## Open items and risks
 
@@ -220,16 +228,11 @@ autocommit connections.
   tool, and the approval card is the draft: `send_email` pauses before anything is sent, and the user sends, edits or
   declines it. A second tool would only add a step the model could skip.
 
-- **Resolved by ruling:** app mail lands in the Outbox as admin-only system mail (ruling 1), and the Outbox stays
-  with K (ruling 2).
-- **Admins can read live password-reset links.** System mail is stored verbatim, and allauth's reset email holds
-  a working reset link, so an admin opening it in the Outbox could take over that account. That follows from
-  ruling 1; Django admins can already reset passwords, but it's worth knowing.
-- **System mail records no `Event`.** The assistant path records `EMAIL_SENT` in `send_approved_email`. The
-  backend's system branch only writes the Outbox row, because no service calls it (allauth does). The row is the
-  record; adding an event would mean the backend writing audit rows itself.
-- **CI doesn't run e2e.** `frontend-ci` has no Playwright job, so a broken spec on main (`shell.spec.ts`, above)
-  stays invisible. That's for whoever owns CI.
+- **Resolved by ruling:**
+  - App mail lands in the Outbox as admin-only, metadata-only system mail.
+  - The Outbox stays with K.
+  - System mail records no `Event`: the Outbox row is the record.
+  - Frontend CI now runs e2e.
 - **v3 streaming is marked experimental** (`LangChainBetaWarning`). The wire translation is pinned by tests in
   `test_wire.py` and the frontend fixtures, so a LangGraph bump that changes event shapes fails CI.
 - **Known gaps:**

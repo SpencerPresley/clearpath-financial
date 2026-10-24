@@ -1,6 +1,6 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button as AriaButton, Focusable } from 'react-aria-components';
+import { Button as AriaButton } from 'react-aria-components';
 
 import { AssistantPanel } from '../../features/assistant/AssistantPanel';
 import { AssistantToggle } from '../../features/assistant/AssistantToggle';
@@ -42,31 +42,6 @@ function writeCollapsed(value: boolean) {
 
 function NavItem({ section, collapsed }: { section: NavSection; collapsed: boolean }) {
   const label = <span className={collapsed ? 'sr-only' : 'app-nav-item-label'}>{section.label}</span>;
-
-  if (section.to === undefined) {
-    // Not built yet: a disabled link (no href, no placeholder page). Focusable so keyboard users can
-    // discover it, with the same tooltip as real links when the rail is collapsed.
-    const item = (
-      <span
-        role="link"
-        aria-disabled="true"
-        aria-label={`${section.label}, soon`}
-        tabIndex={0}
-        className="app-nav-item"
-      >
-        <Icon name={section.icon} />
-        {label}
-        {!collapsed && <span className="app-nav-item-note">Soon</span>}
-      </span>
-    );
-    return collapsed ? (
-      <Tooltip content={`${section.label} · Soon`} placement="right">
-        <Focusable>{item}</Focusable>
-      </Tooltip>
-    ) : (
-      item
-    );
-  }
 
   const link = (
     <NavLink to={section.to} className="app-nav-item">
