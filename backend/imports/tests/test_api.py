@@ -75,6 +75,8 @@ def test_sample_flow_load_map_preview_commit(admin_user: User, django_capture_on
     after = client.get(f"/api/imports/{job['id']}/preview").json()
     assert after["status"] == "committed"
     assert after["counts"]["ready"] == 178
+    linked = {r["item_id"] for r in after["rows"] if r["action"] == "create"}
+    assert linked == set(ReviewItem.objects.filter(is_legacy=True).values_list("pk", flat=True))
 
     listed = client.get("/api/imports").json()
     assert [j["id"] for j in listed] == [job["id"]]

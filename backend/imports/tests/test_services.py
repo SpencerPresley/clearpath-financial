@@ -162,6 +162,32 @@ def test_committed_preview_shows_what_commit_did(committed: int, admin_user: Use
     }
 
 
+def test_committed_preview_links_each_created_row_to_its_item(committed: int, admin_user: User) -> None:
+    preview = selectors.get_preview(viewer=admin_user, job_id=committed)
+
+    created = [r for r in preview.rows if r.action is RowAction.CREATE]
+    assert len(created) == 178
+    items = {i.pk: i.legacy_ref for i in ReviewItem.objects.only("legacy_ref")}
+    assert all(r.item_id is not None and items[r.item_id] == r.legacy_ref for r in created)
+    assert all(r.item_id is None for r in preview.rows if r.action is not RowAction.CREATE)
+
+
+def test_committed_preview_reads_item_ids_in_one_query(
+    committed: int, admin_user: User, django_assert_max_num_queries: Callable[..., AbstractContextManager[Any]]
+) -> None:
+    with django_assert_max_num_queries(3):  # the job, its stored rows, nothing per row
+        selectors.get_preview(viewer=admin_user, job_id=committed)
+
+
+def test_preview_before_commit_has_no_item_ids(admin_user: User, clock: FixedClock) -> None:
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+
+    preview = selectors.get_preview(viewer=admin_user, job_id=job_id)
+
+    assert preview.rows
+    assert all(r.item_id is None for r in preview.rows)
+
+
 @pytest.mark.parametrize("app_spelling", ["lendcompare", "Lend Compare", "Lend-Compare"])
 def test_existing_partners_are_reused_not_duplicated(
     admin_user: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit, app_spelling: str

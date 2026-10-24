@@ -281,6 +281,7 @@ export const SetImportMappingResponse = zod.object({
 })),
   "rows": zod.array(zod.object({
   "action": zod.enum(['create', 'skip_duplicate', 'skip_already_imported', 'skip_not_data', 'blocked']).describe('What commit does with a row.'),
+  "item_id": zod.union([zod.int(),zod.null()]).describe('The item commit created from this row; null before commit or if skipped.'),
   "legacy_ref": zod.union([zod.string(),zod.null()]),
   "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
   "partner": zod.union([zod.string(),zod.null()]),
@@ -326,6 +327,7 @@ export const GetImportPreviewResponse = zod.object({
 })),
   "rows": zod.array(zod.object({
   "action": zod.enum(['create', 'skip_duplicate', 'skip_already_imported', 'skip_not_data', 'blocked']).describe('What commit does with a row.'),
+  "item_id": zod.union([zod.int(),zod.null()]).describe('The item commit created from this row; null before commit or if skipped.'),
   "legacy_ref": zod.union([zod.string(),zod.null()]),
   "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
   "partner": zod.union([zod.string(),zod.null()]),
