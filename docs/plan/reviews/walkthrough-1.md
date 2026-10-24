@@ -1,6 +1,6 @@
 # Walkthrough review 1: whole app, every role
 
-Fresh-eyes walkthrough before the hosted demo. Main at `a5b59fc`, local stack (own DB `clearpath_walk`,
+Fresh-eyes walkthrough before the hosted demo. Main at `a5b59fc` (rechecked on `7cf32a7`; see below), local stack (own DB `clearpath_walk`,
 `seed_demo`, uvicorn + Celery worker/beat + Vite on 5173), no Anthropic key. Driven with Playwright at
 1440×900 and 1280×800. Screenshots: `docs/plan/reviews/ui/walkthrough-1/` (named `NN-role-what.png`, referred
 to below as `shot NN`).
@@ -11,7 +11,15 @@ bulk fast-track, AI-failure override approval, drift simulate/check/restore/reaf
 Reset demo, a make-interfaces-feel-better polish pass, and API permission probes (`fetch` from each role's session
 against every lead/admin/reviewer-only mutation).
 
-**Counts:** 4 blockers, 20 should-fix, 17 nits.
+**Counts:** 4 blockers, 18 open should-fix (plus 2 already fixed on main), 17 nits.
+
+**Main moved during the review.** I walked `a5b59fc`. Then #43 (production readiness) and #44 (comment links +
+quick-jump) merged, and this branch is rebased on `7cf32a7`. I re-seeded on `7cf32a7` and rechecked:
+- **Fixed by #44:** S2 ("Search (soon)" is now a working ⌘K quick-jump, shot 151) and S13 (the duplicate
+  re-review notifications are gone, shot 150). They're kept below, marked fixed, so the evidence trail stays intact.
+- **Still present:** every blocker. `pricing.py:75`, `LlmStatus.tsx:86`, `decisions.py:358-360` and
+  `ResubmitPage.tsx` are unchanged. The files behind S1, S4–S12 and S14–S20 are also untouched by #43/#44
+  (`git diff a5b59fc 7cf32a7` on those paths shows only an unrelated `legacy_ref` search filter).
 
 Environment notes, not product findings: the dev CSRF and drift-fetch allowlists are pinned to ports
 5173/8000 (`config/settings/dev.py`), so a second local stack on other ports can't sign in and can't run
@@ -123,7 +131,7 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   only in `routes/index.tsx`.
 - **Fix:** navigate to `/` on sign-out (or in `onSignedIn` when the user id changed).
 
-### S2. "Search (soon)" sits in the header of every screen
+### S2. "Search (soon)" sits in the header of every screen (fixed on main by #44)
 - **Role / screen:** All roles, top bar. **Steps:** sign in.
 - **Saw:** a disabled search box with the label "Search (soon)" (shot 02 and every later shot). Spec §2 anti-goal: "Fake
   depth: … 'coming soon' screens … fails the project." The ledger says a real quick-jump is in flight. Make sure
@@ -241,7 +249,7 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   unverified" (`card.py:103`). An internal doc filename and "unverified" have no place in a compliance citation.
   Use "ClearPath card program policy" and keep the caveat in code comments.
 
-### S13. Duplicate notifications, against the ledger ruling
+### S13. Duplicate notifications, against the ledger ruling (fixed on main by #44)
 - **Role / screen:** Reviewer, notification bell. **Steps:** fresh seed, sign in as Dana, open the bell.
 - **Saw:** Dana's inbox has pairs at the same minute for CP-21, CP-13 and CP-5: "… is back for your review" plus
   "… needs re-review · offer terms changed" (shot 62). Ledger ruling: "one notification per action — a reopen's
@@ -434,8 +442,8 @@ exactly why it's back ("Offer terms changed … v4 was generated with the new nu
 shows only 9.49→9.99 and 376→380. That's the clearest "beats Excel + email" moment in the product: no
 spreadsheet ever told anyone which approved ads quote a rate that just changed. After she fast-tracks it, the
 screen claims the AI review was carried from v4 (B4), and the approval never shows what it was approved against
-(S3). After deciding there's no "next" (S8). The evaluator understands the product in about 90 seconds, then sees
-"Search (soon)" (S2).
+(S3). After deciding there's no "next" (S8). The evaluator understands the product in about 90 seconds; on
+`a5b59fc` the next thing they saw was "Search (soon)" (S2, fixed by #44).
 
 **Compliance lead (Rachel).** The Offer terms page with its impact preview is excellent and makes the fan-out
 concrete. The drift demo works and reads like real monitoring. But a lead who publishes a rate change and then
