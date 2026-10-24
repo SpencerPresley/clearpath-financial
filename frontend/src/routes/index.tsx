@@ -1,11 +1,14 @@
-import { createFileRoute, stripSearchParams } from '@tanstack/react-router';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 
-import { QueuePage } from '../features/queue/QueuePage';
-import { queueRouteSearchSchema } from '../features/queue/search';
+import { landingFor } from '../ui/layout/landing';
+import { useViewer } from '../ui/layout/Viewer';
+
+// "/" has no screen of its own: it sends each viewer to where their work starts (SessionGate has resolved them).
+function Home() {
+  const viewer = useViewer();
+  return <Navigate to={landingFor(viewer.roles)} replace />;
+}
 
 export const Route = createFileRoute('/')({
-  // Filters, sort, layout, and the preview item are the URL (features/queue/search.ts).
-  validateSearch: queueRouteSearchSchema,
-  search: { middlewares: [stripSearchParams({ sort: 'queue', layout: 'table' })] },
-  component: QueuePage,
+  component: Home,
 });

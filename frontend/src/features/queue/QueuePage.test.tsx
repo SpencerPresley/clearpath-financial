@@ -38,7 +38,7 @@ beforeEach(() => {
 describe('QueuePage', () => {
   it('opens to My queue and says why it is empty, with the next action', async () => {
     serveItems([]);
-    const { router } = renderApp('/');
+    const { router } = renderApp('/queue');
     expect(await screen.findByRole('heading', { name: 'Nothing assigned to you' })).toBeInTheDocument();
     expect(await screen.findByText('4 unassigned items')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'My queue' })).toHaveAttribute('aria-pressed', 'true');
@@ -51,7 +51,7 @@ describe('QueuePage', () => {
 
   it('says no items match when filters narrow a view to nothing', async () => {
     serveItems([]);
-    renderApp(`/${searchString({ view: 'mine', mine: true, risk_tier: ['high'] })}`);
+    renderApp(`/queue${searchString({ view: 'mine', mine: true, risk_tier: ['high'] })}`);
     expect(await screen.findByRole('heading', { name: 'No items match these filters' })).toBeInTheDocument();
     expect(screen.getByText('Modified')).toBeInTheDocument();
   });
@@ -65,7 +65,7 @@ describe('QueuePage', () => {
         ),
       ),
     );
-    renderApp('/');
+    renderApp('/queue');
     expect(await screen.findByRole('heading', { name: "Couldn't load the queue" })).toBeInTheDocument();
     expect(screen.getByText('The queue is temporarily unavailable.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('QueuePage', () => {
     const [first, second] = rows;
     if (first === undefined || second === undefined) throw new Error('fixture needs two rows');
     server.use(getGetItemMockHandler(makeDetail(second)));
-    const { router } = renderApp('/');
+    const { router } = renderApp('/queue');
     await screen.findByText(first.title);
 
     await userEvent.keyboard('j');
@@ -112,7 +112,7 @@ describe('QueuePage', () => {
 
   it('opens the shortcuts help with ?', async () => {
     serveItems(queueRows());
-    renderApp('/');
+    renderApp('/queue');
     await screen.findByText('RateRadar lead-gen form copy');
     await act(async () => {
       await userEvent.keyboard('?');
@@ -122,7 +122,7 @@ describe('QueuePage', () => {
 
   it('switches to the board and keeps the filters in the URL', async () => {
     serveItems(queueRows());
-    const { router } = renderApp('/');
+    const { router } = renderApp('/queue');
     await screen.findByText('RateRadar lead-gen form copy');
     await userEvent.click(screen.getByRole('radio', { name: 'Board' }));
     expect(await screen.findByRole('grid', { name: 'Submitted' })).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('QueuePage', () => {
 
   it('keeps the filters in place while rows are selected', async () => {
     serveItems(queueRows());
-    renderApp('/');
+    renderApp('/queue');
     await screen.findByText('RateRadar lead-gen form copy');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select CP-1044' }));
     expect(await screen.findByRole('toolbar', { name: 'Bulk actions' })).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe('QueuePage', () => {
     const [first] = rows;
     if (first === undefined) throw new Error('fixture needs a row');
     server.use(getGetItemMockHandler(makeDetail(first)));
-    renderApp(`/?item=${String(first.id)}`);
+    renderApp(`/queue?item=${String(first.id)}`);
     await screen.findByRole('complementary', { name: `Preview ${first.key}` });
     expect(await screen.findByRole('columnheader', { name: 'Findings' })).toBeInTheDocument();
     for (const name of ['Risk', 'Partner', 'Assignee', 'Round']) {

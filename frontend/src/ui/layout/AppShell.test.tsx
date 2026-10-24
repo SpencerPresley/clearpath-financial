@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -61,6 +61,20 @@ describe('AppShell', () => {
     // Every section is a real page: no placeholder links.
     for (const link of within(nav).getAllByRole('link')) expect(link).toHaveAttribute('href');
     expect(within(nav).getByRole('link', { name: 'Outbox' })).toHaveAttribute('href', '/outbox');
+  });
+
+  it.each<[Role[], string]>([
+    [['reviewer'], 'Queue'],
+    [['lead', 'reviewer'], 'Queue'],
+    [['marketer'], 'My submissions'],
+    [['admin'], 'Import'],
+  ])('sends %j from "/" to %s', async (roles, section) => {
+    renderApp({ roles });
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    const link = await within(nav).findByRole('link', { name: section });
+    await waitFor(() => {
+      expect(link).toHaveAttribute('aria-current', 'page');
+    });
   });
 
   it('filters sections by the viewer roles', async () => {

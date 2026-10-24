@@ -188,7 +188,7 @@ export function WaitingRow({ summary, search }: { summary?: MetricsSummaryOut; s
         : summary.waiting.map((w) => (
             <Link
               key={w.more_than_days}
-              to="/"
+              to="/queue"
               search={{
                 waiting: w.more_than_days,
                 ...(search.product !== undefined && { product: [search.product] }),
