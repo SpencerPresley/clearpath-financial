@@ -21,6 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
 | J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
+| Fast-track/review polish | agent (worktree `fix/fast-track-polish`) | — | in progress | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
@@ -96,7 +97,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
-- Frontend follow-ups queue (next frontend polish agent): PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
+- Frontend follow-ups queue: items 1–5 taken by the fast-track/polish agent; remaining: adopt API-gaps contract in queue and /mine. Original list: PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
 - Deploy wave: prod settings require ANTHROPIC_API_KEY.
 
 - UI glossary nit for the wave walkthrough: status badge says "Re-review" while lane/view/stat say "Needs re-review"; pick one label (spec §5.4).
