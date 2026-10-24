@@ -1,0 +1,66 @@
+name: API contract
+
+# Fails when the committed OpenAPI schema or generated client drifts from the
+# backend. Fix locally with `make schema` and commit the result.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/openapi/**'
+      - 'frontend/src/api/generated/**'
+      - 'frontend/orval.config.ts'
+      - '.github/workflows/api-contract.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/openapi/**'
+      - 'frontend/src/api/generated/**'
+      - 'frontend/orval.config.ts'
+      - '.github/workflows/api-contract.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLEARPATH_ENV_FILE: ''
+      DJANGO_SECRET_KEY: ci-only-not-secret
+      POSTGRES_PASSWORD: unused-schema-export-does-not-connect
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.5'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Export OpenAPI schema
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run --frozen python manage.py export_openapi_schema \
+            --api config.api.api --output ../frontend/openapi/ninja.json --indent 2 --sorted
+      - name: Regenerate client
+        working-directory: frontend
+        run: npm ci && npm run generate:api
+      - name: Fail on drift
+        # Stage first so newly generated files (a new router tag -> a new folder) count as drift too.
+        run: |
+          git add -A -- frontend/openapi frontend/src/api/generated
+          git diff --cached --stat --exit-code -- frontend/openapi frontend/src/api/generated

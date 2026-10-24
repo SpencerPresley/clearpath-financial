@@ -151,13 +151,130 @@ Friction only where compliance requires it, which means only at the decision.
 ### Metrics come from the event log
 Time-in-queue and time-per-round are queries over the events, and the imported tracker's dates supply real history, so there's no placeholder data. They're built into the data model early and surfaced late, as a stats strip and an age column.
 
+## Workflow policies
+
+### Approval expiry
+No regulation sets how long an approval lasts. It's company policy, stored in an editable `ExpiryPolicy(channel, months)` table. Rate changes are already handled by the link between approvals and offer terms, so expiry only has to catch everything else: rule changes, and content nobody has touched.
+
+| Channel | Default | Why |
+|---|---|---|
+| One-off sends (email, SMS, direct mail drop) | End of the planned send window | The approval covers one send |
+| Evergreen owned (site pages, templates, call scripts) | 12 months | A yearly pass catches rule changes on content nobody edits |
+| Affiliate / partner placements, paid social | 6 months | The content sits outside our control and drifts |
+
+### Reviewer assignment: automatic, with claiming still allowed
+
+Each item is assigned by the first rule that applies:
+1. A resubmission or re-review goes back to the previous reviewer.
+2. Otherwise, it goes to the available reviewer with the lowest weighted open load (risk tier: high 3, medium 2, low 1). Ties go to whoever has gone longest without a new assignment.
+3. If nobody is eligible, the item goes to the unassigned pool and the lead is notified.
+
+Other rules:
+- **No per-user cap.** Load only ranks reviewers.
+- **Manual and bulk assignment by a lead skips automatic assignment.**
+- **Who can reassign:**
+  - leads and admins: anything, including in bulk
+  - reviewers: claim from the pool, or hand off their own items
+  - marketers: nothing
+- **Every assignment event records its reason**, e.g. "Dana: load 4 vs Sam 7".
+
+**Concurrency.** Assignment runs inside the submit transaction, under `pg_advisory_xact_lock(<ASSIGNMENT_KEY>)`. Load is computed after the lock is acquired. Under READ COMMITTED each statement gets a fresh snapshot, so the count sees the assignment the previous transaction just committed.
+- **Rejected: `SKIP LOCKED`.** It picks from a partial set. Dana is skipped and Sam gets the item at load 10 vs her 5. If every row is locked, the set is empty and the item lands in the pool for no reason.
+- **Rejected: row-level `FOR UPDATE`.** It works, but a lock on one advisory key can't deadlock on lock ordering.
+
+**Reviewer specialties are rejected.** They'd need a category list, someone to own it, and per-reviewer membership, which multiplies the conditionals. If they're ever wanted, `product` already exists on every item, so it would be one reviewer-to-products table.
+
+## Technical architecture
+
+### Data
+- **Postgres only.** Specific needs:
+  - transactions spanning decision + status + event
+  - a trigger that makes `event` append-only
+  - `EXCLUDE USING gist (product WITH =, effective_range WITH &&)` so exactly one terms version is in effect at any time
+  - a full-text `tsvector` generated column with a GIN index, plus `pg_trgm`
+  - JSONB for event payloads, fees, and saved views
+  - the LangGraph checkpointer (`langgraph-checkpoint-postgres`)
+- **Rejected: NoSQL.** JSONB already covers flexible payloads, and we'd lose joins, transactions spanning several rows, and constraints.
+- **State tables plus events, not event sourcing.** Each action is one service function that checks the transition, updates rows, and inserts the event in one transaction. Event sourcing would cost projections, replay, and versioning of event schemas, and nothing we need requires it.
+- **The event log doubles as the transactional outbox.** A dispatcher polls `event WHERE id > cursor` and enqueues side effects. If Redis goes down after a commit, nothing is lost, so Redis is disposable.
+- **Keys.** The primary key is a `bigint` identity. `CP-1042` is a display format derived from it. Imported Request IDs go in a separate unique `legacy_ref`.
+- **One `ItemFilter` schema** is shared by the queue API, saved views, export, and the assistant's tools.
+- **Indexes** are listed in `product-spec.md`. Proven with `EXPLAIN ANALYZE` against 50k seeded items. Most of the speed comes from avoiding N+1 queries, denormalized counts, and keyset pagination.
+
+### Search
+Lexical first:
+- `find_phrase` uses `ILIKE` / similarity backed by a trigram GIN index.
+- `search_text` uses `websearch_to_tsquery` with `ts_rank_cd`.
+
+`ts_rank_cd` isn't BM25, and BM25 isn't available to us: ParadeDB `pg_search` isn't in the RDS extension list. That's fine at our corpus size.
+
+Search returns ranked candidates, so a semantic channel can be fused in later with reciprocal rank fusion: pgvector 0.8.2 is on RDS for PG17. The case lexical search misses is paraphrase ("doesn't impact your credit" vs "won't hurt your score").
+
+### Checks
+- Code rules are pure functions.
+- LLM findings are rejected unless the quote sits exactly at `[start, end)` in the version text.
+- Tests:
+  - the span validator is a pure function, so most cases need no model
+  - `GenericFakeChatModel` (which emits `AIMessage` with `tool_calls`) feeds bad spans through the full path
+  - each rule-check row in the regs report becomes should-flag / shouldn't-flag fixtures
+
+### Stack
+- **Backend:**
+  - Django + django-ninja, with OpenAPI generating `ninja.json`
+  - Celery + Redis on the same server
+  - ASGI server, with SSE for assistant streaming
+  - **no Channels**: live queue updates come from React Query refetch-on-focus plus polling
+  - django-allauth in headless mode, with MFA
+  - uv + `pyproject.toml`; ruff; Pyrefly with django-stubs, with selectors returning typed dataclasses to cover Pyrefly's loose `annotate`/`values` typing
+  - pytest
+- **Frontend:**
+  - Vite + React + TypeScript
+  - Orval generating React Query hooks, zod schemas, and MSW handlers. CI fails if the regenerated spec or client differs from what's committed.
+  - TanStack Router (filters live in validated URL search params), Query, Table, Form, Charts, Markdown
+  - Tailwind v4 with tokens in one `@theme` file; the default palette is reset so only ClearPath tokens compile
+  - daisyUI with a custom theme
+  - React Aria Components for menus, comboboxes, popovers, and dialogs
+  - ESLint (type-aware `no-floating-promises`) + Prettier + `tsc --noEmit`
+  - Vitest / Testing Library / MSW / Playwright
+- **Rejected: the MUI Data Grid.** Column resizing *is* free, but multi-sort and multi-filter are Pro, and it brings a second styling system (Emotion). We sort and filter server-side anyway, so the deciding factor was one styling system.
+- **Layout:**
+  - backend: one Django app per domain, each with `models` / `services` (the only place state changes) / `selectors` / `api` / `schemas` / `tasks`
+  - frontend: `src/features/*`, `src/api` (generated), `src/ui`, `src/theme`
+
+### Hosting (AWS, Terraform)
+- **One CloudFront distribution:**
+  - the default path goes to the S3 frontend bucket, readable only by CloudFront
+  - `/api/*` and `/_allauth/*` go to the app server, so session cookies and CSRF are same-origin and there's no CORS
+  - SPA deep links are handled by a CloudFront Function on the S3 behavior only. Custom error responses apply to the whole distribution, so they would turn API 404s into `index.html`.
+- **App server:** EC2 in a private subnet with no public IP, reached through a **CloudFront VPC origin**.
+  - Outbound traffic (Anthropic API, image pulls) goes through a NAT gateway.
+  - Docker Compose on the server runs web, Celery worker and beat, Redis, and the outbox dispatcher. Postgres runs on RDS instead.
+- **Database:** RDS Postgres in private subnets, encrypted, accepting connections only from the app's security group.
+- **Edge security:** CloudFront geo restriction to the US, plus AWS WAF:
+  - managed rule sets: Common, KnownBadInputs, IP reputation
+  - a rate-based rule on login
+- **Server security:**
+  - no port 22; shell and deploys go through SSM
+  - IMDSv2 required
+  - secrets in SSM Parameter Store
+  - documents bucket encrypted and versioned, downloads only via presigned URLs issued after Django's permission check
+- **Deploy:**
+  1. GitHub-hosted runners build the images and push them to ECR.
+  2. The workflow assumes an IAM role via GitHub OIDC. The trust policy is pinned to `repo:SpencerPresley/clearpath-financial:environment:production`, and no AWS secret is stored in GitHub.
+  3. SSM Run Command runs `docker compose pull && up -d && migrate`.
+  4. `aws s3 sync` uploads the frontend, then a CloudFront invalidation.
+- **Rejected: a self-hosted runner on the server.** GitHub's hardening guide says self-hosted runners "should almost never be used for public repositories," because any PR author could run code on the prod box.
+
 ## Deliverables
 1. The app (hosted) and the repo
 2. This decisions doc
 3. A non-technical product doc for the compliance team: what the tool does, a day in the life of a reviewer and of a marketer. *Not yet written.*
 
-## Open questions
-- Stack (frontend, backend, database, hosting, job runner)
-- Content format: plain text plus an optional image mockup, or rendered PDF/HTML? Current default: text plus optional image. Consequence: layout rules like "12-point, bordered, front page" for the FCRA prescreen notice become human checklist items instead of code checks.
-- Default approval expiry per channel. Company policy; we'll pick a value.
-- How to assign reviewers: round-robin by product, or claim-from-queue?
+## Settled defaults
+- **Content format:** plain text plus an optional image mockup. Layout rules such as the FCRA prescreen notice's "12-point, bordered, front page" can't be checked in plain text, so they become human checklist items.
+
+- **Domain (added later):** a subdomain of `spencerpresley.com`, whose DNS is hosted at Squarespace, not Route 53. That takes two records added by hand in Squarespace:
+  - the ACM DNS-validation CNAME, for a certificate in us-east-1
+  - `clearpath` CNAME pointing to the distribution's `*.cloudfront.net` domain
+
+  Terraform outputs both record values. Until then, the default `*.cloudfront.net` address works.

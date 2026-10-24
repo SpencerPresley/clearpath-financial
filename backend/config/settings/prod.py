@@ -1,0 +1,13 @@
+from .base import *
+
+DEBUG = False
+
+# TLS terminates at CloudFront; the app sits behind it in a private subnet.
+SECURE_PROXY_SSL_HEADER = ("HTTP_CLOUDFRONT_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"

@@ -1,0 +1,90 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+env:
+  CLEARPATH_ENV_FILE: ''
+  DJANGO_SECRET_KEY: ci-only-not-secret
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: '5432'
+  POSTGRES_DB: clearpath
+  POSTGRES_USER: clearpath
+  POSTGRES_PASSWORD: clearpath-ci
+
+jobs:
+  static:
+    name: ${{ matrix.check.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - { name: Ruff lint, group: lint, run: ruff check . }
+          - { name: Ruff format, group: lint, run: ruff format --check . }
+          - { name: Pyrefly, group: typecheck, run: pyrefly check }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.5'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen --group ${{ matrix.check.group }}
+      - run: uv run --frozen --group ${{ matrix.check.group }} ${{ matrix.check.run }}
+
+  tests:
+    name: Tests and migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Same image as compose: the schema relies on btree_gist, pg_trgm, and later pgvector.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: clearpath
+          POSTGRES_USER: clearpath
+          POSTGRES_PASSWORD: clearpath-ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U clearpath -d clearpath"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.5'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen
+      - name: Migrations are in sync with models
+        run: uv run --frozen python manage.py makemigrations --check --dry-run
+      - name: Django system checks
+        run: uv run --frozen python manage.py check --fail-level WARNING
+      - name: Tests
+        run: uv run --frozen pytest -q

@@ -1,3 +1,30 @@
-.env.*
+# Secrets (the local .env is a 1Password-mounted pipe)
 .env
+.env.*
 !.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+backend/staticfiles/
+backend/media/
+celerybeat-schedule*
+
+# Node
+node_modules/
+frontend/dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

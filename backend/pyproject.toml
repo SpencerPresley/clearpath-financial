@@ -1,0 +1,66 @@
+[project]
+name = "clearpath-backend"
+version = "0.1.0"
+description = "ClearPath Financial marketing compliance review service"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "celery[redis]>=5.6.3",
+    "django>=6.1.2",
+    "django-allauth[mfa,socialaccount]>=65.20.1",
+    "django-ninja>=1.7.1",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.16.1",
+    "uvicorn>=0.54.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "factory-boy>=3.3.3",
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+]
+lint = [
+    "ruff>=0.17.2",
+]
+typecheck = [
+    "celery-types>=0.26.0",
+    "django-stubs>=6.1.2",
+    "pyrefly>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+addopts = ["--strict-markers"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "COM812", "ISC001",          # conflict with the formatter
+  "D",                         # docstrings reviewed by hand, not enforced
+  "CPY", "FIX002", "TD002", "TD003",
+  "TC001", "TC002", "TC003",   # ninja/pydantic need runtime annotations
+  "RUF012",                    # Django Meta / class attrs
+  "EM", "TRY003",              # messages at the raise site are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "PLR2004", "ANN", "ARG", "PLC0415"]
+"config/settings/*.py" = ["F405", "F403"]
+"**/api.py" = ["ARG001"]  # ninja passes request to every operation
+
+[tool.pyrefly]
+project-includes = ["config", "core"]
+project-excludes = ["**/migrations/**", "**/.venv/**", "**/__pycache__/**"]
+python-version = "3.13"
