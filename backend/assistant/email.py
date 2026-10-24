@@ -36,7 +36,7 @@ class EmailDraft:
     item_id: int | None
 
 
-def _at_domain(address: str) -> bool:
+def at_internal_domain(address: str) -> bool:
     local, at, domain = address.rpartition("@")
     return bool(local) and at == "@" and "@" not in local and domain == settings.ASSISTANT_EMAIL_DOMAIN.lower()
 
@@ -45,7 +45,7 @@ def allowed_recipients() -> frozenset[str]:
     """Active users' emails and the team aliases, limited to the exact internal domain."""
     users = User.objects.filter(is_active=True).values_list("email", flat=True)
     candidates = {e.lower() for e in users} | {a.lower() for a in settings.ASSISTANT_TEAM_ADDRESSES}
-    return frozenset(a for a in candidates if _at_domain(a))
+    return frozenset(a for a in candidates if at_internal_domain(a))
 
 
 def _bare_address(raw: str) -> str | None:
