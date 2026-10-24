@@ -6,6 +6,7 @@
 import type { Page, Route } from '@playwright/test';
 
 import type {
+  AttachmentOut,
   CheckPreviewIn,
   CheckPreviewOut,
   DecisionIn,
@@ -47,6 +48,8 @@ export interface StubOptions {
   findings?: FindingOut[];
   placements?: PlacementOut[];
   rows?: ItemRowOut[];
+  /** Item attachments; defaults to the rate sheet. */
+  attachments?: AttachmentOut[];
   /** Delay for POST /checks/preview, to capture the "checking" state. */
   previewDelayMs?: number;
 }
@@ -132,6 +135,27 @@ function preview(body: CheckPreviewIn): CheckPreviewOut {
   return { findings, terms_refs: [], ruleset_key: '2026-07-21:2026-10-24.3' };
 }
 
+/** A stand-in creative (kind `creative`), served as SVG so the review screen's mockup slot has something real. */
+export const MOCKUP_ATTACHMENT: AttachmentOut = {
+  ...ATTACHMENTS[0],
+  id: 72,
+  kind: 'creative',
+  original_name: 'fall-pl-social-1080.svg',
+  content_type: 'image/svg+xml',
+  size_bytes: 1_204,
+  download_url: '/api/attachments/72/download',
+};
+
+const MOCKUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="540" viewBox="0 0 540 540">
+<rect width="540" height="540" fill="#f4f1ea"/><rect x="0" y="380" width="540" height="160" fill="#1f3a5f"/>
+<text x="40" y="110" font-family="Georgia, serif" font-size="44" fill="#1f3a5f">Need cash fast?</text>
+<text x="40" y="170" font-family="Helvetica, Arial" font-size="26" fill="#333">Personal loans as low as 5.99% APR</text>
+<text x="40" y="215" font-family="Helvetica, Arial" font-size="20" fill="#555">Check your rate in 2 minutes</text>
+<rect x="40" y="260" width="200" height="56" rx="6" fill="#e2a03f"/>
+<text x="62" y="296" font-family="Helvetica, Arial" font-size="22" fill="#1f3a5f">Check my rate</text>
+<text x="40" y="470" font-family="Helvetica, Arial" font-size="16" fill="#fff">ClearPath Financial · Loans from $2,000 to $40,000</text>
+</svg>`;
+
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -188,7 +212,12 @@ export async function stubApi(page: Page, options: StubOptions = {}): Promise<St
       return json(route, created, 201);
     }
     if ((m = /^\/items\/\d+\/attachments$/.exec(path))) {
-      return method === 'GET' ? json(route, ATTACHMENTS) : json(route, ATTACHMENTS[0], 201);
+      return method === 'GET'
+        ? json(route, options.attachments ?? ATTACHMENTS)
+        : json(route, ATTACHMENTS[0], 201);
+    }
+    if (path === '/attachments/72/download') {
+      return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: MOCKUP_SVG });
     }
     if ((m = /^\/items\/\d+$/.exec(path))) return json(route, state.item);
     if ((m = /^\/items\/\d+\/findings$/.exec(path))) {

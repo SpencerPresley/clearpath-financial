@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import {
+  ATTACHMENTS,
   DECISION_APPROVED,
   FINDINGS_OPEN,
   dismissedAll,
@@ -15,7 +16,7 @@ import {
   triaged,
   versionFixture,
 } from '../src/test/fixtures/review';
-import { stubApi } from './stubApi';
+import { MOCKUP_ATTACHMENT, stubApi } from './stubApi';
 import type { StubOptions } from './stubApi';
 
 const OUT = '../docs/plan/reviews/ui/review';
@@ -100,6 +101,7 @@ const REVIEW_STATES: Record<
         live_placements_count: 1,
       },
       findings: triaged(FINDINGS_OPEN),
+      attachments: [...ATTACHMENTS, MOCKUP_ATTACHMENT],
     },
     url: '/items/1042?tab=history',
   },
