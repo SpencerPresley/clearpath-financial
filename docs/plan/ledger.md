@@ -21,7 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
 | J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
-| Fast-track/review polish | agent (worktree `fix/fast-track-polish`) | PR #33 | final change (required seen_versions) | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
+| Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
