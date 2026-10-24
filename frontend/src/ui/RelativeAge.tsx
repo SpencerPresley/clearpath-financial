@@ -41,12 +41,13 @@ export function RelativeAge({ at, now }: RelativeAgeProps) {
   }
   const age = formatAge(date, now ?? new Date());
   const absolute = absoluteFormat.format(date);
+  // role="img" + aria-label: the spoken name is the absolute time ("3d" reads badly), and RAC's
+  // Focusable requires an interactive or img role on a tooltip trigger.
   return (
     <Tooltip content={absolute}>
       <Focusable>
-        <time className="app-age" dateTime={date.toISOString()} tabIndex={0}>
-          <span aria-hidden="true">{age}</span>
-          <span className="sr-only">{absolute}</span>
+        <time className="app-age" dateTime={date.toISOString()} role="img" aria-label={absolute}>
+          {age}
         </time>
       </Focusable>
     </Tooltip>

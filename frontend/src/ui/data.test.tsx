@@ -70,7 +70,7 @@ describe('RelativeAge', () => {
     expect(time).toHaveAttribute('dateTime', '2026-10-21T12:00:00.000Z');
     expect(time).toHaveTextContent('3d');
     expect(time).toHaveClass('app-age'); // theme.css: tabular-nums, so ages align in columns
-    expect(screen.getByText(/Oct 2\d, 2026/)).toHaveClass('sr-only');
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/Oct 2\d, 2026/);
   });
 
   it('shows the absolute time as a tooltip on focus', async () => {

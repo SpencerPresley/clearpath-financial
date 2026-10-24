@@ -173,7 +173,11 @@
 
 @layer base {
   html {
-    @apply bg-base-200 font-sans text-ui text-base-content antialiased;
+    @apply bg-base-200 font-sans text-base-content antialiased;
+  }
+  /* The 13px UI size goes on body, not html: on html it would rescale every rem (spacing, radii). */
+  body {
+    @apply text-ui;
   }
 
   h1,
@@ -526,7 +530,13 @@
   }
 
   .app-main {
-    @apply overflow-auto px-6 py-5;
+    @apply overflow-auto px-6 py-5 outline-none;
+  }
+  .app-skip-link {
+    @apply sr-only;
+  }
+  .app-skip-link:focus {
+    @apply not-sr-only fixed top-2 left-2 z-50 rounded-md bg-base-100 px-3 py-1.5 text-ui font-medium text-primary shadow-overlay;
   }
   .app-page-title {
     @apply mb-1 text-lg font-semibold text-base-content;

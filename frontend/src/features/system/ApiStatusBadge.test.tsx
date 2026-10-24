@@ -8,27 +8,37 @@ import { server } from '../../test/server';
 import { ApiStatusBadge } from './ApiStatusBadge';
 
 describe('ApiStatusBadge', () => {
-  it('shows online when the health endpoint reports ok', async () => {
+  it('stays quiet when the health endpoint reports ok: named for screen readers only', async () => {
     server.use(getHealthMockHandler({ status: 'ok', database: true }));
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(await screen.findByText('API: online')).toBeInTheDocument();
+    const indicator = await screen.findByRole('img', { name: 'API online' });
+    expect(indicator).not.toHaveTextContent('API online'); // glyph only, no visible text
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('shows unavailable when the health endpoint fails', async () => {
+  it('shows nothing visible while the first check is in flight', () => {
+    server.use(getHealthMockHandler({ status: 'ok', database: true }));
+
+    renderWithQuery(<ApiStatusBadge />);
+
+    expect(screen.getByText('Checking API')).toHaveClass('sr-only');
+  });
+
+  it('alerts visibly when the health endpoint fails', async () => {
     server.use(http.get('*/api/health', () => HttpResponse.json({ detail: 'down' }, { status: 503 })));
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(await screen.findByText('API: unavailable')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('API unavailable');
   });
 
-  it('shows unavailable when the health endpoint reports a non-ok status', async () => {
+  it('alerts visibly when the health endpoint reports a non-ok status', async () => {
     server.use(getHealthMockHandler({ status: 'degraded', database: false }));
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(await screen.findByText('API: unavailable')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('API unavailable');
   });
 });
