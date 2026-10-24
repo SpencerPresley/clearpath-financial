@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FINDINGS_OPEN, triaged } from '../../test/fixtures/review';
+import { FINDINGS_OPEN, dismissedAll, triaged } from '../../test/fixtures/review';
 import { decisionGate } from './gate';
 
 const inReview = { status: 'in_review', llm_check_status: 'succeeded', current_version_n: 2 } as const;
@@ -19,10 +19,26 @@ describe('decisionGate', () => {
     ]);
   });
 
-  it('enables Approve once everything is triaged', () => {
-    const gate = decisionGate(inReview, triaged(FINDINGS_OPEN), 2);
+  it('enables Approve once everything is dismissed', () => {
+    const gate = decisionGate(inReview, dismissedAll(FINDINGS_OPEN), 2);
     expect(gate.approve).toEqual({ enabled: true, blockers: [] });
+    expect(gate.approveWithEdits).toEqual({ enabled: true, blockers: [] });
     expect(gate.overrideRequired).toBe(false);
+  });
+
+  it('sends accepted findings to Approve with edits: plain Approve would ship copy that must change', () => {
+    const gate = decisionGate(inReview, triaged(FINDINGS_OPEN), 2);
+    expect(gate.approve).toEqual({ enabled: false, blockers: ['2 accepted findings need a change'] });
+    expect(gate.approveWithEdits).toEqual({ enabled: true, blockers: [] });
+    expect(gate.acceptedCount).toBe(2);
+    expect(decisionGate(inReview, triaged(FINDINGS_OPEN.slice(0, 1)), 2).approve.blockers).toEqual([
+      '1 accepted finding needs a change',
+    ]);
+  });
+
+  it('blocks Approve with edits on the same conditions as Approve, except accepted findings', () => {
+    const gate = decisionGate({ ...inReview, llm_check_status: 'running' }, FINDINGS_OPEN.slice(0, 1), 2);
+    expect(gate.approveWithEdits.blockers).toEqual(['1 finding to triage', 'AI check running']);
   });
 
   it('blocks Approve while the AI check is queued or running', () => {
@@ -30,7 +46,7 @@ describe('decisionGate', () => {
       'AI check queued',
     ]);
     expect(
-      decisionGate({ ...inReview, llm_check_status: 'running' }, triaged(FINDINGS_OPEN), 2).approve,
+      decisionGate({ ...inReview, llm_check_status: 'running' }, dismissedAll(FINDINGS_OPEN), 2).approve,
     ).toEqual({ enabled: false, blockers: ['AI check running'] });
   });
 

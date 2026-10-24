@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { DecisionIn } from '../src/api/generated/model';
 import { stubApi } from './stubApi';
 
-test('a reviewer triages every finding by keyboard and approves', async ({ page }) => {
+test('a reviewer triages every finding by keyboard and requests the accepted changes', async ({ page }) => {
   const api = await stubApi(page);
   await page.goto('/items/1042');
 
@@ -34,18 +34,21 @@ test('a reviewer triages every finding by keyboard and approves', async ({ page 
   await expect(page.locator('#finding-9004')).toHaveAttribute('aria-current', 'true');
   await page.keyboard.press('a');
   await expect(page.getByText('findings to triage')).toHaveCount(0);
+  // Accepted findings are required changes, so a plain Approve stays off.
+  await expect(page.getByText('3 accepted findings need a change')).toBeVisible();
+  await expect(approve).toBeDisabled();
 
-  await approve.click();
-  await page.getByLabel('Reason').fill('Range and license line present.');
-  await page.getByRole('button', { name: 'Approve', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Request changes' }).click();
+  const changes = page.getByLabel('Changes needed');
+  await expect(changes).toHaveValue(/Rate claim needs the full APR range/);
+  await page.getByRole('button', { name: 'Request changes' }).last().click();
 
-  await expect(page.getByText('Approved v2 by Dana Reyes')).toBeVisible();
+  await expect(page.getByText(/Changes requested v2 by Dana Reyes/)).toBeVisible();
   const decision = api.posted.find((p) => p.path === '/items/1042/decisions');
   expect(decision?.body).toMatchObject({
-    outcome: 'approved',
+    outcome: 'changes_requested',
     version_n: 2,
-    reason: 'Range and license line present.',
-    evidence_attachment_ids: [71],
+    evidence_attachment_ids: [],
   } satisfies Partial<DecisionIn>);
 });
 

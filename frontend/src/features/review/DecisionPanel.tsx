@@ -21,7 +21,7 @@ import { Button } from '../../ui/Button';
 import type { ButtonVariant } from '../../ui/Button';
 import { ModalDialog } from '../../ui/Dialog';
 import { CheckboxField, TextAreaField } from '../../ui/forms/fields';
-import { apiErrorMessage } from '../../ui/forms/apiErrors';
+import { apiErrorBody, apiErrorMessage } from '../../ui/forms/apiErrors';
 import type { IconKey } from '../../ui/icons';
 import { ItemKey } from '../../ui/ItemKey';
 import { ATTACHMENT_KIND_LABELS, formatDate } from '../../ui/labels';
@@ -112,10 +112,15 @@ export interface DecisionPanelProps {
   gate: DecisionGate;
   findings: readonly FindingOut[];
   attachments: readonly AttachmentOut[];
-  /** Approve with edits: the reviewer's text (the panel posts it; the center pane edits it). */
+  /**
+   * Approve with edits: the reviewer's text (the panel posts it; the center pane edits it). Undefined when
+   * re-approving a reviewer-edit version after triaging its new findings (the text is already v+1).
+   */
   editedText?: string;
   onCancel: () => void;
   onDone: () => void;
+  /** The server kept the reviewer's v+1 but it has new findings to triage first (409 findings_need_triage). */
+  onNeedsTriage: (message: string) => void;
 }
 
 function LivePlacements({ itemId }: { itemId: number }) {
@@ -151,6 +156,7 @@ export function DecisionPanel({
   editedText,
   onCancel,
   onDone,
+  onNeedsTriage,
 }: DecisionPanelProps) {
   const queryClient = useQueryClient();
   const copy = MODES[mode];
@@ -166,7 +172,7 @@ export function DecisionPanel({
   const [errors, setErrors] = useState<{ reason?: string; override?: string; form?: string }>({});
   const [confirming, setConfirming] = useState(false);
 
-  const settle = (n: number) => {
+  const refresh = () => {
     for (const key of [
       getGetItemQueryKey(item.id),
       getListFindingsQueryKey(item.id),
@@ -177,6 +183,9 @@ export function DecisionPanel({
     ]) {
       void queryClient.invalidateQueries({ queryKey: key });
     }
+  };
+  const settle = (n: number) => {
+    refresh();
     showToast({
       title: `${copy.done} · v${String(n)}`,
       description: <ItemKey value={item.key} copyable={false} />,
@@ -185,6 +194,15 @@ export function DecisionPanel({
   };
   const fail = (error: unknown) => {
     setConfirming(false);
+    const code = apiErrorBody(error)?.code;
+    // The item moved on under us (a new version, or new findings on the reviewer's edit): reload it.
+    if (code === 'findings_need_triage' || code === 'stale_version') {
+      refresh();
+    }
+    if (code === 'findings_need_triage') {
+      onNeedsTriage(apiErrorMessage(error));
+      return;
+    }
     setErrors({ form: apiErrorMessage(error) });
   };
 
@@ -227,9 +245,13 @@ export function DecisionPanel({
   });
   const pending = record.isPending || fastTrack.isPending || reaffirm.isPending || pull.isPending;
 
+  const reapprovingEdit = mode === 'approved_with_edits' && editedText === undefined;
   const noEdits =
-    mode === 'approved_with_edits' && (editedText ?? '') === (item.current_version?.content_text ?? '');
-  const blocked = isApprove && !gate.approve.enabled;
+    mode === 'approved_with_edits' &&
+    !reapprovingEdit &&
+    editedText === (item.current_version?.content_text ?? '');
+  const actionGate = mode === 'approved_with_edits' ? gate.approveWithEdits : gate.approve;
+  const blocked = isApprove && !actionGate.enabled;
 
   const send = () => {
     const trimmed = reason.trim();
@@ -252,7 +274,8 @@ export function DecisionPanel({
             reason: trimmed,
             evidence_attachment_ids: isApprove ? evidence : [],
             llm_override_reason: isApprove && gate.overrideRequired ? override.trim() : null,
-            edited_content_text: mode === 'approved_with_edits' ? (editedText ?? '') : null,
+            // Re-approving a reviewer-edit version after triage posts no text (the text is already v+1).
+            edited_content_text: mode === 'approved_with_edits' ? (editedText ?? null) : null,
           },
         });
     }
@@ -291,7 +314,7 @@ export function DecisionPanel({
         }}
       >
         <h2 id="decision-panel-title" className="app-decision-panel-title">
-          {copy.title(titleN, nextN)}
+          {reapprovingEdit ? `Approve your edited v${String(currentN)}` : copy.title(titleN, nextN)}
         </h2>
         <div className="app-decision-fields">
           <TextAreaField
@@ -363,7 +386,7 @@ export function DecisionPanel({
           <Button variant="ghost" onPress={onCancel}>
             Cancel
           </Button>
-          {blocked && <span className="app-gate-note">{gate.approve.blockers.join(' · ')}</span>}
+          {blocked && <span className="app-gate-note">{actionGate.blockers.join(' · ')}</span>}
           {!blocked && noEdits && <span className="app-gate-note">No edits yet</span>}
           {errors.form !== undefined && (
             <span className="app-field-error" role="alert">

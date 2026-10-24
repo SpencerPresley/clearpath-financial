@@ -243,6 +243,17 @@ export function triaged(findings: readonly FindingOut[]): FindingOut[] {
   );
 }
 
+/** Every finding dismissed with a reason: the state in which a plain Approve is allowed. */
+export function dismissedAll(findings: readonly FindingOut[]): FindingOut[] {
+  return findings.map((finding) => ({
+    ...finding,
+    state: 'dismissed',
+    reason: 'Disclosed in the landing-page footer this ad links to.',
+    resolved_by: REVIEWER,
+    resolved_at: NOW,
+  }));
+}
+
 export const ATTACHMENTS: AttachmentOut[] = [
   {
     id: 71,

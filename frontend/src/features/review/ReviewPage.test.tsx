@@ -12,6 +12,7 @@ import { routeTree } from '../../routeTree.gen';
 import {
   DECISION_APPROVED,
   FINDINGS_OPEN,
+  dismissedAll,
   FINDING_CREDIT,
   FINDING_RATE,
   REVIEWER,
@@ -189,8 +190,8 @@ describe('ReviewPage', () => {
     expect(document.body.textContent).not.toMatch(/violation/i);
   });
 
-  it('approves once triaged, posting the reason and evidence', async () => {
-    const { posted } = renderReview({ findings: triaged(FINDINGS_OPEN) });
+  it('approves once everything is dismissed, posting the reason and evidence', async () => {
+    const { posted } = renderReview({ findings: dismissedAll(FINDINGS_OPEN) });
     await screen.findByRole('heading', { name: /Fall personal loan/ });
     await waitFor(() => {
       expect(approveButton()).toBeEnabled();
@@ -223,7 +224,7 @@ describe('ReviewPage', () => {
   it('requires an override reason to approve after the AI check failed, and offers Retry', async () => {
     const { posted } = renderReview({
       item: itemFixture({ llm_check_status: 'failed' }),
-      findings: triaged(FINDINGS_OPEN),
+      findings: dismissedAll(FINDINGS_OPEN),
     });
     await screen.findByText('AI check failed.');
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -242,6 +243,54 @@ describe('ReviewPage', () => {
     await waitFor(() => {
       expect(posted.at(-1)?.body).toMatchObject({
         llm_override_reason: 'Vendor outage; copy reviewed line by line.',
+      });
+    });
+  });
+
+  it('keeps plain Approve off while accepted findings need a change', async () => {
+    renderReview({ findings: triaged(FINDINGS_OPEN) });
+    expect(await screen.findByText('2 accepted findings need a change')).toBeInTheDocument();
+    expect(approveButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Approve with edits' })).toBeEnabled();
+  });
+
+  it('reloads and returns to triage when the edited version comes back with new findings', async () => {
+    const { posted } = renderReview({ findings: triaged(FINDINGS_OPEN) });
+    server.use(
+      http.post('*/api/items/:id/decisions', async ({ request }) => {
+        posted.push({ path: new URL(request.url).pathname, body: await request.json() });
+        return HttpResponse.json(
+          { code: 'findings_need_triage', message: 'v3 has 1 new finding. Triage it, then approve again.' },
+          { status: 409 },
+        );
+      }),
+    );
+    await screen.findByRole('heading', { name: /Fall personal loan/ });
+    await userEvent.keyboard('e');
+    await userEvent.type(await screen.findByLabelText('Edited copy (v3)'), ' Guaranteed.');
+    await userEvent.type(screen.getByLabelText(/^Reason/), 'Tightened the claim.');
+    await userEvent.click(screen.getByRole('button', { name: 'Approve edited version' }));
+    expect(
+      await screen.findByText('v3 has 1 new finding. Triage it, then approve again.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Edited copy (v3)')).not.toBeInTheDocument();
+  });
+
+  it('re-approves a reviewer-edit version without sending text again', async () => {
+    const { posted } = renderReview({
+      item: itemFixture({ current_version: versionFixture(2, { origin: 'reviewer_edit' }) }),
+      findings: dismissedAll(FINDINGS_OPEN),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve with edits' }));
+    expect(screen.getByRole('heading', { name: 'Approve your edited v2' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edited copy/)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/^Reason/), 'Edit triaged.');
+    await userEvent.click(screen.getByRole('button', { name: 'Approve edited version' }));
+    await waitFor(() => {
+      expect(posted[0]?.body).toMatchObject({
+        outcome: 'approved_with_edits',
+        version_n: 2,
+        edited_content_text: null,
       });
     });
   });
@@ -343,6 +392,20 @@ describe('ReviewPage', () => {
     renderReview({ item: itemFixture({ status: 'withdrawn' }), findings: [] });
     expect(await screen.findByText(/The marketer can start a new round/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  });
+
+  it('offers Claim on an unassigned item', async () => {
+    const { posted } = renderReview({ item: itemFixture({ status: 'submitted', assignee: null }) });
+    server.use(
+      http.post('*/api/items/:id/claim', ({ request }) => {
+        posted.push({ path: new URL(request.url).pathname, body: null });
+        return HttpResponse.json({});
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Claim' }));
+    await waitFor(() => {
+      expect(posted.map((p) => p.path)).toContain('/api/items/1042/claim');
+    });
   });
 
   it('hides decisions and triage from marketers', async () => {

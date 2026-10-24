@@ -1,10 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
+
+import { getGetItemHistoryQueryKey, getGetItemQueryKey, useClaimItem } from '../../api/generated/items/items';
 import type { ItemDetailOut } from '../../api/generated/model';
 import { RiskTierBadge, StatusBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
+import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { IconButton } from '../../ui/IconButton';
 import { ItemKey } from '../../ui/ItemKey';
 import { OUTCOME_LABELS, formatDate } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
+import { showToast } from '../../ui/toast';
 import { fastTrackAvailable } from './decisionModes';
 import type { DecisionMode } from './decisionModes';
 import type { DecisionGate } from './gate';
@@ -43,6 +48,21 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
   const pressed = (m: DecisionMode) => (mode === m ? true : undefined);
   const showDecisions = isDecider && gate.canDecide;
   const showRereview = isDecider && item.status === 'needs_rereview';
+  // Only the assignee (or a lead) may decide; an unassigned item is claimed first (decisions.md, assignment).
+  const showClaim =
+    isDecider && item.assignee === null && (item.status === 'submitted' || item.status === 'needs_rereview');
+  const queryClient = useQueryClient();
+  const claim = useClaimItem({
+    mutation: {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getGetItemQueryKey(item.id) });
+        void queryClient.invalidateQueries({ queryKey: getGetItemHistoryQueryKey(item.id) });
+      },
+      onError: (error) => {
+        showToast({ title: 'Not claimed', description: apiErrorMessage(error), tone: 'error' });
+      },
+    },
+  });
 
   return (
     <header className="app-decision-bar">
@@ -62,6 +82,17 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
         </div>
       </div>
       <div className="app-decision-bar-actions">
+        {showClaim && (
+          <Button
+            icon="action.assign"
+            isDisabled={claim.isPending}
+            onPress={() => {
+              claim.mutate({ itemId: item.id });
+            }}
+          >
+            Claim
+          </Button>
+        )}
         {showDecisions && (
           <>
             {!gate.approve.enabled && (

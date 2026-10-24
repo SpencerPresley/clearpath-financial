@@ -9,6 +9,7 @@ import type { Page } from '@playwright/test';
 import {
   DECISION_APPROVED,
   FINDINGS_OPEN,
+  dismissedAll,
   PLACEMENTS,
   itemRowFixture,
   triaged,
@@ -69,7 +70,7 @@ const REVIEW_STATES: Record<
     },
   },
   'review-all-triaged': {
-    options: { findings: triaged(FINDINGS_OPEN) },
+    options: { findings: dismissedAll(FINDINGS_OPEN) },
     before: async (page) => {
       await page.getByRole('button', { name: 'Approve', exact: true }).click();
       await page

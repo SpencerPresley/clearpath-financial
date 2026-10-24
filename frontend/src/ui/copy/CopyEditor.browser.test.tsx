@@ -35,7 +35,8 @@ it('grows with the copy and keeps the highlight layer the same size as the text'
   await page.viewport(1280, 800);
   const screen = await render(<Harness />);
   const textarea = screen.getByLabelText('Copy').element() as HTMLTextAreaElement;
-  const backdrop = document.querySelector('.app-copy-backdrop') as HTMLElement;
+  const backdrop = document.querySelector<HTMLElement>('.app-copy-backdrop');
+  if (backdrop === null) throw new Error('no highlight backdrop');
 
   const check = () => {
     expect(textarea.scrollHeight).toBeLessThanOrEqual(textarea.clientHeight + 1);

@@ -11,6 +11,7 @@ import { flattenGroups, groupFindings } from '../../ui/findings/groupFindings';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { useViewer } from '../../ui/layout/Viewer';
 import { SkeletonBadge, SkeletonText } from '../../ui/Skeleton';
+import { showToast } from '../../ui/toast';
 import { useHotkeys } from '../../ui/useHotkeys';
 import { CopyPane } from './CopyPane';
 import { DecisionBar } from './DecisionBar';
@@ -100,7 +101,10 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
     item !== undefined && isDecider && data.viewingCurrent && TRIAGE_STATUSES.includes(item.status);
 
   // Approve with edits: the reviewer's draft gets the same live code checks as intake.
-  const editing = mode === 'approved_with_edits' && item !== undefined;
+  // A reviewer-edit current version in review means the reviewer's v+1 came back with findings to triage;
+  // Approve with edits then re-approves it as is (no new editor).
+  const reapprovingEdit = item?.current_version?.origin === 'reviewer_edit';
+  const editing = mode === 'approved_with_edits' && item !== undefined && !reapprovingEdit;
   const liveInput: CheckPreviewIn | null =
     editing && item.current_version !== null
       ? {
@@ -147,7 +151,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
     if (next !== undefined) activate(next.id);
   };
   const openMode = (next: DecisionMode) => {
-    if (next === 'approved_with_edits' && item?.current_version) {
+    if (next === 'approved_with_edits' && item?.current_version && !reapprovingEdit) {
       setEditText(item.current_version.content_text);
       setShowEditDiff(false);
     }
@@ -254,6 +258,12 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
             onDone={() => {
               setMode(null);
               onSearchChange({ v: undefined, compare: undefined });
+            }}
+            onNeedsTriage={(message) => {
+              setMode(null);
+              setActiveId(null);
+              onSearchChange({ v: undefined, compare: undefined, tab: undefined });
+              showToast({ title: 'Your edit has new findings', description: message });
             }}
           />
         )}
