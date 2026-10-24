@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "exports",
     "metrics",
     "assistant",
+    "drift",
 ]
 
 MIDDLEWARE = [
@@ -229,3 +230,8 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# --- Fetching pages (drift.fetcher) ---
+# Exact "host:port" origins exempt from the fetcher's private-address and port rules. Empty everywhere except dev
+# (config/settings/dev.py), where the local stack fetches its own demo partner pages.
+DRIFT_FETCH_PRIVATE_ORIGINS: list[str] = []
