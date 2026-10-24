@@ -21,8 +21,7 @@ import { wordDiff } from '../../ui/copy/wordDiff';
 import { SelectField } from '../../ui/forms/fields';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
-import { ORIGIN_LABELS, plural } from '../../ui/labels';
-import { RelativeAge } from '../../ui/RelativeAge';
+import { ORIGIN_LABELS, formatDate, plural } from '../../ui/labels';
 import { SkeletonText } from '../../ui/Skeleton';
 import { findingMessageId } from './FindingCard';
 
@@ -117,7 +116,7 @@ function LiveDiffView({ diff }: { diff: LiveDiff }) {
   return (
     <div className="app-copy-sheet">
       <p className="app-copy-caption">
-        {liveLabel(diff)} · {diff.location} · checked <RelativeAge at={diff.checkedAt} />:{' '}
+        {liveLabel(diff)} · {diff.location} · checked {formatDate(diff.checkedAt)} ·{' '}
         {changes === 0 ? 'no changes' : plural(changes, 'change')}
       </p>
       <DiffText segments={diff.segments} />
