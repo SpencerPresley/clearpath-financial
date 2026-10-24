@@ -6,7 +6,10 @@ import type {
   AttachmentKind,
   Channel,
   DecisionOutcome,
+  FindingState,
   Market,
+  PartnerStatus,
+  PartnerType,
   Product,
   ReopenReason,
   VersionOrigin,
@@ -63,6 +66,26 @@ export const OUTCOME_LABELS: Record<DecisionOutcome, string> = {
   approved_with_edits: 'Approved with edits',
   changes_requested: 'Changes requested',
   rejected: 'Rejected',
+};
+
+export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
+  affiliate: 'Affiliate',
+  lead_gen: 'Lead gen',
+  marketplace: 'Marketplace',
+  influencer: 'Influencer',
+};
+
+/** A partner's standing with ClearPath: an attribute, shown without a status color (spec §5.2). */
+export const PARTNER_STATUS_LABELS: Record<PartnerStatus, string> = {
+  active: 'Active',
+  paused: 'Paused',
+  terminated: 'Terminated',
+};
+
+export const FINDING_STATE_LABELS: Record<FindingState, string> = {
+  open: 'Open',
+  accepted: 'Accepted',
+  dismissed: 'Dismissed',
 };
 
 /** Channels that require a partner (backend core.domain.PARTNER_CHANNELS). */
