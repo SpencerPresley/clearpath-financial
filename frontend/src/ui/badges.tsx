@@ -57,6 +57,26 @@ export function StatusBadge({ status }: { status: ItemStatus }) {
   return <Badge meta={STATUS_META[status]} />;
 }
 
+/**
+ * Icon-only status for dense cells (board cards, narrow columns), spec §5.2a: tone + glyph, named by its label
+ * for assistive tech and by `title` on hover. No tooltip trigger: inside a keyboard-navigated row a per-cell
+ * tab stop would break j/k navigation, so the row is the tab stop and this is announced with it.
+ */
+export function StatusMark({ status }: { status: ItemStatus }) {
+  const meta = STATUS_META[status];
+  return (
+    <span
+      role="img"
+      aria-label={meta.label}
+      title={meta.label}
+      className="app-status-mark"
+      data-tone={meta.tone}
+    >
+      <Icon name={meta.icon} size={14} />
+    </span>
+  );
+}
+
 export function SeverityBadge({ severity }: { severity: Severity }) {
   return <Badge meta={SEVERITY_META[severity]} />;
 }
@@ -71,6 +91,15 @@ export function SourceTag({ source }: { source: FindingSource }) {
   );
 }
 
-export function RiskTierBadge({ tier }: { tier: RiskTier }) {
-  return <Badge meta={{ ...RISK_META[tier], tone: 'neutral' }} className="app-badge app-badge-outline" />;
+const RISK_SHORT: Record<RiskTier, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+
+/** `short` drops "risk" from the label where a column header already says Risk (dense tables). */
+export function RiskTierBadge({ tier, short = false }: { tier: RiskTier; short?: boolean }) {
+  const meta = { ...RISK_META[tier], tone: 'neutral' as const };
+  return (
+    <Badge
+      meta={short ? { ...meta, label: RISK_SHORT[tier] } : meta}
+      className="app-badge app-badge-outline"
+    />
+  );
 }

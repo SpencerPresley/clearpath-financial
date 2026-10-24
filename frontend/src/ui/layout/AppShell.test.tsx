@@ -6,27 +6,42 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
+import { getItemsMock } from '../../api/generated/items/items.msw';
+import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
+import { getPartnersMock } from '../../api/generated/partners/partners.msw';
+import { getUsersMock } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
 import { server } from '../../test/server';
 import type { Role } from '../domain';
 import { NAV_COLLAPSED_KEY } from './AppShell';
-import { ViewerProvider } from './Viewer';
 
-function renderApp({ roles, path = '/' }: { roles?: readonly Role[]; path?: string } = {}) {
+const ALL_ROLES: Role[] = ['marketer', 'reviewer', 'lead', 'admin'];
+
+function renderApp({ roles = ALL_ROLES, path = '/' }: { roles?: Role[]; path?: string } = {}) {
+  // The shell's viewer comes from GET /api/me (SessionGate in the root route). The index route is the queue;
+  // its lists get the generated mocks (these tests assert on the shell, not on queue data).
+  server.use(
+    ...getItemsMock(),
+    ...getUsersMock(),
+    ...getPartnersMock(),
+    getGetMeMockHandler({
+      id: 1,
+      display_name: 'Test User',
+      email: 'test@clearpath.test',
+      roles,
+      effective_roles: roles,
+      is_available: true,
+    }),
+  );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
     context: { queryClient },
   });
-  const app = <RouterProvider router={router} />;
   return render(
     <QueryClientProvider client={queryClient}>
-      {roles === undefined ? (
-        app
-      ) : (
-        <ViewerProvider viewer={{ name: 'Test User', roles, isDemo: false }}>{app}</ViewerProvider>
-      )}
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -68,14 +83,41 @@ describe('AppShell', () => {
     expect(search).toHaveAttribute('placeholder', 'Search (soon)');
   });
 
-  it('opens the account panel and says plainly that sign-in is not wired yet', async () => {
+  it('opens the account panel with the signed-in user, roles, and sign out', async () => {
+    const user = userEvent.setup();
+    renderApp({ roles: ['lead', 'reviewer'] });
+    await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
+    const panel = await screen.findByRole('dialog', { name: 'Account' });
+    expect(panel).toHaveTextContent('test@clearpath.test');
+    expect(panel).toHaveTextContent('Compliance lead, Reviewer');
+    expect(within(panel).getByRole('button', { name: 'Sign out' })).toBeEnabled();
+  });
+
+  it('signs out and returns to the sign-in form', async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(await screen.findByRole('button', { name: /Demo user/ }));
-    const panel = await screen.findByRole('dialog', { name: 'Account' });
-    expect(panel).toHaveTextContent('No sign-in yet');
-    // No inert "Sign out": the action doesn't exist until accounts do.
-    expect(within(panel).queryByText('Sign out')).toBeNull();
+    let signedIn = true;
+    server.use(
+      http.delete('*/_allauth/browser/v1/auth/session', () => {
+        signedIn = false;
+        return HttpResponse.json({ status: 401 }, { status: 401 });
+      }),
+      http.get('*/api/me', () =>
+        signedIn
+          ? HttpResponse.json({
+              id: 1,
+              display_name: 'Test User',
+              email: 'test@clearpath.test',
+              roles: ['reviewer'],
+              effective_roles: ['reviewer'],
+              is_available: true,
+            })
+          : HttpResponse.json({ code: 'not_authenticated', message: 'Sign in.' }, { status: 401 }),
+      ),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
   });
 
   it('keeps unbuilt sections reachable by keyboard and named in the collapsed rail', async () => {

@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
+import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
 import type { DecisionIn, FindingOut } from '../../api/generated/model';
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
@@ -23,8 +24,8 @@ import {
 import { reviewHandlers } from '../../test/fixtures/reviewHandlers';
 import type { ReviewHandlerOptions } from '../../test/fixtures/reviewHandlers';
 import { server } from '../../test/server';
+import { ROLES } from '../../ui/domain';
 import type { Role } from '../../ui/domain';
-import { ViewerProvider } from '../../ui/layout/Viewer';
 
 interface Posted {
   path: string;
@@ -91,15 +92,19 @@ function renderReview(
     context: { queryClient },
   });
   const app = <RouterProvider router={router} />;
-  render(
-    <QueryClientProvider client={queryClient}>
-      {options.roles === undefined ? (
-        app
-      ) : (
-        <ViewerProvider viewer={{ name: 'T', roles: options.roles, isDemo: false }}>{app}</ViewerProvider>
-      )}
-    </QueryClientProvider>,
+  // The root route resolves the viewer from GET /api/me (SessionGate); default to every role.
+  const roles = options.roles ?? ROLES;
+  server.use(
+    getGetMeMockHandler({
+      id: 1,
+      display_name: 'T',
+      email: 't@clearpath.demo',
+      roles: [...roles],
+      effective_roles: [...roles],
+      is_available: true,
+    }),
   );
+  render(<QueryClientProvider client={queryClient}>{app}</QueryClientProvider>);
   return { posted, router };
 }
 

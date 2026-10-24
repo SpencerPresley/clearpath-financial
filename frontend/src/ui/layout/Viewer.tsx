@@ -1,33 +1,32 @@
 /*
- * Who is using the app, as far as the shell needs to know (name for the user menu, roles for the nav).
- *
- * There is no session/current-user endpoint yet, so the default viewer is an explicit demo viewer with
- * all four roles, and the user menu says so. When /api/me lands, the root route provides the real
- * viewer through ViewerProvider and DEMO_VIEWER goes away.
+ * Who is using the app, as far as the UI needs to know: id (ownership checks), name for the user menu, and
+ * effective roles for the nav and role-gated controls. SessionGate (root route) resolves it from GET /api/me.
  */
 import { createContext, use } from 'react';
 import type { ReactNode } from 'react';
 
-import { ROLES } from '../domain';
 import type { Role } from '../domain';
 
 export interface Viewer {
+  id: number;
   name: string;
+  email: string;
+  /** Effective roles (granted plus implied: a lead is also a reviewer). */
   roles: readonly Role[];
-  /** True until real sign-in exists; the user menu shows it. */
-  isDemo: boolean;
 }
 
-export const DEMO_VIEWER: Viewer = { name: 'Demo user', roles: ROLES, isDemo: true };
-
-const ViewerContext = createContext<Viewer>(DEMO_VIEWER);
+const ViewerContext = createContext<Viewer | null>(null);
 
 export function ViewerProvider({ viewer, children }: { viewer: Viewer; children: ReactNode }) {
   return <ViewerContext value={viewer}>{children}</ViewerContext>;
 }
 
 export function useViewer(): Viewer {
-  return use(ViewerContext);
+  const viewer = use(ViewerContext);
+  if (viewer === null) {
+    throw new Error('useViewer needs a ViewerProvider (SessionGate provides it in the app).');
+  }
+  return viewer;
 }
 
 export function initialsOf(name: string): string {

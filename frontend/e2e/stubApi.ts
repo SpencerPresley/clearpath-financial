@@ -55,6 +55,8 @@ export interface StubOptions {
   attachments?: AttachmentOut[];
   /** Delay for POST /checks/preview, to capture the "checking" state. */
   previewDelayMs?: number;
+  /** The signed-in viewer's roles (GET /api/me, read by the root route's SessionGate); defaults to all four. */
+  roles?: string[];
 }
 
 const USERS: UserOut[] = [
@@ -191,6 +193,17 @@ export async function stubApi(page: Page, options: StubOptions = {}): Promise<St
 
     let m: RegExpMatchArray | null;
     if (path === '/health') return json(route, { status: 'ok', database: true });
+    if (path === '/me') {
+      const roles = options.roles ?? ['marketer', 'reviewer', 'lead', 'admin'];
+      return json(route, {
+        id: REVIEWER.id,
+        display_name: REVIEWER.name,
+        email: 'reviewer@clearpath.demo',
+        roles,
+        effective_roles: roles,
+        is_available: true,
+      });
+    }
     if (path === '/users') return json(route, USERS);
     if (path === '/partners') return json(route, []);
     if (path === '/checks/preview') {

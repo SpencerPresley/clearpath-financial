@@ -1491,3 +1491,578 @@
     translate: 300% 0;
   }
 }
+
+/* ---- Queue (workstream H part 2: table, filters, board, preview drawer) ----------------------------- */
+@theme static {
+  /* Selected rows and active chips: near-neutral (chroma <= 0.006, like nav-active) so selection never reads as
+     the info-blue "In review" tint (§5.2). The navy carriers are the checkbox, the chip border, and the row bar. */
+  --color-selected: oklch(95% 0.005 258);
+  --color-selected-hover: oklch(93% 0.006 258);
+}
+
+@layer components {
+  /* Icon-only status for dense cells: tone carried by glyph color, label by aria-label/title. */
+  .app-status-mark {
+    @apply inline-flex size-5 items-center justify-center rounded-sm border;
+  }
+  .app-status-mark[data-tone='neutral'] {
+    @apply border-status-neutral-line bg-status-neutral-soft text-status-neutral-soft-content;
+  }
+  .app-status-mark[data-tone='info'] {
+    @apply border-status-info-line bg-status-info-soft text-status-info-soft-content;
+  }
+  .app-status-mark[data-tone='warning'] {
+    @apply border-status-warning-line bg-status-warning-soft text-status-warning-soft-content;
+  }
+  .app-status-mark[data-tone='success'] {
+    @apply border-status-success-line bg-status-success-soft text-status-success-soft-content;
+  }
+  .app-status-mark[data-tone='error'] {
+    @apply border-status-error-line bg-status-error-soft text-status-error-soft-content;
+  }
+  .app-status-mark[data-tone='alert'] {
+    @apply border-status-alert bg-status-alert text-status-alert-content;
+  }
+
+  /* ---- Page frame: header rows fixed, the data region scrolls (sticky table header inside it). ---- */
+  .app-queue {
+    @apply flex h-full min-h-0 flex-col gap-3;
+  }
+  .app-queue-body {
+    @apply flex min-h-0 flex-1 gap-3;
+  }
+  .app-queue-region {
+    @apply relative min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-queue-region[aria-busy='true'] .app-table tbody {
+    opacity: 0.6;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+
+  /* ---- Table ----------------------------------------------------------------------------------- */
+  .app-table {
+    @apply w-full table-fixed border-separate border-spacing-0 text-ui;
+  }
+  .app-th {
+    @apply sticky top-0 z-10 h-8 border-b border-base-300 bg-base-100 px-2 text-left text-meta font-medium whitespace-nowrap text-muted select-none;
+  }
+  .app-th-label {
+    @apply inline-flex h-6 items-center;
+  }
+  .app-th-sort {
+    @apply -mx-1 inline-flex h-6 cursor-default items-center gap-1 rounded-sm px-1 font-medium text-muted;
+    transition-property: background-color, color;
+    transition-duration: 120ms;
+  }
+  .app-th-sort:hover {
+    @apply bg-hover text-base-content;
+  }
+  .app-th[aria-sort] .app-th-sort {
+    @apply text-base-content;
+  }
+  .app-th-sort:hover .app-th-sort-icon,
+  .app-th-sort:focus-visible .app-th-sort-icon {
+    opacity: 1;
+  }
+  /* Sortable headers show a dim glyph at rest so it's clear which 2 of the headers sort. */
+  .app-th-sort-icon[data-idle] {
+    opacity: 0.4;
+  }
+  .app-th-sort-icon {
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  /* Resize grip: an 8px hit area on the column edge; the 2px rule shows on hover and while dragging. */
+  .app-th-resize {
+    @apply absolute top-0 -right-1 z-20 h-full w-2 cursor-col-resize touch-none;
+  }
+  .app-th-resize::after {
+    content: '';
+    @apply absolute inset-y-1.5 left-[3px] w-0.5 rounded-xs bg-transparent;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-th:hover .app-th-resize::after {
+    @apply bg-base-300;
+  }
+  .app-th[data-resizing] .app-th-resize::after,
+  .app-th-resize:hover::after {
+    @apply bg-primary;
+  }
+
+  .app-tr {
+    @apply h-row cursor-default outline-none;
+  }
+  .app-tr > .app-td {
+    @apply border-b border-base-300;
+  }
+  .app-tr:hover > .app-td {
+    @apply bg-hover;
+  }
+  .app-tr[data-selected] > .app-td {
+    @apply bg-selected;
+  }
+  .app-tr[data-selected]:hover > .app-td {
+    @apply bg-selected-hover;
+  }
+  /* The active row (roving tab stop, drawer target): a navy bar on the leading edge, like the nav. */
+  .app-tr[data-active] > .app-td:first-child {
+    box-shadow: inset 2px 0 0 var(--color-primary);
+  }
+  .app-tr:focus-visible > .app-td {
+    @apply border-y-focus;
+  }
+  .app-tr:focus-visible > .app-td:first-child {
+    box-shadow:
+      inset 2px 0 0 var(--color-focus),
+      inset 0 2px 0 var(--color-focus),
+      inset 0 -2px 0 var(--color-focus);
+  }
+  .app-tr:focus-visible > .app-td:not(:first-child):not(:last-child) {
+    box-shadow:
+      inset 0 2px 0 var(--color-focus),
+      inset 0 -2px 0 var(--color-focus);
+  }
+  .app-tr:focus-visible > .app-td:last-child {
+    box-shadow:
+      inset -2px 0 0 var(--color-focus),
+      inset 0 2px 0 var(--color-focus),
+      inset 0 -2px 0 var(--color-focus);
+  }
+  .app-td {
+    @apply overflow-hidden px-2 align-middle text-ellipsis whitespace-nowrap;
+  }
+  .app-td[data-column='select'],
+  .app-th[data-column='select'] {
+    @apply p-0;
+  }
+  /* The whole select cell is the checkbox's hit area (36x36), not the 14px box (WCAG 2.5.8). */
+  .app-check-hit {
+    @apply flex h-[calc(var(--spacing-row)-1px)] w-full cursor-default items-center pl-3;
+  }
+  .app-cell-title {
+    @apply block truncate text-base-content;
+  }
+  .app-check {
+    @apply size-3.5 align-middle;
+    accent-color: var(--color-primary);
+  }
+  .app-findings-count {
+    @apply inline-flex items-center gap-1 text-base-content;
+  }
+  .app-findings-count[data-zero] {
+    @apply text-muted;
+  }
+  .app-findings-count[data-zero] .app-icon {
+    opacity: 0.5;
+  }
+  .app-tags {
+    @apply flex items-center gap-1 overflow-hidden;
+  }
+  .app-tag {
+    @apply inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border border-base-300 bg-base-200 px-1.5 text-meta text-base-content;
+  }
+
+  /* ---- Inline edits: the value is the control; a caret and hover fill say it's editable. ------- */
+  .app-cell-control {
+    @apply inline-flex max-w-full;
+  }
+  .app-cell-edit {
+    @apply -mx-1 inline-flex h-7 max-w-full min-w-0 cursor-default items-center gap-1 rounded-md px-1 outline-none;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-cell-edit[data-hovered],
+  .app-cell-edit[data-pressed] {
+    @apply bg-hover;
+  }
+  .app-cell-edit-wide {
+    @apply w-full justify-start;
+  }
+  .app-cell-edit-caret {
+    @apply text-muted opacity-0;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-cell-edit[data-hovered] .app-cell-edit-caret,
+  .app-cell-edit[data-focus-visible] .app-cell-edit-caret,
+  .app-tr[data-active] .app-cell-edit-caret {
+    opacity: 1;
+  }
+  .app-cell-edit-hint {
+    @apply text-muted opacity-0;
+  }
+  .app-cell-edit[data-hovered] .app-cell-edit-hint,
+  .app-cell-edit[data-focus-visible] .app-cell-edit-hint {
+    opacity: 1;
+  }
+  .app-tag-editor {
+    @apply flex flex-col gap-2;
+  }
+  .app-tag-remove.app-btn {
+    @apply size-4 w-4 rounded-xs;
+  }
+  .app-input {
+    @apply h-8 w-full rounded-md border border-base-300 bg-base-100 px-2 text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-input[data-focused] {
+    @apply border-focus;
+  }
+  .app-input[data-invalid] {
+    @apply border-status-error;
+  }
+  .app-field-error {
+    @apply text-meta text-status-error-soft-content;
+  }
+  .app-textarea {
+    @apply min-h-16 w-full resize-y rounded-md border border-base-300 bg-base-100 px-2 py-1.5 text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-textarea[data-focused] {
+    @apply border-focus;
+  }
+
+  /* ---- Page header: title + counts, views, filters --------------------------------------------- */
+  .app-queue-head {
+    @apply flex flex-wrap items-end justify-between gap-x-6 gap-y-2;
+  }
+  .app-queue-title {
+    @apply text-lg leading-7 font-semibold text-base-content;
+  }
+  /* min-h holds the two-line height when counts fail, so the rows below don't move (§5.3). */
+  .app-stats {
+    @apply flex min-h-12 items-stretch gap-px text-ui;
+  }
+  .app-stats > .app-inline-error {
+    @apply self-center;
+  }
+  .app-stat {
+    @apply flex flex-col items-start justify-center rounded-md px-2.5 py-0.5 text-left;
+  }
+  .app-stat + .app-stat {
+    box-shadow: -1px 0 0 var(--color-base-300);
+  }
+  .app-stat-btn {
+    @apply cursor-default;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-stat-btn:hover:not(:disabled) {
+    @apply bg-hover;
+  }
+  .app-stat-btn[data-active] .app-stat-label {
+    @apply text-primary;
+  }
+  .app-stat-figure {
+    @apply text-base leading-6 font-semibold text-base-content tabular-nums;
+  }
+  .app-stat-btn[data-alert] .app-stat-figure {
+    @apply text-status-alert-soft-content;
+  }
+  .app-stat-label {
+    @apply text-meta whitespace-nowrap text-muted;
+  }
+
+  /* One line at every width: tabs scroll sideways before the toolbar wraps under them (§5.3). */
+  .app-view-bar {
+    @apply flex min-h-8 min-w-0 flex-nowrap items-center gap-2;
+  }
+  .app-view-tabs {
+    @apply flex min-w-0 shrink items-center gap-0.5 overflow-x-auto p-px;
+    scrollbar-width: none;
+  }
+  .app-view-tab {
+    @apply inline-flex h-7 cursor-default items-center rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap text-muted;
+    transition-property: background-color, color, border-color;
+    transition-duration: 120ms;
+  }
+  .app-view-tab[data-hovered] {
+    @apply bg-hover text-base-content;
+  }
+  .app-view-tab[data-selected] {
+    @apply border-base-300 bg-base-100 font-medium text-base-content;
+  }
+  .app-view-sep {
+    @apply mx-1.5 h-4 w-px bg-base-300;
+  }
+  .app-view-saved {
+    @apply inline-flex items-center;
+  }
+  .app-view-modified {
+    @apply shrink-0 text-meta whitespace-nowrap text-muted italic;
+  }
+  .app-view-group {
+    @apply flex min-w-0 shrink items-center gap-2;
+  }
+  .app-view-actions {
+    @apply flex shrink-0 items-center gap-1;
+  }
+  .app-inline-error {
+    @apply inline-flex items-center gap-1.5 text-meta text-status-error-soft-content;
+  }
+
+  .app-toolbar-end {
+    @apply ml-auto flex shrink-0 items-center gap-1;
+  }
+  .app-segmented {
+    @apply inline-flex rounded-md border border-base-300 bg-base-100 p-0.5;
+  }
+  .app-segmented-item {
+    @apply inline-flex h-6 cursor-default items-center gap-1.5 rounded-xs px-2 text-ui text-muted;
+    transition-property: background-color, color;
+    transition-duration: 120ms;
+  }
+  .app-segmented-item[data-hovered] {
+    @apply text-base-content;
+  }
+  .app-segmented-item[data-selected] {
+    @apply bg-nav-active font-medium text-primary;
+  }
+
+  .app-filter-bar {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .app-queue-search {
+    @apply flex h-7 w-48 items-center gap-1.5 rounded-md border border-base-300 bg-base-100 px-2;
+  }
+  .app-queue-search[data-focus-within] {
+    @apply border-focus;
+  }
+  .app-queue-search-input {
+    @apply min-w-0 flex-1 bg-transparent text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-queue-search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .app-chip {
+    @apply inline-flex h-7 max-w-56 items-center rounded-md border border-base-300 bg-base-100 text-ui text-base-content;
+  }
+  .app-chip[data-active] {
+    @apply border-primary/30 bg-selected;
+  }
+  .app-chip-btn {
+    @apply inline-flex h-full min-w-0 cursor-default items-center gap-1 rounded-md px-2 whitespace-nowrap outline-none;
+  }
+  .app-chip-btn[data-hovered] {
+    @apply bg-hover;
+  }
+  .app-chip:not([data-active]) .app-chip-btn {
+    @apply text-muted;
+  }
+  .app-chip-btn.app-chip-plain {
+    @apply h-7 gap-1.5 text-muted;
+  }
+  .app-chip-clear.app-btn {
+    @apply mr-0.5 size-6 w-6 rounded-sm;
+  }
+  .app-menu-check {
+    @apply pl-1.5;
+  }
+  .app-menu-check-mark {
+    @apply inline-flex size-4 shrink-0 items-center justify-center text-primary;
+  }
+  .app-menu-item[data-selected] {
+    @apply font-medium;
+  }
+
+  /* ---- Preview drawer: a side panel beside the list (non-modal), same surface as the table. ----- */
+  .app-drawer {
+    @apply flex w-100 shrink-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-drawer-head {
+    @apply flex h-10 shrink-0 items-center justify-between gap-2 border-b border-base-300 pr-1.5 pl-3;
+  }
+  .app-drawer-body {
+    @apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3;
+  }
+  .app-drawer-title {
+    @apply text-sm leading-5 font-semibold text-base-content outline-none;
+  }
+  .app-drawer-open.app-btn {
+    @apply self-start no-underline;
+  }
+  .app-drawer-open .app-kbd {
+    @apply ml-1 border-brand-muted/40 bg-transparent text-brand-muted;
+  }
+  .app-drawer-reopen {
+    @apply text-meta font-medium text-status-alert-soft-content;
+  }
+  .app-drawer-section {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-drawer-label {
+    @apply text-meta font-medium text-muted;
+  }
+  .app-drawer-findings {
+    @apply flex flex-wrap items-center gap-3;
+  }
+  .app-drawer-severity {
+    @apply inline-flex items-center gap-1 font-medium;
+  }
+  .app-drawer-severity[data-tone='error'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-drawer-severity[data-tone='warning'] {
+    @apply text-status-warning-soft-content;
+  }
+  .app-drawer-quote {
+    @apply line-clamp-3 border-l-2 border-base-300 pl-2 text-base-content;
+  }
+  .app-drawer-facts {
+    @apply grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 border-y border-base-300 py-3;
+  }
+  .app-drawer-fact {
+    @apply contents;
+  }
+  .app-drawer-fact dt {
+    @apply text-muted;
+  }
+  .app-drawer-fact dd {
+    @apply min-w-0 text-base-content;
+  }
+
+  /* ---- Board: five status lanes, flat cards on rules (no shadows: only overlays float). -------- */
+  .app-board-wrap {
+    @apply flex min-h-0 flex-1 flex-col gap-2;
+  }
+  .app-board {
+    @apply grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(12rem,1fr))] gap-2 overflow-x-auto;
+  }
+  .app-board-col {
+    @apply flex min-h-0 flex-col rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-board-col-head {
+    @apply flex h-9 shrink-0 items-center justify-between gap-2 border-b border-base-300 px-3;
+  }
+  .app-board-col-title {
+    @apply text-ui font-medium text-base-content;
+  }
+  .app-board-list {
+    @apply flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5 outline-none;
+  }
+  .app-board-list[data-drop-target] {
+    @apply bg-selected;
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+  .app-board-empty {
+    @apply px-1.5 py-2 text-meta text-muted;
+  }
+  .app-board-note {
+    @apply text-meta text-muted;
+  }
+  .app-card {
+    @apply cursor-default rounded-md border border-base-300 bg-base-100 outline-none;
+    transition-property: border-color, background-color, opacity;
+    transition-duration: 120ms;
+  }
+  .app-card[data-hovered] {
+    @apply border-muted/40 bg-base-200;
+  }
+  .app-card[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -1px;
+  }
+  .app-card[data-dragging] {
+    opacity: 0.5;
+  }
+  .app-card-skeleton {
+    @apply flex flex-col gap-2 p-2.5;
+  }
+  .app-card-body {
+    @apply flex flex-col gap-1 px-2.5 py-2;
+  }
+  .app-card-top {
+    @apply flex items-center gap-1;
+  }
+  .app-card-drag {
+    @apply -ml-1.5 inline-flex size-6 cursor-grab items-center justify-center rounded-sm text-muted outline-none;
+  }
+  .app-card-drag[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+  }
+  .app-card-title {
+    @apply line-clamp-2 text-ui text-base-content;
+  }
+  .app-card-meta {
+    @apply flex min-w-0 items-center gap-1 text-meta text-muted;
+  }
+  .app-card-claim.app-btn {
+    @apply mt-1 self-start;
+  }
+
+  /* ---- Bulk bar: floats at the bottom of the list while rows are selected, so neither the rows nor the
+     active filters move (§5.3). It overlays content, so it takes the overlay shadow. ---------------- */
+  .app-bulk-bar {
+    @apply sticky bottom-2 z-20 mx-2 mb-2 flex h-10 w-fit items-center gap-2 rounded-md border border-primary/30 bg-base-100 px-2 shadow-overlay;
+  }
+  .app-bulk-count {
+    @apply pr-1 pl-1 font-medium text-primary;
+  }
+
+  /* ---- Modal (shortcuts help, bulk fast-track reason) ------------------------------------------ */
+  .app-modal-overlay {
+    @apply fixed inset-0 z-40 flex items-start justify-center bg-neutral/20 pt-[12vh];
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-modal-overlay[data-entering],
+  .app-modal-overlay[data-exiting] {
+    opacity: 0;
+  }
+  .app-modal {
+    @apply max-w-[calc(100vw-2rem)] rounded-lg border border-base-300 bg-base-100 p-4 text-base-content shadow-overlay outline-none;
+  }
+  .app-modal-head {
+    @apply mb-3 flex items-center justify-between gap-3;
+  }
+  .app-shortcuts {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-shortcut {
+    @apply grid grid-cols-[4.5rem_1fr] items-center gap-3;
+  }
+
+  /* ---- Shell wiring: sign-in (allauth headless) and the session loading frame. ----------------- */
+  .app-signin {
+    @apply grid h-screen grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
+  }
+  /* The shell's topbar spans two columns; here there is one, so it must not create a second. */
+  .app-signin > .app-topbar {
+    @apply col-span-full;
+  }
+  .app-signin-main {
+    @apply flex items-start justify-center overflow-auto px-6 py-10;
+  }
+  .app-signin-form {
+    @apply flex w-full max-w-sm flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-5;
+  }
+  .app-field-label {
+    @apply mb-1 block text-meta font-medium text-base-content;
+  }
+  .app-signin-demo {
+    @apply mt-2 flex flex-col gap-1 border-t border-base-300 pt-3;
+  }
+  .app-signin-demo-list {
+    @apply -mx-1.5 flex flex-col;
+  }
+  .app-signin-demo-btn {
+    @apply flex w-full cursor-default items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-signin-demo-btn:hover {
+    @apply bg-hover;
+  }
+
+  /* Error and empty share a layout; the error's glyph takes the error color so they read apart (§5.5). */
+  .app-queue-error .app-empty-icon {
+    @apply text-status-error-soft-content;
+  }
+  .app-filter-more[data-pressed] {
+    @apply bg-hover;
+  }
+
+  .app-table-footer {
+    @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
+  }
+}

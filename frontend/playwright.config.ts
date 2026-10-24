@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+// E2E_PORT lets parallel worktrees run e2e without sharing (or reusing) one preview server.
+const PORT = Number(process.env.E2E_PORT ?? 4173);
 
 // Smoke-level e2e against the production build served by `vite preview`. API calls
 // are stubbed per test with page.route, so no backend is needed.
