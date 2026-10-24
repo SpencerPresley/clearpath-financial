@@ -29,8 +29,10 @@ export const PreviewChecksBody = zod.object({
 export const PreviewChecksResponse = zod.object({
   "findings": zod.array(zod.object({
   "citation": zod.string(),
+  "fix_kind": zod.union([zod.enum(['replace', 'insert', 'instruction']).describe('What a finding\'s suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`\nin place of the finding\'s span; `insert` puts it right after the span (the text carries its own leading space\nor punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means\nunknown (rows from before the field existed).'),zod.null()]).describe('What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion.'),
   "message": zod.string(),
   "quote": zod.union([zod.string(),zod.null()]),
+  "replacement_text": zod.union([zod.string(),zod.null()]).describe('The literal text for replace and insert, used verbatim (an insert carries its own leading space).'),
   "rule_id": zod.string(),
   "severity": zod.enum(['blocking', 'warning']),
   "source": zod.enum(['code', 'llm', 'human']),
@@ -73,10 +75,12 @@ export const AcceptFindingResponse = zod.object({
   "carried_from_id": zod.union([zod.int(),zod.null()]).describe('Set when a dismissal was carried forward from an earlier version.'),
   "citation": zod.string(),
   "created_at": zod.iso.datetime({"offset":true}),
+  "fix_kind": zod.union([zod.enum(['replace', 'insert', 'instruction']).describe('What a finding\'s suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`\nin place of the finding\'s span; `insert` puts it right after the span (the text carries its own leading space\nor punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means\nunknown (rows from before the field existed).'),zod.null()]).describe('What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion.'),
   "id": zod.int(),
   "message": zod.string(),
   "quote": zod.union([zod.string(),zod.null()]),
   "reason": zod.string(),
+  "replacement_text": zod.union([zod.string(),zod.null()]).describe('The literal text for replace and insert, used verbatim (an insert carries its own leading space).'),
   "resolved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "resolved_by": zod.union([zod.object({
   "id": zod.int(),
@@ -114,10 +118,12 @@ export const DismissFindingResponse = zod.object({
   "carried_from_id": zod.union([zod.int(),zod.null()]).describe('Set when a dismissal was carried forward from an earlier version.'),
   "citation": zod.string(),
   "created_at": zod.iso.datetime({"offset":true}),
+  "fix_kind": zod.union([zod.enum(['replace', 'insert', 'instruction']).describe('What a finding\'s suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`\nin place of the finding\'s span; `insert` puts it right after the span (the text carries its own leading space\nor punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means\nunknown (rows from before the field existed).'),zod.null()]).describe('What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion.'),
   "id": zod.int(),
   "message": zod.string(),
   "quote": zod.union([zod.string(),zod.null()]),
   "reason": zod.string(),
+  "replacement_text": zod.union([zod.string(),zod.null()]).describe('The literal text for replace and insert, used verbatim (an insert carries its own leading space).'),
   "resolved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "resolved_by": zod.union([zod.object({
   "id": zod.int(),
@@ -146,10 +152,12 @@ export const ReopenFindingResponse = zod.object({
   "carried_from_id": zod.union([zod.int(),zod.null()]).describe('Set when a dismissal was carried forward from an earlier version.'),
   "citation": zod.string(),
   "created_at": zod.iso.datetime({"offset":true}),
+  "fix_kind": zod.union([zod.enum(['replace', 'insert', 'instruction']).describe('What a finding\'s suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`\nin place of the finding\'s span; `insert` puts it right after the span (the text carries its own leading space\nor punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means\nunknown (rows from before the field existed).'),zod.null()]).describe('What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion.'),
   "id": zod.int(),
   "message": zod.string(),
   "quote": zod.union([zod.string(),zod.null()]),
   "reason": zod.string(),
+  "replacement_text": zod.union([zod.string(),zod.null()]).describe('The literal text for replace and insert, used verbatim (an insert carries its own leading space).'),
   "resolved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "resolved_by": zod.union([zod.object({
   "id": zod.int(),
@@ -183,10 +191,12 @@ export const ListFindingsResponseItem = zod.object({
   "carried_from_id": zod.union([zod.int(),zod.null()]).describe('Set when a dismissal was carried forward from an earlier version.'),
   "citation": zod.string(),
   "created_at": zod.iso.datetime({"offset":true}),
+  "fix_kind": zod.union([zod.enum(['replace', 'insert', 'instruction']).describe('What a finding\'s suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`\nin place of the finding\'s span; `insert` puts it right after the span (the text carries its own leading space\nor punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means\nunknown (rows from before the field existed).'),zod.null()]).describe('What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion.'),
   "id": zod.int(),
   "message": zod.string(),
   "quote": zod.union([zod.string(),zod.null()]),
   "reason": zod.string(),
+  "replacement_text": zod.union([zod.string(),zod.null()]).describe('The literal text for replace and insert, used verbatim (an insert carries its own leading space).'),
   "resolved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "resolved_by": zod.union([zod.object({
   "id": zod.int(),
@@ -215,7 +225,7 @@ export const RetryLlmCheckParams = zod.object({
 })
 
 export const RetryLlmCheckResponse = zod.object({
-  "age_days": zod.int(),
+  "age_days": zod.int().describe('Whole days since `queue_entered_at`.'),
   "approval_expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).describe('When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved.'),
   "assignee": zod.union([zod.object({
   "id": zod.int(),
@@ -223,6 +233,7 @@ export const RetryLlmCheckResponse = zod.object({
 }).describe('A person or partner shown in a cell.'),zod.null()]),
   "channel": zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script']),
   "current_version_n": zod.union([zod.int(),zod.null()]),
+  "fast_track_eligible": zod.boolean().describe('The fast-track lane would take the item now, by the rule it enforces: needs re-review, its current version generated by an offer-terms change, and no live page showing other copy. Open findings and the AI check still gate the approval, as in every lane (bulk skips those with a reason).'),
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "key": zod.string(),
@@ -251,11 +262,12 @@ export const RetryLlmCheckResponse = zod.object({
   "planned_first_run": zod.union([zod.iso.date(),zod.null()]),
   "planned_last_run": zod.union([zod.iso.date(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "queue_entered_at": zod.iso.datetime({"offset":true}).describe('When the item last entered the review queue (submission, resubmission, new round or reopen). Age, `waiting_more_than_days`, and the oldest/newest/queue sorts measure from it.'),
   "reopen_reason": zod.union([zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),zod.null()]),
   "risk_tier": zod.enum(['high', 'medium', 'low']),
   "round": zod.int(),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),
-  "submitted_at": zod.iso.datetime({"offset":true}),
+  "submitted_at": zod.iso.datetime({"offset":true}).describe('The latest (re)submission by the marketer.'),
   "tags": zod.array(zod.string()),
   "title": zod.string(),
   "updated_at": zod.iso.datetime({"offset":true})

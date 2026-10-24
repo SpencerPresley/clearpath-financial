@@ -11,6 +11,7 @@ import {
   ATTACHMENT_KIND_LABELS,
   DRIFT_RESULT_LABELS,
   OUTCOME_LABELS,
+  PRODUCT_LABELS,
   REOPEN_REASON_LABELS,
   RISK_TIER_LABELS,
   formatDate,
@@ -139,6 +140,8 @@ export const EVENT_SENTENCES: Sentences = {
     `Placement checked: ${DRIFT_RESULT_LABELS.unchanged}, ${plural(e.payload.rule_ids.length, 'new blocking finding')} beside it`,
   'attachment.added': (e) => `Evidence added: ${ATTACHMENT_KIND_LABELS[e.payload.kind]}`,
   'terms.published': (e) => `Offer terms v${String(e.payload.version)} published`,
+  'terms.refs_relinked': (e, { v }) =>
+    `Quotes on ${v(e.payload.version_id)} re-checked against ${PRODUCT_LABELS[e.payload.product].toLowerCase()} terms v${String(e.payload.terms_version)}; numbers unchanged`,
   // Events about other entities; the item history doesn't normally carry them, but every type has a sentence.
   'partner.created': (e) => `Partner added: ${e.payload.name}`,
   'partner.updated': () => 'Partner updated',

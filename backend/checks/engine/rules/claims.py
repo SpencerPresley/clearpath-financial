@@ -11,6 +11,7 @@ from checks.engine.rule import (
     URL_SH24,
     Hit,
     Rule,
+    instruct,
     make_spec,
 )
 from checks.engine.text import APOS, compile_i, window_after, window_before
@@ -90,7 +91,7 @@ def _preapproved(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
             continue
         if "qualif" in m.group(0).lower() and _QUESTION_AFTER.match(window_after(a.text, m.end(), 24)):
             continue
-        yield Hit(
+        yield instruct(
             Span(m.start(), m.end()),
             "Pre-approval language implies a firm offer. Use it only for a prescreened offer with the selection "
             "criteria on file, or soften it.",
@@ -107,7 +108,7 @@ def _guaranteed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
         after = window_after(a.text, m.end(), _GUARANTEE_REACH, sentence.end)
         if _RATE_BEFORE.search(before) or _RATE_AFTER.match(after) or not _APPROVAL_WORDS.search(before + after):
             continue
-        yield Hit(
+        yield instruct(
             Span(m.start(), m.end()),
             "Approval depends on underwriting, so a guarantee may mislead. Remove it or say approval isn't guaranteed.",
             '"Subject to credit approval."',
@@ -118,7 +119,7 @@ def _credit_impact(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[
     if AttachmentKind.SUBSTANTIATION in ctx.attachment_kinds:
         return
     for m in _CREDIT_IMPACT.finditer(a.text):
-        yield Hit(
+        yield instruct(
             Span(m.start(), m.end()),
             "Credit-impact claims need evidence of the pull type. Attach substantiation and limit the claim to the "
             "soft-pull step.",

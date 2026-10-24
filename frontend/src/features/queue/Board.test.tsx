@@ -18,7 +18,15 @@ const ACTIVE = [
   makeRow({ id: 1, status: 'submitted', assignee: null, title: 'Submitted one' }),
   makeRow({ id: 2, status: 'in_review', title: 'Reviewing one' }),
   makeRow({ id: 3, status: 'changes_requested', title: 'Back with marketer' }),
-  makeRow({ id: 4, status: 'needs_rereview', reopen_reason: 'terms_changed', title: 'Terms moved' }),
+  // Submitted two months ago, back in the queue two hours ago: the card's age is the time in the queue (S4).
+  makeRow({
+    id: 4,
+    status: 'needs_rereview',
+    reopen_reason: 'terms_changed',
+    title: 'Terms moved',
+    submitted_at: new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString(),
+    queue_entered_at: new Date(Date.now() - 2 * 3600 * 1000 - 60 * 1000).toISOString(),
+  }),
 ];
 const APPROVED = [makeRow({ id: 5, status: 'approved', title: 'Cleared last week' })];
 
@@ -60,6 +68,17 @@ describe('Board', () => {
     expect((await column('Changes requested')).getByText('Back with marketer')).toBeInTheDocument();
     expect((await column('Needs re-review')).getByText('Terms moved')).toBeInTheDocument();
     expect((await column('Approved · last 14 days')).getByText('Cleared last week')).toBeInTheDocument();
+  });
+
+  it('ages a card from when it entered the queue', async () => {
+    serve();
+    setup();
+    const column = within(await screen.findByRole('grid', { name: 'Needs re-review' }));
+    const age = column.getByText('2h');
+    expect(age).toHaveAttribute(
+      'title',
+      expect.stringMatching(/^In the queue since .+ · last submitted .+$/),
+    );
   });
 
   it('asks for every board status and only the last 14 days of approvals', async () => {

@@ -19,6 +19,7 @@ from typing import Final
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 
 from accounts.models import User
 from accounts.services import MeChanges, update_me
@@ -32,6 +33,7 @@ from core.domain import (
     AttachmentKind,
     CheckStatus,
     DecisionOutcome,
+    DriftResult,
     DriftTrigger,
     FindingSource,
     FindingState,
@@ -86,9 +88,10 @@ from partners.services import NewPartner, create_partner
 from reviews.assignment import assign_item, claim_item
 from reviews.decisions import DecisionInput, pull_item, reaffirm, record_decision
 from reviews.errors import FindingsNeedTriage
-from reviews.models import QUEUE_STATUSES, Placement, ReviewItem
+from reviews.models import QUEUE_STATUSES, Placement, ReviewItem, Snapshot
 from reviews.placements import PlacementInput, confirm_takedown, record_placement
 from reviews.rereview import run_expiry_sweep
+from reviews.selectors import live_placements_q
 from reviews.services import (
     AttachmentOwner,
     ItemFieldChanges,
@@ -100,14 +103,15 @@ from reviews.services import (
     update_item_fields,
 )
 from reviews.versions import resubmit_item, start_new_round
-from terms.fanout import fan_out_item
+from terms.fanout import fan_out_item, recheck_in_flight_item
 from terms.fast_track import fast_track_approve
 from terms.models import OfferTerms
-from terms.selectors import affected_approvals
+from terms.selectors import affected_approvals, in_flight_quoting_superseded
 from terms.services import PublishTermsInput, publish_terms
 
 AI_LATENCY: Final = timedelta(seconds=6)  # an AI check lands this long after the version it reviews
 SWEEP_AT: Final = time(6, 0, tzinfo=UTC)  # the beat schedule's daily expiry sweep (config/settings/base.py)
+DRIFT_SWEEP_AT: Final = time(7, 0, tzinfo=UTC)  # and its daily drift sweep, after the expiry sweep
 
 # What a reviewer writes when clearing the human checklist on ordinary copy.
 CHECKLIST_NOTES: Final = {
@@ -151,6 +155,14 @@ class Runner:
         self.item_ids: dict[str, int] = {}
         self.ai_scripts: dict[int, tuple[str, AiScript]] = {}  # version id -> (story key, script)
         self._entries: list[_Entry] = []
+        self._stories = {story.key: story for story in catalog.stories}
+        # The UTC days each story checks its demo page itself; the drift sweep leaves those days to the story.
+        self._page_check_days = {
+            story.key: {
+                step.at.resolve(now).astimezone(UTC).date() for step in story.steps if isinstance(step, PageCheck)
+            }
+            for story in catalog.stories
+        }
 
     # --- timeline ----------------------------------------------------------------------------------------------
 
@@ -181,9 +193,13 @@ class Runner:
                 )
         first = min(e.at for e in self._entries).date()
         for offset in range((self.now.date() - first).days + 1):
-            at = datetime.combine(first + timedelta(days=offset), SWEEP_AT)
+            day = first + timedelta(days=offset)
+            at = datetime.combine(day, SWEEP_AT)
             if at <= self.now:
                 self._add(at, "expiry sweep", lambda: run_expiry_sweep(clock=self.clock))
+            drift_at = datetime.combine(day, DRIFT_SWEEP_AT)
+            if drift_at <= self.now:
+                self._add(drift_at, "drift sweep", self._drift_sweep)
         for entry in sorted(self._entries):
             self.clock.at = entry.at
             try:
@@ -311,6 +327,9 @@ class Runner:
         # What the terms.fan_out handler's per-item tasks do, one item per transaction.
         for affected in affected_approvals(product=spec.product, clock=self.clock):
             fan_out_item(item_id=affected.item_id, clock=self.clock)
+        # And what the terms.recheck_in_flight handler's tasks do: re-check in-flight items quoting the old terms.
+        for item_id in in_flight_quoting_superseded(product=spec.product, clock=self.clock):
+            recheck_in_flight_item(item_id=item_id, clock=self.clock)
 
     def _global(self, event: GlobalStep) -> None:
         if isinstance(event, SetAvailability):
@@ -479,7 +498,13 @@ class Runner:
         return placed
 
     def _check_page(self, story: Story, step: PageCheck, clock: FixedClock) -> None:
-        """One drift check, as the worker runs it (request, claim, complete), on the HTML the page serves now."""
+        found = self._run_page_check(story, clock)
+        if found is not step.expect:
+            raise SeedError(f"{story.key}: the drift check found {found}, expected {step.expect}")
+
+    def _run_page_check(self, story: Story, clock: FixedClock) -> DriftResult | None:
+        """One scheduled drift check, as the worker runs it (request, claim, complete), on the HTML the page serves
+        now."""
         placement_id, slug = self._demo_placement(story)
         page = get_page(slug)
         if page is None:
@@ -492,9 +517,33 @@ class Runner:
             raise SeedError(f"{story.key}: drift check {snapshot_id} couldn't be claimed")
         html = render_page(page, edited=slug in self.edited_pages, today=clock.today())
         fetched = FetchedPage(url=claimed.url, final_url=claimed.url, status=200, content_type="text/html", text=html)
-        outcome = complete_drift_check(claim=claimed, page=fetched, clock=clock)
-        if outcome.result is not step.expect:
-            raise SeedError(f"{story.key}: the drift check found {outcome.result}, expected {step.expect}")
+        return complete_drift_check(claim=claimed, page=fetched, clock=clock).result
+
+    def _drift_sweep(self) -> None:
+        """The daily drift sweep (`drift.services.run_sweep`'s filters: monitored, live, approved, not legacy), for
+        the placements on the demo pages, so "Checked daily" is true of the seeded history (walkthrough nit 9). Other
+        monitored placements point at partner sites nothing here can fetch, so they're left out rather than failed
+        (three failed checks would count as missing copy). A page's first check is its story's PageCheck (the demo
+        page serves one copy, written for the moment the story checks it: LendCompare's already carries the
+        fast-tracked numbers), and the sweep runs from then on; a story's own PageCheck that UTC day is that day's
+        check. Every sweep check must find the page unchanged: drift is something a story tells, with a PageCheck."""
+        today = self.clock.at.astimezone(UTC).date()
+        by_placement = {placement_id: key for key, (placement_id, _) in self.demo_placements.items()}
+        due = Placement.objects.filter(
+            live_placements_q(self.clock.today()),
+            pk__in=list(by_placement),
+            monitored=True,
+            item__status=ItemStatus.APPROVED.value,
+            item__is_legacy=False,
+        ).exclude(url="")
+        checked_before = due.filter(Exists(Snapshot.objects.filter(placement=OuterRef("pk"))))
+        for placement_id in checked_before.order_by("pk").values_list("pk", flat=True):
+            story = self._stories[by_placement[placement_id]]
+            if today in self._page_check_days.get(story.key, set()):
+                continue
+            found = self._run_page_check(story, self.clock)
+            if found is not DriftResult.UNCHANGED:
+                raise SeedError(f"{story.key}: the daily drift sweep found {found}; tell it with a PageCheck step")
 
     def _submit(self, story: Story, step: Submit) -> None:
         result = submit_item(

@@ -18,7 +18,7 @@ import type { ColumnSizingState, ColumnVisibilityState, RowSelectionState } from
 import type { ItemRowOut, ItemSort } from '../../api/generated/model';
 import { StatusBadge } from '../../ui/badges';
 import { ItemKey } from '../../ui/ItemKey';
-import { formatAge } from '../../ui/RelativeAge';
+import { ageTitle, formatQueueAge } from './age';
 import { useQueueCell } from './cellContext';
 import { AssigneeCell } from './AssigneeCell';
 import { FindingsCount } from './FindingsCount';
@@ -96,7 +96,8 @@ type Direction = 'ascending' | 'descending';
 
 /**
  * The column and direction each server order sorts by (backend reviews.filters.ItemSort). Status ascends in
- * board order, risk from low to high, names A to Z with blanks last. Oldest first is Age descending. Queue
+ * board order, risk from low to high, names A to Z with blanks last. Oldest first (longest in the queue) is Age
+ * descending. Queue
  * order and Updated aren't a column's order.
  */
 const SORT_COLUMN: Record<ItemSort, readonly [ColumnId, Direction] | null> = {
@@ -152,12 +153,12 @@ function Muted({ children }: { children: string }) {
   return <span className="text-muted">{children}</span>;
 }
 
-function AgeCell({ at }: { at: string }) {
+function AgeCell({ row }: { row: ItemRowOut }) {
   const { now } = useQueueCell();
-  const date = new Date(at);
+  const date = new Date(row.queue_entered_at);
   return (
-    <time className="app-age" dateTime={date.toISOString()} title={date.toLocaleString('en-US')}>
-      {formatAge(date, now ?? new Date())}
+    <time className="app-age" dateTime={date.toISOString()} title={ageTitle(row)}>
+      {formatQueueAge(date, now ?? new Date())}
     </time>
   );
 }
@@ -271,12 +272,12 @@ export const queueColumns = helper.columns([
     minSize: 64,
     cell: ({ row }) => <FindingsCount count={row.original.open_findings_count} />,
   }),
-  helper.accessor('submitted_at', {
+  helper.accessor('queue_entered_at', {
     id: 'age',
     header: COLUMN_LABELS.age,
     size: 56,
     minSize: 56,
-    cell: ({ row }) => <AgeCell at={row.original.submitted_at} />,
+    cell: ({ row }) => <AgeCell row={row.original} />,
   }),
   helper.accessor('round', {
     id: 'round',

@@ -11,7 +11,16 @@ from functools import cache
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
-from checks.engine.rule import CALIFORNIA, CLOSED_END, UNVERSIONED, URL_CA_22162, Hit, Rule, make_spec
+from checks.engine.rule import (
+    CALIFORNIA,
+    CLOSED_END,
+    UNVERSIONED,
+    URL_CA_22162,
+    Hit,
+    Rule,
+    instruct,
+    make_spec,
+)
 from checks.engine.text import phrase_pattern
 from checks.engine.types import RuleContext
 from core.domain import Severity
@@ -36,7 +45,7 @@ def _phrases(phrases: tuple[str, ...]) -> re.Pattern[str]:
 def _license_disclosure(_ctx: RuleContext, a: Analysis, config: EngineConfig) -> Iterable[Hit]:
     phrases = config.ca_license_phrases
     if not phrases or not _phrases(phrases).search(a.text):
-        yield Hit(
+        yield instruct(
             None,
             "Ads running in California must disclose the license the loan is made or arranged under.",
             f'"{phrases[0]}."' if phrases else None,

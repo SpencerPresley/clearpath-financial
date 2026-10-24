@@ -7,7 +7,7 @@ from celery import shared_task
 
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import ItemStatus, Product
-from terms.fanout import fan_out_item
+from terms.fanout import fan_out_item, recheck_in_flight_item
 from terms.selectors import affected_approvals
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,31 @@ def fan_out_item_task(item_id: int, *, clock: Clock = SYSTEM_CLOCK) -> str:
 
 def enqueue_fan_out(item_id: int) -> None:
     fan_out_item_task.delay(item_id)
+
+
+@shared_task(
+    name="terms.recheck_in_flight_item",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    max_retries=8,
+)
+def recheck_in_flight_item_task(item_id: int, *, clock: Clock = SYSTEM_CLOCK) -> str:
+    """One in-flight item's code re-check after a terms change, in its own transaction. Idempotent."""
+    started = time.monotonic()
+    logger.info("terms recheck start item_id=%d", item_id)
+    outcome = recheck_in_flight_item(item_id=item_id, clock=clock)
+    logger.info(
+        "terms recheck done item_id=%d outcome=%s duration_ms=%d",
+        item_id,
+        outcome,
+        (time.monotonic() - started) * 1000,
+    )
+    return outcome.value
+
+
+def enqueue_recheck(item_id: int) -> None:
+    recheck_in_flight_item_task.delay(item_id)
 
 
 @shared_task(name="terms.reconcile_fan_out")

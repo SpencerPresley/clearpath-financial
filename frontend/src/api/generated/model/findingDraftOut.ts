@@ -5,13 +5,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FindingSource } from './findingSource';
+import type { FixKind } from './fixKind';
 import type { Severity } from './severity';
 import type { SpanOut } from './spanOut';
 
 export interface FindingDraftOut {
   citation: string;
+  /** What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion. */
+  fix_kind: FixKind | null;
   message: string;
   quote: string | null;
+  /** The literal text for replace and insert, used verbatim (an insert carries its own leading space). */
+  replacement_text: string | null;
   rule_id: string;
   severity: Severity;
   source: FindingSource;

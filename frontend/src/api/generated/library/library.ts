@@ -73,7 +73,8 @@ export const getListLibraryUrl = (params?: ListLibraryParams,) => {
 }
 
 /**
- * The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:
+ * The approved archive, legacy included. `approved_to_run` (default): currently approved and not past the
+ * approval's expiry (legacy approvals included, which the expiry sweep never moves). `ever_approved`:
  * every item that ever received an approval, whatever its status now (precedent doesn't lapse).
  * @summary List Library
  */

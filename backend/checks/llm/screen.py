@@ -21,7 +21,7 @@ from checks.engine.types import FindingDraft, RuleContext, Span
 from checks.llm.rules import LLM_RULES_BY_ID, LlmRule
 from checks.llm.schema import DroppedFinding, DropReason, RawFinding
 from checks.llm.spans import Anchor, anchor_quote
-from core.domain import FindingSource
+from core.domain import FindingSource, FixKind
 
 _DASHES = "".join(chr(c) for c in range(0x2010, 0x2015))  # hyphen, non-breaking hyphen, figure/en/em dash
 BANNED_WORDING = re.compile(
@@ -113,6 +113,10 @@ def _finding(item: RawFinding, rule: LlmRule, anchor: Anchor, text: str) -> tupl
     fix, fix_removed = _fix(item.suggested_fix)
     if fix_removed:
         adjustments.append(Adjustment("fix_removed", item.rule_id, item.quote, item.suggested_fix))
+    # An AI suggestion is applied as written only when the model says it is literal wording for the quote
+    # (and it changes something); otherwise it's advice for the reviewer.
+    quote = text[span.start : span.end]
+    literal = fix is not None and item.fix_kind == FixKind.REPLACE.value and fix != quote
     finding = FindingDraft(
         rule_id=rule.spec.id,
         source=FindingSource.LLM,
@@ -121,7 +125,9 @@ def _finding(item: RawFinding, rule: LlmRule, anchor: Anchor, text: str) -> tupl
         citation=rule.spec.citation,
         suggested_fix=fix,
         span=span,
-        quote=text[span.start : span.end],
+        quote=quote,
+        fix_kind=None if fix is None else FixKind.REPLACE if literal else FixKind.INSTRUCTION,
+        replacement_text=fix if literal else None,
     )
     return finding, adjustments
 

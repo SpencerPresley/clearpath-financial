@@ -89,6 +89,8 @@ const PREVIEW_RULES: { phrase: string; draft: Omit<FindingDraftOut, 'span' | 'qu
       severity: 'blocking',
       message: 'Rate claim needs the full APR range',
       suggested_fix: 'Show the range: 5.99%–35.99% APR',
+      fix_kind: 'instruction',
+      replacement_text: null,
     },
   },
   {
@@ -100,6 +102,8 @@ const PREVIEW_RULES: { phrase: string; draft: Omit<FindingDraftOut, 'span' | 'qu
       severity: 'blocking',
       message: 'Credit-impact claim should be limited to checking your rate',
       suggested_fix: 'Checking your rate won’t affect your credit score.',
+      fix_kind: 'instruction',
+      replacement_text: null,
     },
   },
   {
@@ -111,6 +115,8 @@ const PREVIEW_RULES: { phrase: string; draft: Omit<FindingDraftOut, 'span' | 'qu
       severity: 'blocking',
       message: '“Guaranteed” approval claims need a firm offer of credit',
       suggested_fix: 'Remove “guaranteed”',
+      fix_kind: 'instruction',
+      replacement_text: null,
     },
   },
 ];
@@ -133,6 +139,8 @@ function preview(body: CheckPreviewIn): CheckPreviewOut {
       severity: 'blocking',
       message: 'California ads need the CFL license disclosure',
       suggested_fix: 'Add “Loans made or arranged pursuant to a California Financing Law license.”',
+      fix_kind: 'instruction',
+      replacement_text: null,
       span: null,
       quote: null,
     });

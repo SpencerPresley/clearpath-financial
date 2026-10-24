@@ -62,7 +62,7 @@ from reviews.models import (
     Version,
 )
 from reviews.months import add_months
-from reviews.selectors import drift_rereview, live_placements_q
+from reviews.selectors import drift_rereview, fast_track_check, live_placements_q
 from reviews.transitions import Action, apply_transition, require_transition, start_review
 from reviews.versions import create_version
 
@@ -158,6 +158,26 @@ def _require_approvable(
     if accepted:
         raise AcceptedFindingsBlockApproval(accepted_count=accepted)
     return _require_ai_done(item, override), terms_ids
+
+
+def _require_page_matches(item: ReviewItem, clock: Clock) -> None:
+    """Refuse (`drift_not_restored`) while a live page shows something other than the approved copy: a live
+    placement's latest check found it modified or missing, or a drift re-review isn't restored yet. Re-approving
+    without a full review (reaffirm, fast-track) would approve something that isn't what's live."""
+    drift = drift_rereview(item_id=item.pk, today=clock.today())
+    if drift is not None and not drift.restored:
+        raise DriftNotRestored(placement_id=drift.placement_id)
+
+
+def _require_fast_trackable(item: ReviewItem, version: Version, clock: Clock) -> None:
+    """Fast-track approves only a generated terms-change version, and only while the live page shows the approved
+    copy: it is for re-reviews where only the numbers changed, never a way to clear drift (walkthrough B1). Bulk
+    skips a refused item with its code."""
+    check = fast_track_check(item_id=item.pk, version_origin=VersionOrigin(version.origin), today=clock.today())
+    if not check.generated:
+        raise Conflict("Only a generated terms-change version can be fast-tracked.", details={"version_n": version.n})
+    if check.drift is not None:
+        raise DriftNotRestored(placement_id=check.drift.placement_id)
 
 
 def _open_summaries(version: Version) -> list[FindingSummary]:
@@ -355,10 +375,8 @@ def record_decision(*, actor: User, item_id: int, data: DecisionInput, clock: Cl
             start_review(item, reviewer=actor, at=now)
         require_transition(item, action)
         evidence = _evidence(item, data.evidence_attachment_ids)
-        if data.lane is DecisionLane.FAST_TRACK and VersionOrigin(version.origin) is not VersionOrigin.FAST_TRACK:
-            raise Conflict(
-                "Only a generated terms-change version can be fast-tracked.", details={"version_n": version.n}
-            )
+        if data.lane is DecisionLane.FAST_TRACK:
+            _require_fast_trackable(item, version, clock)
         approval: _Approval | None = None
         if data.outcome is DecisionOutcome.APPROVED_WITH_EDITS:
             version, refusal = _edited_version(item, version, actor=actor, data=data, clock=clock)
@@ -417,9 +435,7 @@ def reaffirm(
         item = locked_item(item_id)
         require_reviewer_of(actor, item)
         require_transition(item, Action.REAFFIRM)
-        drift = drift_rereview(item_id=item.pk)
-        if drift is not None and not drift.restored:
-            raise DriftNotRestored(placement_id=drift.placement_id)
+        _require_page_matches(item, clock)
         version = item.current_version
         if version is None or _approved_version_n(item) != version.n:
             raise Conflict(

@@ -104,7 +104,9 @@ export const GetMetricsSummaryResponse = zod.object({
   "imported_from": zod.union([zod.iso.date(),zod.null()]).describe('First date of imported history under these filters, any period.'),
   "imported_to": zod.union([zod.iso.date(),zod.null()]),
   "open_fix_live": zod.object({
-  "count": zod.int().describe('Live content sent back for re-review and not yet fixed, now.'),
+  "awaiting_takedown": zod.int().describe('Of those, pulled (withdrawn or rejected) with a takedown not yet confirmed; not in the queue.'),
+  "count": zod.int().describe('Live fixes open now: live content sent back for re-review and not yet fixed (approved again, or every requested takedown confirmed). Equals in_rereview + awaiting_takedown.'),
+  "in_rereview": zod.int().describe('Of those, not pulled: still being re-reviewed (needs re-review, in review, or a changes round).'),
   "oldest_hours": zod.union([zod.number(),zod.null()])
 }),
   "period_from": zod.iso.date(),

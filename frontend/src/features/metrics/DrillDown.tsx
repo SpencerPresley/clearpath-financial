@@ -101,7 +101,7 @@ export function DrillDown({
     heading.current?.focus({ preventScroll: true });
   }, [takeFocus, metric, openOnly, range.from, range.to]);
   const title = openOnly
-    ? `${meta.label} · re-reviews open now`
+    ? `${meta.label} · live fixes open now`
     : `${meta.label} · ${rangeLabel(range.from, range.to)}`;
   const data = query.data;
 
@@ -171,7 +171,7 @@ export function DrillDown({
               {data.rows.length < data.total
                 ? `Largest ${String(data.rows.length)} of ${String(data.total)}`
                 : openOnly
-                  ? plural(data.total, 'open re-review')
+                  ? plural(data.total, 'open live fix', 'open live fixes')
                   : plural(data.total, meta.noun[0], meta.noun[1])}
             </span>
           )}

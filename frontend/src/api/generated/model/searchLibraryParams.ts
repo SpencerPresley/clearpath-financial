@@ -43,7 +43,7 @@ reopen_reason?: SearchLibraryReopenReasonItem[];
 submitted_after?: string | null;
 submitted_before?: string | null;
 /**
- * Submitted more than N days ago.
+ * Entered the queue more than N days ago (last submission, resubmission, new round or reopen).
  */
 waiting_more_than_days?: number | null;
 approved_after?: string | null;

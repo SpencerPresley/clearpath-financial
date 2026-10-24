@@ -58,6 +58,7 @@ function row(o: Partial<Row> & { id: number }, days: number): Row {
     assignee: dana,
     open_findings_count: 2,
     age_days: days,
+    fast_track_eligible: false,
     round: 1,
     reopen_reason: null,
     llm_check_status: 'succeeded',
@@ -68,6 +69,7 @@ function row(o: Partial<Row> & { id: number }, days: number): Row {
     planned_first_run: '2026-11-01',
     planned_last_run: null,
     submitted_at: ago(days * DAY + 3 * HOUR),
+    queue_entered_at: ago(days * DAY + 3 * HOUR),
     updated_at: ago(5 * HOUR),
     ...o,
   };

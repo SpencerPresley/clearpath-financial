@@ -6,7 +6,11 @@
  */
 
 export interface OpenFixLiveOut {
-  /** Live content sent back for re-review and not yet fixed, now. */
+  /** Of those, pulled (withdrawn or rejected) with a takedown not yet confirmed; not in the queue. */
+  awaiting_takedown: number;
+  /** Live fixes open now: live content sent back for re-review and not yet fixed (approved again, or every requested takedown confirmed). Equals in_rereview + awaiting_takedown. */
   count: number;
+  /** Of those, not pulled: still being re-reviewed (needs re-review, in review, or a changes round). */
+  in_rereview: number;
   oldest_hours: number | null;
 }

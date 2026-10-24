@@ -18,6 +18,7 @@ from audit.payloads import (
     FindingAcceptedPayload,
     FindingDismissedPayload,
     FindingReopenedPayload,
+    TermsRefsRelinkedPayload,
 )
 from audit.services import record_event
 from checks.engine import (
@@ -191,6 +192,8 @@ def persist_findings(*, version: Version, drafts: Sequence[FindingDraft], clock:
             quote=quote,
             message=draft.message,
             suggested_fix=draft.suggested_fix or "",
+            fix_kind=draft.fix_kind,
+            replacement_text=draft.replacement_text,
             created_at=now,
             **(
                 {
@@ -247,6 +250,34 @@ def _persist_refs(version: Version, refs: Sequence[TermsRefDraft], terms: OfferT
         )
     # A re-run (reaffirm) keeps the refs already recorded: they say which terms the approved text quoted.
     TermsRef.objects.bulk_create(rows, ignore_conflicts=True)
+
+
+def relink_terms_refs(*, version: Version, terms: OfferTerms, clock: Clock = SYSTEM_CLOCK) -> None:
+    """Point an in-flight version's refs at `terms`, whose numbers the caller has found unchanged (walkthrough S20,
+    `terms.fanout.recheck_in_flight_item`), and record TERMS_REFS_RELINKED so History shows it. The quoted values
+    and spans stay: only which terms version they quote moves. Never for an approved version: its refs are the
+    decision's record of what it quoted. Call inside the caller's transaction, with the item locked."""
+    item = version.item  # pyrefly: ignore[missing-attribute]
+    if ItemStatus(item.status) not in (ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.CHANGES_REQUESTED):
+        raise InvalidTransition(action="relink_terms_refs", from_status=ItemStatus(item.status))
+    stale = TermsRef.objects.filter(version=version).exclude(offer_terms=terms)
+    previous = tuple(sorted(set(stale.values_list("offer_terms_id", flat=True))))
+    stale.update(offer_terms=terms)
+    record_event(
+        type=EventType.TERMS_REFS_RELINKED,
+        entity=EntityType.VERSION,
+        entity_id=version.pk,
+        item_id=item.pk,
+        payload=TermsRefsRelinkedPayload(
+            version_id=version.pk,
+            product=Product(terms.product),
+            offer_terms_id=terms.pk,
+            terms_version=terms.version,
+            previous_offer_terms_ids=previous,
+        ),
+        actor=None,
+        at=clock.now(),
+    )
 
 
 def open_count(version: Version) -> int:

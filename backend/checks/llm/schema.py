@@ -52,6 +52,9 @@ class RawFinding(BaseModel):
     end: int
     message: str
     suggested_fix: str = ""
+    # "replace": suggested_fix is literal wording for the quote; anything else is advice. Older outputs (and the
+    # canned demo ones) have no field and read as advice, so nothing is applied that wasn't meant literally.
+    fix_kind: str = "instruction"
 
 
 @dataclass(frozen=True)
@@ -94,8 +97,14 @@ def report_tool(*, strict: bool = False) -> dict[str, Any]:
                 "type": _STRING,
                 "description": 'Replacement wording for the quote, or a concrete edit. "" if none.',
             },
+            "fix_kind": {
+                "type": _STRING,
+                "enum": ["replace", "instruction"],
+                "description": '"replace" if suggested_fix is the exact wording to put in place of the quote; '
+                'otherwise "instruction".',
+            },
         },
-        "required": ["rule_id", "quote", "start", "end", "message", "suggested_fix"],
+        "required": ["rule_id", "quote", "start", "end", "message", "suggested_fix", "fix_kind"],
         "additionalProperties": False,
     }
     tool: dict[str, Any] = {

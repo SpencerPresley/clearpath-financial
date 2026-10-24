@@ -38,6 +38,23 @@ describe('describeEvent', () => {
     ]);
   });
 
+  it('says when a terms change left the quoted numbers unchanged', () => {
+    const relinked: Entry = {
+      ...base('terms.refs_relinked'),
+      actor: null,
+      payload: {
+        version_id: 501,
+        product: 'personal_loan',
+        offer_terms_id: 14,
+        terms_version: 3,
+        previous_offer_terms_ids: [12],
+      },
+    };
+    expect(describeEvent(relinked, { versions, users })).toBe(
+      'Quotes on v1 re-checked against personal loan terms v3; numbers unchanged',
+    );
+  });
+
   it('names dismissals, carried dismissals, and reopenings', () => {
     const dismissed: Entry = {
       ...base('finding.dismissed'),

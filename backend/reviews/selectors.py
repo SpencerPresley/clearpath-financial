@@ -28,6 +28,7 @@ from django.db.models import (
 )
 from django.db.models.fields.tuple_lookups import Tuple, TupleGreaterThan, TupleLessThan
 from django.db.models.functions import Coalesce, Lower, NullIf
+from django.utils import timezone
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
@@ -42,6 +43,7 @@ from core.domain import (
     ReopenReason,
     RiskTier,
     TakedownState,
+    VersionOrigin,
 )
 from core.errors import InvalidInput, NotFound
 from reviews.filters import ItemFilter, ItemSort
@@ -74,19 +76,52 @@ def is_item_live(*, item_id: int, today: date) -> bool:
 
 @dataclass(frozen=True)
 class DriftRereview:
-    """For a drift_detected re-review: the placement whose check sent the item back, and whether its latest
-    finished check found the approved copy again (`unchanged`). Reaffirm is allowed only then: re-approving copy the
-    partner still shows changed (or a page that's gone) would approve something that isn't what's live."""
+    """For a re-review whose live page differs (or differed) from the approved copy: the placement, and whether its
+    latest finished check found the approved copy again (`unchanged`). While `restored` is false, neither Reaffirm
+    nor Fast-track is allowed: re-approving copy the partner still shows changed (or a page that's gone) would
+    approve something that isn't what's live (walkthrough B1)."""
 
     placement_id: int
     restored: bool
 
 
-def drift_rereview(*, item_id: int) -> DriftRereview | None:
-    """The drift state of the item's current reopen; None unless it's needs_rereview(drift_detected) and a check
-    sent it back. Two queries."""
+_DRIFTED_RESULTS: Final = (DriftResult.MODIFIED.value, DriftResult.MISSING.value)
+
+
+def _drifted_live_placement(item_id: int, today: date) -> int | None:
+    """A live placement of the item whose latest successful check found the copy modified or missing. Covers a
+    re-review for another reason (terms changed) whose page changed afterwards: the item was already in re-review,
+    so the check didn't send it back again. One query."""
+    latest = (
+        Snapshot.objects.filter(placement_id=OuterRef("pk"), status=CheckStatus.SUCCEEDED.value)
+        .order_by("-requested_at", "-pk")
+        .values("result")[:1]
+    )
+    return (
+        Placement.objects.filter(live_placements_q(today), item_id=item_id)
+        .annotate(latest_result=Subquery(latest))
+        .filter(latest_result__in=_DRIFTED_RESULTS)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+        .first()
+    )
+
+
+def drift_rereview(*, item_id: int, today: date) -> DriftRereview | None:
+    """The drift state of a needs_rereview item; None if it isn't in re-review or no check found its page changed.
+
+    Unresolved (`restored=False`) when either a live placement's latest successful check found the copy modified or
+    missing, whatever the reopen reason; or the item reopened for drift and the reopening placement's latest
+    finished check isn't `unchanged` (this is what catches a page unreachable on consecutive checks: those checks
+    failed, with no result). Restored when it reopened for drift and that check is `unchanged`. Up to four queries.
+    """
     item = ReviewItem.objects.filter(pk=item_id).values_list("status", "reopen_reason").first()
-    if item != (ItemStatus.NEEDS_REREVIEW.value, ReopenReason.DRIFT_DETECTED.value):
+    if item is None or item[0] != ItemStatus.NEEDS_REREVIEW.value:
+        return None
+    drifted = _drifted_live_placement(item_id, today)
+    if drifted is not None:
+        return DriftRereview(placement_id=drifted, restored=False)
+    if item[1] != ReopenReason.DRIFT_DETECTED.value:
         return None
     reopening = (
         Snapshot.objects.filter(placement__item_id=item_id, reopen_event__isnull=False)
@@ -105,6 +140,29 @@ def drift_rereview(*, item_id: int) -> DriftRereview | None:
         .first()
     )
     return DriftRereview(placement_id=reopening, restored=latest == DriftResult.UNCHANGED.value)
+
+
+@dataclass(frozen=True)
+class FastTrackCheck:
+    """Whether the fast-track lane takes an item's current version: it must be a generated terms-change version
+    (`generated`) and no live page may show something other than the approved copy (`drift` is the unresolved drift
+    re-review, if any). `reviews.decisions` raises on this; the queue rows show it as `fast_track_eligible`."""
+
+    generated: bool
+    drift: DriftRereview | None
+
+    @property
+    def eligible(self) -> bool:
+        return self.generated and self.drift is None
+
+
+def fast_track_check(*, item_id: int, version_origin: VersionOrigin, today: date) -> FastTrackCheck:
+    """The fast-track lane's rule for an item at a version of `version_origin` (walkthrough B1). No query unless
+    the version is generated; then up to four (`drift_rereview`)."""
+    if version_origin is not VersionOrigin.FAST_TRACK:
+        return FastTrackCheck(generated=False, drift=None)
+    drift = drift_rereview(item_id=item_id, today=today)
+    return FastTrackCheck(generated=True, drift=drift if drift is not None and not drift.restored else None)
 
 
 # --- filtering -------------------------------------------------------------------------------------------------
@@ -164,7 +222,7 @@ def filter_items(*, viewer: User, filters: ItemFilter, clock: Clock = SYSTEM_CLO
         qs = qs.filter(reopen_reason__in=f.reopen_reason)
     qs = _in_range(qs, "submitted_at", f.submitted_after, f.submitted_before)
     if f.waiting_more_than_days is not None:
-        qs = qs.filter(submitted_at__lt=clock.now() - timedelta(days=f.waiting_more_than_days))
+        qs = qs.filter(queue_entered_at__lt=clock.now() - timedelta(days=f.waiting_more_than_days))
     qs = _in_range(qs, "approved_at", f.approved_after, f.approved_before)
     if f.approved_within_days is not None:
         qs = qs.filter(approved_at__gte=clock.now() - timedelta(days=f.approved_within_days))
@@ -219,7 +277,8 @@ class ItemRow:
     open_findings_count: int
     submitted_at: datetime
     updated_at: datetime
-    age_days: int
+    queue_entered_at: datetime  # when it last entered the queue (submission, resubmission, new round, reopen)
+    age_days: int  # whole days since queue_entered_at
     planned_first_run: date | None
     planned_last_run: date | None
     current_version_n: int | None
@@ -230,6 +289,10 @@ class ItemRow:
     partner: PartyRef | None
     owner: PartyRef | None
     assignee: PartyRef | None
+    # The fast-track lane would take it now (`fast_track_check`): a re-review whose current version the terms
+    # fan-out generated, with no live page showing other copy. Open findings and the AI check still gate the
+    # approval itself, as in every lane.
+    fast_track_eligible: bool
 
 
 @dataclass(frozen=True)
@@ -280,7 +343,8 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
         open_findings_count=item.open_findings_count,
         submitted_at=item.submitted_at,
         updated_at=item.updated_at,
-        age_days=max((now - item.submitted_at).days, 0),
+        queue_entered_at=item.queue_entered_at,
+        age_days=max((now - item.queue_entered_at).days, 0),
         planned_first_run=item.planned_first_run,
         planned_last_run=item.planned_last_run,
         current_version_n=getattr(item, "current_version_n", None),
@@ -289,7 +353,17 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
         partner=PartyRef(id=partner.pk, name=partner.name) if partner is not None else None,
         owner=_person(item.owner),
         assignee=_person(item.assignee),
+        fast_track_eligible=_fast_track_eligible(item, now),
     )
+
+
+def _fast_track_eligible(item: ReviewItem, now: datetime) -> bool:
+    """Queries only for a re-review at a generated version, which few rows are."""
+    origin = getattr(item, "current_version_origin", None)
+    if item.status != ItemStatus.NEEDS_REREVIEW.value or origin is None:
+        return False
+    check = fast_track_check(item_id=item.pk, version_origin=VersionOrigin(origin), today=timezone.localdate(now))
+    return check.eligible
 
 
 def _display_name(user: str) -> Coalesce:
@@ -310,6 +384,7 @@ def row_queryset(qs: QuerySet[ReviewItem]) -> QuerySet[ReviewItem]:
     `decision_item_idx`, evaluated for the rows returned."""
     return qs.select_related("partner", "owner", "assignee").annotate(
         current_version_n=F("current_version__n"),
+        current_version_origin=F("current_version__origin"),
         latest_decision_outcome=_latest_decision_field("outcome"),
         latest_decision_reason=_latest_decision_field("reason"),
         latest_decision_at=_latest_decision_field("decided_at"),
@@ -370,7 +445,7 @@ STATUS_ORDER: Final = (
 RISK_ORDER: Final = (RiskTier.LOW, RiskTier.MEDIUM, RiskTier.HIGH)
 
 _ID: Final = _Key("id", "int")
-_SUBMITTED: Final = _Key("submitted_at", "datetime")
+_IN_QUEUE: Final = _Key("queue_entered_at", "datetime")  # Age: time since the item last entered the queue
 _COLUMN_SORTS: Final[dict[tuple[ItemSort, ItemSort], tuple[_Key, ...]]] = {
     (ItemSort.TITLE, ItemSort.TITLE_DESC): (_Key("title", "str"), _ID),
     (ItemSort.STATUS, ItemSort.STATUS_DESC): (_Key("sort_status", "int", _rank("status", STATUS_ORDER)), _ID),
@@ -384,9 +459,9 @@ _COLUMN_SORTS: Final[dict[tuple[ItemSort, ItemSort], tuple[_Key, ...]]] = {
 # (descending, keys). Every sort ends in id so the order is total, and each runs one direction (every key the
 # same way), so a page boundary is a single row-value comparison; for the queue, one the index can seek to.
 _SORTS: Final[dict[ItemSort, tuple[bool, tuple[_Key, ...]]]] = {
-    ItemSort.QUEUE: (False, (_Key("queue_priority", "int"), _SUBMITTED, _ID)),
-    ItemSort.OLDEST: (False, (_SUBMITTED, _ID)),
-    ItemSort.NEWEST: (True, (_SUBMITTED, _ID)),
+    ItemSort.QUEUE: (False, (_Key("queue_priority", "int"), _IN_QUEUE, _ID)),
+    ItemSort.OLDEST: (False, (_IN_QUEUE, _ID)),
+    ItemSort.NEWEST: (True, (_IN_QUEUE, _ID)),
     ItemSort.UPDATED: (True, (_Key("updated_at", "datetime"), _ID)),
     **{asc: (False, keys) for (asc, _), keys in _COLUMN_SORTS.items()},
     **{desc: (True, keys) for (_, desc), keys in _COLUMN_SORTS.items()},
@@ -496,7 +571,7 @@ class LibraryScope(StrEnum):
     """The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value
     doesn't lapse; run-permission does)."""
 
-    APPROVED_TO_RUN = "approved_to_run"  # current status approved, legacy included
+    APPROVED_TO_RUN = "approved_to_run"  # current status approved and not past its expiry, legacy included
     EVER_APPROVED = "ever_approved"  # any approving decision, or an imported item the tracker had as approved
 
 
@@ -513,7 +588,11 @@ def library_items(  # list_items' arguments plus the scope
     """The approved archive. `filters.status` narrows within the scope (e.g. ever-approved items now expired)."""
     qs = filter_items(viewer=viewer, filters=filters, clock=clock)
     if scope is LibraryScope.APPROVED_TO_RUN:
-        qs = qs.filter(status=ItemStatus.APPROVED.value)
+        # Not past its expiry, either: legacy items skip the expiry sweep, so their status stays approved after the
+        # date passes, and this tab answers "can I run this?" (walkthrough S19). No expiry recorded: still listed.
+        qs = qs.filter(status=ItemStatus.APPROVED.value).filter(
+            Q(approval_expires_at__isnull=True) | Q(approval_expires_at__gt=clock.now())
+        )
     else:
         approvals = Decision.objects.filter(item=OuterRef("pk"), outcome__in=APPROVED_OUTCOMES)
         qs = qs.filter(Exists(approvals) | Q(is_legacy=True, status=ItemStatus.APPROVED.value))

@@ -309,6 +309,7 @@ CC_STORIES: Final = (
                             "Only a limited number of invitations were mailed.",
                             "Scarcity claim: confirm the mail quantity makes this true, or remove it.",
                             "Remove the line.",
+                            fix_kind="instruction",
                         ),
                     )
                 ),

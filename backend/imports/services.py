@@ -388,6 +388,7 @@ def _create_item(row: ParsedRow, *, partner_id: int | None, notes: str, at: date
         notes=notes,
         source_url=row.asset_url or "",
         submitted_at=submitted_at,
+        queue_entered_at=submitted_at,  # the tracker records no later re-entry
         approved_at=_midnight(row.approved_on) if approved else None,
         approval_expires_at=_midnight(row.expires_on) if approved else None,
         created_at=at,

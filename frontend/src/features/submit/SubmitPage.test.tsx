@@ -76,6 +76,8 @@ function previewHandler(requests: CheckPreviewIn[] = []) {
               severity: 'blocking',
               message: 'Rate claim needs the full APR range',
               suggested_fix: 'Show the range: 5.99%–35.99% APR',
+              fix_kind: 'instruction',
+              replacement_text: null,
               span: spanOf(body.content_text, 'as low as'),
               quote: 'as low as',
             },
@@ -198,7 +200,9 @@ describe('SubmitPage', () => {
                   source: 'code',
                   severity: 'blocking',
                   message: "This APR isn't offered; current APRs are 9.99%–35.99%.",
-                  suggested_fix: '9.99%–35.99%',
+                  suggested_fix: '9.99%',
+                  fix_kind: 'replace',
+                  replacement_text: '9.99%',
                   span: spanOf(body.content_text, '4.99%'),
                   quote: '4.99%',
                 },
@@ -209,6 +213,8 @@ describe('SubmitPage', () => {
                   severity: 'warning',
                   message: 'This payment needs the APR stated with it.',
                   suggested_fix: 'Add the APR, e.g. "12.99% APR".',
+                  fix_kind: 'instruction',
+                  replacement_text: null,
                   span: spanOf(body.content_text, 'Personal'),
                   quote: 'Personal',
                 },
@@ -223,14 +229,14 @@ describe('SubmitPage', () => {
     await fillValid(user, '💸 Personal loans at 4.99% APR.');
 
     const panel = screen.getByRole('region', { name: 'Code checks' });
-    const apply = await within(panel).findByRole('button', { name: 'Apply suggestion: 9.99%–35.99%' });
+    const apply = await within(panel).findByRole('button', { name: 'Apply suggestion: 9.99%' });
     // An instruction isn't text to paste: no Apply on it.
     expect(within(panel).getAllByRole('button', { name: /^Apply/ })).toHaveLength(1);
     await user.click(apply);
 
-    expect(screen.getByLabelText('Copy')).toHaveValue('💸 Personal loans at 9.99%–35.99% APR.');
+    expect(screen.getByLabelText('Copy')).toHaveValue('💸 Personal loans at 9.99% APR.');
     await waitFor(() => {
-      expect(requests.at(-1)?.content_text).toBe('💸 Personal loans at 9.99%–35.99% APR.');
+      expect(requests.at(-1)?.content_text).toBe('💸 Personal loans at 9.99% APR.');
     });
     expect(await within(panel).findByText('No code findings.')).toBeInTheDocument();
   });

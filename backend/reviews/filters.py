@@ -14,10 +14,10 @@ class ItemSort(StrEnum):
     """One member per order: each runs one direction so a keyset page boundary is a single row comparison.
     Column sorts come in pairs, `x` ascending and `x_desc` the exact reverse."""
 
-    # Re-reviews of live content first, then risk tier, then age (spec §4.3 Review). With no status filter,
-    # limited to the queue statuses (submitted, in_review, needs_rereview).
+    # Re-reviews of live content first, then risk tier, then age: time since the item last entered the queue
+    # (spec §4.3 Review). With no status filter, limited to the queue statuses (submitted, in_review, needs_rereview).
     QUEUE = "queue"
-    OLDEST = "oldest"
+    OLDEST = "oldest"  # longest in the queue first: by when the item last entered it (Age)
     NEWEST = "newest"
     UPDATED = "updated"  # most recently changed first
     TITLE = "title"
@@ -65,7 +65,11 @@ class ItemFilter(Schema):
     reopen_reason: list[ReopenReason] = Field(default_factory=list)
     submitted_after: datetime | None = None
     submitted_before: datetime | None = None
-    waiting_more_than_days: int | None = Field(default=None, ge=0, description="Submitted more than N days ago.")
+    waiting_more_than_days: int | None = Field(
+        default=None,
+        ge=0,
+        description="Entered the queue more than N days ago (last submission, resubmission, new round or reopen).",
+    )
     approved_after: datetime | None = None
     approved_before: datetime | None = None
     approved_within_days: int | None = Field(default=None, ge=0, description="Approved in the last N days.")

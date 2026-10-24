@@ -21,7 +21,7 @@ from audit.payloads import EventPayload, ItemReviewStartedPayload
 from audit.services import record_event
 from core.domain import EntityType, EventType, ItemStatus, ReopenReason
 from core.errors import InvalidTransition
-from reviews.models import ReviewItem
+from reviews.models import QUEUE_STATUSES, ReviewItem
 
 S = ItemStatus
 
@@ -101,7 +101,12 @@ def apply_transition(  # the event's columns plus the reopen reason
     elif transition.reopen == "clear":
         item.reopen_reason = None
     item.updated_at = at
-    item.save(update_fields=["status", "reopen_reason", "updated_at"])
+    update_fields = ["status", "reopen_reason", "updated_at"]
+    if transition.target.value in QUEUE_STATUSES and from_status.value not in QUEUE_STATUSES:
+        # Resubmit, new round, reopen: the item is waiting for a reviewer again, from now (walkthrough S4).
+        item.queue_entered_at = at
+        update_fields.append("queue_entered_at")
+    item.save(update_fields=update_fields)
     return record_event(
         type=transition.event,
         entity=entity,

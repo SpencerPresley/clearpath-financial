@@ -85,7 +85,7 @@ describe('QueueTable', () => {
     expect(r.getByText('LendStack')).toBeInTheDocument();
     expect(r.getByText('Unassigned')).toBeInTheDocument();
     expect(r.getByText('4 open findings')).toBeInTheDocument();
-    expect(r.getByText('3d')).toBeInTheDocument();
+    expect(r.getByText('3.1d')).toBeInTheDocument(); // 3 days 2 hours in the queue: never "3d"
     expect(r.getByText('R2')).toBeInTheDocument();
   });
 

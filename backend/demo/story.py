@@ -12,7 +12,7 @@ five minutes before the seed ran. Run dates (`first_run`, `last_run`) are whole 
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Final
+from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
 from core.domain import (
@@ -108,6 +108,8 @@ class AiFinding:
     quote: str
     message: str
     suggested_fix: str = ""
+    # How the model labels the suggestion (checks.llm.schema): wording for the quote, or advice ("Remove the line.").
+    fix_kind: Literal["replace", "instruction"] = "replace"
 
 
 @dataclass(frozen=True)

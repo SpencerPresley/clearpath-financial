@@ -12,6 +12,7 @@ import { Link } from '@tanstack/react-router';
 
 import type { MetricName, MetricsSummaryOut } from '../../api/generated/model';
 import { Icon } from '../../ui/Icon';
+import { plural } from '../../ui/labels';
 import { formatHours, formatRounds } from './format';
 import { METRIC_META } from './labels';
 import type { MetricsSearch } from './search';
@@ -152,7 +153,11 @@ export function MetricTiles({
                 }}
               >
                 <Icon name="status.needs_rereview" size={13} className="shrink-0" />
-                {`${String(open.count)} ${open.count === 1 ? 're-review' : 're-reviews'} open · oldest ${formatHours(open.oldest_hours)}`}
+                {/* Live fixes, not re-reviews: pulled items awaiting a confirmed takedown are still unfixed (ruling
+                    6) but aren't in the queue's Needs re-review count, so they're named separately (nit 10). */}
+                {`${plural(open.count, 'live fix', 'live fixes')} open · oldest ${formatHours(open.oldest_hours)}${
+                  open.awaiting_takedown > 0 ? ` · ${String(open.awaiting_takedown)} awaiting takedown` : ''
+                }`}
               </button>
             )}
           </div>

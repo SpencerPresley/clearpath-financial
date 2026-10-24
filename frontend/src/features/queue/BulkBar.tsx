@@ -1,9 +1,10 @@
 /*
  * Bulk actions on the selection (decisions.md "Ergonomics": bulk assign and bulk fast-track approval).
  * - Assign: leads and admins (decisions.md "Who can reassign"), via POST /items/bulk/assign.
- * - Fast-track approve: leads only (the server refuses anyone else), only for selected items in needs re-review,
- *   each at the version its row showed (`seen_versions`); needs a reason. The server skips any item with open
- *   findings (spec §4.2 ruling 4) or a newer version, and those stay selected so they can go the normal lane.
+ * - Fast-track approve: leads only (the server refuses anyone else), only for selected rows the server marks
+ *   `fast_track_eligible`, each at the version its row showed (`seen_versions`); needs a reason. The server skips
+ *   any item with open findings (spec §4.2 ruling 4) or a newer version; those, and the selected rows that weren't
+ *   eligible, stay selected so they can go the normal lane.
  * An action the viewer can't take isn't rendered (no dead buttons).
  */
 import { useQueryClient } from '@tanstack/react-query';
@@ -40,16 +41,16 @@ import { showToast } from '../../ui/toast';
 import { Tooltip } from '../../ui/Tooltip';
 
 /**
- * Whether a row can take fast-track at all. Fast-track approves the version the offer-terms fan-out generated, so
- * only offer-terms re-reviews have one; an approval-expiry re-review never does, and a drift re-review is refused
- * while the partner page differs (the review screen's `rereviewActions`). Rows don't carry the version's origin or
- * the drift check, so the server still decides per item and skips the rest with a reason.
+ * Whether the fast-track lane would take a row: the server computes `fast_track_eligible` with the rule it
+ * enforces (a re-review whose current version the offer-terms fan-out generated, with no live page showing other
+ * copy), so the bar never guesses from the reopen reason. Open findings and the AI check still decide per item.
  */
 export function canFastTrackRow(row: ItemRowOut): boolean {
-  return row.status === 'needs_rereview' && row.reopen_reason === 'terms_changed';
+  return row.fast_track_eligible && row.current_version_n !== null;
 }
 
-const NO_FAST_TRACK = 'Only offer-terms re-reviews can be fast-tracked, and none is selected.';
+const NO_FAST_TRACK =
+  'None of the selected items can be fast-tracked: only an offer-terms re-review whose live page shows the approved copy can.';
 
 function items(n: number) {
   return `${String(n)} item${n === 1 ? '' : 's'}`;
@@ -85,12 +86,13 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
   // Each re-review at the version its row showed: one a later terms change generated after the queue loaded is
   // skipped as stale_version, never approved unseen.
   const seenVersions = rows.flatMap((r) =>
-    selected.has(r.id) && r.status === 'needs_rereview' && r.current_version_n !== null
+    selected.has(r.id) && canFastTrackRow(r) && r.current_version_n !== null
       ? [{ item_id: r.id, version_n: r.current_version_n }]
       : [],
   );
-  const rereviewIds = seenVersions.map((v) => v.item_id);
-  const fastTrackable = rows.some((r) => selected.has(r.id) && canFastTrackRow(r));
+  const fastTrackIds = seenVersions.map((v) => v.item_id);
+  const fastTrackable = fastTrackIds.length > 0;
+  const hasRereview = rows.some((r) => selected.has(r.id) && r.status === 'needs_rereview');
 
   const settle = () => {
     void qc.invalidateQueries({ queryKey: getListItemsQueryKey().slice(0, 1) });
@@ -140,19 +142,21 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
   };
 
   const doFastTrack = () => {
+    const sent = new Set(fastTrackIds);
     fastTrack.mutate(
-      { data: { item_ids: rereviewIds, reason: reason.trim(), seen_versions: seenVersions } },
+      { data: { item_ids: fastTrackIds, reason: reason.trim(), seen_versions: seenVersions } },
       {
         onSuccess: (result) => {
           setReasonOpen(false);
           setReason('');
-          keepSkipped(result);
+          const skipped = new Set(result.skipped.map((s) => s.item_id));
+          onSelectionChange(selectedIds.filter((id) => skipped.has(id) || !sent.has(id)));
           const done = result.succeeded.length;
           showToast(
             result.skipped.length === 0
               ? { title: `Fast-tracked ${items(done)}` }
               : {
-                  title: `Fast-tracked ${String(done)} of ${items(rereviewIds.length)} · ${String(result.skipped.length)} skipped`,
+                  title: `Fast-tracked ${String(done)} of ${items(fastTrackIds.length)} · ${String(result.skipped.length)} skipped`,
                   description: skippedDetail(result),
                 },
             result.skipped.length === 0 ? undefined : 10_000,
@@ -214,7 +218,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
           </Popover>
         </MenuTrigger>
       )}
-      {isLead && rereviewIds.length > 0 && (
+      {isLead && hasRereview && (
         <span className="app-bulk-action">
           <Button
             size="sm"
@@ -226,7 +230,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
             }}
           >
             {fastTrackable
-              ? `Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`
+              ? `Fast-track ${String(fastTrackIds.length)} ${fastTrackIds.length === 1 ? 're-review' : 're-reviews'}…`
               : 'Fast-track'}
           </Button>
           {!fastTrackable && (
@@ -263,7 +267,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
         <Modal className="app-modal w-96">
           <Dialog className="flex flex-col gap-3 outline-none">
             <Heading slot="title" className="text-sm font-semibold">
-              {`Fast-track approve ${items(rereviewIds.length)}`}
+              {`Fast-track approve ${items(fastTrackIds.length)}`}
             </Heading>
             <p className="text-muted">
               Approves the generated version of each re-review. Items with open findings are skipped and stay

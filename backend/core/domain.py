@@ -58,6 +58,17 @@ class FindingSource(StrEnum):
     HUMAN = "human"
 
 
+class FixKind(StrEnum):
+    """What a finding's suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`
+    in place of the finding's span; `insert` puts it right after the span (the text carries its own leading space
+    or punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means
+    unknown (rows from before the field existed)."""
+
+    REPLACE = "replace"
+    INSERT = "insert"
+    INSTRUCTION = "instruction"
+
+
 class AttachmentKind(StrEnum):
     CREATIVE = "creative"
     SUBSTANTIATION = "substantiation"
@@ -295,6 +306,9 @@ class EventType(StrEnum):
     PAGE_FINDINGS_FLAGGED = "placement.page_findings_flagged"
     ATTACHMENT_ADDED = "attachment.added"
     TERMS_PUBLISHED = "terms.published"
+    # An in-flight version's quoted numbers all still hold under a newly published terms version: its terms refs
+    # now point at that version (the S20 re-check; approved versions are never re-linked).
+    TERMS_REFS_RELINKED = "terms.refs_relinked"
     PARTNER_CREATED = "partner.created"
     PARTNER_UPDATED = "partner.updated"
     USER_AVAILABILITY_CHANGED = "user.availability_changed"

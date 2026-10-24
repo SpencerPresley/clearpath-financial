@@ -176,6 +176,21 @@ def test_fix_live_stays_open_until_the_last_takedown_is_confirmed() -> None:
     assert [(c.item_id, c.start) for c in still_open] == [(1, T0 + timedelta(hours=10))]
 
 
+def test_an_open_fix_says_whether_it_waits_on_a_takedown_or_a_review() -> None:
+    # Walkthrough nit 10: the queue's Needs re-review count leaves out pulled items whose takedown isn't confirmed;
+    # the fix-live clock rightly keeps running for them (ruling 6), so each open clock says which it is.
+    reopened = [fact(E.ITEM_SUBMITTED, 0, item_id=1), fact(E.ITEM_REOPENED, 10, item_id=1)]
+    pulled = [
+        fact(E.ITEM_SUBMITTED, 0, item_id=2),
+        fact(E.ITEM_REOPENED, 10, item_id=2),
+        fact(E.ITEM_WITHDRAWN, 11, item_id=2, placement_ids=(71,)),
+    ]
+
+    _, still_open = native_measurements([*reopened, *pulled])
+
+    assert [(c.item_id, c.awaiting_takedown) for c in still_open] == [(1, False), (2, True)]
+
+
 def test_a_reject_with_nothing_live_ends_the_fix_at_the_rejection() -> None:
     facts = [
         fact(E.ITEM_SUBMITTED, 0),

@@ -10,6 +10,7 @@ from core.domain import (
     Channel,
     CreditCardTerms,
     FindingSource,
+    FixKind,
     Market,
     PartnerType,
     PersonalLoanTerms,
@@ -70,6 +71,9 @@ class FindingDraft:
     suggested_fix: str | None
     span: Span | None
     quote: str | None  # == text[span.start:span.end] when span is set
+    # What Apply does with the fix (see `FixKind`); None with no fix. `replacement_text` only for replace/insert.
+    fix_kind: FixKind | None = None
+    replacement_text: str | None = None
 
 
 @dataclass(frozen=True)

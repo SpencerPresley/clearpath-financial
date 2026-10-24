@@ -43,6 +43,7 @@ class ScriptedReviewModel(GenericFakeChatModel):
                     "end": start + len(finding.quote),
                     "message": finding.message,
                     "suggested_fix": finding.suggested_fix,
+                    "fix_kind": finding.fix_kind,
                 }
             )
         message = AIMessage(

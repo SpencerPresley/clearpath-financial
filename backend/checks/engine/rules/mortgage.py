@@ -9,7 +9,17 @@ from collections.abc import Iterable
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
-from checks.engine.rule import REGN_1014, REGZ_1026_24, URL_1014, URL_1026_24, Hit, Rule, make_spec
+from checks.engine.rule import (
+    REGN_1014,
+    REGZ_1026_24,
+    URL_1014,
+    URL_1026_24,
+    Hit,
+    Rule,
+    instruct,
+    make_spec,
+    replace_with,
+)
 from checks.engine.text import APOS, compile_i, window_after, window_before
 from checks.engine.types import RuleContext, Span
 from core.domain import Product, Severity
@@ -82,6 +92,7 @@ _ARM_NAME = re.compile(r"\bARM\b|(?i:\b(?:adjustable|variable)[-\s]rate\s+mortga
 _FIXED = compile_i(r"\bfixed\b")
 # "fixed" naming a fixed-rate product in an ad that offers both kinds (1026.24(i)(1)(iii)): "30-year fixed".
 _FIXED_PRODUCT = compile_i(r"\b\d{1,2}[-\s]year\s+fixed\b|\bfixed[-\s]rate\s+(?:mortgages?|loans?|options?)\b")
+_ARM_TYPE = re.compile(r"\b(\d{1,2})/\d{1,2}(?:\s+ARM\b|(?i:\s+adjustable[-\s]rate\s+mortgage\b))")
 _FIXED_PERIOD = compile_i(r"\b\d+\s*(?:-\s*)?(?:years?|yrs?|months?)\b")
 _MAY_CHANGE = compile_i(
     r"\b(?:may|can|could|will|then)\s+(?:\w+\s+)?(?:adjust|change|vary|increase|reset)\w*|\badjusts?\b|\badjustable\b"
@@ -124,12 +135,16 @@ def _arm_fixed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
     if not fixed:
         return
     first = fixed[0]
+    # The fixed period comes from the ARM the copy names ("7/6 ARM" is fixed 7 years); there are no mortgage rate
+    # terms to take it from, so without one the suggestion leaves the number out rather than inventing it.
+    arm = _ARM_TYPE.search(text)
+    years = arm.group(1) if arm else None
     if not _ARM_NAME.search(text, 0, first.start()):
-        yield Hit(
+        yield instruct(
             Span(first.start(), first.end()),
             'In an adjustable-rate ad, put "ARM" or "Adjustable-Rate Mortgage" before the first "fixed", '
             "at least as prominently.",
-            '"5/1 ARM: rate fixed for the first 5 years, then may adjust annually"',
+            f'"{arm.group(0)}: rate fixed for the first {years} years, then may adjust"' if arm else None,
         )
         return
     for m in fixed:
@@ -138,10 +153,10 @@ def _arm_fixed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
             text, m.end(), _FIXED_REACH, para.end
         )
         if not (_FIXED_PERIOD.search(near) and _MAY_CHANGE.search(near)):
-            yield Hit(
+            yield instruct(
                 Span(m.start(), m.end()),
                 'Next to each "fixed", say how long the rate is fixed and that it may change after that.',
-                '"fixed for the first 5 years, then may adjust annually"',
+                f'"fixed for the first {years} years, then may adjust"' if years else None,
             )
 
 
@@ -158,7 +173,7 @@ def _payment_taxes_insurance(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -
         if elsewhere
         else "Add next to the payment that it excludes taxes and insurance and the actual payment will be greater."
     )
-    yield Hit(
+    yield instruct(
         payment.span,
         message,
         '"Payment does not include taxes and insurance premiums; the actual payment obligation will be greater."',
@@ -181,7 +196,7 @@ def _government(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hi
 
 def _debt_elimination(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     for m in _DEBT_ELIMINATION.finditer(a.text):
-        yield Hit(
+        yield instruct(
             Span(m.start(), m.end()),
             "Debt-elimination language may mislead. It's fine to say the loan can consolidate or reduce payments.",
             '"Consolidate your debt into one monthly payment."',
@@ -193,13 +208,36 @@ def _counselor(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
         if _HOUSING_COUNSELING.search(window_before(a.text, m.end(), _DISCLAIMER_REACH)):
             continue  # referring consumers to housing counseling is not calling loan staff counselors
         span = Span(m.start(), m.end())
-        yield Hit(span, 'Call loan staff "loan officers," not "counselors."', '"loan officer"')
+        yield replace_with(span, 'Call loan staff "loan officers," not "counselors."', _loan_officer(m.group(0)))
         return
+
+
+def _loan_officer(word: str) -> str:
+    """ "counselor" -> "loan officer", keeping the copy's plural and leading capital."""
+    officer = "loan officers" if word.lower().endswith("s") else "loan officer"
+    return officer.capitalize() if word[0].isupper() else officer
+
+
+_PRE_APPROV = compile_i(r"pre[-\s]?approv(?P<suffix>ed|als?)")
+_PREQUAL = {"ed": "qualified", "al": "qualification", "als": "qualifications"}
+
+
+def _prequalified(phrase: str) -> str:
+    """ "Get pre-approved" -> "Get prequalified", "preapprovals" -> "prequalifications"; the rest of the phrase,
+    and a leading capital, stay as written."""
+
+    def swap(m: re.Match[str]) -> str:
+        word = "pre" + _PREQUAL[m.group("suffix").lower()]
+        return word.capitalize() if m.group(0)[0].isupper() else word
+
+    return _PRE_APPROV.sub(swap, phrase)
 
 
 def _preapproval_offer(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     for m in _PREAPPROVAL_OFFER.finditer(a.text):
-        yield Hit(Span(m.start(), m.end()), "ClearPath offers prequalification, not preapproval.", '"Get prequalified"')
+        yield replace_with(
+            Span(m.start(), m.end()), "ClearPath offers prequalification, not preapproval.", _prequalified(m.group(0))
+        )
 
 
 RULES: tuple[Rule, ...] = (

@@ -106,7 +106,11 @@ class ReviewItem(models.Model):
     # Denormalized: maintained by the services that create and triage findings (queue speed, decisions.md).
     open_findings_count = models.PositiveIntegerField(default=0)
 
-    submitted_at = models.DateTimeField()  # latest (re)submission; the queue's "age"
+    submitted_at = models.DateTimeField()  # latest (re)submission by the marketer
+    # When the item last entered the reviewers' queue: submission, resubmission, a new round, or a reopen
+    # (re-review). The queue's Age, "Waiting >3 days", and age order measure from it (walkthrough S4): a re-review
+    # opened a minute ago isn't 8 weeks old. Maintained by `reviews.transitions.apply_transition` and intake.
+    queue_entered_at = models.DateTimeField()
     approved_at = models.DateTimeField(null=True, blank=True)
     approval_expires_at = models.DateTimeField(null=True, blank=True)
     retention_until = models.DateField(null=True, blank=True)
@@ -114,7 +118,7 @@ class ReviewItem(models.Model):
     updated_at = models.DateTimeField()
 
     # Queue order (spec §4.3 Review): re-reviews of live content first, then risk tier; age breaks ties via
-    # submitted_at in the index. A re-review is a queued item with a reopen_reason, so it keeps its priority
+    # queue_entered_at in the index. A re-review is a queued item with a reopen_reason, so it keeps its priority
     # when a reviewer opens it (in_review) and through a changes_requested -> submitted loop. An expired item
     # is not queued. Contract for E: clear reopen_reason when the re-review resolves (approve, reaffirm,
     # withdraw) and when a marketer starts a new round from expired.
@@ -164,12 +168,12 @@ class ReviewItem(models.Model):
         ]
         indexes = [
             models.Index(
-                fields=["queue_priority", "submitted_at", "id"],
+                fields=["queue_priority", "queue_entered_at", "id"],
                 condition=Q(status__in=QUEUE_STATUSES),
                 name="item_queue_idx",
             ),
             models.Index(
-                fields=["assignee", "queue_priority", "submitted_at", "id"],
+                fields=["assignee", "queue_priority", "queue_entered_at", "id"],
                 condition=Q(status__in=QUEUE_STATUSES),
                 name="item_assignee_queue_idx",
             ),
