@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from core.domain import CreditCardTerms, OfferTermsValues, PersonalLoanTerms, Product
+from core.domain import CreditCardTerms, EntityType, EventType, OfferTermsValues, PersonalLoanTerms, Product, TermsField
 
 TERMS = TypeAdapter(OfferTermsValues)
 
@@ -48,3 +48,19 @@ def test_terms_round_trip_through_json() -> None:
 
     assert TERMS.validate_json(TERMS.dump_json(terms)) == terms
     assert terms.product is Product.PERSONAL_LOAN
+
+
+def test_terms_fields_name_real_schema_fields_or_examples() -> None:
+    schema_fields = set(PersonalLoanTerms.model_fields) | set(CreditCardTerms.model_fields)
+
+    for field in TermsField:
+        assert field.value in schema_fields or field.value.startswith("example_"), field
+
+
+def test_event_types_are_dotted_and_namespaced() -> None:
+    namespaces = {e.value for e in EntityType} | {"llm_check", "checks", "terms", "demo"}
+
+    for event_type in EventType:
+        namespace, _, action = event_type.value.partition(".")
+        assert action, event_type
+        assert namespace in namespaces, event_type
