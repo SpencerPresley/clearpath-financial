@@ -2,7 +2,14 @@
 
 from enum import StrEnum
 
-from django.db import IntegrityError, migrations
+from django.db import IntegrityError, migrations, models
+
+
+class CurrentTransactionId(models.Func):
+    """`pg_current_xact_id()` as a bigint: the inserting transaction's id, used as a column default."""
+
+    template = "(pg_current_xact_id()::text::bigint)"
+    output_field = models.BigIntegerField()
 
 
 def enum_choices(enum: type[StrEnum]) -> list[tuple[str, str]]:

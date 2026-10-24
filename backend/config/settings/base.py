@@ -90,6 +90,8 @@ INSTALLED_APPS = [
     "terms",
     "reviews",
     "checks",
+    "audit",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -179,6 +181,11 @@ CELERY_RESULT_BACKEND = None
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = 300
+CELERY_BEAT_SCHEDULE = {
+    # The event log is the outbox (decisions.md "Data"): poll it often; Redis is disposable.
+    "dispatch-outbox": {"task": "audit.dispatch_outbox", "schedule": 2.0},
+    "redeliver-stale-events": {"task": "audit.redeliver_stale_events", "schedule": 300.0},
+}
 
 LOGGING = {
     "version": 1,

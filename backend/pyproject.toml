@@ -62,6 +62,6 @@ ignore = [
 "core/errors.py" = ["N818"]  # domain error names are fixed by the spec (InvalidTransition, NotPermitted, ...)
 
 [tool.pyrefly]
-project-includes = ["config", "core", "checks", "accounts", "conftest.py", "partners", "terms", "reviews"]
+project-includes = ["config", "core", "checks", "accounts", "conftest.py", "partners", "terms", "reviews", "audit", "notifications"]
 project-excludes = ["**/migrations/**", "**/.venv/**", "**/__pycache__/**"]
 python-version = "3.13"
