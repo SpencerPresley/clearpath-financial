@@ -10,6 +10,7 @@ import {
   APPROVED_ROWS,
   exportJob,
   LIBRARY_PARTNERS,
+  libraryRow,
   ME_LIBRARY_MARKETER,
   ME_LIBRARY_REVIEWER,
   PRECEDENT_HITS,
@@ -71,6 +72,20 @@ describe('Library: approved to run', () => {
     ).toBeInTheDocument();
     expect(within(legacy).getByText(/CP-412 is a legacy import with no decision record/)).toBeInTheDocument();
     expect(within(legacy).queryByRole('button', { name: /^Build pack for/ })).toBeNull();
+  });
+
+  it('says when each approval expires, in place of the planned run', async () => {
+    serveLibrary([
+      libraryRow({ id: 1088, approval_expires_at: '2026-12-31T05:00:00Z' }),
+      libraryRow({ id: 412, is_legacy: true, approval_expires_at: null }),
+    ]);
+    renderApp('/library');
+
+    const table = await screen.findByRole('table', { name: 'Approved to run' });
+    expect(within(table).getByRole('columnheader', { name: 'Expires' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Planned run' })).toBeNull();
+    expect(within(table).getByRole('row', { name: /CP-1088/ })).toHaveTextContent('Dec 31, 2026');
+    expect(within(table).getByRole('row', { name: /CP-412/ })).toHaveTextContent('No expiry');
   });
 
   it('writes filters to the URL and sends them to the API', async () => {

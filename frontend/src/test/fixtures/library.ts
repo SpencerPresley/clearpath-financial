@@ -71,7 +71,8 @@ export function libraryRow(overrides: Partial<ItemRowOut> & { id: number }): Ite
     partner: null,
     owner: { id: 11, name: 'Priya Natarajan' },
     assignee: { id: 21, name: 'Dana Reyes' },
-    approval_expires_at: null,
+    // Native approvals carry an expiry; legacy imports often don't (the tracker left it blank).
+    approval_expires_at: overrides.is_legacy === true ? null : '2027-03-31T04:00:00Z',
     latest_decision: null,
     notes: '',
     ...overrides,

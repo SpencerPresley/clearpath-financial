@@ -17,43 +17,27 @@ import { hasFilters } from './search';
 import type { LibrarySearch } from './search';
 import type { LibraryItemsQuery } from './useLibraryItems';
 
-/** Key, title, product, channel, partner, planned run, evidence pack. Title takes the rest. */
+/** Key, title, product, channel, partner, expires, evidence pack. Title takes the rest. */
 const COLUMNS = [
   { id: 'key', label: 'Item', width: '5.5rem' },
   { id: 'title', label: 'Title', width: undefined },
   { id: 'product', label: 'Product', width: '8.5rem' },
   { id: 'channel', label: 'Channel', width: '7rem' },
   { id: 'partner', label: 'Partner', width: '7.5rem' },
-  { id: 'run', label: 'Planned run', width: '10.5rem' },
+  { id: 'expires', label: 'Expires', width: '7.5rem' },
   { id: 'pack', label: 'Evidence pack', width: '7.5rem' },
 ] as const;
 
 const TITLE_MIN = 240;
 /** Fits the 1280px layout (1014px for the table) without sideways scrolling. */
-const MIN_WIDTH = TITLE_MIN + 46.5 * 16;
+const MIN_WIDTH = TITLE_MIN + 43.5 * 16;
 
-function shortDate(value: string, withYear: boolean): string {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString(
-        'en-US',
-        withYear ? { month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' },
-      );
-}
-
-/** "Nov 1 – Dec 31, 2026", "From Oct 1, 2026", or an em dash. */
-export function plannedRun(first: string | null, last: string | null): string {
-  if (first === null && last === null) return '—';
-  if (first !== null && last !== null) {
-    if (first.slice(0, 4) === last.slice(0, 4))
-      return `${shortDate(first, false)} – ${shortDate(last, true)}`;
-    // Across a year end, short years keep it inside the column: "Nov 15 '26 – Jan 15 '27".
-    const year = (d: string) => `'${d.slice(2, 4)}`;
-    return `${shortDate(first, false)} ${year(first)} – ${shortDate(last, false)} ${year(last)}`;
-  }
-  if (first !== null) return `From ${formatDate(first)}`;
-  return `Until ${formatDate(last ?? '')}`;
+/**
+ * When run permission lapses: the latest approval's expiry. An approval with no expiry (allowed for legacy
+ * imports, where the tracker left it blank) says so instead of showing a blank.
+ */
+function expires(at: string | null) {
+  return at === null ? <span className="text-muted">No expiry</span> : formatDate(at);
 }
 
 function Colgroup() {
@@ -110,7 +94,7 @@ function Row({ row }: { row: ItemRowOut }) {
       <td className="app-td" title={row.partner?.name}>
         {row.partner?.name ?? <span className="text-muted">—</span>}
       </td>
-      <td className="app-td app-figure">{plannedRun(row.planned_first_run, row.planned_last_run)}</td>
+      <td className="app-td app-figure">{expires(row.approval_expires_at)}</td>
       <td className="app-td">
         <EvidencePackAction itemId={row.id} itemKey={row.key} isLegacy={row.is_legacy} compact />
       </td>

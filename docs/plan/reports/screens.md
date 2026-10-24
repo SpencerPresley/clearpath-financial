@@ -269,19 +269,17 @@ Private database, migrated and seeded, then dropped. Preview: "2 approved items 
 will expire."; publish v2 and its history diff; the unchanged gate. Partners list, detail, items, findings history,
 upload, edit, create, and a duplicate-name 422 landing on Name.
 
-## Decisions needed (all three PRs)
+## Decisions (all three PRs)
 
-Every one of these is reversible. Each is listed with its default as built.
+The orchestrator ruled on 1–7: 1–5 were accepted as built, and 6 and 7 are built in PR 3 as ruled.
 
 1. **Who reads metrics.** Built: reviewers, leads and admins; marketers get a 403. The nav shows Metrics to leads only (product-spec Roles). Changing who can read is a one-line `require_role` change.
 2. **Per-source figures.** When native and imported data both contribute, the tiles show each source's figure and no blended number. The blended median is still in the API.
 3. **Imported data's reach.** Imported history feeds time to first review, rounds and throughput. It doesn't feed time per round or time to fix live content, because the tracker has no per-round dates and imported items are never reopened.
 4. **Attribution by end time.** A measurement counts in the period where it ends.
 5. **Open fix-live clocks are a drill-down list, not a queue link.** This deviates from the plan: the queue can't show withdrawn items whose takedowns are pending, and ruling 6 counts those as open.
-6. **Reviewers and partner pages (P1).**
-   - Should Partners, and Offer terms read-only, appear in reviewers' nav?
-   - Separately, the review screen's owner should link the partner name to `/partners/$id`.
-7. **Library Approved and Expires columns (L6).** #32 now provides `approval_expires_at`. Adding a column breaks the 1280 fit, so something has to give way; Planned run is the candidate.
+6. **Reviewers and partner pages (P1). Ruled and built:** Offer terms and Partners appear in reviewers' nav (read-only), and the review Details tab links the partner name to its page.
+7. **Library Expires column (L6). Ruled and built:** "Expires" replaces "Planned run" on Approved to run. An approval with no expiry reads "No expiry".
 8. **Plan path.** The issue named `frontend-secondary.md`; the brief's `docs/plan/screens.md` was used.
 
 ## Follow-ups for other owners

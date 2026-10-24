@@ -59,7 +59,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'Offer terms',
     icon: 'nav.offer_terms',
     group: 'reference',
-    roles: ['lead'],
+    roles: ['reviewer', 'lead'],
     to: '/terms',
   },
   {
@@ -67,7 +67,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'Partners',
     icon: 'nav.partners',
     group: 'reference',
-    roles: ['lead'],
+    roles: ['reviewer', 'lead'],
     to: '/partners',
   },
   {
