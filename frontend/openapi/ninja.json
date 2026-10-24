@@ -9239,9 +9239,9 @@
             ],
             "description": "Set when the URL is one of this site's demo pages."
           },
-          "gone_streak": {
-            "description": "How many of the latest checks in a row found the page gone (HTTP 404/410), up to 3; at 3 on a live placement the approved copy counts as missing and the item is reopened.",
-            "title": "Gone Streak",
+          "failure_streak": {
+            "description": "How many of the latest checks in a row couldn't fetch the page (404, outage, ...), up to 3; at 3 on a live placement the approved copy counts as missing and the item is reopened.",
+            "title": "Failure Streak",
             "type": "integer"
           },
           "is_live": {
@@ -9282,7 +9282,7 @@
           "monitored",
           "is_live",
           "latest",
-          "gone_streak",
+          "failure_streak",
           "demo_page"
         ],
         "title": "PlacementDriftOut",

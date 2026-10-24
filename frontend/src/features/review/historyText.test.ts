@@ -73,7 +73,7 @@ describe('describeEvent', () => {
     expect(describeEvent(reopened, { versions, users })).toBe('Sent to re-review: Offer terms changed');
   });
 
-  it('describes drift attention and a page gone on repeated checks', () => {
+  it('describes drift attention and repeated failed checks', () => {
     const flagged: Entry = {
       ...base('placement.page_findings_flagged'),
       actor: null,
@@ -88,7 +88,7 @@ describe('describeEvent', () => {
       'Placement checked: copy unchanged, 2 new blocking findings beside it',
     );
     expect(describeEvent(gone, { versions, users })).toBe(
-      'Sent to re-review: Live copy changed (page not found on 3 checks in a row)',
+      'Sent to re-review: Live copy changed (page couldn’t be fetched on 3 checks in a row)',
     );
   });
 

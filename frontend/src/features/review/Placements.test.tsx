@@ -47,7 +47,7 @@ function placement(overrides: Partial<PlacementDriftOut> = {}): PlacementDriftOu
     monitored: true,
     is_live: true,
     latest: snapshot(),
-    gone_streak: 0,
+    failure_streak: 0,
     demo_page: null,
     ...overrides,
   };
@@ -88,7 +88,7 @@ describe('checkOutcome', () => {
 
   it('reads a failed check that reopened the item as the copy missing', () => {
     expect(checkOutcome(snapshot({ status: 'failed', result: null, reopened_item: true }))).toEqual({
-      label: 'Page not found',
+      label: 'Page unreachable',
       tone: 'alert',
       icon: 'drift.missing',
     });
@@ -226,7 +226,7 @@ describe('PlacementsSection', () => {
     expect(screen.queryByText('New blocking findings')).not.toBeInTheDocument();
   });
 
-  it('counts a page that keeps returning not found', async () => {
+  it('counts checks in a row that could not fetch the page', async () => {
     const gone = {
       status: 'failed' as const,
       result: null,
@@ -234,23 +234,23 @@ describe('PlacementsSection', () => {
       error_code: 'http_error',
       error_message: 'The site returned an error. (HTTP 404)',
     };
-    serve({ item_id: 1042, placements: [placement({ gone_streak: 2, latest: snapshot(gone) })] });
+    serve({ item_id: 1042, placements: [placement({ failure_streak: 2, latest: snapshot(gone) })] });
     renderSection();
 
     expect(await screen.findByText('Check failed')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'The site returned an error. (HTTP 404) Not found on 2 checks in a row. Nothing changed on the item.',
+        'The site returned an error. (HTTP 404) 2 checks in a row couldn’t fetch the page. Nothing changed on the item.',
       ),
     ).toBeInTheDocument();
   });
 
-  it('says when a page gone on repeated checks sent the item to re-review', async () => {
+  it('says when repeated failed checks sent the item to re-review', async () => {
     serve({
       item_id: 1042,
       placements: [
         placement({
-          gone_streak: 3,
+          failure_streak: 3,
           latest: snapshot({
             status: 'failed',
             result: null,
@@ -264,10 +264,10 @@ describe('PlacementsSection', () => {
     });
     renderSection();
 
-    expect(await screen.findByText('Page not found')).toBeInTheDocument();
+    expect(await screen.findByText('Page unreachable')).toBeInTheDocument();
     expect(screen.getByText('This check sent the item to re-review.')).toBeInTheDocument();
     expect(
-      screen.getByText('The page wasn’t found on 3 checks in a row, so the approved copy counts as missing.'),
+      screen.getByText('3 checks in a row couldn’t fetch the page, so the approved copy counts as missing.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Nothing changed on the item/)).not.toBeInTheDocument();
   });
