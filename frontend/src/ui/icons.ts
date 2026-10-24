@@ -15,8 +15,11 @@
 import {
   ArrowBendUpLeftIcon,
   ArrowClockwiseIcon,
+  ArrowDownIcon,
   ArrowsCounterClockwiseIcon,
+  ArrowsDownUpIcon,
   ArrowSquareOutIcon,
+  ArrowUpIcon,
   ArrowUUpLeftIcon,
   BookmarkSimpleIcon,
   BooksIcon,
@@ -155,6 +158,10 @@ export const icons = {
   'action.save_view': regular(BookmarkSimpleIcon),
   'action.reload': regular(ArrowClockwiseIcon),
   'action.drag': bold(DotsSixVerticalIcon),
+  // Column sort state (server-sorted columns only).
+  'sort.ascending': regular(ArrowUpIcon),
+  'sort.descending': regular(ArrowDownIcon),
+  'sort.none': regular(ArrowsDownUpIcon),
   // Queue layouts (table is the default; board is the toggle, decisions.md "Queue views").
   'view.table': regular(TableIcon),
   'view.board': regular(KanbanIcon),
