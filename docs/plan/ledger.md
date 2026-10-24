@@ -22,7 +22,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | L demo seed (#13) | agent (worktree `wsL/demo-seed`) | — | in progress | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree `wsM/drift`) | — | in progress | SSRF-guarded fetch, drift snapshots/reopen, self-hosted demo partner pages |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
-| J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
+| J screens + metrics (#11) | agent (worktree) | #34 merged (metrics); #35 library+import, #36 terms+partners restacking | in progress | per-source metric figures (no blended numbers); every number drills to its items |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree) | PR #32 merged | done (CI failure root-caused: MoreFilters removed the focused submenu mid-selection; fixed in product code) | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
@@ -33,6 +33,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: metrics show native and imported figures side by side, never blended — a blend tracks the data mix, not team speed. Imported history feeds first review, rounds, throughput only.
+- Ruling: reviewers see Partners and Offer terms (read-only) in nav; partner name on the review screen links to the partner page; Library "Expires" replaces "Planned run".
 
 - Ruling: bulk fast-track is Lead-only (spec: bulk actions are Lead); single `POST /items/{id}/fast-track-approve` is open to the assignee reviewer or a lead; the review screen uses the single endpoint with the version it showed; bulk requires `seen_versions` for every item (422 otherwise). Supersedes F's ruling that opened bulk to reviewers. Implemented in PR #33.
 - Ruling: items whose quoted numbers didn't change still go to re-review (approval must point at terms in effect); the UI labels them "Numbers unchanged" so fast-track is a confirm, not a review.
@@ -98,6 +101,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- J follow-ups for other owners: library search by tracker ID (legacy_ref) + search paging (reviews); terms impact API normal-lane count includes expired items (terms); import commit stuck "Importing" if worker dies (imports: add timeout/reconcile like D2's); AppShell.test uses Outbox as an unbuilt example (K must update).
 
 - Accepted from #32: approval_expires_at keeps the latest approval's expiry; Age sort oldest-first; no "In queue" tab (stat links to it); queue exports exclude legacy. Open: wire PATCH /views into ViewBar ("Save changes" on a modified saved view).
 
