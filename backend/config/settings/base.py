@@ -56,6 +56,12 @@ class Env(BaseSettings):
     # origin: in production that is the CloudFront site, which routes /demo-partners/* to the app.
     demo_partners_base_url: str | None = None
 
+    # Uploaded files (attachments, imports, exports). Production stores them in this S3 bucket (Terraform's
+    # DOCUMENTS_BUCKET). Optional here so the image builds and collectstatic runs without it; the production deploy
+    # check (core/deploy_checks.py) requires it.
+    documents_bucket: str = ""
+    aws_default_region: str | None = None
+
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
 
@@ -142,8 +148,20 @@ DATABASES: dict[str, dict[str, Any]] = {
         "NAME": env.postgres_db,
         "USER": env.postgres_user,
         "PASSWORD": env.postgres_password.get_secret_value(),
-        "CONN_MAX_AGE": 60,
+        # Under ASGI, Django's docs say to disable persistent connections and use the backend's pool instead
+        # (topics/async; ref/databases "Persistent connections"): each request's sync code runs in its own thread,
+        # so CONN_MAX_AGE > 0 leaves a connection behind per thread. The psycopg pool requires CONN_MAX_AGE = 0, and
+        # CONN_HEALTH_CHECKS becomes the pool's check on checkout.
+        "CONN_MAX_AGE": 0,
         "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": {
+            # One pool per process. psycopg_pool's default is a fixed 4 (max_size = min_size). min_size 1 matters for
+            # Celery: its Django fixup closes the pool after every prefork task, so each task refills it to min_size.
+            # max_size 8 per process: 2 uvicorn workers x 8 plus the Celery children stays far below db.t4g.micro's
+            # max_connections (sizing in docs/plan/reports/deploy-prep.md). timeout: a saturated pool fails a request
+            # after 10 s instead of queueing it toward CloudFront's 60 s origin timeout.
+            "pool": {"min_size": 1, "max_size": 8, "timeout": 10},
+        },
     },
 }
 
@@ -164,7 +182,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # --- allauth (headless SPA + MFA) ---
-# Accounts are provisioned by an admin, so there is no public signup.
+# Accounts are provisioned by an admin, so there is no public signup: the adapter closes it (allauth's default is open).
+ACCOUNT_ADAPTER = "accounts.adapter.AccountAdapter"
 HEADLESS_ONLY = True
 HEADLESS_FRONTEND_URLS = {
     "account_reset_password_from_key": f"{env.frontend_base_url}/account/password/reset/{{key}}",
@@ -197,9 +216,14 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Evidence attachments. Local filesystem in dev; production overrides STORAGES with S3 (workstream A).
+# Uploaded files (attachments, imports, exports). Local filesystem in dev and tests; production keeps them in S3
+# (prod.py STORAGES). Downloads always stream through the app's permission-checked endpoints, never MEDIA_URL.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+DOCUMENTS_BUCKET = env.documents_bucket
+
+# Production refuses to start without its runtime configuration (core/deploy_checks.py); prod.py turns this on.
+PRODUCTION_CONFIG_REQUIRED = False
 
 # --- LLM pre-review (checks.prereview) ---
 # No key (dev, CI): every AI check ends `failed` with code not_configured, so Approve asks for an override reason.

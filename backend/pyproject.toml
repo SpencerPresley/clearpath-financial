@@ -10,6 +10,7 @@ dependencies = [
     "django>=6.1.2",
     "django-allauth[mfa,socialaccount]>=65.20.1",
     "django-ninja>=1.7.1",
+    "django-storages[s3]>=1.14.6",
     "httpx2>=2.16.0",
     "langchain>=1.4.7",
     "langchain-anthropic>=1.7.6",
@@ -28,6 +29,7 @@ package = false
 [dependency-groups]
 dev = [
     "factory-boy>=3.3.3",
+    "moto[s3]>=5.2.4",
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
 ]

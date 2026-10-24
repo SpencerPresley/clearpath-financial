@@ -43,6 +43,23 @@ def test_headless_login_rejects_wrong_password(user_factory: UserFactory) -> Non
 
 
 @pytest.mark.django_db
+def test_public_signup_is_closed() -> None:
+    """Admins provision accounts; allauth's default adapter would let anyone create a signed-in, role-less account."""
+    client = Client()
+
+    config = client.get("/_allauth/browser/v1/config").json()
+    signup = client.post(
+        "/_allauth/browser/v1/auth/signup",
+        {"email": "stranger@example.com", "password": "Str0ng-enough-pass!"},
+        content_type="application/json",
+    )
+
+    assert config["data"]["account"]["is_open_for_signup"] is False
+    assert signup.status_code == 403
+    assert client.get("/api/me").status_code == 401
+
+
+@pytest.mark.django_db
 def test_update_me_availability_records_an_event(user_factory: UserFactory) -> None:
     from audit.models import Event
 
