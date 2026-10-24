@@ -228,7 +228,12 @@ def _wait_for_a_blocked_lock(locktype: str) -> None:
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT count(*) FROM pg_locks WHERE locktype = %s AND NOT granted", [locktype])
+            # Scoped to this test database: other worktrees' tests share the Postgres server.
+            cursor.execute(
+                "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid "
+                "WHERE l.locktype = %s AND NOT l.granted AND a.datname = current_database()",
+                [locktype],
+            )
             if cursor.fetchone()[0]:
                 return
         time.sleep(0.02)
