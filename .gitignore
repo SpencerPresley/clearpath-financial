@@ -28,3 +28,6 @@ crash.log
 .DS_Store
 .idea/
 .vscode/
+
+# Agent worktrees
+.claude/worktrees/
