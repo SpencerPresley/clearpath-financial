@@ -163,10 +163,19 @@ test('intake-empty', async ({ page }) => {
 test('intake-live-findings', async ({ page }) => {
   await stubApi(page);
   await page.goto('/submit');
+  await page.getByLabel('Title').fill('Fall personal loan promo — paid social');
+  await page.getByRole('button', { name: /Product/ }).click();
+  await page.getByRole('option', { name: 'Personal loan' }).click();
+  await page.getByRole('button', { name: /Channel/ }).click();
+  await page.getByRole('option', { name: 'Paid social' }).click();
+  await page.getByText('California', { exact: true }).click();
+  await page.getByLabel('First run').fill('2026-11-01');
   const copy = page.getByRole('textbox', { name: /copy/i }).first();
   await copy.fill(versionFixture(1).content_text + '\nGuaranteed approval in minutes.');
-  await page.waitForTimeout(600);
+  await expect(page.locator('.app-copy-backdrop mark').first()).toBeVisible();
   await capture(page, 'intake-live-findings');
+  await page.getByRole('button', { name: 'Submit', exact: true }).click();
+  await capture(page, 'intake-confirm');
 });
 
 test('mine', async ({ page }) => {
@@ -218,4 +227,30 @@ test('mine', async ({ page }) => {
   });
   await page.goto('/mine');
   await capture(page, 'mine');
+});
+
+test('resubmit', async ({ page }) => {
+  await stubApi(page, {
+    item: {
+      status: 'changes_requested',
+      latest_decision: {
+        ...DECISION_APPROVED,
+        outcome: 'changes_requested',
+        version_n: 2,
+        reason:
+          'Add the full APR range next to “as low as”, and limit the credit-score claim to checking your rate.',
+      },
+    },
+    findings: triaged(FINDINGS_OPEN),
+  });
+  await page.goto('/mine/1042/resubmit');
+  const copy = page.getByRole('textbox', { name: 'Copy' });
+  await copy.fill(
+    versionFixture(2)
+      .content_text.replace('as low as 5.99% APR', '5.99%–35.99% APR for borrowers with excellent credit')
+      .replace('with no impact on your credit score', '; checking your rate won’t affect your credit score'),
+  );
+  await capture(page, 'resubmit-edit');
+  await page.getByRole('radio', { name: /Changes vs/ }).click();
+  await capture(page, 'resubmit-diff');
 });

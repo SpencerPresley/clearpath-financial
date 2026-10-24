@@ -12,6 +12,19 @@ describe('wordDiff', () => {
     ]);
   });
 
+  it('folds short unchanged words between changes into one rewritten phrase', () => {
+    const segments = wordDiff(
+      'Check your rate in 2 minutes with no impact on your credit score.',
+      'Check your rate in 2 minutes; checking your rate won’t affect your credit score.',
+    );
+    expect(segments).toEqual([
+      { op: 'equal', text: 'Check your rate in 2 minutes' },
+      { op: 'delete', text: ' with no impact on ' },
+      { op: 'insert', text: '; checking your rate won’t affect ' },
+      { op: 'equal', text: 'your credit score.' },
+    ]);
+  });
+
   it('returns one equal segment for identical text', () => {
     expect(wordDiff('same copy', 'same copy')).toEqual([{ op: 'equal', text: 'same copy' }]);
   });
