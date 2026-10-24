@@ -6,6 +6,7 @@
  */
 import type { Channel } from './channel';
 import type { CheckStatus } from './checkStatus';
+import type { DecisionSummaryOut } from './decisionSummaryOut';
 import type { ItemStatus } from './itemStatus';
 import type { Market } from './market';
 import type { PartyRefOut } from './partyRefOut';
@@ -15,14 +16,18 @@ import type { RiskTier } from './riskTier';
 
 export interface ItemRowOut {
   age_days: number;
+  /** When the latest approval expires. Kept after it lapses or the item is reopened (read it with `status`); null if the item was never approved. */
+  approval_expires_at: string | null;
   assignee: PartyRefOut | null;
   channel: Channel;
   current_version_n: number | null;
   id: number;
   is_legacy: boolean;
   key: string;
+  latest_decision: DecisionSummaryOut | null;
   llm_check_status: CheckStatus;
   markets: Market[];
+  notes: string;
   open_findings_count: number;
   owner: PartyRefOut | null;
   partner: PartyRefOut | null;

@@ -4,12 +4,17 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { QueueStatFiltersOut } from './queueStatFiltersOut';
 import type { StatusCountOut } from './statusCountOut';
 
 export interface QueueStatsOut {
+  /** Non-legacy items in each status. */
   by_status: StatusCountOut[];
+  filters: QueueStatFiltersOut;
   mine: number;
+  /** Status needs_rereview. A re-review a reviewer has opened is in review. */
   needs_rereview: number;
+  /** In a reviewer's queue: submitted, in review, or needs re-review. */
   open: number;
   unassigned: number;
   waiting_over_3_days: number;

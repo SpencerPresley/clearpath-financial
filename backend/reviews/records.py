@@ -33,7 +33,7 @@ from core.permissions import has_role
 from reviews.diff import DiffSegment, diff_texts
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, Decision, Placement, ReviewItem, SavedView, Version
-from reviews.selectors import ItemRow, PartyRef, item_row, live_placements_q, row_queryset
+from reviews.selectors import DecisionSummary, ItemRow, PartyRef, item_row, live_placements_q, row_queryset
 
 
 def _person(user: User) -> PartyRef:
@@ -185,13 +185,11 @@ class Evidence:
 
 
 @dataclass(frozen=True)
-class DecisionRow:
+class DecisionRow(DecisionSummary):  # outcome, reason, decided_at
     id: int
     version_n: int
-    outcome: DecisionOutcome
     lane: DecisionLane
     approver: PartyRef
-    reason: str
     ruleset_date: date
     engine_version: str
     expires_at: datetime | None
@@ -199,7 +197,6 @@ class DecisionRow:
     ai_review_carried_from_n: int | None
     terms_versions: tuple[OfferTermsRef, ...]
     evidence: tuple[Evidence, ...]
-    decided_at: datetime
 
 
 def _decisions(item_id: int) -> QuerySet[Decision]:
@@ -264,7 +261,6 @@ def get_decision(*, decision_id: int) -> DecisionRow:
 
 @dataclass(frozen=True)
 class ItemDetail(ItemRow):
-    notes: str
     is_prescreen: bool
     risk_tier_overridden: bool
     source_url: str | None
@@ -273,11 +269,10 @@ class ItemDetail(ItemRow):
     legacy_reviewer: str
     legacy_history: str
     approved_at: datetime | None
-    approval_expires_at: datetime | None
     retention_until: date | None
     current_version: VersionDetail | None
     versions: tuple[VersionSummary, ...]
-    latest_decision: DecisionRow | None
+    latest_decision: DecisionRow | None  # the row's summary, as the full record
     live_placements_count: int
     numbers_change: bool | None
     llm_check_failure_code: LlmFailureCode | None
@@ -330,8 +325,7 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
     latest = next(iter(_decisions(item_id)[:1]), None)
     failure_code, failure_reason = _llm_failure(item_id, row.llm_check_status, current)
     return ItemDetail(
-        **{field: getattr(row, field) for field in ItemRow.__dataclass_fields__},
-        notes=item.notes,
+        **{field: getattr(row, field) for field in ItemRow.__dataclass_fields__ if field != "latest_decision"},
         is_prescreen=item.is_prescreen,
         risk_tier_overridden=item.risk_tier_overridden,
         source_url=item.source_url or None,
@@ -340,7 +334,6 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
         legacy_reviewer=item.legacy_reviewer,
         legacy_history=item.legacy_history,
         approved_at=item.approved_at,
-        approval_expires_at=item.approval_expires_at,
         retention_until=item.retention_until,
         current_version=current,
         versions=versions,
@@ -574,15 +567,23 @@ class SavedViewRow:
     created_at: datetime
 
 
-def list_saved_views(*, owner: User) -> tuple[SavedViewRow, ...]:
-    return tuple(
-        SavedViewRow(
-            id=v.pk,
-            name=v.name,
-            filters=ItemFilter.model_validate(v.filters),
-            sort=ItemSort(v.sort),
-            columns=tuple(v.columns),
-            created_at=v.created_at,
-        )
-        for v in SavedView.objects.filter(owner=owner).order_by("name")
+def _saved_view_row(v: SavedView) -> SavedViewRow:
+    return SavedViewRow(
+        id=v.pk,
+        name=v.name,
+        filters=ItemFilter.model_validate(v.filters),
+        sort=ItemSort(v.sort),
+        columns=tuple(v.columns),
+        created_at=v.created_at,
     )
+
+
+def list_saved_views(*, owner: User) -> tuple[SavedViewRow, ...]:
+    return tuple(_saved_view_row(v) for v in SavedView.objects.filter(owner=owner).order_by("name"))
+
+
+def get_saved_view(*, owner: User, view_id: int) -> SavedViewRow:
+    view = SavedView.objects.filter(owner=owner, pk=view_id).first()
+    if view is None:
+        raise NotFound.entity("saved view", view_id)
+    return _saved_view_row(view)

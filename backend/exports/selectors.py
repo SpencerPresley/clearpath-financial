@@ -3,7 +3,6 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final
 
 from django.db.models import Exists, F, OuterRef, QuerySet
 from django.urls import reverse
@@ -17,23 +16,13 @@ from exports.domain import ExportKind, ExportStatus
 from exports.models import ExportJob
 from exports.xlsx import ExportRow
 from reviews.filters import ItemFilter, ItemSort
-from reviews.models import APPROVED_OUTCOMES, QUEUE_STATUSES, Decision, ReviewItem
-from reviews.selectors import filter_items
-
-_ORDER: Final[dict[ItemSort, tuple[str, ...]]] = {
-    ItemSort.QUEUE: ("queue_priority", "submitted_at", "id"),
-    ItemSort.OLDEST: ("submitted_at", "id"),
-    ItemSort.NEWEST: ("-submitted_at", "-id"),
-    ItemSort.UPDATED: ("-updated_at", "-id"),
-    ItemSort.TITLE: ("title", "id"),
-}
+from reviews.models import APPROVED_OUTCOMES, Decision, ReviewItem
+from reviews.selectors import view_items
 
 
 def _view(*, viewer: User, filters: ItemFilter, sort: ItemSort, clock: Clock) -> QuerySet[ReviewItem]:
-    qs = filter_items(viewer=viewer, filters=filters, clock=clock)
-    if sort is ItemSort.QUEUE and not filters.status:  # the queue view's implicit statuses (reviews.filters)
-        qs = qs.filter(status__in=QUEUE_STATUSES)
-    return qs.order_by(*_ORDER[sort])
+    # The rows the queue list pages through, in its order (including the queue sort's implicit scope).
+    return view_items(viewer=viewer, filters=filters, sort=sort, clock=clock)
 
 
 def _name(user: User | None) -> str | None:

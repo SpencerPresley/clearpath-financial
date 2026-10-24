@@ -259,6 +259,45 @@ def test_saved_views_round_trip(reviewer: User) -> None:
 
 
 @pytest.mark.django_db
+def test_patch_saved_view_by_its_owner_only(reviewer: User, lead: User) -> None:
+    client = _client(reviewer)
+    view = client.post(
+        "/api/views", {"name": "Mine", "filters": {"mine": True}, "columns": ["title"]}, content_type="application/json"
+    ).json()
+
+    patched = client.patch(
+        f"/api/views/{view['id']}",
+        {"filters": {"mine": True, "risk_tier": ["high"]}, "sort": "risk_tier_desc"},
+        content_type="application/json",
+    )
+    foreign = _client(lead).patch(f"/api/views/{view['id']}", {"name": "Lead's"}, content_type="application/json")
+
+    assert patched.status_code == 200, patched.content
+    body = patched.json()
+    assert (body["name"], body["sort"], body["columns"]) == ("Mine", "risk_tier_desc", ["title"])
+    assert (body["filters"]["mine"], body["filters"]["risk_tier"]) == (True, ["high"])
+    assert foreign.status_code == 404
+
+
+@pytest.mark.django_db
+def test_list_and_stats_responses_carry_totals_and_view_filters(marketer: User, reviewer: User) -> None:
+    make_item(marketer, status="needs_rereview", reopen_reason="terms_changed", notes="Live on LendStack.")
+    make_item(marketer)
+    client = _client(reviewer)
+
+    stats = client.get("/api/items/stats").json()
+    rereviews = client.get(
+        "/api/items", {"status": stats["filters"]["needs_rereview"]["status"], "is_legacy": "false", "limit": 1}
+    ).json()
+
+    assert stats["needs_rereview"] == rereviews["total"] == 1
+    assert stats["filters"]["needs_rereview"]["is_legacy"] is False
+    assert rereviews["rows"][0]["notes"] == "Live on LendStack."
+    assert {s["status"]: s["filters"]["status"] for s in stats["by_status"]}["submitted"] == ["submitted"]
+    assert client.get("/api/items", {"limit": 1}).json()["total"] == 2
+
+
+@pytest.mark.django_db
 def test_library_lists_approved_and_searches(marketer: User, reviewer: User) -> None:
     from reviews.models import Decision
 

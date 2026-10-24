@@ -5,6 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * One member per order: each runs one direction so a keyset page boundary is a single row comparison.
+ * Column sorts come in pairs, `x` ascending and `x_desc` the exact reverse.
+ */
 export type ItemSort = typeof ItemSort[keyof typeof ItemSort];
 
 
@@ -14,4 +18,17 @@ export const ItemSort = {
   newest: 'newest',
   updated: 'updated',
   title: 'title',
+  title_desc: 'title_desc',
+  status: 'status',
+  status_desc: 'status_desc',
+  risk_tier: 'risk_tier',
+  risk_tier_desc: 'risk_tier_desc',
+  assignee: 'assignee',
+  assignee_desc: 'assignee_desc',
+  partner: 'partner',
+  partner_desc: 'partner_desc',
+  open_findings: 'open_findings',
+  open_findings_desc: 'open_findings_desc',
+  round: 'round',
+  round_desc: 'round_desc',
 } as const;

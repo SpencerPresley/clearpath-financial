@@ -95,6 +95,24 @@ def test_export_follows_the_view_sort(
     assert [r[1] for r in _sheet(_file(job_id))[1:]] == ["Alpha", "Beta", "Gamma"]
 
 
+@pytest.mark.parametrize("sort", list(ItemSort))
+def test_export_rows_are_the_list_view_in_its_order(
+    lead: User, marketer: User, user_factory: UserFactory, clock: FixedClock, sort: ItemSort
+) -> None:
+    from exports.selectors import export_rows
+    from reviews.selectors import list_items
+
+    reviewer = user_factory(roles=[Role.REVIEWER])
+    for n, status in enumerate((ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.APPROVED)):
+        make_item(marketer, title=f"Item {n}", status=status, assignee=reviewer if n else None, round=3 - n)
+    make_item(None, status=ItemStatus.SUBMITTED, is_legacy=True, legacy_ref="REQ-9", markets=[])  # not in the queue
+
+    listed = list_items(viewer=lead, filters=ItemFilter(), sort=sort, clock=clock).rows
+    exported = list(export_rows(viewer=lead, filters=ItemFilter(), sort=sort, clock=clock))
+
+    assert [r.key for r in exported] == [r.key for r in listed]
+
+
 def test_marketers_cannot_export_views(marketer: User, clock: FixedClock) -> None:
     with pytest.raises(NotPermitted):
         services.request_export(actor=marketer, filters=ItemFilter(), clock=clock)

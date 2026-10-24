@@ -406,6 +406,34 @@ def create_saved_view(*, actor: User, data: NewSavedView, clock: Clock = SYSTEM_
     return view.pk
 
 
+@dataclass(frozen=True)
+class SavedViewChanges:
+    """None leaves a field as it is."""
+
+    name: str | None = None
+    filters: ItemFilter | None = None
+    sort: ItemSort | None = None
+    columns: tuple[str, ...] | None = None
+
+
+def update_saved_view(*, actor: User, view_id: int, changes: SavedViewChanges) -> None:
+    """Save a modified view in place. Only its owner sees it, so another user's view is a 404, as in delete."""
+    view = SavedView.objects.filter(owner=actor, pk=view_id).first()
+    if view is None:
+        raise NotFound.entity("saved view", view_id)
+    if changes.name is not None:
+        if SavedView.objects.filter(owner=actor, name=changes.name).exclude(pk=view_id).exists():
+            raise InvalidInput.for_field("name", "You already have a view with this name.")
+        view.name = changes.name
+    if changes.filters is not None:
+        view.filters = changes.filters.model_dump(mode="json")
+    if changes.sort is not None:
+        view.sort = changes.sort.value
+    if changes.columns is not None:
+        view.columns = list(changes.columns)
+    view.save(update_fields=["name", "filters", "sort", "columns"])
+
+
 def delete_saved_view(*, actor: User, view_id: int) -> None:
     deleted, _ = SavedView.objects.filter(owner=actor, pk=view_id).delete()
     if not deleted:

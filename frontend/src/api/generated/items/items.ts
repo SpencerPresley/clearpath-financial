@@ -49,6 +49,7 @@ import type {
   ResubmitIn,
   SavedViewIn,
   SavedViewOut,
+  SavedViewUpdateIn,
   SubmitItemIn,
   UploadItemAttachmentBody,
   VersionDiffOut,
@@ -2605,4 +2606,93 @@ export const useDeleteSavedView = <TError = ErrorOut,
         TContext
       > => {
       return useMutation(getDeleteSavedViewMutationOptions(options), queryClient);
+    }
+    export const getUpdateSavedViewUrl = (viewId: number,) => {
+
+
+
+
+  return `/api/views/${viewId}`
+}
+
+/**
+ * Save a modified view in place: name, filters, sort, and/or columns. Owner only (404 otherwise).
+ * @summary Update Saved View
+ */
+export const updateSavedView = async (viewId: number,
+    savedViewUpdateIn: SavedViewUpdateIn, options?: Parameters<typeof customFetch>[1]): Promise<SavedViewOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SavedViewOut>(getUpdateSavedViewUrl(viewId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(savedViewUpdateIn)
+  }
+);}
+
+
+
+
+
+export const getUpdateSavedViewMutationKey = () => ['updateSavedView'] as const;
+
+export const getUpdateSavedViewMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSavedView>>, TError,UpdateSavedViewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSavedView>>, TError,UpdateSavedViewMutationVariables, TContext> => {
+
+const mutationKey = getUpdateSavedViewMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSavedView>>, UpdateSavedViewMutationVariables> = (props) => {
+          const {viewId,data} = props ?? {};
+
+          return  updateSavedView(viewId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSavedViewMutationResult = NonNullable<Awaited<ReturnType<typeof updateSavedView>>>
+    export type UpdateSavedViewMutationBody = SavedViewUpdateIn
+    export type UpdateSavedViewMutationError = ErrorOut
+    export type UpdateSavedViewMutationVariables = {viewId: number;data: SavedViewUpdateIn}
+
+    /**
+ * @summary Update Saved View
+ */
+export const useUpdateSavedView = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSavedView>>, TError,UpdateSavedViewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateSavedView>>,
+        TError,
+        UpdateSavedViewMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateSavedViewMutationOptions(options), queryClient);
     }

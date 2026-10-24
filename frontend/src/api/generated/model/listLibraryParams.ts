@@ -61,7 +61,7 @@ run_from?: string | null;
  */
 run_to?: string | null;
 scope?: 'approved_to_run' | 'ever_approved';
-sort?: 'queue' | 'oldest' | 'newest' | 'updated' | 'title';
+sort?: 'queue' | 'oldest' | 'newest' | 'updated' | 'title' | 'title_desc' | 'status' | 'status_desc' | 'risk_tier' | 'risk_tier_desc' | 'assignee' | 'assignee_desc' | 'partner' | 'partner_desc' | 'open_findings' | 'open_findings_desc' | 'round' | 'round_desc';
 cursor?: string | null;
 /**
  * @minimum 1
