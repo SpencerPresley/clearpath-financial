@@ -56,6 +56,9 @@ she can also:
 
 - reassign anything (open any item, **Details**, assignee), and see **Unassigned** and **Waiting >3 days** across
   the team;
+- open **Workload by reviewer** under the queue counts: each reviewer's open items and weighted load (high 3,
+  medium 2, low 1), the number auto-assignment ranks by. Leah shows as out of office, and the assignee menus mark
+  her too. A reviewer's open count opens exactly those items;
 - review **Offer terms**: personal loan v1 (the 9.49% floor carried over from the tracker at go-live) and v2
   (today's 9.99%), and card v1 and v2 (the Prime move). Each publish fanned out to the approvals that quoted it,
   which is where the terms re-reviews come from;
@@ -85,8 +88,15 @@ You land on **My submissions**.
 
 You land on **Import**.
 
-- **Import** shows the Excel tracker import that brought in the 178 legacy rows (matched to partners where the
-  tracker named one). They're in the **Library** with `legacy=only`.
+- **Import** shows the Excel tracker import that brought in the 178 legacy rows at go-live (matched to partners
+  where the tracker named one). They're in the **Library** with `legacy=only`. Open it from **Recent imports**: its
+  **Columns**, **Values** and **Preview** steps stay viewable, read-only, so you can see the mapping it inferred
+  (`PL` as Personal loan, `CardPerks` matched to CardPerks Weekly) and what happened to each messy row ("Imported,
+  date from last round", "Skipped: duplicate"). **Load sample tracker** walks the same steps on a new copy; since
+  the rows are already in, its preview says so in one line and links back to that import.
+- **Users**: everyone's roles, availability and account. Toggle a role, mark Leah back in office, add someone.
+  There's always an admin: you can't deactivate yourself or drop the last admin role. Reviewers set their own
+  availability from the account menu. **Metrics** is in an admin's nav too.
 - **Reset demo**: account menu (top right), **Reset demo…**, confirm. It runs as a background job, takes about
   ten seconds, and everyone stays signed in. The dialog can be closed while it runs; a notice appears when it's
   done.
