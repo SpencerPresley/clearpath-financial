@@ -147,7 +147,18 @@ describe('FilterBar', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Product' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Credit card' }));
     expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ product: ['credit_card'] }));
+    // The menu keeps its list while open: the submenu holding focus stays mounted, so a second pick works and
+    // each Escape lands in a menu (submenu, then root). Product joins the bar once the menu closes.
+    expect(screen.getByRole('menuitem', { name: 'Product' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Personal loan' }));
+    expect(spy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ product: ['credit_card', 'personal_loan'] }),
+    );
     await userEvent.keyboard('{Escape}{Escape}');
-    expect(await screen.findByRole('button', { name: 'Product: Credit card' })).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Product: Credit card, Personal loan/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(await screen.findByRole('menu', { name: 'More filters' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Product' })).toBeNull();
   });
 });
