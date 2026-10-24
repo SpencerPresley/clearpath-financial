@@ -35,7 +35,7 @@ beforeEach(() => {
   server.use(
     getGetMeMockHandler(LEAD_ME),
     getGetPartnerMockHandler(PARTNER_DETAIL),
-    getListItemsMockHandler({ rows: partnerItemRows(), next_cursor: null }),
+    getListItemsMockHandler({ rows: partnerItemRows(), next_cursor: null, total: 3 }),
     getListPartnerFindingsMockHandler(({ request }) =>
       new URL(request.url).searchParams.get('cursor') === 'page-2'
         ? { rows: PARTNER_FINDINGS_PAGE_2, next_cursor: null }

@@ -215,7 +215,9 @@ rate terms, spec §4.2 ruling 1).
   counts the fast-track ones; the tile shows the total, with "n get new numbers" computed from items.
 - **The impact preview takes no base.** It's always against the version in effect. That's right after a rebase (the
   base is then the version in effect), but nothing can ask for a preview "against v12".
-- **Findings history has no total.** The tab shows the loaded count, with "+" when there are more pages.
+- **Findings history has no total.** The tab shows the loaded count, with "+" when there are more pages. (The
+  items list does have one now: #32 added `ItemPageOut.total`. The Items tab still says "n items shown" and takes
+  its count from `PartnerDetailOut.item_count`; showing "n of total" is a small follow-up.)
 - **Agreement visibility isn't in the response.** `PartnerDetailOut.attachments` is empty both for "none on file"
   and "you can't see them"; the page infers the second from the viewer's roles, duplicating the backend rule.
 - **`last_submitted_at` includes legacy imports' tracker dates** (`Max(items__submitted_at)`), so a partner with

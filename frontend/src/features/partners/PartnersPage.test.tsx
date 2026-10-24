@@ -115,7 +115,7 @@ describe('Partners list', () => {
           : HttpResponse.json({ ...PARTNER_DETAIL, id: 40, name: 'FundFlow' }, { status: 201 });
       }),
       getGetPartnerMockHandler({ ...PARTNER_DETAIL, id: 40, name: 'FundFlow' }),
-      getListItemsMockHandler({ rows: [], next_cursor: null }),
+      getListItemsMockHandler({ rows: [], next_cursor: null, total: 0 }),
       getListPartnerFindingsMockHandler({ rows: [], next_cursor: null }),
     );
     const { router } = renderApp('/partners');
@@ -184,7 +184,7 @@ describe('items served for a partner', () => {
       getGetPartnerMockHandler(PARTNER_DETAIL),
       getListItemsMockHandler(({ request }) => {
         params = new URL(request.url).searchParams;
-        return { rows: partnerItemRows(), next_cursor: null };
+        return { rows: partnerItemRows(), next_cursor: null, total: 3 };
       }),
       getListPartnerFindingsMockHandler({ rows: [], next_cursor: null }),
     );

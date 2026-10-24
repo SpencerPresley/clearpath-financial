@@ -136,6 +136,9 @@ function affectedRow(o: Partial<ItemRowOut> & { id: number; title: string }): It
     planned_last_run: null,
     submitted_at: '2026-09-20T14:00:00Z',
     updated_at: '2026-09-25T14:00:00Z',
+    approval_expires_at: null,
+    latest_decision: null,
+    notes: '',
     ...o,
   };
 }

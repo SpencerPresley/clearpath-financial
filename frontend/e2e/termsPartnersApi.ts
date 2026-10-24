@@ -176,7 +176,8 @@ export async function stubTermsPartners(page: Page, opts: TermsPartnersStub = {}
     if (path === '/api/items') {
       if (opts.items === 'hang' || typeof opts.items === 'number')
         return serve(route, opts.items, 'Items', []);
-      return fulfill(route, { rows: opts.items ?? partnerItemRows(), next_cursor: null });
+      const rows = opts.items ?? partnerItemRows();
+      return fulfill(route, { rows, next_cursor: null, total: rows.length });
     }
     return fulfill(route, { code: 'not_found', message: `No stub for ${method} ${path}` }, 404);
   });
