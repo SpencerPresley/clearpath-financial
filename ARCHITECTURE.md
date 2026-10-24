@@ -155,7 +155,7 @@ Terraform in [`infra/`](infra/), runbook in [infra/README.md](infra/README.md), 
 
 ```mermaid
 flowchart LR
-    viewer([Browser, US only]) --> cf["CloudFront + WAF"]
+    viewer(["Browser, US only"]) --> cf["CloudFront + WAF"]
     cf -->|"default: SPA, admin static"| s3fe[("S3 frontend bucket (OAC)")]
     cf -->|"/api, /_allauth, /accounts, /django-admin, /demo-partners"| vpco["CloudFront VPC origin"]
     subgraph vpc["VPC, private subnets"]

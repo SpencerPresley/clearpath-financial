@@ -97,7 +97,7 @@ a prompt.
 > read-only except `send_email`, and a test checks every tool name and argument schema.
 
 - **AI findings are warnings only.** A database check constraint (`finding_llm_is_warning`) refuses an AI finding
-  with any other severity. Blocking findings come only from deterministic code checks and from people.
+  with any other severity. Only deterministic code checks produce blocking findings; a person decides what blocks approval.
 - **Every AI finding must point at real text.** A finding is kept only if its quote sits exactly at its
   `[start, end)` offsets in the version text, or, if the offsets are wrong, the quote occurs exactly once and is
   re-anchored there. Otherwise it is dropped and counted. In the live eval the model's offsets were wrong 20 times
