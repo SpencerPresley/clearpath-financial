@@ -636,8 +636,8 @@ export const useUploadPartnerAttachment = <TError = ErrorOut,
 }
 
 /**
- * The findings history: every finding on any version of the partner's items, newest first. Reviewers, leads,
- * and admins. `next_cursor` is null on the last page.
+ * The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),
+ * newest first. Reviewers, leads, and admins. `next_cursor` is null on the last page.
  * @summary List Findings
  */
 export const listPartnerFindings = async (partnerId: number,

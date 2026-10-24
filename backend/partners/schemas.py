@@ -21,6 +21,7 @@ class PartnerRowOut(Schema):
 
 class RepeatIssueOut(Schema):
     rule_id: str
+    rule_title: str | None = Field(description="The rule's title; null for a rule the registry doesn't know.")
     citation: str
     count: int
     items: int

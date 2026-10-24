@@ -84,7 +84,8 @@ export const CreatePartnerResponse = zod.object({
   "count": zod.int(),
   "items": zod.int(),
   "last_seen_at": zod.iso.datetime({"offset":true}),
-  "rule_id": zod.string()
+  "rule_id": zod.string(),
+  "rule_title": zod.union([zod.string(),zod.null()]).describe('The rule\'s title; null for a rule the registry doesn\'t know.')
 })),
   "status": zod.enum(['active', 'paused', 'terminated']),
   "type": zod.enum(['affiliate', 'lead_gen', 'marketplace', 'influencer']),
@@ -129,7 +130,8 @@ export const GetPartnerResponse = zod.object({
   "count": zod.int(),
   "items": zod.int(),
   "last_seen_at": zod.iso.datetime({"offset":true}),
-  "rule_id": zod.string()
+  "rule_id": zod.string(),
+  "rule_title": zod.union([zod.string(),zod.null()]).describe('The rule\'s title; null for a rule the registry doesn\'t know.')
 })),
   "status": zod.enum(['active', 'paused', 'terminated']),
   "type": zod.enum(['affiliate', 'lead_gen', 'marketplace', 'influencer']),
@@ -195,7 +197,8 @@ export const UpdatePartnerResponse = zod.object({
   "count": zod.int(),
   "items": zod.int(),
   "last_seen_at": zod.iso.datetime({"offset":true}),
-  "rule_id": zod.string()
+  "rule_id": zod.string(),
+  "rule_title": zod.union([zod.string(),zod.null()]).describe('The rule\'s title; null for a rule the registry doesn\'t know.')
 })),
   "status": zod.enum(['active', 'paused', 'terminated']),
   "type": zod.enum(['affiliate', 'lead_gen', 'marketplace', 'influencer']),
@@ -254,8 +257,8 @@ export const UploadPartnerAttachmentResponse = zod.object({
 })
 
 /**
- * The findings history: every finding on any version of the partner's items, newest first. Reviewers, leads,
- * and admins. `next_cursor` is null on the last page.
+ * The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),
+ * newest first. Reviewers, leads, and admins. `next_cursor` is null on the last page.
  * @summary List Findings
  */
 export const ListPartnerFindingsParams = zod.object({
@@ -268,6 +271,7 @@ export const listPartnerFindingsQueryLimitMax = 200;
 
 
 export const ListPartnerFindingsQueryParams = zod.object({
+  "rule_id": zod.union([zod.string(),zod.null()]).optional(),
   "cursor": zod.union([zod.string(),zod.null()]).optional(),
   "limit": zod.int().min(1).max(listPartnerFindingsQueryLimitMax).default(listPartnerFindingsQueryLimitDefault)
 })

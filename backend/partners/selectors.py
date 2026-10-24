@@ -6,6 +6,8 @@ from datetime import date, datetime
 from django.db.models import Count, Max, Q, Sum
 
 from accounts.models import User
+from checks.engine.registry import RULES
+from checks.llm.rules import LLM_RULES_BY_ID
 from checks.models import Finding
 from core.domain import FindingSource, FindingState, ItemStatus, PartnerStatus, PartnerType, Severity
 from core.errors import InvalidInput, NotFound, NotPermitted
@@ -30,10 +32,21 @@ class RepeatIssue:
     """A rule that keeps firing on this partner's content: the "repeat issues" panel."""
 
     rule_id: str
+    rule_title: str | None
     citation: str
     count: int
     items: int
     last_seen_at: datetime
+
+
+def rule_title(rule_id: str) -> str | None:
+    """The rule's plain-English title from the code/checklist registry or the AI check's rules; None for a rule
+    neither knows (retired, or imported history)."""
+    spec = RULES.get(rule_id)
+    if spec is not None:
+        return spec.title
+    llm = LLM_RULES_BY_ID.get(rule_id)
+    return llm.spec.title if llm is not None else None
 
 
 @dataclass(frozen=True)
@@ -97,6 +110,7 @@ def repeat_issues(*, partner_id: int, limit: int = 10) -> tuple[RepeatIssue, ...
     return tuple(
         RepeatIssue(
             rule_id=r["rule_id"],
+            rule_title=rule_title(r["rule_id"]),
             citation=r["citation"],
             count=r["count"],
             items=r["items"],
@@ -170,9 +184,9 @@ def _decode_finding_cursor(cursor: str) -> tuple[datetime, int]:
 
 
 def list_partner_findings(
-    *, partner_id: int, viewer: User, cursor: str | None = None, limit: int = 50
+    *, partner_id: int, viewer: User, rule_id: str | None = None, cursor: str | None = None, limit: int = 50
 ) -> PartnerFindingPage:
-    """Every finding on any version of the partner's items, newest first (ties by id), one page per call.
+    """Every finding on any version of the partner's items (or one rule's), newest first (ties by id), one page.
 
     Reviewers, leads, and admins (as for partner agreements: the history is a review tool). Two queries: the
     partner's existence and the page."""
@@ -181,6 +195,8 @@ def list_partner_findings(
     if not Partner.objects.filter(pk=partner_id).exists():
         raise NotFound.entity("partner", partner_id)
     qs = Finding.objects.filter(version__item__partner_id=partner_id)
+    if rule_id:
+        qs = qs.filter(rule_id=rule_id)
     if cursor is not None:
         at, pk = _decode_finding_cursor(cursor)
         qs = qs.filter(Q(created_at__lt=at) | Q(created_at=at, pk__lt=pk))

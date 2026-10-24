@@ -9078,10 +9078,23 @@
           "rule_id": {
             "title": "Rule Id",
             "type": "string"
+          },
+          "rule_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rule's title; null for a rule the registry doesn't know.",
+            "title": "Rule Title"
           }
         },
         "required": [
           "rule_id",
+          "rule_title",
           "citation",
           "count",
           "items",
@@ -20150,7 +20163,7 @@
     },
     "/api/partners/{partner_id}/findings": {
       "get": {
-        "description": "The findings history: every finding on any version of the partner's items, newest first. Reviewers, leads,\nand admins. `next_cursor` is null on the last page.",
+        "description": "The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),\nnewest first. Reviewers, leads, and admins. `next_cursor` is null on the last page.",
         "operationId": "listPartnerFindings",
         "parameters": [
           {
@@ -20160,6 +20173,22 @@
             "schema": {
               "title": "Partner Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
             }
           },
           {

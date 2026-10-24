@@ -58,12 +58,16 @@ def update_partner(request: HttpRequest, partner_id: int, body: PartnerUpdateIn)
     operation_id="listPartnerFindings",
 )
 def list_findings(
-    request: HttpRequest, partner_id: int, cursor: str | None = None, limit: PageLimit = 50
+    request: HttpRequest,
+    partner_id: int,
+    rule_id: str | None = None,
+    cursor: str | None = None,
+    limit: PageLimit = 50,
 ) -> selectors.PartnerFindingPage:
-    """The findings history: every finding on any version of the partner's items, newest first. Reviewers, leads,
-    and admins. `next_cursor` is null on the last page."""
+    """The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),
+    newest first. Reviewers, leads, and admins. `next_cursor` is null on the last page."""
     return selectors.list_partner_findings(
-        partner_id=partner_id, viewer=current_user(request), cursor=cursor, limit=limit
+        partner_id=partner_id, viewer=current_user(request), rule_id=rule_id, cursor=cursor, limit=limit
     )
 
 

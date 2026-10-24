@@ -9,6 +9,8 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
 from accounts.models import User
+from checks.engine.registry import RULES
+from checks.llm.rules import LLM_RULES_BY_ID
 from checks.models import Finding
 from core.domain import FindingSource, FindingState, Severity
 from partners.models import Partner
@@ -108,6 +110,40 @@ def test_findings_paginate_by_cursor_without_gaps_or_repeats(marketer: User, lea
     seen = [r["id"] for page in (first, second, third) for r in page["rows"]]
     assert seen == [ids[4], ids[3], ids[2], ids[1], ids[0]]
     assert third["next_cursor"] is None
+
+
+@pytest.mark.django_db
+def test_findings_filter_by_rule(marketer: User, reviewer: User) -> None:
+    partner = make_partner()
+    version = _partner_version(marketer, partner)
+    _finding(version, minutes=1, rule_id="endorsement.material_connection")
+    _finding(version, minutes=2, rule_id="closed_end.trigger_apr")
+
+    body = _client(reviewer).get(f"/api/partners/{partner.pk}/findings?rule_id=endorsement.material_connection").json()
+
+    assert [r["rule_id"] for r in body["rows"]] == ["endorsement.material_connection"]
+
+
+@pytest.mark.django_db
+def test_repeat_issues_name_the_rule(marketer: User, reviewer: User) -> None:
+    partner = make_partner()
+    for _ in range(2):
+        version = _partner_version(marketer, partner)
+        _finding(version, minutes=next(_serial), rule_id="endorsement.material_connection")
+        _finding(
+            version,
+            minutes=next(_serial),
+            rule_id="llm.material_connection",
+            source=FindingSource.LLM,
+            severity=Severity.WARNING,
+        )
+
+    issues = _client(reviewer).get(f"/api/partners/{partner.pk}").json()["repeat_issues"]
+
+    assert {i["rule_id"]: i["rule_title"] for i in issues} == {
+        "endorsement.material_connection": RULES["endorsement.material_connection"].title,
+        "llm.material_connection": LLM_RULES_BY_ID["llm.material_connection"].spec.title,
+    }
 
 
 @pytest.mark.django_db

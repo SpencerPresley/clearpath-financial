@@ -6,6 +6,7 @@
  */
 
 export type ListPartnerFindingsParams = {
+rule_id?: string | null;
 cursor?: string | null;
 /**
  * @minimum 1
