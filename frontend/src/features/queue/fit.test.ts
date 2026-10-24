@@ -18,8 +18,11 @@ const AT_1280_ASSISTANT = 778;
 const AT_1280_DRAWER = 634;
 
 describe('fitColumns (walkthrough-1 nit 3)', () => {
-  it('keeps the designed widths when the title has room (1440, nothing open)', () => {
-    const fit = fitColumns(AT_1440, DEFAULT_COLUMN_VISIBILITY, {});
+  it.each([
+    ['', AT_1440],
+    [' with a classic 15px scrollbar', AT_1440 - 15],
+  ])('keeps the designed widths when the title has room (1440, nothing open%s)', (_, width) => {
+    const fit = fitColumns(width, DEFAULT_COLUMN_VISIBILITY, {});
     // Only the select cell widens, to the row checkbox's 40px hit area.
     expect(fit.sizing).toEqual({ select: 40 });
     expect(fit.visibility).toEqual(DEFAULT_COLUMN_VISIBILITY);

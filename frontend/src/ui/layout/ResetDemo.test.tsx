@@ -115,7 +115,7 @@ describe('ResetDemoDialog', () => {
 });
 
 describe('Reset demo from the account menu', () => {
-  it('drops every cached screen of the old data and goes to the landing page', async () => {
+  it('leaves the deleted import job for the landing page and drops the old cache', async () => {
     const user = userEvent.setup();
     server.use(
       ...getLibraryMock(),
@@ -133,11 +133,11 @@ describe('Reset demo from the account menu', () => {
       http.post('*/api/admin/demo/reset', () => HttpResponse.json(job('queued'), { status: 202 })),
       http.get('*/api/admin/demo/resets/7', () => HttpResponse.json(job('done', { seeded_items: 44 }))),
     );
-    const { router, queryClient } = renderApp('/library');
-    expect(await screen.findByRole('heading', { name: 'Library', level: 1 })).toBeInTheDocument();
-    // A screen of the old data the admin looked at earlier (import job 2, deleted by the reset).
-    queryClient.setQueryData(['/api/imports/2'], { id: 2 });
-
+    // The review's repro: the Import page open on job 2, which the reset deletes.
+    const { router, queryClient } = renderApp('/import?job=2');
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['/api/imports/2'])).toBeDefined();
+    });
     await user.click(screen.getByRole('button', { name: /account$/ }));
     await user.click(await screen.findByRole('button', { name: 'Reset demo…' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'Reset the demo?' });
@@ -146,10 +146,13 @@ describe('Reset demo from the account menu', () => {
     await waitFor(
       () => {
         expect(router.state.location.pathname).toBe('/import');
+        expect(router.state.location.search).toEqual({});
         expect(queryClient.getQueryData(['/api/imports/2'])).toBeUndefined();
       },
       { timeout: 4000 },
     );
+    // The start screen, not the deleted job's preview.
+    expect(await screen.findByRole('region', { name: 'Start an import' })).toBeInTheDocument();
     // Same person, same session: the shell stays up (no sign-in, no blank loading screen).
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
   });

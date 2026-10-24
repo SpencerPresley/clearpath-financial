@@ -8,8 +8,11 @@
 import { queueColumns, TITLE_MIN_WIDTH } from './columns';
 import type { ColumnId, ColumnSizing, ColumnVisibility } from './columns';
 
-/** Below this much title, the designed widths give way to the compact ones. */
-const COMFORTABLE_TITLE = 320;
+/**
+ * Below this much title, the designed widths give way to the compact ones. 300 keeps the designed widths at
+ * 1440 with or without a classic 15px scrollbar (Windows, most Linux), so the hosted demo matches macOS there.
+ */
+const COMFORTABLE_TITLE = 300;
 /** Columns step aside until the title gets at least this much. */
 const TITLE_TARGET = 200;
 
