@@ -21,7 +21,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 merged `9f4d228` | done; logins + guided paths in docs/demo.md |
 | Walkthrough review 1 | fresh reviewer (worktree) | — | in progress | local full-stack walkthrough per role before deploy; findings only |
-| Deploy prep | agent (worktree) | PR #43 | adding S3 gateway endpoint; found + closed open public signup | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
+| Deploy (apply + first deploy) | orchestrator | — | terraform apply running (77 resources) | then: SSM key, GitHub vars, deploy, smoke, verify-client-ip | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree) | PR #42 merged | done | bell + popover, typed detail per kind, 3 queries per page |
