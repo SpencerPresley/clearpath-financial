@@ -13,7 +13,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | 0 foundation (#1) | agent (worktree `ws0/foundation`) | — | in progress | models, migrations, patterns, API contract |
 | C rules engine (#4) | agent (worktree `wsC/rules-engine`) | — | in progress | pure engine in backend/checks/engine |
 | H design system (#9, part 1) | agent (worktree `wsH/design-system`) | — | in progress | tokens, icon registry, components, shell, gallery |
-| infra-terraform (#2) | agent (worktree) | PR #16 | fixing review | review: 1 blocker (immutable OIDC sub), 5 should-fix; app follow-ups in #18 |
+| infra-terraform (#2) | agent (worktree) | PR #16 merged `b7c2ea3` | done (not applied) | 74 resources; sub verified from a real token; app follow-ups in #18 |
 | sample-tracker (#3) | agent (worktree) | PR #17 merged `b01999b` | done | 180 rows; samples/README.md is the import oracle; importer notes in reports/sample-tracker.md |
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
@@ -52,5 +52,3 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
-- Before pulling the PR #16 merge: delete the untracked `docs/plan/reviews/infra-terraform.md` in main's
-  working tree (the PR adds the same path).

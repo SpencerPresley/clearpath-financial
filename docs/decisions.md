@@ -270,7 +270,7 @@ Search returns ranked candidates, so a semantic channel can be fused in later wi
   - documents bucket encrypted and versioned, downloads only via presigned URLs issued after Django's permission check
 - **Deploy:**
   1. GitHub-hosted runners build the images and push them to ECR.
-  2. The workflow assumes an IAM role via GitHub OIDC. The trust policy is pinned to `repo:SpencerPresley/clearpath-financial:environment:production`, and no AWS secret is stored in GitHub.
+  2. The deploy job (the only job with `id-token: write`, running after credential-free build jobs) assumes an IAM role via GitHub OIDC. The trust policy pins `aud` and `sub = repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/main` (GitHub's immutable subject format, observed from a real token). It's not pinned to a GitHub environment, because environments and branch protection aren't available on this private Free-plan repo. No AWS secret is stored in GitHub.
   3. SSM Run Command runs `docker compose pull && up -d && migrate`.
   4. `aws s3 sync` uploads the frontend, then a CloudFront invalidation.
 - **Rejected: a self-hosted runner on the server.** GitHub's hardening guide says self-hosted runners "should almost never be used for public repositories," because any PR author could run code on the prod box.
