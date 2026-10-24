@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.db import models
 
-from exports.schemas import ExportKind, ExportStatus
+from exports.domain import ExportKind, ExportStatus
 
 
 class ExportJob(models.Model):
