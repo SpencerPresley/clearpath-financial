@@ -6,6 +6,7 @@ content word by word, then one final chunk carrying every tool call as `tool_cal
 """
 
 import json
+import time
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
 
@@ -66,3 +67,22 @@ class ToolCallingFakeModel(GenericFakeChatModel):
 
 def scripted(*messages: AIMessage | str) -> ToolCallingFakeModel:
     return ToolCallingFakeModel(messages=iter(messages))
+
+
+class FailingModel(ToolCallingFakeModel):
+    """Stands in for the provider failing after the SDK's retries; the error text must never reach the user."""
+
+    messages: Iterator[AIMessage | str] = iter(())
+
+    def _stream(self, *args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
+        raise RuntimeError("upstream 529 overloaded_error: request_id=req_secret body={...}")
+
+
+class SlowModel(ToolCallingFakeModel):
+    """Pauses before each reply, so the stream sits idle long enough for a keepalive."""
+
+    delay: float = 0.3
+
+    def _stream(self, *args: Any, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
+        time.sleep(self.delay)  # runs in langchain's executor thread, not on the event loop
+        yield from super()._stream(*args, **kwargs)

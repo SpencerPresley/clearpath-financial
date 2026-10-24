@@ -11624,16 +11624,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11743,16 +11733,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11768,7 +11748,7 @@
     },
     "/api/assistant/threads/{thread_id}/state": {
       "get": {
-        "description": "The checkpointed conversation and any pending approval (hydrates the panel). [workstream K]",
+        "description": "The checkpointed conversation and any pending approval (hydrates the panel).",
         "operationId": "getAssistantThreadState",
         "parameters": [
           {
@@ -11852,16 +11832,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [

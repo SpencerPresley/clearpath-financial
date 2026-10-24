@@ -31,11 +31,12 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
+from pydantic import ValidationError
 
 from accounts.models import User
 from assistant.email import check_recipients
 from assistant.prompt import system_message
-from assistant.tools import SEND_EMAIL, build_tools
+from assistant.tools import SEND_EMAIL, SendEmailArgs, build_tools
 from core.clock import SYSTEM_CLOCK, Clock
 from core.errors import InvalidInput
 from reviews.selectors import ItemRow
@@ -47,21 +48,29 @@ APPROVAL_DESCRIPTION = "Review this email. Nothing is sent until you approve it.
 type ToolResult = ToolMessage | Command[Any]
 
 
+def _refusal(tool_call: dict[str, Any], reason: str) -> ToolMessage:
+    return ToolMessage(
+        content=f"Not sent and not shown to the user. {reason}",
+        name=SEND_EMAIL,
+        tool_call_id=tool_call["id"],
+        status="error",
+    )
+
+
 def recipient_refusal(tool_call: dict[str, Any]) -> ToolMessage | None:
-    """The error the model gets instead of an approval prompt when a draft names an outside recipient."""
+    """The error the model gets instead of an approval prompt when a draft names an outside recipient (or
+    isn't a valid draft at all, so every approval prompt carries a well-formed email)."""
     if tool_call.get("name") != SEND_EMAIL:
         return None
-    to = (tool_call.get("args") or {}).get("to")
-    recipients = [to] if isinstance(to, str) else [str(r) for r in to] if isinstance(to, list) else []
     try:
-        check_recipients(recipients)
+        draft = SendEmailArgs.model_validate(tool_call.get("args") or {})
+    except ValidationError as e:
+        fields = ", ".join(sorted({str(err["loc"][0]) for err in e.errors() if err["loc"]})) or "arguments"
+        return _refusal(tool_call, f"Invalid {fields}.")
+    try:
+        check_recipients(draft.to)
     except InvalidInput as e:
-        return ToolMessage(
-            content=f"Not sent and not shown to the user. {e.message}. Only staff directory addresses receive email.",
-            name=SEND_EMAIL,
-            tool_call_id=tool_call["id"],
-            status="error",
-        )
+        return _refusal(tool_call, f"{e.message}. Only staff directory addresses receive email.")
     return None
 
 

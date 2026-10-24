@@ -113,7 +113,7 @@ export const StartAssistantRunBody = zod.object({
 export const StartAssistantRunResponse = zod.unknown()
 
 /**
- * The checkpointed conversation and any pending approval (hydrates the panel). [workstream K]
+ * The checkpointed conversation and any pending approval (hydrates the panel).
  * @summary Get Thread State
  */
 export const GetAssistantThreadStateParams = zod.object({

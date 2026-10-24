@@ -518,7 +518,7 @@ export const useStartAssistantRun = <TError = ErrorOut,
 }
 
 /**
- * The checkpointed conversation and any pending approval (hydrates the panel). [workstream K]
+ * The checkpointed conversation and any pending approval (hydrates the panel).
  * @summary Get Thread State
  */
 export const getAssistantThreadState = async (threadId: string, options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadStateOut> => {
