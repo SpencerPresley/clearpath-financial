@@ -5,12 +5,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ImportProblemKind } from './importProblemKind';
+import type { ProblemSeverity } from './problemSeverity';
 
 export interface ImportProblemOut {
   column: string | null;
   kind: ImportProblemKind;
   message: string;
-  /** 1-based row number in the sheet, as the admin sees it in Excel. */
-  row_number: number;
+  /** Excel's row number; null for a problem with the whole sheet. */
+  row_number: number | null;
+  /** error: the row is skipped (or blocks commit); warning: imported, worth a look; info: a value read from a non-standard form. */
+  severity: ProblemSeverity;
   value: string | null;
 }

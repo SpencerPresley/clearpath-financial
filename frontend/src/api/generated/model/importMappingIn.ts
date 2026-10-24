@@ -6,9 +6,14 @@
  */
 import type { ColumnMappingIn } from './columnMappingIn';
 import type { StatusMappingIn } from './statusMappingIn';
+import type { ValueMappingIn } from './valueMappingIn';
 
+/**
+ * `columns` are merged into the current mapping (headers left out keep theirs); `status_values` and
+ * `value_mappings` replace the saved lists.
+ */
 export interface ImportMappingIn {
-  /** @minItems 1 */
-  columns: ColumnMappingIn[];
+  columns?: ColumnMappingIn[];
   status_values?: StatusMappingIn[];
+  value_mappings?: ValueMappingIn[];
 }

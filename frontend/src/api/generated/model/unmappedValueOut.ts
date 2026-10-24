@@ -6,7 +6,8 @@
  */
 import type { ImportTargetField } from './importTargetField';
 
-export interface ColumnMappingOut {
-  source: string;
-  target: ImportTargetField;
+export interface UnmappedValueOut {
+  field: ImportTargetField;
+  rows: number;
+  value: string;
 }

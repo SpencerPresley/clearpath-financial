@@ -8,7 +8,34 @@ import * as zod from 'zod';
 
 
 /**
- * Upload a tracker xlsx; detects columns and suggests a mapping. Admins only. [workstream G]
+ * The 20 most recent imports. Admins only.
+ * @summary List Imports
+ */
+export const ListImportsResponseItem = zod.object({
+  "commit_requested_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "created_at": zod.iso.datetime({"offset":true}),
+  "created_by": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "error": zod.union([zod.string(),zod.null()]).describe('Why the last commit failed, if it did.'),
+  "filename": zod.string(),
+  "id": zod.int(),
+  "row_count": zod.int().describe('Sheet rows below the header, data or not.'),
+  "sheet_name": zod.string(),
+  "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
+  "summary": zod.union([zod.object({
+  "created": zod.int(),
+  "partners_created": zod.int(),
+  "skipped": zod.int()
+}),zod.null()]).describe('Set once committed.'),
+  "updated_at": zod.iso.datetime({"offset":true})
+})
+export const ListImportsResponse = zod.array(ListImportsResponseItem)
+
+/**
+ * Upload a tracker xlsx; reads it and guesses the column mapping. Admins only. 422 if it isn't an xlsx.
  * @summary Upload
  */
 export const UploadImportBody = zod.object({
@@ -16,67 +43,91 @@ export const UploadImportBody = zod.object({
 })
 
 export const UploadImportResponse = zod.object({
-  "column_mapping": zod.array(zod.object({
-  "source": zod.string(),
-  "target": zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.')
-})),
   "columns": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What the column is mapped to now.'),
   "name": zod.string(),
   "sample_values": zod.array(zod.string()),
-  "suggested_field": zod.union([zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
+  "suggested_field": zod.union([zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
 })),
+  "commit_requested_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "created_at": zod.iso.datetime({"offset":true}),
   "created_by": zod.object({
   "id": zod.int(),
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
+  "error": zod.union([zod.string(),zod.null()]).describe('Why the last commit failed, if it did.'),
   "filename": zod.string(),
   "id": zod.int(),
-  "row_count": zod.int(),
+  "row_count": zod.int().describe('Sheet rows below the header, data or not.'),
   "sheet_name": zod.string(),
   "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
-  "status_mapping": zod.array(zod.object({
-  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional().describe('The decision implied, if any.'),
+  "status_values": zod.array(zod.object({
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'mapped']),zod.null()]).describe('default: the built-in table; mapped: the admin\'s mapping; null: not mapped yet.'),
   "source_value": zod.string(),
-  "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
-})),
-  "status_values": zod.array(zod.string()).describe('Distinct values found in the mapped status column.')
+  "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]).describe('Null until mapped: the row can\'t be imported.')
+})).describe('Distinct values in the mapped status column.'),
+  "summary": zod.union([zod.object({
+  "created": zod.int(),
+  "partners_created": zod.int(),
+  "skipped": zod.int()
+}),zod.null()]).describe('Set once committed.'),
+  "updated_at": zod.iso.datetime({"offset":true}),
+  "value_mappings": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "source_value": zod.string(),
+  "value": zod.string()
+}))
 })
 
 /**
- * Start an import from the bundled sample tracker. [workstream G]
+ * Start an import from the bundled sample tracker ("Load sample tracker").
  * @summary Load Sample
  */
 export const LoadSampleImportResponse = zod.object({
-  "column_mapping": zod.array(zod.object({
-  "source": zod.string(),
-  "target": zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.')
-})),
   "columns": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What the column is mapped to now.'),
   "name": zod.string(),
   "sample_values": zod.array(zod.string()),
-  "suggested_field": zod.union([zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
+  "suggested_field": zod.union([zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
 })),
+  "commit_requested_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "created_at": zod.iso.datetime({"offset":true}),
   "created_by": zod.object({
   "id": zod.int(),
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
+  "error": zod.union([zod.string(),zod.null()]).describe('Why the last commit failed, if it did.'),
   "filename": zod.string(),
   "id": zod.int(),
-  "row_count": zod.int(),
+  "row_count": zod.int().describe('Sheet rows below the header, data or not.'),
   "sheet_name": zod.string(),
   "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
-  "status_mapping": zod.array(zod.object({
-  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional().describe('The decision implied, if any.'),
+  "status_values": zod.array(zod.object({
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'mapped']),zod.null()]).describe('default: the built-in table; mapped: the admin\'s mapping; null: not mapped yet.'),
   "source_value": zod.string(),
-  "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
-})),
-  "status_values": zod.array(zod.string()).describe('Distinct values found in the mapped status column.')
+  "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]).describe('Null until mapped: the row can\'t be imported.')
+})).describe('Distinct values in the mapped status column.'),
+  "summary": zod.union([zod.object({
+  "created": zod.int(),
+  "partners_created": zod.int(),
+  "skipped": zod.int()
+}),zod.null()]).describe('Set once committed.'),
+  "updated_at": zod.iso.datetime({"offset":true}),
+  "value_mappings": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "source_value": zod.string(),
+  "value": zod.string()
+}))
 })
 
 /**
- * [workstream G]
+ * The job, its columns and current mapping. Poll this after `commitImport`.
  * @summary Get Import
  */
 export const GetImportParams = zod.object({
@@ -84,35 +135,47 @@ export const GetImportParams = zod.object({
 })
 
 export const GetImportResponse = zod.object({
-  "column_mapping": zod.array(zod.object({
-  "source": zod.string(),
-  "target": zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.')
-})),
   "columns": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What the column is mapped to now.'),
   "name": zod.string(),
   "sample_values": zod.array(zod.string()),
-  "suggested_field": zod.union([zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
+  "suggested_field": zod.union([zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
 })),
+  "commit_requested_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "created_at": zod.iso.datetime({"offset":true}),
   "created_by": zod.object({
   "id": zod.int(),
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
+  "error": zod.union([zod.string(),zod.null()]).describe('Why the last commit failed, if it did.'),
   "filename": zod.string(),
   "id": zod.int(),
-  "row_count": zod.int(),
+  "row_count": zod.int().describe('Sheet rows below the header, data or not.'),
   "sheet_name": zod.string(),
   "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
-  "status_mapping": zod.array(zod.object({
-  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional().describe('The decision implied, if any.'),
+  "status_values": zod.array(zod.object({
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'mapped']),zod.null()]).describe('default: the built-in table; mapped: the admin\'s mapping; null: not mapped yet.'),
   "source_value": zod.string(),
-  "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
-})),
-  "status_values": zod.array(zod.string()).describe('Distinct values found in the mapped status column.')
+  "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]).describe('Null until mapped: the row can\'t be imported.')
+})).describe('Distinct values in the mapped status column.'),
+  "summary": zod.union([zod.object({
+  "created": zod.int(),
+  "partners_created": zod.int(),
+  "skipped": zod.int()
+}),zod.null()]).describe('Set once committed.'),
+  "updated_at": zod.iso.datetime({"offset":true}),
+  "value_mappings": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "source_value": zod.string(),
+  "value": zod.string()
+}))
 })
 
 /**
- * Create legacy items (is_legacy, legacy_ref kept). [workstream G]
+ * Create the legacy items in the background; poll `getImport`. Safe to repeat: nothing is imported twice.
  * @summary Commit
  */
 export const CommitImportParams = zod.object({
@@ -122,62 +185,121 @@ export const CommitImportParams = zod.object({
 export const commitImportBodySkipRowsWithProblemsDefault = true;
 
 export const CommitImportBody = zod.object({
-  "skip_rows_with_problems": zod.boolean().default(commitImportBodySkipRowsWithProblemsDefault)
+  "skip_rows_with_problems": zod.boolean().default(commitImportBodySkipRowsWithProblemsDefault).describe('Skip rows with error-severity problems; false refuses to commit while any exist.')
 })
 
 export const CommitImportResponse = zod.object({
+  "columns": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What the column is mapped to now.'),
+  "name": zod.string(),
+  "sample_values": zod.array(zod.string()),
+  "suggested_field": zod.union([zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),zod.null()])
+})),
+  "commit_requested_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "committed_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "created_at": zod.iso.datetime({"offset":true}),
+  "created_by": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
+  "error": zod.union([zod.string(),zod.null()]).describe('Why the last commit failed, if it did.'),
+  "filename": zod.string(),
+  "id": zod.int(),
+  "row_count": zod.int().describe('Sheet rows below the header, data or not.'),
+  "sheet_name": zod.string(),
+  "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
+  "status_values": zod.array(zod.object({
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "rows": zod.int(),
+  "source": zod.union([zod.enum(['default', 'mapped']),zod.null()]).describe('default: the built-in table; mapped: the admin\'s mapping; null: not mapped yet.'),
+  "source_value": zod.string(),
+  "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]).describe('Null until mapped: the row can\'t be imported.')
+})).describe('Distinct values in the mapped status column.'),
+  "summary": zod.union([zod.object({
   "created": zod.int(),
-  "job_id": zod.int(),
+  "partners_created": zod.int(),
   "skipped": zod.int()
+}),zod.null()]).describe('Set once committed.'),
+  "updated_at": zod.iso.datetime({"offset":true}),
+  "value_mappings": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "source_value": zod.string(),
+  "value": zod.string()
+}))
 })
 
 /**
- * Save the column and status-value mapping; returns the refreshed preview. [workstream G]
+ * Save the column, status-value, and value mappings; returns the refreshed preview.
  * @summary Set Mapping
  */
 export const SetImportMappingParams = zod.object({
   "job_id": zod.int()
 })
 
+export const setImportMappingBodyStatusValuesItemSourceValueMax = 200;
+
+export const setImportMappingBodyValueMappingsItemSourceValueMax = 200;
+
+export const setImportMappingBodyValueMappingsItemValueMax = 200;
 
 
 
 export const SetImportMappingBody = zod.object({
   "columns": zod.array(zod.object({
-  "source": zod.string(),
-  "target": zod.enum(['legacy_ref', 'title', 'product', 'channel', 'partner', 'submitter', 'reviewer', 'submitted_on', 'decided_on', 'status', 'expires_on', 'first_run', 'last_run', 'risk_tier', 'markets', 'comments', 'notes', 'asset_link', 'ignore']).describe('What a tracker column maps onto.')
-})).min(1),
+  "source": zod.string().describe('A header from the sheet.'),
+  "target": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.')
+})).optional(),
   "status_values": zod.array(zod.object({
-  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional(),
-  "source_value": zod.string(),
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional().describe('Defaults to the decision the status implies.'),
+  "source_value": zod.string().min(1).max(setImportMappingBodyStatusValuesItemSourceValueMax),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
+})).optional(),
+  "value_mappings": zod.array(zod.object({
+  "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
+  "source_value": zod.string().min(1).max(setImportMappingBodyValueMappingsItemSourceValueMax),
+  "value": zod.string().min(1).max(setImportMappingBodyValueMappingsItemValueMax).describe('product/channel/risk_tier: the app value; partner: a partner name; trigger_terms: yes or no.')
 })).optional()
-})
+}).describe('`columns` are merged into the current mapping (headers left out keep theirs); `status_values` and\n`value_mappings` replace the saved lists.')
 
 export const SetImportMappingResponse = zod.object({
+  "counts": zod.object({
+  "already_imported": zod.int(),
+  "blocked": zod.int().describe('Rows with an error-severity problem.'),
+  "duplicates": zod.int(),
+  "not_data": zod.int(),
+  "ready": zod.int().describe('Rows commit creates an item for (or created, once committed).'),
+  "rows_total": zod.int()
+}),
   "job_id": zod.int(),
   "problems": zod.array(zod.object({
   "column": zod.union([zod.string(),zod.null()]),
-  "kind": zod.enum(['missing_value', 'unparseable_date', 'unmapped_status', 'unknown_value', 'duplicate_ref', 'already_imported', 'unknown_partner']),
+  "kind": zod.enum(['missing_mapping', 'missing_value', 'unparseable_date', 'coerced_date', 'unmapped_status', 'inferred_status', 'unknown_value', 'unknown_partner', 'fuzzy_partner', 'missing_expiry', 'unknown_trigger_terms', 'derived_approval_date', 'unresolved_approver', 'inconsistent_dates', 'duplicate_row', 'reused_ref', 'already_imported', 'not_data_row']),
   "message": zod.string(),
-  "row_number": zod.int().describe('1-based row number in the sheet, as the admin sees it in Excel.'),
+  "row_number": zod.union([zod.int(),zod.null()]).describe('Excel\'s row number; null for a problem with the whole sheet.'),
+  "severity": zod.enum(['error', 'warning', 'info']).describe('error: the row is skipped (or blocks commit); warning: imported, worth a look; info: a value read from a non-standard form.'),
   "value": zod.union([zod.string(),zod.null()])
 })),
-  "rows_ready": zod.int(),
-  "rows_total": zod.int(),
-  "rows_with_problems": zod.int(),
-  "sample_rows": zod.array(zod.object({
+  "rows": zod.array(zod.object({
+  "action": zod.enum(['create', 'skip_duplicate', 'skip_already_imported', 'skip_not_data', 'blocked']).describe('What commit does with a row.'),
   "legacy_ref": zod.union([zod.string(),zod.null()]),
-  "ok": zod.boolean(),
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "partner": zod.union([zod.string(),zod.null()]),
+  "problem_count": zod.int(),
   "row_number": zod.int(),
   "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
-  "submitted_on": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "submitted_on": zod.union([zod.iso.date(),zod.null()]),
   "title": zod.union([zod.string(),zod.null()])
-}))
+})),
+  "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
+  "unmapped": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),
+  "rows": zod.int(),
+  "value": zod.string()
+})).describe('Values the admin must map before those rows import.')
 })
 
 /**
- * Row problems are reported values, not errors (spec §6.1). [workstream G]
+ * Every row with what commit does with it, and every problem. Row problems are values, not errors.
  * @summary Preview
  */
 export const GetImportPreviewParams = zod.object({
@@ -185,24 +307,39 @@ export const GetImportPreviewParams = zod.object({
 })
 
 export const GetImportPreviewResponse = zod.object({
+  "counts": zod.object({
+  "already_imported": zod.int(),
+  "blocked": zod.int().describe('Rows with an error-severity problem.'),
+  "duplicates": zod.int(),
+  "not_data": zod.int(),
+  "ready": zod.int().describe('Rows commit creates an item for (or created, once committed).'),
+  "rows_total": zod.int()
+}),
   "job_id": zod.int(),
   "problems": zod.array(zod.object({
   "column": zod.union([zod.string(),zod.null()]),
-  "kind": zod.enum(['missing_value', 'unparseable_date', 'unmapped_status', 'unknown_value', 'duplicate_ref', 'already_imported', 'unknown_partner']),
+  "kind": zod.enum(['missing_mapping', 'missing_value', 'unparseable_date', 'coerced_date', 'unmapped_status', 'inferred_status', 'unknown_value', 'unknown_partner', 'fuzzy_partner', 'missing_expiry', 'unknown_trigger_terms', 'derived_approval_date', 'unresolved_approver', 'inconsistent_dates', 'duplicate_row', 'reused_ref', 'already_imported', 'not_data_row']),
   "message": zod.string(),
-  "row_number": zod.int().describe('1-based row number in the sheet, as the admin sees it in Excel.'),
+  "row_number": zod.union([zod.int(),zod.null()]).describe('Excel\'s row number; null for a problem with the whole sheet.'),
+  "severity": zod.enum(['error', 'warning', 'info']).describe('error: the row is skipped (or blocks commit); warning: imported, worth a look; info: a value read from a non-standard form.'),
   "value": zod.union([zod.string(),zod.null()])
 })),
-  "rows_ready": zod.int(),
-  "rows_total": zod.int(),
-  "rows_with_problems": zod.int(),
-  "sample_rows": zod.array(zod.object({
+  "rows": zod.array(zod.object({
+  "action": zod.enum(['create', 'skip_duplicate', 'skip_already_imported', 'skip_not_data', 'blocked']).describe('What commit does with a row.'),
   "legacy_ref": zod.union([zod.string(),zod.null()]),
-  "ok": zod.boolean(),
+  "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]),
+  "partner": zod.union([zod.string(),zod.null()]),
+  "problem_count": zod.int(),
   "row_number": zod.int(),
   "status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
-  "submitted_on": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "submitted_on": zod.union([zod.iso.date(),zod.null()]),
   "title": zod.union([zod.string(),zod.null()])
-}))
+})),
+  "status": zod.enum(['uploaded', 'mapped', 'committing', 'committed', 'failed']),
+  "unmapped": zod.array(zod.object({
+  "field": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.'),
+  "rows": zod.int(),
+  "value": zod.string()
+})).describe('Values the admin must map before those rows import.')
 })
 

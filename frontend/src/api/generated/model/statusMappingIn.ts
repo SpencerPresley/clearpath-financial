@@ -8,7 +8,12 @@ import type { DecisionOutcome } from './decisionOutcome';
 import type { ItemStatus } from './itemStatus';
 
 export interface StatusMappingIn {
+  /** Defaults to the decision the status implies. */
   outcome?: DecisionOutcome | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   source_value: string;
   status: ItemStatus;
 }

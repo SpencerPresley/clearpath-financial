@@ -6,5 +6,6 @@
  */
 
 export interface ImportCommitIn {
+  /** Skip rows with error-severity problems; false refuses to commit while any exist. */
   skip_rows_with_problems?: boolean;
 }

@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ImportCommitOut {
+export interface ImportSummaryOut {
   created: number;
-  job_id: number;
+  partners_created: number;
   skipped: number;
 }

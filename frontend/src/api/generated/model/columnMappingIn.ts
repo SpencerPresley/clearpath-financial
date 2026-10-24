@@ -7,6 +7,7 @@
 import type { ImportTargetField } from './importTargetField';
 
 export interface ColumnMappingIn {
+  /** A header from the sheet. */
   source: string;
   target: ImportTargetField;
 }

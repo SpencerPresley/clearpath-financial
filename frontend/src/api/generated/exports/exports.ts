@@ -61,7 +61,7 @@ export const getCreateExportUrl = () => {
 }
 
 /**
- * Build an xlsx of the filtered items in the background; poll `getExport`. [workstream G]
+ * Build an xlsx of the filtered view in the background; poll `getExport`. Reviewers, leads, admins.
  * @summary Create Export
  */
 export const createExport = async (exportIn: ExportIn, options?: Parameters<typeof customFetch>[1]): Promise<ExportOut> => {
@@ -149,7 +149,7 @@ export const useCreateExport = <TError = ErrorOut,
 }
 
 /**
- * [workstream G]
+ * Status of an export you requested; `download_url` once ready.
  * @summary Get Export
  */
 export const getExport = async (exportId: number, options?: Parameters<typeof customFetch>[1]): Promise<ExportOut> => {
@@ -241,6 +241,107 @@ export function useGetExport<TData = Awaited<ReturnType<typeof getExport>>, TErr
 
 
 
+export const getDownloadExportUrl = (exportId: number,) => {
+
+
+
+
+  return `/api/exports/${exportId}/download`
+}
+
+/**
+ * The file. Only its requester (or an admin) can download it; 409 until it's ready.
+ * @summary Download Export
+ */
+export const downloadExport = async (exportId: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadExportUrl(exportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadExportQueryKey = (exportId: number,) => {
+    return [
+    `/api/exports/${exportId}/download`
+    ] as const;
+    }
+
+
+export const getDownloadExportQueryOptions = <TData = Awaited<ReturnType<typeof downloadExport>>, TError = ErrorOut>(exportId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadExportQueryKey(exportId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadExport>>> = ({ signal }) => downloadExport(exportId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: exportId !== null && exportId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DownloadExportQueryResult = NonNullable<Awaited<ReturnType<typeof downloadExport>>>
+export type DownloadExportQueryError = ErrorOut
+
+
+export function useDownloadExport<TData = Awaited<ReturnType<typeof downloadExport>>, TError = ErrorOut>(
+ exportId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadExport>>,
+          TError,
+          Awaited<ReturnType<typeof downloadExport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadExport<TData = Awaited<ReturnType<typeof downloadExport>>, TError = ErrorOut>(
+ exportId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadExport>>,
+          TError,
+          Awaited<ReturnType<typeof downloadExport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadExport<TData = Awaited<ReturnType<typeof downloadExport>>, TError = ErrorOut>(
+ exportId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Download Export
+ */
+
+export function useDownloadExport<TData = Awaited<ReturnType<typeof downloadExport>>, TError = ErrorOut>(
+ exportId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadExport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDownloadExportQueryOptions(exportId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export const getGetEvidencePackUrl = (itemId: number,) => {
 
 
@@ -250,8 +351,8 @@ export const getGetEvidencePackUrl = (itemId: number,) => {
 }
 
 /**
- * The latest approval's record. 409 if the item was never approved. [workstream G]
- * @summary Evidence Pack
+ * The latest approval's record. 409 if the item was never approved (or is a legacy import).
+ * @summary Get Evidence Pack
  */
 export const getEvidencePack = async (itemId: number, options?: Parameters<typeof customFetch>[1]): Promise<EvidencePackOut> => {
 
@@ -322,7 +423,7 @@ export function useGetEvidencePack<TData = Awaited<ReturnType<typeof getEvidence
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Evidence Pack
+ * @summary Get Evidence Pack
  */
 
 export function useGetEvidencePack<TData = Awaited<ReturnType<typeof getEvidencePack>>, TError = ErrorOut>(
@@ -342,3 +443,77 @@ export function useGetEvidencePack<TData = Awaited<ReturnType<typeof getEvidence
 
 
 
+export const getCreateEvidencePackUrl = (itemId: number,) => {
+
+
+
+
+  return `/api/items/${itemId}/evidence-pack`
+}
+
+/**
+ * Build the evidence pack zip (files, hashes, history) in the background; poll `getExport`.
+ * @summary Create Evidence Pack
+ */
+export const createEvidencePack = async (itemId: number, options?: Parameters<typeof customFetch>[1]): Promise<ExportOut> => {
+
+  return customFetch<ExportOut>(getCreateEvidencePackUrl(itemId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateEvidencePackMutationKey = () => ['createEvidencePack'] as const;
+
+export const getCreateEvidencePackMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEvidencePack>>, TError,CreateEvidencePackMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEvidencePack>>, TError,CreateEvidencePackMutationVariables, TContext> => {
+
+const mutationKey = getCreateEvidencePackMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEvidencePack>>, CreateEvidencePackMutationVariables> = (props) => {
+          const {itemId} = props ?? {};
+
+          return  createEvidencePack(itemId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEvidencePackMutationResult = NonNullable<Awaited<ReturnType<typeof createEvidencePack>>>
+
+    export type CreateEvidencePackMutationError = ErrorOut
+    export type CreateEvidencePackMutationVariables = {itemId: number}
+
+    /**
+ * @summary Create Evidence Pack
+ */
+export const useCreateEvidencePack = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEvidencePack>>, TError,CreateEvidencePackMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createEvidencePack>>,
+        TError,
+        CreateEvidencePackMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateEvidencePackMutationOptions(options), queryClient);
+    }
