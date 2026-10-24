@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ageTitle, formatQueueAge } from './columns';
+import { ageTitle, formatQueueAge } from './age';
 
 const HOUR = 60 * 60 * 1000;
 const now = new Date('2026-10-24T15:00:00Z');

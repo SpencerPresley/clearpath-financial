@@ -56,6 +56,22 @@ describe('PreviewDrawer', () => {
     expect(d.getByText('High risk')).toBeInTheDocument();
   });
 
+  it('ages the item from when it entered the queue, with its last submission alongside', async () => {
+    const reopened = {
+      ...DETAIL,
+      submitted_at: '2026-08-26T19:00:00Z',
+      queue_entered_at: '2026-10-22T19:00:00Z',
+    };
+    server.use(getGetItemMockHandler(reopened), getListFindingsMockHandler(FINDINGS));
+    renderWithQuery(
+      <PreviewDrawer itemId={1047} viewer={REVIEWER} onClose={vi.fn()} onOpenReview={vi.fn()} />,
+    );
+    const drawer = within(await screen.findByRole('complementary', { name: 'Preview CP-1047' }));
+    const inQueue = await drawer.findByText('In queue since');
+    expect(inQueue.parentElement).toHaveTextContent('Oct 22, 2026');
+    expect(drawer.getByText('Last submitted').parentElement).toHaveTextContent('Aug 26, 2026');
+  });
+
   it('counts open findings by severity, ignoring triaged ones', async () => {
     setup();
     expect(await screen.findByText('2 blocking')).toBeInTheDocument();

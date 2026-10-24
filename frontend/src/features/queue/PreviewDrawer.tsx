@@ -35,6 +35,20 @@ import { canEditFields, canEditRisk, useItemPatch } from './useItemPatch';
 
 export const PREVIEW_HEADING_ID = 'queue-preview-title';
 
+const QUEUE_STATUSES: ReadonlySet<ItemDetailOut['status']> = new Set([
+  'submitted',
+  'in_review',
+  'needs_rereview',
+]);
+
+/** In the queue since later than its last submission (a reopen): the age is the queue's, like the Age column (S4). */
+function reenteredQueue(item: ItemDetailOut): boolean {
+  return (
+    QUEUE_STATUSES.has(item.status) &&
+    new Date(item.submitted_at).getTime() < new Date(item.queue_entered_at).getTime()
+  );
+}
+
 function runDates(item: ItemDetailOut): string {
   if (item.planned_first_run === null) return '—';
   const first = formatDate(item.planned_first_run);
@@ -183,11 +197,22 @@ function DrawerBody({
           <Fact label="Submitted by">{item.owner?.name ?? (item.legacy_submitter || '—')}</Fact>
           <Fact label="Assignee">{item.assignee?.name ?? 'Unassigned'}</Fact>
           <Fact label="Round">{`${roundLabel(item.round)} · v${String(item.current_version_n ?? 1)}`}</Fact>
-          <Fact label="Submitted">
-            <span className="inline-flex items-center gap-1.5">
-              {formatDate(item.submitted_at)} <RelativeAge at={item.submitted_at} />
-            </span>
-          </Fact>
+          {reenteredQueue(item) ? (
+            <>
+              <Fact label="In queue since">
+                <span className="inline-flex items-center gap-1.5">
+                  {formatDate(item.queue_entered_at)} <RelativeAge at={item.queue_entered_at} />
+                </span>
+              </Fact>
+              <Fact label="Last submitted">{formatDate(item.submitted_at)}</Fact>
+            </>
+          ) : (
+            <Fact label="Submitted">
+              <span className="inline-flex items-center gap-1.5">
+                {formatDate(item.submitted_at)} <RelativeAge at={item.submitted_at} />
+              </span>
+            </Fact>
+          )}
           <Fact label="Planned run">{runDates(item)}</Fact>
           <Fact label="Markets">
             {item.markets.length > 0 ? item.markets.map((m) => MARKET_LABEL[m]).join(', ') : '—'}

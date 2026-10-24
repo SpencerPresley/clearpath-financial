@@ -16,8 +16,7 @@ import { Icon } from '../../ui/Icon';
 import { ItemKey } from '../../ui/ItemKey';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { errorMessage } from '../../ui/errorMessage';
-import { formatDateTime } from '../../ui/labels';
-import { formatAge } from '../../ui/RelativeAge';
+import { ageTitle, formatQueueAge } from './age';
 import { FindingsCount } from './FindingsCount';
 import { toListParams } from './search';
 import type { QueueSearch } from './search';
@@ -59,12 +58,8 @@ function Card({
           </AriaButton>
         )}
         <ItemKey value={row.key} copyable={false} />
-        <time
-          className="app-age ml-auto"
-          dateTime={row.submitted_at}
-          title={formatDateTime(row.submitted_at)}
-        >
-          {formatAge(new Date(row.submitted_at), now)}
+        <time className="app-age ml-auto" dateTime={row.queue_entered_at} title={ageTitle(row)}>
+          {formatQueueAge(new Date(row.queue_entered_at), now)}
         </time>
       </div>
       <p className="app-card-title">{row.title}</p>

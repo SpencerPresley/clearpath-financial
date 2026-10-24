@@ -18,8 +18,7 @@ import type { ColumnSizingState, ColumnVisibilityState, RowSelectionState } from
 import type { ItemRowOut, ItemSort } from '../../api/generated/model';
 import { StatusBadge } from '../../ui/badges';
 import { ItemKey } from '../../ui/ItemKey';
-import { formatDateTime } from '../../ui/labels';
-import { formatAge } from '../../ui/RelativeAge';
+import { ageTitle, formatQueueAge } from './age';
 import { useQueueCell } from './cellContext';
 import { AssigneeCell } from './AssigneeCell';
 import { FindingsCount } from './FindingsCount';
@@ -152,26 +151,6 @@ export function nextSort(id: ColumnId, sort: ItemSort): ItemSort {
 
 function Muted({ children }: { children: string }) {
   return <span className="text-muted">{children}</span>;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Time in the queue, compact. Under a week it keeps one decimal, rounded up, so an item listed under "Waiting
- * >3 days" never reads "3d" (walkthrough nit 1): 3 days and 2 hours is "3.1d". Otherwise as `formatAge`.
- */
-export function formatQueueAge(at: Date, now: Date): string {
-  const days = (now.getTime() - at.getTime()) / DAY_MS;
-  if (days < 1 || days >= 7) return formatAge(at, now);
-  return `${(Math.ceil(days * 10) / 10).toFixed(1)}d`;
-}
-
-/** The Age tooltip: when the item entered the queue, and its last submission when that was earlier (a reopen). */
-export function ageTitle(row: Pick<ItemRowOut, 'queue_entered_at' | 'submitted_at'>): string {
-  const since = `In the queue since ${formatDateTime(row.queue_entered_at)}`;
-  return new Date(row.submitted_at).getTime() < new Date(row.queue_entered_at).getTime()
-    ? `${since} · last submitted ${formatDateTime(row.submitted_at)}`
-    : since;
 }
 
 function AgeCell({ row }: { row: ItemRowOut }) {
