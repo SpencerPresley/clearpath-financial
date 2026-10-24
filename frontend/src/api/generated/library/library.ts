@@ -73,7 +73,8 @@ export const getListLibraryUrl = (params?: ListLibraryParams,) => {
 }
 
 /**
- * The approved archive, including legacy items. `status` is ignored: always approved.
+ * The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:
+ * every item that ever received an approval, whatever its status now (precedent doesn't lapse).
  * @summary List Library
  */
 export const listLibrary = async (params?: ListLibraryParams, options?: Parameters<typeof customFetch>[1]): Promise<ItemPageOut> => {

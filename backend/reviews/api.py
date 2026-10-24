@@ -9,10 +9,10 @@ from ninja import File, Form, Query, Router, Status, UploadedFile
 from accounts.api import current_user
 from audit.schemas import ItemHistoryOut
 from core.clock import SYSTEM_CLOCK
-from core.domain import AttachmentKind, ItemStatus
+from core.domain import AttachmentKind
 from core.errors import NotImplementedYet
 from core.schemas import ERRORS, STUB_ERRORS, PageLimit
-from reviews import records, search, selectors, services
+from reviews import assignment, decisions, placements, records, search, selectors, services, versions
 from reviews.filters import ItemFilter, ItemSort
 from reviews.schemas import (
     AssignIn,
@@ -135,12 +135,13 @@ def list_versions(request: HttpRequest, item_id: int) -> list[records.VersionSum
     return list(records.list_versions(item_id=item_id))
 
 
-@items_router.post(
-    "/items/{int:item_id}/versions", response={201: VersionOut, **STUB_ERRORS}, operation_id="resubmitItem"
-)
-def resubmit_item(request: HttpRequest, item_id: int, body: ResubmitIn) -> Status[VersionOut]:
-    """Submit v+1 after changes were requested; bumps the round. [workstream E]"""
-    raise NotImplementedYet("resubmitting")
+@items_router.post("/items/{int:item_id}/versions", response={201: VersionOut, **ERRORS}, operation_id="resubmitItem")
+def resubmit_item(request: HttpRequest, item_id: int, body: ResubmitIn) -> Status[records.VersionDetail]:
+    """Submit v+1 after changes were requested: bumps the round, back to the previous reviewer. Submitter only."""
+    result = versions.resubmit_item(
+        actor=current_user(request), item_id=item_id, content_text=body.content_text, note=body.note
+    )
+    return Status(201, records.get_version(item_id=item_id, n=result.version_n))
 
 
 @items_router.get(
@@ -164,12 +165,11 @@ def get_history(request: HttpRequest, item_id: int) -> records.ItemHistory:
     return records.item_history(item_id=item_id)
 
 
-@items_router.post(
-    "/items/{int:item_id}/new-round", response={201: VersionOut, **STUB_ERRORS}, operation_id="startNewRound"
-)
-def start_new_round(request: HttpRequest, item_id: int, body: NewRoundIn) -> Status[VersionOut]:
-    """withdrawn or expired -> draft v+1 -> submitted. [workstream E]"""
-    raise NotImplementedYet("starting a new round")
+@items_router.post("/items/{int:item_id}/new-round", response={201: VersionOut, **ERRORS}, operation_id="startNewRound")
+def start_new_round(request: HttpRequest, item_id: int, body: NewRoundIn) -> Status[records.VersionDetail]:
+    """withdrawn or expired -> submitted with v+1 (a copy of the current version unless text is given)."""
+    result = versions.start_new_round(actor=current_user(request), item_id=item_id, content_text=body.content_text)
+    return Status(201, records.get_version(item_id=item_id, n=result.version_n))
 
 
 # --- comments --------------------------------------------------------------------------------------------------
@@ -237,7 +237,7 @@ def upload_item_attachment(
     },
 )
 def download_attachment(request: HttpRequest, attachment_id: int) -> FileResponse:
-    attachment = records.get_attachment(attachment_id=attachment_id)
+    attachment = records.get_attachment(attachment_id=attachment_id, viewer=current_user(request))
     return FileResponse(
         attachment.file.open("rb"),
         as_attachment=True,
@@ -249,22 +249,29 @@ def download_attachment(request: HttpRequest, attachment_id: int) -> FileRespons
 # --- assignment ------------------------------------------------------------------------------------------------
 
 
-@items_router.post("/items/{int:item_id}/claim", response={200: ItemRowOut, **STUB_ERRORS}, operation_id="claimItem")
-def claim_item(request: HttpRequest, item_id: int) -> ItemRowOut:
-    """A reviewer takes an item: submitted -> in_review, assigned to them. [workstream E]"""
-    raise NotImplementedYet("claiming")
+@items_router.post("/items/{int:item_id}/claim", response={200: ItemRowOut, **ERRORS}, operation_id="claimItem")
+def claim_item(request: HttpRequest, item_id: int) -> selectors.ItemRow:
+    """A reviewer takes an item (from the pool, or their own) and starts reviewing it: submitted or
+    needs_rereview -> in_review. Leads may claim anyone's."""
+    assignment.claim_item(actor=current_user(request), item_id=item_id)
+    return selectors.get_item_row(item_id=item_id)
 
 
-@items_router.post("/items/{int:item_id}/assign", response={200: ItemRowOut, **STUB_ERRORS}, operation_id="assignItem")
-def assign_item(request: HttpRequest, item_id: int, body: AssignIn) -> ItemRowOut:
-    """Manual assignment by a lead, or a reviewer handing off their own item. [workstream E]"""
-    raise NotImplementedYet("assignment")
+@items_router.post("/items/{int:item_id}/assign", response={200: ItemRowOut, **ERRORS}, operation_id="assignItem")
+def assign_item(request: HttpRequest, item_id: int, body: AssignIn) -> selectors.ItemRow:
+    """Manual assignment by a lead, or a reviewer handing off their own item. Null returns it to the pool."""
+    assignment.assign_item(
+        actor=current_user(request), item_id=item_id, assignee_id=body.assignee_id, reason=body.reason
+    )
+    return selectors.get_item_row(item_id=item_id)
 
 
-@items_router.post("/items/bulk/assign", response={200: BulkResultOut, **STUB_ERRORS}, operation_id="bulkAssignItems")
-def bulk_assign(request: HttpRequest, body: BulkAssignIn) -> BulkResultOut:
-    """[workstream E]"""
-    raise NotImplementedYet("bulk assignment")
+@items_router.post("/items/bulk/assign", response={200: BulkResultOut, **ERRORS}, operation_id="bulkAssignItems")
+def bulk_assign(request: HttpRequest, body: BulkAssignIn) -> assignment.BulkResult:
+    """Leads and admins. Each item is assigned on its own; problems come back per item in `skipped`."""
+    return assignment.bulk_assign(
+        actor=current_user(request), item_ids=body.item_ids, assignee_id=body.assignee_id, reason=body.reason
+    )
 
 
 # --- placements ------------------------------------------------------------------------------------------------
@@ -278,29 +285,50 @@ def list_placements(request: HttpRequest, item_id: int) -> list[records.Placemen
 
 
 @items_router.post(
-    "/items/{int:item_id}/placements", response={201: PlacementOut, **STUB_ERRORS}, operation_id="recordPlacement"
+    "/items/{int:item_id}/placements", response={201: PlacementOut, **ERRORS}, operation_id="recordPlacement"
 )
-def record_placement(request: HttpRequest, item_id: int, body: PlacementIn) -> Status[PlacementOut]:
-    """The marketer records where approved content runs. [workstream E]"""
-    raise NotImplementedYet("recording placements")
+def record_placement(request: HttpRequest, item_id: int, body: PlacementIn) -> Status[records.PlacementRow]:
+    """The submitter (or a lead) records where the approved version runs. Approved items only."""
+    placement_id = placements.record_placement(
+        actor=current_user(request),
+        item_id=item_id,
+        data=placements.PlacementInput(
+            location=body.location,
+            first_run=body.first_run,
+            url=body.url,
+            last_run=body.last_run,
+            monitored=body.monitored,
+        ),
+    )
+    return Status(201, records.get_placement(placement_id=placement_id))
 
 
 @items_router.patch(
-    "/placements/{int:placement_id}", response={200: PlacementOut, **STUB_ERRORS}, operation_id="updatePlacement"
+    "/placements/{int:placement_id}", response={200: PlacementOut, **ERRORS}, operation_id="updatePlacement"
 )
-def update_placement(request: HttpRequest, placement_id: int, body: PlacementUpdateIn) -> PlacementOut:
-    """[workstream E]"""
-    raise NotImplementedYet("updating placements")
+def update_placement(request: HttpRequest, placement_id: int, body: PlacementUpdateIn) -> records.PlacementRow:
+    """End or extend a run (`last_run`; send null for open-ended) or flip `monitored`. Omitted fields stay."""
+    sent = body.model_fields_set
+    placements.update_placement(
+        actor=current_user(request),
+        placement_id=placement_id,
+        changes=placements.PlacementChanges(
+            last_run=body.last_run if "last_run" in sent else "keep",
+            monitored=body.monitored if "monitored" in sent and body.monitored is not None else "keep",
+        ),
+    )
+    return records.get_placement(placement_id=placement_id)
 
 
 @items_router.post(
     "/placements/{int:placement_id}/confirm-takedown",
-    response={200: PlacementOut, **STUB_ERRORS},
+    response={200: PlacementOut, **ERRORS},
     operation_id="confirmTakedown",
 )
-def confirm_takedown(request: HttpRequest, placement_id: int) -> PlacementOut:
-    """Stops the "time to fix live content" clock (ruling 6). [workstream E]"""
-    raise NotImplementedYet("confirming takedowns")
+def confirm_takedown(request: HttpRequest, placement_id: int) -> records.PlacementRow:
+    """The requested takedown happened. Stops the "time to fix live content" clock (ruling 6)."""
+    placements.confirm_takedown(actor=current_user(request), placement_id=placement_id)
+    return records.get_placement(placement_id=placement_id)
 
 
 # --- saved views -----------------------------------------------------------------------------------------------
@@ -338,26 +366,48 @@ def list_decisions(request: HttpRequest, item_id: int) -> list[records.DecisionR
 
 
 @decisions_router.post(
-    "/items/{int:item_id}/decisions", response={201: DecisionOut, **STUB_ERRORS}, operation_id="recordDecision"
+    "/items/{int:item_id}/decisions", response={201: DecisionOut, **ERRORS}, operation_id="recordDecision"
 )
-def record_decision(request: HttpRequest, item_id: int, body: DecisionIn) -> Status[DecisionOut]:
-    """Approve, approve with edits, request changes, or reject. Approve needs every finding triaged
-    (409 open_findings_block_decision) and the AI check finished (409 ai_check_pending). [workstream E]"""
-    raise NotImplementedYet("decisions")
+def record_decision(request: HttpRequest, item_id: int, body: DecisionIn) -> Status[records.DecisionRow]:
+    """Approve, approve with edits, request changes, or reject the current version. Every decision needs a
+    reason. Approvals also need every finding triaged (409 open_findings_block_decision; plain Approve also
+    409 accepted_findings_block_approval), the AI check finished (409 ai_check_pending; failed needs
+    llm_override_reason), and current offer terms (409 stale_offer_terms). Approve with edits may answer 409
+    findings_need_triage with v+1's new findings (v+1 is kept). A newer version is 409 stale_version."""
+    result = decisions.record_decision(
+        actor=current_user(request),
+        item_id=item_id,
+        data=decisions.DecisionInput(
+            outcome=body.outcome,
+            version_n=body.version_n,
+            reason=body.reason,
+            evidence_attachment_ids=tuple(body.evidence_attachment_ids),
+            llm_override_reason=body.llm_override_reason,
+            edited_content_text=body.edited_content_text,
+        ),
+    )
+    return Status(201, records.get_decision(decision_id=result.decision_id))
 
 
 @decisions_router.post(
-    "/items/{int:item_id}/reaffirm", response={201: DecisionOut, **STUB_ERRORS}, operation_id="reaffirmApproval"
+    "/items/{int:item_id}/reaffirm", response={201: DecisionOut, **ERRORS}, operation_id="reaffirmApproval"
 )
-def reaffirm(request: HttpRequest, item_id: int, body: ReaffirmIn) -> Status[DecisionOut]:
-    """needs_rereview -> approved on the same version. [workstream E]"""
-    raise NotImplementedYet("reaffirming")
+def reaffirm(request: HttpRequest, item_id: int, body: ReaffirmIn) -> Status[records.DecisionRow]:
+    """needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new
+    findings come back as 409 findings_need_triage."""
+    result = decisions.reaffirm(
+        actor=current_user(request), item_id=item_id, reason=body.reason, llm_override_reason=body.llm_override_reason
+    )
+    return Status(201, records.get_decision(decision_id=result.decision_id))
 
 
-@decisions_router.post("/items/{int:item_id}/pull", response={200: ItemRowOut, **STUB_ERRORS}, operation_id="pullItem")
-def pull_item(request: HttpRequest, item_id: int, body: PullIn) -> ItemRowOut:
-    """Request takedown of live content; the item goes to withdrawn (ruling 6). [workstream E]"""
-    raise NotImplementedYet("pulling content")
+@decisions_router.post("/items/{int:item_id}/pull", response={200: ItemRowOut, **ERRORS}, operation_id="pullItem")
+def pull_item(request: HttpRequest, item_id: int, body: PullIn) -> selectors.ItemRow:
+    """Request takedown of live content; the item goes to withdrawn (ruling 6)."""
+    decisions.pull_item(
+        actor=current_user(request), item_id=item_id, reason=body.reason, placement_ids=tuple(body.placement_ids)
+    )
+    return selectors.get_item_row(item_id=item_id)
 
 
 @decisions_router.post(
@@ -375,13 +425,16 @@ def bulk_fast_track(request: HttpRequest, body: BulkFastTrackIn) -> BulkResultOu
 def list_library(
     request: HttpRequest,
     filters: Query[ItemFilter],
+    scope: selectors.LibraryScope = selectors.LibraryScope.APPROVED_TO_RUN,
     sort: ItemSort = ItemSort.UPDATED,
     cursor: str | None = None,
     limit: PageLimit = 50,
 ) -> selectors.ItemPage:
-    """The approved archive, including legacy items. `status` is ignored: always approved."""
-    archive = filters.model_copy(update={"status": [ItemStatus.APPROVED]})
-    return selectors.list_items(viewer=current_user(request), filters=archive, sort=sort, cursor=cursor, limit=limit)
+    """The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:
+    every item that ever received an approval, whatever its status now (precedent doesn't lapse)."""
+    return selectors.library_items(
+        viewer=current_user(request), filters=filters, scope=scope, sort=sort, cursor=cursor, limit=limit
+    )
 
 
 @library_router.get("/library/search", response={200: SearchResultsOut, **ERRORS}, operation_id="searchLibrary")

@@ -95,6 +95,99 @@
         "title": "ApprovalDecision",
         "type": "string"
       },
+      "ApprovalExpiringEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApprovalExpiringPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "item.approval_expiring",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "ApprovalExpiringEventOut",
+        "type": "object"
+      },
+      "ApprovalExpiringPayload": {
+        "additionalProperties": false,
+        "description": "The daily sweep's warning, 30 days ahead; one per approving decision.",
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision_id",
+          "expires_at"
+        ],
+        "title": "ApprovalExpiringPayload",
+        "type": "object"
+      },
       "ApprovalRequiredEventOut": {
         "properties": {
           "approval": {
@@ -1136,13 +1229,14 @@
             "anyOf": [
               {
                 "maxLength": 100000,
+                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Approve with edits: the reviewer's v+1, which is what's approved.",
+            "description": "Approve with edits: the reviewer's v+1, which is what's approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field (and with llm_override_reason again if the AI check failed).",
             "title": "Edited Content Text"
           },
           "evidence_attachment_ids": {
@@ -1220,6 +1314,11 @@
             "title": "Decided At",
             "type": "string"
           },
+          "engine_version": {
+            "description": "The code-check engine version the findings came from; '' if unknown.",
+            "title": "Engine Version",
+            "type": "string"
+          },
           "evidence": {
             "items": {
               "$ref": "#/components/schemas/EvidenceOut"
@@ -1289,6 +1388,7 @@
           "approver",
           "reason",
           "ruleset_date",
+          "engine_version",
           "expires_at",
           "llm_override_reason",
           "ai_review_carried_from_n",
@@ -1384,9 +1484,25 @@
       "DecisionRecordedPayload": {
         "additionalProperties": false,
         "properties": {
+          "ai_review_carried_from_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Review Carried From Version Id"
+          },
           "decision_id": {
             "title": "Decision Id",
             "type": "integer"
+          },
+          "engine_version": {
+            "default": "",
+            "title": "Engine Version",
+            "type": "string"
           },
           "evidence_attachment_ids": {
             "default": [],
@@ -1411,12 +1527,29 @@
           "lane": {
             "$ref": "#/components/schemas/DecisionLane"
           },
+          "llm_override_reason": {
+            "default": "",
+            "title": "Llm Override Reason",
+            "type": "string"
+          },
           "outcome": {
             "$ref": "#/components/schemas/DecisionOutcome"
           },
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "ruleset_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleset Date"
           },
           "terms_version_ids": {
             "default": [],
@@ -4582,6 +4715,7 @@
                   "finding.dismissed": "#/components/schemas/FindingDismissedEventOut",
                   "finding.reopened": "#/components/schemas/FindingReopenedEventOut",
                   "import.committed": "#/components/schemas/ImportCommittedEventOut",
+                  "item.approval_expiring": "#/components/schemas/ApprovalExpiringEventOut",
                   "item.assigned": "#/components/schemas/ItemAssignedEventOut",
                   "item.expired": "#/components/schemas/ItemExpiredEventOut",
                   "item.fields_updated": "#/components/schemas/ItemFieldsUpdatedEventOut",
@@ -4635,6 +4769,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ItemExpiredEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/ApprovalExpiringEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/ItemWithdrawnEventOut"
@@ -5153,6 +5290,11 @@
       "ItemResubmittedPayload": {
         "additionalProperties": false,
         "properties": {
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
           "previous_version_id": {
             "title": "Previous Version Id",
             "type": "integer"
@@ -5869,6 +6011,15 @@
         "title": "LegacyTimeline",
         "type": "object"
       },
+      "LibraryScope": {
+        "description": "The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn't lapse; run-permission does).",
+        "enum": [
+          "approved_to_run",
+          "ever_approved"
+        ],
+        "title": "LibraryScope",
+        "type": "string"
+      },
       "LlmCheckFailedEventOut": {
         "properties": {
           "actor": {
@@ -6461,7 +6612,8 @@
           "assignment",
           "decision",
           "rereview",
-          "mention"
+          "mention",
+          "expiry_warning"
         ],
         "title": "NotificationKind",
         "type": "string"
@@ -7857,6 +8009,19 @@
       },
       "ReaffirmIn": {
         "properties": {
+          "llm_override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when the version's AI check failed.",
+            "title": "Llm Override Reason"
+          },
           "reason": {
             "maxLength": 10000,
             "minLength": 1,
@@ -10678,7 +10843,7 @@
     },
     "/api/checks/preview": {
       "post": {
-        "description": "Run the code rules on unsaved text; nothing is stored. [workstream C]",
+        "description": "Run the code rules on unsaved text, as the marketer types; nothing is stored.",
         "operationId": "previewChecks",
         "parameters": [],
         "requestBody": {
@@ -10761,16 +10926,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11087,7 +11242,7 @@
     },
     "/api/findings/{finding_id}/accept": {
       "post": {
-        "description": "Accepted findings become required changes in the request-changes message. [workstream E]",
+        "description": "The problem is real: it becomes a required change. Assignee or lead; current version only.",
         "operationId": "acceptFinding",
         "parameters": [
           {
@@ -11180,16 +11335,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11205,7 +11350,7 @@
     },
     "/api/findings/{finding_id}/dismiss": {
       "post": {
-        "description": "[workstream E]",
+        "description": "Not a problem here, with the reason. Assignee or lead; current version only.",
         "operationId": "dismissFinding",
         "parameters": [
           {
@@ -11298,16 +11443,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11323,7 +11458,6 @@
     },
     "/api/findings/{finding_id}/reopen": {
       "post": {
-        "description": "[workstream E]",
         "operationId": "reopenFinding",
         "parameters": [
           {
@@ -11406,16 +11540,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12785,7 +12909,7 @@
     },
     "/api/items/bulk/assign": {
       "post": {
-        "description": "[workstream E]",
+        "description": "Leads and admins. Each item is assigned on its own; problems come back per item in `skipped`.",
         "operationId": "bulkAssignItems",
         "parameters": [],
         "requestBody": {
@@ -12868,16 +12992,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13399,7 +13513,7 @@
     },
     "/api/items/{item_id}/assign": {
       "post": {
-        "description": "Manual assignment by a lead, or a reviewer handing off their own item. [workstream E]",
+        "description": "Manual assignment by a lead, or a reviewer handing off their own item. Null returns it to the pool.",
         "operationId": "assignItem",
         "parameters": [
           {
@@ -13492,16 +13606,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13749,7 +13853,7 @@
     },
     "/api/items/{item_id}/claim": {
       "post": {
-        "description": "A reviewer takes an item: submitted -> in_review, assigned to them. [workstream E]",
+        "description": "A reviewer takes an item (from the pool, or their own) and starts reviewing it: submitted or\nneeds_rereview -> in_review. Leads may claim anyone's.",
         "operationId": "claimItem",
         "parameters": [
           {
@@ -13832,16 +13936,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14178,7 +14272,7 @@
         ]
       },
       "post": {
-        "description": "Approve, approve with edits, request changes, or reject. Approve needs every finding triaged\n(409 open_findings_block_decision) and the AI check finished (409 ai_check_pending). [workstream E]",
+        "description": "Approve, approve with edits, request changes, or reject the current version. Every decision needs a\nreason. Approvals also need every finding triaged (409 open_findings_block_decision; plain Approve also\n409 accepted_findings_block_approval), the AI check finished (409 ai_check_pending; failed needs\nllm_override_reason), and current offer terms (409 stale_offer_terms). Approve with edits may answer 409\nfindings_need_triage with v+1's new findings (v+1 is kept). A newer version is 409 stale_version.",
         "operationId": "recordDecision",
         "parameters": [
           {
@@ -14271,16 +14365,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14930,7 +15014,7 @@
     },
     "/api/items/{item_id}/new-round": {
       "post": {
-        "description": "withdrawn or expired -> draft v+1 -> submitted. [workstream E]",
+        "description": "withdrawn or expired -> submitted with v+1 (a copy of the current version unless text is given).",
         "operationId": "startNewRound",
         "parameters": [
           {
@@ -15023,16 +15107,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15147,7 +15221,7 @@
         ]
       },
       "post": {
-        "description": "The marketer records where approved content runs. [workstream E]",
+        "description": "The submitter (or a lead) records where the approved version runs. Approved items only.",
         "operationId": "recordPlacement",
         "parameters": [
           {
@@ -15240,16 +15314,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15265,7 +15329,7 @@
     },
     "/api/items/{item_id}/pull": {
       "post": {
-        "description": "Request takedown of live content; the item goes to withdrawn (ruling 6). [workstream E]",
+        "description": "Request takedown of live content; the item goes to withdrawn (ruling 6).",
         "operationId": "pullItem",
         "parameters": [
           {
@@ -15358,16 +15422,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15383,7 +15437,7 @@
     },
     "/api/items/{item_id}/reaffirm": {
       "post": {
-        "description": "needs_rereview -> approved on the same version. [workstream E]",
+        "description": "needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new\nfindings come back as 409 findings_need_triage.",
         "operationId": "reaffirmApproval",
         "parameters": [
           {
@@ -15476,16 +15530,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15600,7 +15644,7 @@
         ]
       },
       "post": {
-        "description": "Submit v+1 after changes were requested; bumps the round. [workstream E]",
+        "description": "Submit v+1 after changes were requested: bumps the round, back to the previous reviewer. Submitter only.",
         "operationId": "resubmitItem",
         "parameters": [
           {
@@ -15693,16 +15737,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15824,7 +15858,7 @@
     },
     "/api/library": {
       "get": {
-        "description": "The approved archive, including legacy items. `status` is ignored: always approved.",
+        "description": "The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:\nevery item that ever received an approval, whatever its status now (precedent doesn't lapse).",
         "operationId": "listLibrary",
         "parameters": [
           {
@@ -16225,6 +16259,25 @@
               ],
               "description": "Has a placement running on or before this date.",
               "title": "Run To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "description": "The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn't lapse; run-permission does).",
+                  "enum": [
+                    "approved_to_run",
+                    "ever_approved"
+                  ],
+                  "title": "LibraryScope",
+                  "type": "string"
+                }
+              ],
+              "default": "approved_to_run"
             }
           },
           {
@@ -18617,7 +18670,7 @@
     },
     "/api/placements/{placement_id}": {
       "patch": {
-        "description": "[workstream E]",
+        "description": "End or extend a run (`last_run`; send null for open-ended) or flip `monitored`. Omitted fields stay.",
         "operationId": "updatePlacement",
         "parameters": [
           {
@@ -18710,16 +18763,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -18735,7 +18778,7 @@
     },
     "/api/placements/{placement_id}/confirm-takedown": {
       "post": {
-        "description": "Stops the \"time to fix live content\" clock (ruling 6). [workstream E]",
+        "description": "The requested takedown happened. Stops the \"time to fix live content\" clock (ruling 6).",
         "operationId": "confirmTakedown",
         "parameters": [
           {
@@ -18818,16 +18861,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [

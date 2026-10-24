@@ -60,6 +60,7 @@ run_from?: string | null;
  * Has a placement running on or before this date.
  */
 run_to?: string | null;
+scope?: 'approved_to_run' | 'ever_approved';
 sort?: 'queue' | 'oldest' | 'newest' | 'updated' | 'title';
 cursor?: string | null;
 /**

@@ -4,6 +4,7 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { ApprovalExpiringEventOut } from './approvalExpiringEventOut';
 import type { AttachmentAddedEventOut } from './attachmentAddedEventOut';
 import type { ChecksCompletedEventOut } from './checksCompletedEventOut';
 import type { CommentAddedEventOut } from './commentAddedEventOut';
@@ -43,5 +44,5 @@ import type { UserRolesChangedEventOut } from './userRolesChangedEventOut';
 import type { VersionCreatedEventOut } from './versionCreatedEventOut';
 
 export interface ItemHistoryOut {
-  entries: (ItemSubmittedEventOut | ItemResubmittedEventOut | ItemAssignedEventOut | ItemReviewStartedEventOut | ItemFieldsUpdatedEventOut | ItemRiskTierOverriddenEventOut | ItemReopenedEventOut | ItemExpiredEventOut | ItemWithdrawnEventOut | ItemNewRoundStartedEventOut | ItemImportedEventOut | VersionCreatedEventOut | ChecksCompletedEventOut | LlmCheckRequestedEventOut | LlmCheckSucceededEventOut | LlmCheckFailedEventOut | FindingAcceptedEventOut | FindingDismissedEventOut | FindingReopenedEventOut | CommentAddedEventOut | DecisionRecordedEventOut | PlacementRecordedEventOut | PlacementUpdatedEventOut | TakedownRequestedEventOut | TakedownConfirmedEventOut | AttachmentAddedEventOut | TermsPublishedEventOut | PartnerCreatedEventOut | PartnerUpdatedEventOut | UserAvailabilityChangedEventOut | UserCreatedEventOut | UserRolesChangedEventOut | UserActiveChangedEventOut | ImportCommittedEventOut | ExportCreatedEventOut | EmailSentEventOut | DemoResetEventOut)[];
+  entries: (ItemSubmittedEventOut | ItemResubmittedEventOut | ItemAssignedEventOut | ItemReviewStartedEventOut | ItemFieldsUpdatedEventOut | ItemRiskTierOverriddenEventOut | ItemReopenedEventOut | ItemExpiredEventOut | ApprovalExpiringEventOut | ItemWithdrawnEventOut | ItemNewRoundStartedEventOut | ItemImportedEventOut | VersionCreatedEventOut | ChecksCompletedEventOut | LlmCheckRequestedEventOut | LlmCheckSucceededEventOut | LlmCheckFailedEventOut | FindingAcceptedEventOut | FindingDismissedEventOut | FindingReopenedEventOut | CommentAddedEventOut | DecisionRecordedEventOut | PlacementRecordedEventOut | PlacementUpdatedEventOut | TakedownRequestedEventOut | TakedownConfirmedEventOut | AttachmentAddedEventOut | TermsPublishedEventOut | PartnerCreatedEventOut | PartnerUpdatedEventOut | UserAvailabilityChangedEventOut | UserCreatedEventOut | UserRolesChangedEventOut | UserActiveChangedEventOut | ImportCommittedEventOut | ExportCreatedEventOut | EmailSentEventOut | DemoResetEventOut)[];
 }

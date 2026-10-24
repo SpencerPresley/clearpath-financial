@@ -7,7 +7,7 @@
 import type { DecisionOutcome } from './decisionOutcome';
 
 export interface DecisionIn {
-  /** Approve with edits: the reviewer's v+1, which is what's approved. */
+  /** Approve with edits: the reviewer's v+1, which is what's approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field (and with llm_override_reason again if the AI check failed). */
   edited_content_text?: string | null;
   /** @maxItems 50 */
   evidence_attachment_ids?: number[];

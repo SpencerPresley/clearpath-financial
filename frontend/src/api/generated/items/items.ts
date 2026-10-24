@@ -393,7 +393,7 @@ export const useSubmitItem = <TError = ErrorOut,
 }
 
 /**
- * [workstream E]
+ * Leads and admins. Each item is assigned on its own; problems come back per item in `skipped`.
  * @summary Bulk Assign
  */
 export const bulkAssignItems = async (bulkAssignIn: BulkAssignIn, options?: Parameters<typeof customFetch>[1]): Promise<BulkResultOut> => {
@@ -858,7 +858,7 @@ export const useUpdateItem = <TError = ErrorOut,
 }
 
 /**
- * Manual assignment by a lead, or a reviewer handing off their own item. [workstream E]
+ * Manual assignment by a lead, or a reviewer handing off their own item. Null returns it to the pool.
  * @summary Assign Item
  */
 export const assignItem = async (itemId: number,
@@ -1124,7 +1124,8 @@ export const useUploadItemAttachment = <TError = ErrorOut,
 }
 
 /**
- * A reviewer takes an item: submitted -> in_review, assigned to them. [workstream E]
+ * A reviewer takes an item (from the pool, or their own) and starts reviewing it: submitted or
+ * needs_rereview -> in_review. Leads may claim anyone's.
  * @summary Claim Item
  */
 export const claimItem = async (itemId: number, options?: Parameters<typeof customFetch>[1]): Promise<ItemRowOut> => {
@@ -1616,7 +1617,7 @@ export const getStartNewRoundUrl = (itemId: number,) => {
 }
 
 /**
- * withdrawn or expired -> draft v+1 -> submitted. [workstream E]
+ * withdrawn or expired -> submitted with v+1 (a copy of the current version unless text is given).
  * @summary Start New Round
  */
 export const startNewRound = async (itemId: number,
@@ -1805,7 +1806,7 @@ export const getRecordPlacementUrl = (itemId: number,) => {
 }
 
 /**
- * The marketer records where approved content runs. [workstream E]
+ * The submitter (or a lead) records where the approved version runs. Approved items only.
  * @summary Record Placement
  */
 export const recordPlacement = async (itemId: number,
@@ -1994,7 +1995,7 @@ export const getResubmitItemUrl = (itemId: number,) => {
 }
 
 /**
- * Submit v+1 after changes were requested; bumps the round. [workstream E]
+ * Submit v+1 after changes were requested: bumps the round, back to the previous reviewer. Submitter only.
  * @summary Resubmit Item
  */
 export const resubmitItem = async (itemId: number,
@@ -2191,7 +2192,7 @@ export const getUpdatePlacementUrl = (placementId: number,) => {
 }
 
 /**
- * [workstream E]
+ * End or extend a run (`last_run`; send null for open-ended) or flip `monitored`. Omitted fields stay.
  * @summary Update Placement
  */
 export const updatePlacement = async (placementId: number,
@@ -2280,7 +2281,7 @@ export const useUpdatePlacement = <TError = ErrorOut,
 }
 
 /**
- * Stops the "time to fix live content" clock (ruling 6). [workstream E]
+ * The requested takedown happened. Stops the "time to fix live content" clock (ruling 6).
  * @summary Confirm Takedown
  */
 export const confirmTakedown = async (placementId: number, options?: Parameters<typeof customFetch>[1]): Promise<PlacementOut> => {

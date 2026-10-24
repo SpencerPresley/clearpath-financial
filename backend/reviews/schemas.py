@@ -175,6 +175,7 @@ class DecisionOut(Schema):
     approver: PartyRefOut
     reason: str
     ruleset_date: date
+    engine_version: str = Field(description="The code-check engine version the findings came from; '' if unknown.")
     expires_at: datetime | None
     llm_override_reason: str | None
     ai_review_carried_from_n: int | None
@@ -328,20 +329,27 @@ class DecisionIn(Schema):
     )
     edited_content_text: str | None = Field(
         default=None,
+        min_length=1,
         max_length=100_000,
-        description="Approve with edits: the reviewer's v+1, which is what's approved.",
+        description=(
+            "Approve with edits: the reviewer's v+1, which is what's approved. If v+1 raises findings, the response "
+            "is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on "
+            "v+1 without this field (and with llm_override_reason again if the AI check failed)."
+        ),
     )
 
     @model_validator(mode="after")
     def _edits_only_with_edits(self) -> Self:
-        with_edits = self.outcome is DecisionOutcome.APPROVED_WITH_EDITS
-        if with_edits != (self.edited_content_text is not None):
-            raise ValueError("edited_content_text is required for approved_with_edits and only allowed there")
+        if self.edited_content_text is not None and self.outcome is not DecisionOutcome.APPROVED_WITH_EDITS:
+            raise ValueError("edited_content_text is only allowed with approved_with_edits")
         return self
 
 
 class ReaffirmIn(Schema):
     reason: str = Field(min_length=1, max_length=10_000)
+    llm_override_reason: str | None = Field(
+        default=None, max_length=2000, description="Required when the version's AI check failed."
+    )
 
 
 class PullIn(Schema):

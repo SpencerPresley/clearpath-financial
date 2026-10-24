@@ -216,6 +216,7 @@ READS = [
     ("listFindings", "/api/items/{item}/findings"),
     ("listSavedViews", "/api/views"),
     ("listLibrary", "/api/library"),
+    ("listLibrary(ever)", "/api/library?scope=ever_approved"),
     ("searchLibrary(text)", "/api/library/search?query=credit+pull"),
     ("searchLibrary(phrase)", f"/api/library/search?mode=phrase&query={PHRASE.replace(' ', '+')}"),
     ("listPartners", "/api/partners"),
