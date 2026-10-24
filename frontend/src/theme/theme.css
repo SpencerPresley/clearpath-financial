@@ -1844,6 +1844,62 @@
     @apply font-medium;
   }
 
+  /* ---- Preview drawer: a side panel beside the list (non-modal), same surface as the table. ----- */
+  .app-drawer {
+    @apply flex w-100 shrink-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-drawer-head {
+    @apply flex h-10 shrink-0 items-center justify-between gap-2 border-b border-base-300 pr-1.5 pl-3;
+  }
+  .app-drawer-body {
+    @apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3;
+  }
+  .app-drawer-title {
+    @apply text-sm leading-5 font-semibold text-base-content outline-none;
+  }
+  .app-drawer-open.app-btn {
+    @apply self-start no-underline;
+  }
+  .app-drawer-open .app-kbd {
+    @apply ml-1 border-brand-muted/40 bg-transparent text-brand-muted;
+  }
+  .app-drawer-reopen {
+    @apply text-meta font-medium text-status-alert-soft-content;
+  }
+  .app-drawer-section {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-drawer-label {
+    @apply text-meta font-medium text-muted;
+  }
+  .app-drawer-findings {
+    @apply flex flex-wrap items-center gap-3;
+  }
+  .app-drawer-severity {
+    @apply inline-flex items-center gap-1 font-medium;
+  }
+  .app-drawer-severity[data-tone='error'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-drawer-severity[data-tone='warning'] {
+    @apply text-status-warning-soft-content;
+  }
+  .app-drawer-quote {
+    @apply line-clamp-3 border-l-2 border-base-300 pl-2 text-base-content;
+  }
+  .app-drawer-facts {
+    @apply grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 border-y border-base-300 py-3;
+  }
+  .app-drawer-fact {
+    @apply contents;
+  }
+  .app-drawer-fact dt {
+    @apply text-muted;
+  }
+  .app-drawer-fact dd {
+    @apply min-w-0 text-base-content;
+  }
+
   /* ---- Bulk bar: replaces the filter row while rows are selected. ------------------------------ */
   .app-bulk-bar {
     @apply flex h-9 items-center gap-2 rounded-md border border-primary/30 bg-selected px-2;
