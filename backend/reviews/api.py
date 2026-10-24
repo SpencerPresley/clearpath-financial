@@ -160,8 +160,8 @@ def get_diff(
 @items_router.get(
     "/items/{int:item_id}/history", response={200: ItemHistoryOut, **ERRORS}, operation_id="getItemHistory"
 )
-def get_history(request: HttpRequest, item_id: int) -> dict[str, object]:
-    return {"entries": records.item_history(item_id=item_id)}
+def get_history(request: HttpRequest, item_id: int) -> records.ItemHistory:
+    return records.item_history(item_id=item_id)
 
 
 @items_router.post(
@@ -391,12 +391,7 @@ def search_library(
     query: Annotated[str, Query(min_length=1, max_length=500)],
     mode: Query[search.SearchMode] = search.SearchMode.TEXT,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
-) -> dict[str, object]:
+) -> search.SearchResults:
     """Precedent search. `phrase`: exact wording, case-insensitive. `text`: full-text with web-search syntax
     ("quoted phrases", -exclusions, or)."""
-    viewer = current_user(request)
-    if mode is search.SearchMode.PHRASE:
-        hits = search.find_phrase(viewer=viewer, phrase=query, filters=filters, limit=limit)
-    else:
-        hits = search.search_text(viewer=viewer, query=query, filters=filters, limit=limit)
-    return {"mode": mode.value, "query": query, "hits": hits}
+    return search.search_library(viewer=current_user(request), query=query, mode=mode, filters=filters, limit=limit)

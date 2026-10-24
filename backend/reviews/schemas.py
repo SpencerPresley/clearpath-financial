@@ -5,7 +5,7 @@ what it is.
 """
 
 from datetime import date, datetime
-from typing import Self
+from typing import Annotated, Self
 
 from ninja import Schema
 from pydantic import Field, model_validator
@@ -28,6 +28,10 @@ from core.domain import (
 from reviews.diff import DiffOp
 from reviews.filters import ItemFilter, ItemSort
 from reviews.search import SearchMode
+
+# ReviewItem.tags is varchar(50)[]: reject what the column can't hold rather than let Postgres truncate it.
+Tag = Annotated[str, Field(min_length=1, max_length=50)]
+
 
 # --- shared pieces ---------------------------------------------------------------------------------------------
 
@@ -106,7 +110,7 @@ class SubmitItemIn(Schema):
     content_text: str = Field(min_length=1, max_length=100_000)
     is_prescreen: bool = Field(default=False, description="A prescreened firm offer (FCRA).")
     source_url: str | None = Field(default=None, max_length=2000, description="Where the copy was fetched from.")
-    tags: list[str] = Field(default_factory=list, max_length=20)
+    tags: list[Tag] = Field(default_factory=list, max_length=20)
 
 
 class FetchCopyIn(Schema):
@@ -122,7 +126,7 @@ class FetchedCopyOut(Schema):
 class ItemUpdateIn(Schema):
     """Inline edits. Omitted fields are left as they are."""
 
-    tags: list[str] | None = Field(default=None, max_length=20)
+    tags: list[Tag] | None = Field(default=None, max_length=20)
     notes: str | None = Field(default=None, max_length=10_000)
     risk_tier: RiskTier | None = Field(default=None, description="Reviewers and leads only; recorded as an override.")
 

@@ -1,5 +1,6 @@
 """The API contract the frontend generates its client from (spec §8.2: changes go through `make schema`)."""
 
+import typing
 from typing import Any
 
 import pytest
@@ -77,6 +78,19 @@ def test_schema_component_names_say_what_they_are() -> None:
     unclear = {n for n in set(schemas) - enums - domain_models if not n.endswith(("In", "Out", "Query"))}
 
     assert unclear == set()
+
+
+def test_no_operation_returns_a_raw_dict() -> None:
+    # Backend CLAUDE.md: typed dataclasses or schemas across boundaries, never raw dicts.
+    offenders = []
+    for router in api._get_bound_routers():
+        for path_view in router.path_operations.values():
+            for operation in path_view.operations:
+                returns = typing.get_type_hints(operation.view_func).get("return")
+                if returns is dict or typing.get_origin(returns) is dict:
+                    offenders.append(operation.operation_id)
+
+    assert offenders == []
 
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [

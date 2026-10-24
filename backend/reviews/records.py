@@ -317,7 +317,12 @@ class HistoryEntry:
     payload: EventPayload
 
 
-def item_history(*, item_id: int) -> tuple[HistoryEntry, ...]:
+@dataclass(frozen=True)
+class ItemHistory:
+    entries: tuple[HistoryEntry, ...]
+
+
+def item_history(*, item_id: int) -> ItemHistory:
     """The item's event log, oldest first: the History tab, rendered."""
     _item_or_404(item_id)
     events = Event.objects.filter(item_id=item_id).select_related("actor").order_by("id")
@@ -337,7 +342,7 @@ def item_history(*, item_id: int) -> tuple[HistoryEntry, ...]:
                 payload=record.payload,
             )
         )
-    return tuple(entries)
+    return ItemHistory(entries=tuple(entries))
 
 
 # --- comments --------------------------------------------------------------------------------------------------

@@ -29,6 +29,19 @@ def _client(user: User) -> Client:
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("tag", ["x" * 51, ""])
+def test_tags_longer_than_the_column_or_empty_are_rejected_not_truncated(marketer: User, tag: str) -> None:
+    client = _client(marketer)
+
+    created = client.post("/api/items", {**SUBMISSION, "tags": [tag]}, content_type="application/json")
+    item = make_item(marketer)
+    updated = client.patch(f"/api/items/{item.pk}", {"tags": [tag]}, content_type="application/json")
+
+    assert (created.status_code, updated.status_code) == (422, 422)
+    assert created.json()["code"] == "validation_error"
+
+
+@pytest.mark.django_db
 def test_submit_item_round_trip(marketer: User) -> None:
     client = _client(marketer)
 

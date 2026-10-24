@@ -148,3 +148,21 @@ def search_text(
         _hit(v, _parse_headline(v.headline), float(v.score))  # pyrefly: ignore[missing-attribute]
         for v in versions
     )
+
+
+@dataclass(frozen=True)
+class SearchResults:
+    mode: SearchMode
+    query: str
+    hits: tuple[SearchHit, ...]
+
+
+def search_library(
+    *, viewer: User, query: str, mode: SearchMode, filters: ItemFilter, limit: int = 20, clock: Clock = SYSTEM_CLOCK
+) -> SearchResults:
+    """Precedent search in either mode: `phrase` for exact wording, `text` for full-text."""
+    if mode is SearchMode.PHRASE:
+        hits = find_phrase(viewer=viewer, phrase=query, filters=filters, limit=limit, clock=clock)
+    else:
+        hits = search_text(viewer=viewer, query=query, filters=filters, limit=limit, clock=clock)
+    return SearchResults(mode=mode, query=query, hits=hits)

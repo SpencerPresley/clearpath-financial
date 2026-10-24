@@ -27,8 +27,8 @@ def mark_read(request: HttpRequest, notification_id: int) -> Status[None]:
 @router.post(
     "/notifications/read-all", response={200: MarkAllReadOut, **ERRORS}, operation_id="markAllNotificationsRead"
 )
-def mark_all_read(request: HttpRequest) -> dict[str, int]:
-    return {"marked": services.mark_all_read(user=current_user(request))}
+def mark_all_read(request: HttpRequest) -> MarkAllReadOut:
+    return MarkAllReadOut(marked=services.mark_all_read(user=current_user(request)))
 
 
 @router.get("/outbox", response={200: list[OutboxEmailOut], **ERRORS}, operation_id="listOutboxEmails")
