@@ -12,7 +12,7 @@ transaction) instead of an executor thread's.
 """
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import date, datetime
 from typing import Annotated, Any, Final, Literal
@@ -22,7 +22,7 @@ from langchain_core.tools import BaseTool, InjectedToolCallId, StructuredTool
 from pydantic import BaseModel, Field
 
 from accounts.models import User
-from assistant.email import EmailDraft, check_recipients, send_approved_email
+from assistant.email import EmailDraft, check_recipients, refused_recipients, send_approved_email
 from assistant.schemas import SubjectLine
 from assistant.selectors import parse_item_key
 from checks.selectors import list_findings
@@ -43,7 +43,7 @@ COPY_LIMIT: Final = 4_000
 COMMENT_LIMIT: Final = 5
 SEND_EMAIL: Final = "send_email"  # the one gated tool (HITL + recipient allowlist)
 
-type Artifact = dict[str, list[str]]
+type Artifact = dict[str, Any]
 type ToolOutput = tuple[str, Artifact]
 
 
@@ -538,15 +538,21 @@ def _build_export(viewer: User, args: BuildExportArgs, clock: Clock) -> ToolOutp
 def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str) -> ToolOutput:
     """Runs only after the user approved (or edited) the draft. Third recipient check: `send_approved_email`
     checks again inside its transaction."""
+    drafted = args.model_dump(exclude={"tool_call_id"})
+
+    def blocked(reason: str, refused: Sequence[str] = ()) -> ToolOutput:
+        content = dumps({"error": reason})
+        return content, email_blocked_artifact(drafted, refused=refused, reason=reason)
+
     try:
         to = check_recipients(args.to)
     except DomainError as e:
-        return _error(f"Not sent. {e.message}")
+        return blocked(f"Not sent. {e.message}", refused_recipients(args.to))
     item_id = None
     if args.item_key:
         item_id = parse_item_key(args.item_key)
         if item_id is None:
-            return _error(f"Not sent. {args.item_key!r} isn't an item key.")
+            return blocked(f"Not sent. {args.item_key!r} isn't an item key.")
     draft = EmailDraft(to=to, subject=args.subject, body=args.body, item_id=item_id)
     try:
         outbox_id = send_approved_email(
@@ -558,8 +564,46 @@ def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str
             clock=clock,
         )
     except DomainError as e:
-        return _error(f"Not sent. {e.message}")
-    return _result(EmailSent(sent=True, outbox_id=outbox_id, to=list(to)), [item_key(item_id)] if item_id else [])
+        return blocked(f"Not sent. {e.message}", refused_recipients(args.to))
+    content = dumps(EmailSent(sent=True, outbox_id=outbox_id, to=list(to)))
+    return content, email_sent_artifact(outbox_id=outbox_id, to=to, item_id=item_id)
+
+
+# --- what happened to a send_email call (its ToolMessage artifact; set in code, never by the model) -------------
+
+
+def _drafted_to(args: Mapping[str, Any]) -> list[str]:
+    to = args.get("to")
+    return [to] if isinstance(to, str) else [str(a) for a in to] if isinstance(to, list) else []
+
+
+def _drafted_item_keys(args: Mapping[str, Any]) -> list[str]:
+    key = args.get("item_key")
+    item_id = parse_item_key(key) if isinstance(key, str) else None
+    return [item_key(item_id)] if item_id is not None else []
+
+
+def email_sent_artifact(*, outbox_id: int, to: Sequence[str], item_id: int | None) -> dict[str, Any]:
+    return {
+        "outcome": "sent",
+        "outbox_id": outbox_id,
+        "to": list(to),
+        "item_keys": [item_key(item_id)] if item_id is not None else [],
+    }
+
+
+def email_declined_artifact(args: Mapping[str, Any]) -> dict[str, Any]:
+    return {"outcome": "declined", "to": _drafted_to(args), "item_keys": _drafted_item_keys(args)}
+
+
+def email_blocked_artifact(args: Mapping[str, Any], *, refused: Sequence[str], reason: str) -> dict[str, Any]:
+    return {
+        "outcome": "blocked",
+        "refused": list(refused),
+        "reason": reason,
+        "to": _drafted_to(args),
+        "item_keys": _drafted_item_keys(args),
+    }
 
 
 # --- tool definitions -----------------------------------------------------------------------------------------------

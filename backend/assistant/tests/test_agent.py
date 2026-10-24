@@ -129,3 +129,33 @@ def test_multi_line_subject_is_refused_before_approval(owner: User, dana: User, 
     assert refusal.status == "error"
     assert "subject: Subject must be one line." in str(refusal.content)
     assert "\n" not in str(refusal.content)
+
+
+@pytest.mark.django_db
+def test_blocked_send_artifact_names_the_refused_addresses(world: World, clock: FixedClock) -> None:
+    to = ["dana@clearpath.demo", "partner@evil.example"]
+    run = run_agent(
+        world.reviewer, clock, _call("send_email", "c1", to=to, subject="s", body="b", item_key=world.item.key), "No."
+    )
+
+    (refusal,) = _tool_messages(run)
+    assert refusal.artifact == {
+        "outcome": "blocked",
+        "refused": ["partner@evil.example"],
+        "reason": refusal.content,
+        "to": to,
+        "item_keys": [world.item.key],
+    }
+
+
+@pytest.mark.django_db
+def test_invalid_draft_artifact_refuses_no_address(owner: User, dana: User, clock: FixedClock) -> None:
+    run = run_agent(
+        owner, clock, _call("send_email", "c1", to=["dana@clearpath.demo"], subject="a\nb", body="b"), "Ok."
+    )
+
+    (refusal,) = _tool_messages(run)
+    assert refusal.artifact["outcome"] == "blocked"
+    assert refusal.artifact["refused"] == []
+    assert refusal.artifact["reason"] == refusal.content
+    assert refusal.artifact["to"] == ["dana@clearpath.demo"]

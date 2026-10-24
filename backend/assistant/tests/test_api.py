@@ -186,6 +186,14 @@ def test_search_read_draft_pauses_then_approve_sends_once(world: World, monkeypa
     assert second.lifecycle() == ["running", "completed"]
     assert second.requested() == []
     email = OutboxEmail.objects.get()
+    sent = {"outcome": "sent", "outbox_id": email.pk, "to": ["dana@clearpath.demo"], "item_keys": [world.item.key]}
+    (finished,) = [
+        f.data for f in second.frames if f.method == "tools" and f.data["event"] == "tool-finished"
+    ]  # the tools event carries it...
+    assert finished["output"]["artifact"] == sent
+    values = [f.data for f in second.frames if f.method == "values"][-1]["messages"]
+    assert [m["artifact"] for m in values if m.get("tool_call_id") == "c3"] == [sent]  # ...and so do values
+    assert [m["artifact"] for m in panel.state()["values"]["messages"] if m.get("tool_call_id") == "c3"] == [sent]
     assert (email.to, email.requested_by, email.approved_by) == (
         ["dana@clearpath.demo"],
         world.reviewer,
@@ -217,6 +225,11 @@ def test_reject_sends_nothing_and_tells_the_model(world: World, monkeypatch: pyt
     tool = [m for m in panel.state()["values"]["messages"] if m["type"] == "tool"][-1]
     assert tool["status"] == "error"
     assert runs.REJECT_DEFAULT in tool["content"]
+    declined = {"outcome": "declined", "to": ["dana@clearpath.demo"], "item_keys": [world.item.key]}
+    assert tool["artifact"] == declined
+    values = [f.data for f in stream.frames if f.method == "values"][-1]["messages"]
+    assert [m["artifact"] for m in values if m.get("tool_call_id") == "c3"] == [declined]
+    assert not [f for f in stream.frames if f.method == "tools" and f.data.get("tool_call_id") == "c3"]
 
 
 def test_edit_to_an_outside_address_is_a_field_error(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -487,3 +500,26 @@ def test_subject_with_a_newline_is_rejected_in_the_run_input_schema() -> None:
 
     with pytest.raises(ValidationError, match="Subject must be one line"):
         EmailDraftIn(to=["dana@clearpath.demo"], subject="a\rb", body="b")
+
+
+def test_blocked_send_outcome_on_the_wire_and_in_state(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
+    panel = Panel(world.reviewer)
+    to = ["partner@evil.example"]
+    use_models(
+        monkeypatch, scripted(_call("send_email", "c1", to=to, subject="s", body="b"), "That address isn't allowed.")
+    )
+
+    stream = read(panel.send("Email the partner"))
+
+    assert stream.lifecycle() == ["running", "completed"]
+    assert stream.requested() == []
+    (tool,) = [m for m in panel.state()["values"]["messages"] if m["type"] == "tool"]
+    assert tool["artifact"] == {
+        "outcome": "blocked",
+        "refused": to,
+        "reason": tool["content"],
+        "to": to,
+        "item_keys": [],
+    }
+    values = [f.data for f in stream.frames if f.method == "values"][-1]["messages"]
+    assert [m["artifact"] for m in values if m["type"] == "tool"] == [tool["artifact"]]

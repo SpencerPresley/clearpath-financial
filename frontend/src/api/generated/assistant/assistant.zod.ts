@@ -94,7 +94,7 @@ export const GetAssistantThreadHistoryResponseItem = zod.object({
 })),
   "values": zod.object({
   "messages": zod.array(zod.object({
-  "artifact": zod.unknown().optional().describe('tool messages: {"item_keys": [...]} for links.'),
+  "artifact": zod.unknown().optional().describe('tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: {"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} (the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused before approval: outside recipients, or an invalid draft with refused = []).'),
   "content": zod.union([zod.string(),zod.array(zod.record(zod.string(), zod.unknown()))]),
   "id": zod.union([zod.string(),zod.null()]),
   "name": zod.union([zod.string(),zod.null()]).optional(),
@@ -218,7 +218,7 @@ export const GetAssistantThreadStateResponse = zod.object({
 })),
   "values": zod.object({
   "messages": zod.array(zod.object({
-  "artifact": zod.unknown().optional().describe('tool messages: {"item_keys": [...]} for links.'),
+  "artifact": zod.unknown().optional().describe('tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: {"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} (the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused before approval: outside recipients, or an invalid draft with refused = []).'),
   "content": zod.union([zod.string(),zod.array(zod.record(zod.string(), zod.unknown()))]),
   "id": zod.union([zod.string(),zod.null()]),
   "name": zod.union([zod.string(),zod.null()]).optional(),

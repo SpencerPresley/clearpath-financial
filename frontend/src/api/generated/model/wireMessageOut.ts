@@ -14,7 +14,7 @@ import type { WireToolCallOut } from './wireToolCallOut';
  * A LangChain message as `BaseMessage.model_dump()` gives it, minus provider metadata.
  */
 export interface WireMessageOut {
-  /** tool messages: {"item_keys": [...]} for links. */
+  /** tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: {"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} (the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused before approval: outside recipients, or an invalid draft with refused = []). */
   artifact?: JsonValue;
   content: WireMessageOutContent;
   id: string | null;

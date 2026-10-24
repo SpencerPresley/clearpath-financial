@@ -101,7 +101,15 @@ class WireMessageOut(Schema):
     tool_calls: list[WireToolCallOut] = Field(default_factory=list, description="ai messages only.")
     tool_call_id: str | None = Field(default=None, description="tool messages only.")
     status: Literal["success", "error"] | None = Field(default=None, description="tool messages only.")
-    artifact: JsonValue = Field(default=None, description='tool messages: {"item_keys": [...]} for links.')
+    artifact: JsonValue = Field(
+        default=None,
+        description=(
+            'tool messages, set by app code: {"item_keys": [...]} for links. send_email adds what happened: '
+            '{"outcome": "sent", "outbox_id", "to", "item_keys"} | {"outcome": "declined", "to", "item_keys"} '
+            '(the user rejected it) | {"outcome": "blocked", "refused", "reason", "to", "item_keys"} (refused '
+            "before approval: outside recipients, or an invalid draft with refused = [])."
+        ),
+    )
 
 
 class AssistantStateValuesOut(Schema):

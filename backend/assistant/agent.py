@@ -34,9 +34,15 @@ from langgraph.types import Command
 from pydantic import ValidationError
 
 from accounts.models import User
-from assistant.email import check_recipients
+from assistant.email import check_recipients, refused_recipients
 from assistant.prompt import system_message
-from assistant.tools import SEND_EMAIL, SendEmailArgs, build_tools
+from assistant.tools import (
+    SEND_EMAIL,
+    SendEmailArgs,
+    build_tools,
+    email_blocked_artifact,
+    email_declined_artifact,
+)
 from core.clock import SYSTEM_CLOCK, Clock
 from core.errors import InvalidInput
 from reviews.selectors import ItemRow
@@ -48,13 +54,30 @@ APPROVAL_DESCRIPTION = "Review this email. Nothing is sent until you approve it.
 type ToolResult = ToolMessage | Command[Any]
 
 
-def _refusal(tool_call: dict[str, Any], reason: str) -> ToolMessage:
+_REJECTED_PREFIX = f"User rejected the tool call for `{SEND_EMAIL}`"  # HumanInTheLoopMiddleware's reject text
+
+
+def _refusal(tool_call: dict[str, Any], reason: str, *, refused: Sequence[str] = ()) -> ToolMessage:
+    content = f"Not sent and not shown to the user. {reason}"
     return ToolMessage(
-        content=f"Not sent and not shown to the user. {reason}",
+        content=content,
         name=SEND_EMAIL,
         tool_call_id=tool_call["id"],
         status="error",
+        artifact=email_blocked_artifact(tool_call.get("args") or {}, refused=refused, reason=content),
     )
+
+
+def _mark_declined(result: ToolResult, tool_call: dict[str, Any]) -> ToolResult:
+    """HITL's reject answer comes back out through this middleware: record the outcome on it."""
+    if (
+        isinstance(result, ToolMessage)
+        and result.status == "error"
+        and result.artifact is None
+        and str(result.content).startswith(_REJECTED_PREFIX)
+    ):
+        return result.model_copy(update={"artifact": email_declined_artifact(tool_call.get("args") or {})})
+    return result
 
 
 def recipient_refusal(tool_call: dict[str, Any]) -> ToolMessage | None:
@@ -73,22 +96,25 @@ def recipient_refusal(tool_call: dict[str, Any]) -> ToolMessage | None:
     try:
         check_recipients(draft.to)
     except InvalidInput as e:
-        return _refusal(tool_call, f"{e.message}. Only staff directory addresses receive email.")
+        reason = f"{e.message}. Only staff directory addresses receive email."
+        return _refusal(tool_call, reason, refused=refused_recipients(draft.to))
     return None
 
 
 class RecipientAllowlistMiddleware(AgentMiddleware):
     def wrap_tool_call(self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], ToolResult]) -> ToolResult:
-        refusal = recipient_refusal(dict(request.tool_call))
-        return refusal if refusal is not None else handler(request)
+        call = dict(request.tool_call)
+        refusal = recipient_refusal(call)
+        return refusal if refusal is not None else _mark_declined(handler(request), call)
 
     async def awrap_tool_call(
         self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], Awaitable[ToolResult]]
     ) -> ToolResult:
-        refusal = None
-        if request.tool_call["name"] == SEND_EMAIL:
-            refusal = await sync_to_async(recipient_refusal)(dict(request.tool_call))
-        return refusal if refusal is not None else await handler(request)
+        call = dict(request.tool_call)
+        if call["name"] != SEND_EMAIL:
+            return await handler(request)
+        refusal = await sync_to_async(recipient_refusal)(call)
+        return refusal if refusal is not None else _mark_declined(await handler(request), call)
 
 
 def middleware() -> Sequence[AgentMiddleware[Any, Any, Any]]:

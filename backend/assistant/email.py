@@ -58,10 +58,8 @@ def _bare_address(raw: str) -> str | None:
     return address.lower()
 
 
-def check_recipients(to: Sequence[str]) -> tuple[str, ...]:
-    """Lower-cased, deduped recipients in order, or `InvalidInput` on `to` naming every address refused."""
-    if not to:
-        raise InvalidInput.for_field(TO_FIELD, "Add at least one recipient.")
+def _sort_recipients(to: Sequence[str]) -> tuple[tuple[str, ...], list[str]]:
+    """(accepted: lower-cased, deduped, in order; refused: the inputs as written, stripped)."""
     allowed = allowed_recipients()
     accepted: dict[str, None] = {}
     refused: list[str] = []
@@ -71,9 +69,21 @@ def check_recipients(to: Sequence[str]) -> tuple[str, ...]:
             refused.append(raw.strip() or '""')
         else:
             accepted[address] = None
+    return tuple(accepted), refused
+
+
+def refused_recipients(to: Sequence[str]) -> list[str]:
+    return _sort_recipients(to)[1]
+
+
+def check_recipients(to: Sequence[str]) -> tuple[str, ...]:
+    """Lower-cased, deduped recipients in order, or `InvalidInput` on `to` naming every address refused."""
+    if not to:
+        raise InvalidInput.for_field(TO_FIELD, "Add at least one recipient.")
+    accepted, refused = _sort_recipients(to)
     if refused:
         raise InvalidInput.for_field(TO_FIELD, f"Not an internal address: {', '.join(refused)}")
-    return tuple(accepted)
+    return accepted
 
 
 def _item(item_id: int | None) -> ReviewItem | None:

@@ -10770,7 +10770,7 @@
                 "$ref": "#/components/schemas/JsonValue"
               }
             ],
-            "description": "tool messages: {\"item_keys\": [...]} for links."
+            "description": "tool messages, set by app code: {\"item_keys\": [...]} for links. send_email adds what happened: {\"outcome\": \"sent\", \"outbox_id\", \"to\", \"item_keys\"} | {\"outcome\": \"declined\", \"to\", \"item_keys\"} (the user rejected it) | {\"outcome\": \"blocked\", \"refused\", \"reason\", \"to\", \"item_keys\"} (refused before approval: outside recipients, or an invalid draft with refused = [])."
           },
           "content": {
             "anyOf": [

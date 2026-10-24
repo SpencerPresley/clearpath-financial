@@ -226,3 +226,43 @@ def test_send_email_schema_hides_the_tool_call_id(world: World, clock: FixedCloc
     send = _tools(world.reviewer, clock)["send_email"]
     properties = send.tool_call_schema.model_json_schema()["properties"]  # pyrefly: ignore[missing-attribute]
     assert set(properties) == {"to", "subject", "body", "item_key"}
+
+
+def _artifact(tool: BaseTool, **args: Any) -> dict[str, Any]:
+    message = async_to_sync(tool.ainvoke)({"type": "tool_call", "id": "c1", "name": tool.name, "args": args})
+    assert isinstance(message, ToolMessage)
+    return message.artifact
+
+
+@pytest.mark.django_db
+def test_send_email_artifact_says_sent(world: World, clock: FixedClock) -> None:
+    artifact = _artifact(
+        _tools(world.reviewer, clock)["send_email"],
+        to=["Dana@clearpath.demo", "dana@clearpath.demo"],
+        subject="s",
+        body="b",
+        item_key=world.item.key.lower(),
+    )
+
+    email = OutboxEmail.objects.get()
+    assert artifact == {
+        "outcome": "sent",
+        "outbox_id": email.pk,
+        "to": ["dana@clearpath.demo"],
+        "item_keys": [world.item.key],
+    }
+
+
+@pytest.mark.django_db
+def test_send_email_artifact_says_blocked_when_the_send_time_check_refuses(world: World, clock: FixedClock) -> None:
+    artifact = _artifact(
+        _tools(world.reviewer, clock)["send_email"], to=["dana@clearpath.demo", "x@evil.example"], subject="s", body="b"
+    )
+
+    assert artifact == {
+        "outcome": "blocked",
+        "refused": ["x@evil.example"],
+        "reason": "Not sent. Not an internal address: x@evil.example",
+        "to": ["dana@clearpath.demo", "x@evil.example"],
+        "item_keys": [],
+    }
