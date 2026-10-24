@@ -31,7 +31,7 @@ import {
 } from '../../ui/labels';
 import { useViewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
-import { SkeletonText } from '../../ui/Skeleton';
+import { SkeletonTable, SkeletonText } from '../../ui/Skeleton';
 import { showToast } from '../../ui/toast';
 import { partnerFormFrom, patchBody, websiteHref, websiteLabel } from './partnerValues';
 import { PartnerForm } from './PartnerForm';
@@ -91,7 +91,6 @@ export function PartnerDetailPage({ partnerId, tab, onTabChange }: PartnerDetail
           <Link to="/partners" className="app-tp-link">
             Partners
           </Link>
-          <span aria-hidden="true">/</span>
         </nav>
         <div className="app-partner-title-row">
           <h1 className="app-page-title">{detail.name}</h1>
@@ -158,28 +157,41 @@ function Stat({ value, label }: { value: number; label: string }) {
   );
 }
 
+/** Header, tabs over a table, and the two side boxes, in their final places. */
 function DetailSkeleton() {
   return (
     <div className="app-partner" role="status" aria-label="Loading partner">
       <div className="app-partner-header">
-        <SkeletonText width="5rem" />
-        <SkeletonText width="14rem" />
+        <SkeletonText width="4rem" />
+        <div className="app-partner-title-row">
+          <SkeletonText width="12rem" />
+        </div>
         <div className="app-partner-stats">
           {Array.from({ length: 4 }, (_, i) => (
-            <SkeletonText key={i} width="5rem" />
+            <div key={i} className="app-partner-stat">
+              <span className="app-partner-stat-figure">
+                <SkeletonText width="2rem" />
+              </span>
+              <SkeletonText width="5rem" />
+            </div>
           ))}
         </div>
       </div>
       <div className="app-partner-body">
-        <div className="app-panel-skeleton">
-          {Array.from({ length: 6 }, (_, i) => (
-            <SkeletonText key={i} width={`${String(60 + ((i * 17) % 35))}%`} />
-          ))}
+        <div className="app-partner-main">
+          <div className="app-tabs app-partner-skeleton-tabs">
+            <SkeletonText width="16rem" />
+          </div>
+          <SkeletonTable rows={4} columns={['6.5rem', '1fr', '9rem', '5rem', '7rem']} label="Loading items" />
         </div>
-        <div className="app-panel-skeleton">
-          <SkeletonText width="70%" />
-          <SkeletonText width="90%" />
-          <SkeletonText width="50%" />
+        <div className="app-partner-side">
+          {[5, 4].map((lines, box) => (
+            <div key={box} className="app-partner-section app-panel-skeleton">
+              {Array.from({ length: lines }, (_, i) => (
+                <SkeletonText key={i} width={`${String(50 + ((i * 19 + box * 7) % 45))}%`} />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

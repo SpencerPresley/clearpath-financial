@@ -279,6 +279,29 @@ describe('Offer terms', () => {
     });
   });
 
+  it('keeps Publish disabled when the preview fails, and retries it', async () => {
+    let calls = 0;
+    server.use(
+      getPreviewTermsImpactMockHandler(() => {
+        calls += 1;
+        if (calls === 1) throw new Error('down');
+        return IMPACT_PL;
+      }),
+    );
+    renderApp('/terms');
+    const form = await openEditor();
+    await setField('APR min', '12.99');
+    const impact = screen.getByRole('region', { name: 'Impact of publishing v13' });
+    expect(await within(impact).findByText(/Couldn.t preview the impact/)).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: /Publish v13/ })).toBeDisabled();
+
+    await userEvent.click(within(impact).getByRole('button', { name: 'Retry' }));
+    expect(await within(impact).findByText(IMPACT_PL.summary)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(form).getByRole('button', { name: /Publish v13/ })).toBeEnabled();
+    });
+  });
+
   it('checks the credit card intro offer together', async () => {
     servePreview();
     renderApp('/terms?product=credit_card');

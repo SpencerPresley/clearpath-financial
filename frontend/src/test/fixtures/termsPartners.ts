@@ -3,6 +3,7 @@
  * this file. Numbers follow F's worked example (PL APR 7.49% → 12.99%; "14 approved items quote v12").
  */
 import type {
+  AffectedItemOut,
   AttachmentOut,
   ImpactPreviewOut,
   ItemRowOut,
@@ -139,6 +140,38 @@ function affectedRow(o: Partial<ItemRowOut> & { id: number; title: string }): It
   };
 }
 
+const MORE_TITLES = [
+  'Debt consolidation email, fall',
+  'Personal loan paid search ad A',
+  'Personal loan paid search ad B',
+  'Home improvement landing page',
+  'Rate check display banner',
+  'Wedding loan social carousel',
+  'Medical expense loan email',
+  'Credit card payoff landing page',
+  'Personal loan direct mail insert',
+  'Summer travel loan SMS',
+  'Car repair loan display ad',
+];
+
+/** Eleven more affected items, so the preview's 14 = its table's 14 (7 more live, 4 more not). */
+const MORE_AFFECTED: AffectedItemOut[] = MORE_TITLES.map((title, index) => {
+  const live = index < 7;
+  return {
+    item: affectedRow({
+      id: 1060 + index,
+      title,
+      channel: index % 3 === 0 ? 'email' : index % 3 === 1 ? 'paid_search' : 'display',
+      partner: index === 2 || index === 5 ? { id: 31, name: 'LoanFinder' } : null,
+    }),
+    is_live: live,
+    quoted_fields: index % 2 === 0 ? ['apr_min', 'apr_max'] : ['apr_min', 'example_payment'],
+    will_become: live ? 'needs_rereview' : 'expired',
+    lane: 'fast_track',
+    numbers_change: true,
+  };
+});
+
 export const IMPACT_PL: ImpactPreviewOut = {
   summary: '14 approved items quote v12; 9 will need re-review, 5 will expire.',
   current_terms_id: PL_V12.id,
@@ -185,6 +218,7 @@ export const IMPACT_PL: ImpactPreviewOut = {
       lane: 'normal',
       numbers_change: true,
     },
+    ...MORE_AFFECTED,
   ],
   partners: [
     { partner: { id: 31, name: 'LoanFinder' }, item_count: 4 },

@@ -7,6 +7,8 @@ import { Link } from '@tanstack/react-router';
 
 import type { ImpactPreviewOut } from '../../api/generated/model';
 import { StatusBadge, StatusMark } from '../../ui/badges';
+import { Button } from '../../ui/Button';
+import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { ItemKey } from '../../ui/ItemKey';
 import { plural } from '../../ui/labels';
 import { SkeletonText } from '../../ui/Skeleton';
@@ -37,12 +39,17 @@ export function ImpactPanel({
   preview,
   stale,
   loading,
+  error,
+  onRetry,
 }: {
   nextVersion: number;
   preview: ImpactPreviewOut | undefined;
   /** The preview on screen is for earlier values; the next one is loading. */
   stale: boolean;
   loading: boolean;
+  /** The preview for the current values failed. */
+  error: unknown;
+  onRetry: () => void;
 }) {
   return (
     <section
@@ -51,7 +58,14 @@ export function ImpactPanel({
       className="app-terms-impact"
     >
       <h2 className="app-terms-section-title">Impact</h2>
-      {loading ? (
+      {error !== null ? (
+        <div className="app-inline-error" role="alert">
+          <span>Couldn&apos;t preview the impact. {apiErrorMessage(error)}</span>
+          <Button size="sm" onPress={onRetry}>
+            Retry
+          </Button>
+        </div>
+      ) : loading ? (
         <div role="status" aria-label="Checking the impact" className="app-panel-skeleton">
           <SkeletonText width="90%" />
           <SkeletonText width="60%" />

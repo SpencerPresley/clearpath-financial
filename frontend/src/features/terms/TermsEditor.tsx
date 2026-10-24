@@ -14,7 +14,7 @@ import { ApiError } from '../../api/mutator';
 import { Button } from '../../ui/Button';
 import { ModalDialog } from '../../ui/Dialog';
 import { CheckboxField, TextAreaField, TextInput } from '../../ui/forms/fields';
-import { apiErrorBody, apiErrorMessage, fieldErrorsFrom } from '../../ui/forms/apiErrors';
+import { apiErrorBody, fieldErrorsFrom } from '../../ui/forms/apiErrors';
 import { fieldErrorText } from '../../ui/forms/formErrors';
 import { PRODUCT_LABELS } from '../../ui/labels';
 import { showToast } from '../../ui/toast';
@@ -291,24 +291,10 @@ function EditorFrame({
     },
   });
 
-  let gate: ReactNode;
+  let gate: string;
   if (values === null) gate = 'Complete the fields to preview the impact.';
   else if (unchanged) gate = `Nothing changed yet: these are v${String(current.version)}'s values.`;
-  else if (preview.failed)
-    gate = (
-      <>
-        Couldn&apos;t preview the impact. {apiErrorMessage(preview.query.error)}{' '}
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            void preview.query.refetch();
-          }}
-        >
-          Retry
-        </Button>
-      </>
-    );
+  else if (preview.failed) gate = 'Publishing waits for the impact preview.';
   else if (preview.checking) gate = 'Checking the impact…';
   else gate = 'Review the impact, then publish.';
 
@@ -317,54 +303,62 @@ function EditorFrame({
 
   return (
     <>
-      <div className="app-terms-body">
-        <form
-          aria-label={`Edit ${productLabel} terms`}
-          className="app-terms-editor"
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (canPublish) setConfirming(true);
-          }}
-        >
+      <form
+        aria-label={`Edit ${productLabel} terms`}
+        className="app-terms-body"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (canPublish) setConfirming(true);
+        }}
+      >
+        <div className="app-terms-editor">
           <div className="app-terms-edit-head" aria-hidden="true">
             <span>Field</span>
-            <span>{current === null ? 'In effect' : `v${String(current.version)}`}</span>
+            <span>{current === null ? 'In effect' : `v${String(current.version)} (in effect)`}</span>
             <span>New</span>
           </div>
           {children}
-          <TextAreaField
-            label="Note (optional)"
-            value={note}
-            onChange={setNote}
-            rows={2}
-            placeholder="Why the terms changed, e.g. Q1 rate card"
-            className="app-terms-note"
+        </div>
+        {/* The decision sits with its consequences: impact first, then the note and Publish. */}
+        <div className="app-terms-side">
+          <ImpactPanel
+            nextVersion={nextVersion}
+            preview={values === null || unchanged ? undefined : shown}
+            stale={!preview.ready}
+            loading={preview.checking && shown === undefined}
+            error={preview.failed ? preview.query.error : null}
+            onRetry={() => {
+              void preview.query.refetch();
+            }}
           />
-          {formError !== null && (
-            <p className="app-form-error" role="alert">
-              {formError}
-            </p>
-          )}
-          <div className="app-terms-actions">
-            <Button type="submit" variant="primary" isDisabled={!canPublish}>
-              {`Publish v${String(nextVersion)}…`}
-            </Button>
-            <Button variant="ghost" onPress={onClose}>
-              Cancel
-            </Button>
-            <p className="app-terms-gate" aria-live="polite">
-              {gate}
-            </p>
+          <div className="app-terms-publish">
+            <TextAreaField
+              label="Note (optional)"
+              value={note}
+              onChange={setNote}
+              rows={2}
+              placeholder="Why the terms changed, e.g. Q1 rate card"
+            />
+            {formError !== null && (
+              <p className="app-form-error" role="alert">
+                {formError}
+              </p>
+            )}
+            <div className="app-terms-actions">
+              <Button type="submit" variant="primary" isDisabled={!canPublish}>
+                {`Publish v${String(nextVersion)}…`}
+              </Button>
+              <Button variant="ghost" onPress={onClose}>
+                Cancel
+              </Button>
+              <p className="app-terms-gate" aria-live="polite">
+                {gate}
+              </p>
+            </div>
           </div>
-        </form>
-        <ImpactPanel
-          nextVersion={nextVersion}
-          preview={values === null || unchanged ? undefined : shown}
-          stale={!preview.ready}
-          loading={preview.checking && shown === undefined}
-        />
-      </div>
+        </div>
+      </form>
       {values !== null && !unchanged && shown !== undefined && (
         <AffectedItems preview={shown} stale={!preview.ready} />
       )}

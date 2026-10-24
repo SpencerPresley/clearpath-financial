@@ -66,6 +66,9 @@ export function TermsPage({ product, onProductChange }: TermsPageProps) {
               <Tab key={tab} id={tab} className="app-tab">
                 {PRODUCT_LABELS[tab]}
                 {terms !== undefined && <span className="app-tab-count">v{terms.version}</span>}
+                {current.isPending && tab !== 'mortgage_prequal' && (
+                  <span className="app-tab-count app-terms-tab-pending" aria-hidden="true" />
+                )}
               </Tab>
             );
           })}
@@ -97,18 +100,30 @@ export function TermsPage({ product, onProductChange }: TermsPageProps) {
   );
 }
 
+/** The read-only layout with placeholders: heading, meta line, values card | heading, history card. */
 function TermsSkeleton() {
   return (
     <div role="status" aria-label="Loading offer terms" className="app-terms-body">
-      <div className="app-terms-values app-panel-skeleton">
-        {Array.from({ length: 7 }, (_, i) => (
-          <SkeletonText key={i} width={`${String(60 + ((i * 13) % 35))}%`} />
-        ))}
+      <div className="app-terms-meta">
+        <div className="app-terms-meta-head">
+          <SkeletonText width="4.5rem" />
+        </div>
+        <SkeletonText width="18rem" />
+        <div className="app-terms-values app-panel-skeleton">
+          {Array.from({ length: 7 }, (_, i) => (
+            <SkeletonText key={i} width={`${String(55 + ((i * 13) % 35))}%`} />
+          ))}
+        </div>
       </div>
-      <div className="app-panel-skeleton">
-        <SkeletonText width="40%" />
-        <SkeletonText width="85%" />
-        <SkeletonText width="70%" />
+      <div className="app-terms-history-wrap">
+        <div className="app-terms-meta-head">
+          <SkeletonText width="7rem" />
+        </div>
+        <div className="app-terms-history app-panel-skeleton app-terms-skeleton-card">
+          <SkeletonText width="40%" />
+          <SkeletonText width="85%" />
+          <SkeletonText width="70%" />
+        </div>
       </div>
     </div>
   );
@@ -146,22 +161,14 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
 
   const meta = (
     <section aria-label={`${label} terms in effect`} className="app-terms-meta">
-      <div className="app-terms-meta-line">
-        {current === null ? (
-          <span>No terms in effect</span>
-        ) : (
-          <>
-            <span className="app-terms-version">v{current.version}</span>
-            <span className="app-muted">
-              In effect since {formatDate(current.effective_from)} · published by {current.created_by_name}
-            </span>
-          </>
-        )}
+      <div className="app-terms-meta-head">
+        <h2 className="app-terms-section-title">
+          {editing ? `Edit ${label.toLowerCase()} terms` : 'In effect'}
+        </h2>
         {isLead && !editing && (
           <Button
             size="sm"
             icon="action.edit"
-            className="app-terms-edit-btn"
             onPress={() => {
               setEditing(true);
             }}
@@ -170,7 +177,17 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
           </Button>
         )}
       </div>
-      {current !== null && current.note !== '' && <p className="app-terms-meta-note">{current.note}</p>}
+      {current === null ? (
+        <p className="app-muted">No terms in effect yet.</p>
+      ) : (
+        <p className="app-terms-meta-line">
+          <span className="app-terms-version">v{current.version}</span>
+          <span className="app-muted">
+            since {formatDate(current.effective_from)} · published by {current.created_by_name}
+            {current.note !== '' && ` · ${current.note}`}
+          </span>
+        </p>
+      )}
       {!editing && current !== null && (
         <dl className="app-details app-terms-values">
           {displayRows(current.values).map((row) => (

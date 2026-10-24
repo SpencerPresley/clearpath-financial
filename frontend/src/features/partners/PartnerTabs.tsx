@@ -58,8 +58,8 @@ function LoadMore({
 
 // ---- Items -----------------------------------------------------------------------------------------
 
-/** Key, title, status, channel, open findings, submitted. */
-const ITEM_COLUMNS = ['6.5rem', 'auto', '9rem', '8.5rem', '4.5rem', '7rem'] as const;
+/** Key, title, status, open findings, submitted. Channel rides under the title (partners are mostly one). */
+const ITEM_COLUMNS = ['6.5rem', 'auto', '9rem', '5rem', '7rem'] as const;
 
 export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
   const { query, rows } = usePartnerItems(partner.id);
@@ -105,7 +105,6 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
               <th scope="col">Item</th>
               <th scope="col">Title</th>
               <th scope="col">Status</th>
-              <th scope="col">Channel</th>
               <th scope="col" className="app-tp-num">
                 Findings
               </th>
@@ -124,6 +123,7 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
                   <Link to="/items/$itemId" params={{ itemId: String(item.id) }} className="app-tp-link">
                     {item.title}
                   </Link>
+                  <span className="app-muted"> · {CHANNEL_LABELS[item.channel]}</span>
                   {item.is_legacy && (
                     <span className="app-tag app-tp-legacy" title="Imported from the tracker: metadata only">
                       Legacy
@@ -133,7 +133,6 @@ export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
                 <td>
                   <StatusBadge status={item.status} />
                 </td>
-                <td className="app-muted">{CHANNEL_LABELS[item.channel]}</td>
                 <td className="app-tp-num">{item.is_legacy ? '—' : item.open_findings_count}</td>
                 <td className="app-tp-num app-muted">{formatDate(item.submitted_at)}</td>
               </tr>
