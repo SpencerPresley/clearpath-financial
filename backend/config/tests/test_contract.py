@@ -4,6 +4,7 @@ import typing
 from typing import Any
 
 import pytest
+from django.core.management import get_commands, load_command_class
 from django.test import Client
 
 from accounts.models import User
@@ -31,6 +32,15 @@ TAGS = {
 def _operations() -> list[tuple[str, str, dict[str, Any]]]:
     schema = api.get_openapi_schema()
     return [(path, method, op) for path, ops in schema["paths"].items() for method, op in ops.items()]
+
+
+def test_schema_export_needs_no_database() -> None:
+    # The api-contract drift job has no Postgres; GeneratedField's system check opens a connection, so the export
+    # command must skip system checks (backend CI runs them, with a database).
+    app = get_commands()["export_openapi_schema"]
+    command = load_command_class(app, "export_openapi_schema")
+
+    assert (app, command.requires_system_checks) == ("core", [])
 
 
 def test_schema_exports_as_sorted_json() -> None:

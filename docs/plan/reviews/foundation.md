@@ -47,7 +47,7 @@ On the reviewer's rulings notes:
 - **Ruling 14**: I11 was the counterexample, and it's now fixed.
 
 After the fixes and a rebase onto `origin/main`:
-- 621 backend tests pass (this branch's 295 plus C's 326 engine tests). The rebase also replaced this branch's
+- 622 backend tests pass (this branch's 296 plus C's 326 engine tests). The rebase also replaced this branch's
   `checks.contracts` with C's merged `checks.engine` types (no merged code imported it), and added an
   engine-compatibility test.
 - ruff, pyrefly, makemigrations --check, manage.py check and the frontend checks are all clean.

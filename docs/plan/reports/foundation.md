@@ -249,18 +249,18 @@ partners.selectors.list_partners / get_partner_detail / repeat_issues; notificat
 
 Run after the review fix pass and a rebase onto `origin/main` (which brought in C's engine, #21, and the design
 system's frontend dependencies), at the head of `ws0/foundation` (test DB suffix `ws0`; private dev DB
-`clearpath_ws0`). The 621 backend tests are this branch's 295 plus the engine's 326; the frontend counts
+`clearpath_ws0`). The 622 backend tests are this branch's 296 plus the engine's 326; the frontend counts
 include the design system's tests.
 
 ```
 $ uv run pytest -q
-621 passed in 7.66s
+622 passed in 7.96s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group lint ruff format --check .
-172 files already formatted
+175 files already formatted
 $ uv run --group typecheck pyrefly check
- INFO 0 errors (93 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
+ INFO 0 errors (94 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
 $ manage.py makemigrations --check --dry-run
 No changes detected
 $ manage.py check --fail-level WARNING
@@ -304,6 +304,9 @@ index change, and the dispatcher test blocked for the holder's full 3 s before `
 - **`MeOut.effective_roles`** beside `roles`, so the frontend gates UI without re-implementing role implication.
 - **More real endpoints than the minimum** (comments, attachments, saved views, partners CRUD, notifications,
   typed history, search) where they were thin over services/selectors.
+- **`core` overrides ninja's `export_openapi_schema`** with `requires_system_checks = []` (and sits before
+  `ninja` in INSTALLED_APPS so it wins): GeneratedField's system check opens a DB connection, and the
+  api-contract drift job has no Postgres. System checks still run in backend CI with a database.
 - **Health stays tagged `core`** (the scaffold's tag; the badge test imports `generated/core`).
 - **Read receipts and saved views write no Event**: they're per-user UI state, not domain state.
 
