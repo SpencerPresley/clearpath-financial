@@ -19,13 +19,18 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | F offer terms (#7) | agent (worktree `wsF/offer-terms`) | — | in progress | publish, impact preview, per-item fan-out, fast-track (single + bulk) |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree `wsH/queue`) | — | in progress | table, filters, saved views, board, drawer, /api/me wiring |
-| I review + intake (#10) | agent (worktree `wsI/review-intake`) | — | in progress | review screen, intake with live checks, My submissions |
+| I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
+| I follow-ups | agent (resumed I) | — | in progress | no Reaffirm on terms_changed; remove fetch-URL until endpoint; Pull glyph |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
 | infra-terraform (#2) | agent (worktree) | PR #16 merged `b7c2ea3` | done (not applied) | 74 resources; sub verified from a real token; app follow-ups in #18 |
 | sample-tracker (#3) | agent (worktree) | PR #17 merged `b01999b` | done | 180 rows; samples/README.md is the import oracle; importer notes in reports/sample-tracker.md |
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: AI (llm) findings are always severity=warning, enforced at persistence — the AI never blocks or approves on its own judgment; blocking belongs to deterministic checks and the human — cost if wrong: a real AI catch needs the reviewer to accept it (which then blocks approve anyway).
+- Ruling: Reaffirm is not offered on terms_changed re-reviews — the old version quotes superseded terms and reaffirm re-runs code checks against current terms — Fast-track or the normal lane instead.
+- Ruling: controls whose endpoint returns 501 don't ship (fetch-URL removed from intake until M builds it).
 
 - Ruling: attaching evidence to an item in a reviewable status re-runs code checks on the current version; open findings whose rule no longer fires are dismissed by the system with reason "Resolved: <kind> attached"; accepted/human-dismissed findings untouched — keeps attachment-kind rules honest without making the reviewer re-triage — cost if wrong: system dismissals to reverse.
 - Ruling: reviewer-edit versions carry vN's AI result (no re-run); human checklist dismissals carry only into reviewer-edit and fast-track versions (E's calls, accepted).
@@ -77,6 +82,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- Backend gaps from I (bundle into next backend follow-up): ItemRowOut lacks latest decision reason and approval_expires_at (/mine does N fetches; Approved shows no expiry); SubmitItemIn takes no attachments (evidence uploads after create; E's re-check PR #26 now resolves attachment findings on upload); single-item fast-track endpoint (F); shell Viewer from /api/me (H2).
 
 - Deploy wave checklist: set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
 
