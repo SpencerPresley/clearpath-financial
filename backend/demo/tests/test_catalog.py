@@ -82,6 +82,14 @@ def test_every_ai_quote_is_in_its_text_and_its_rule_applies(seeded: Seeded) -> N
         assert finding.rule_id in LLM_RULES_BY_ID
 
 
+@pytest.mark.parametrize("seeded", [s for s in seeded_versions() if s.ai is not None and s.ai.findings], ids=str)
+def test_no_ai_suggestion_repeats_copy_already_in_the_text(seeded: Seeded) -> None:
+    """Applying a suggestion replaces the quote; one that's already in the copy would duplicate a line (S12)."""
+    assert seeded.ai is not None
+    for finding in seeded.ai.findings:
+        assert not (finding.suggested_fix and finding.suggested_fix in seeded.ctx.text), finding.suggested_fix
+
+
 def test_story_keys_and_titles_are_unique() -> None:
     assert len({s.key for s in CATALOG.stories}) == len(CATALOG.stories)
     assert len({s.title for s in CATALOG.stories}) == len(CATALOG.stories)

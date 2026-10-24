@@ -157,12 +157,12 @@ def _has_postal_address(text: str) -> bool:
     return False
 
 
-def _email_address(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+def _email_address(_ctx: RuleContext, a: Analysis, c: EngineConfig) -> Iterable[Hit]:
     if not _has_postal_address(a.text):
         yield Hit(
             None,
             "Add a valid physical postal address (street address or registered PO box).",
-            '"ClearPath Financial, 123 Market St, Suite 400, San Francisco, CA 94105"',
+            f'"{c.postal_address}"',
         )
 
 

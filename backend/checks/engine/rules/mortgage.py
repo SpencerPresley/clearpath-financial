@@ -82,6 +82,7 @@ _ARM_NAME = re.compile(r"\bARM\b|(?i:\b(?:adjustable|variable)[-\s]rate\s+mortga
 _FIXED = compile_i(r"\bfixed\b")
 # "fixed" naming a fixed-rate product in an ad that offers both kinds (1026.24(i)(1)(iii)): "30-year fixed".
 _FIXED_PRODUCT = compile_i(r"\b\d{1,2}[-\s]year\s+fixed\b|\bfixed[-\s]rate\s+(?:mortgages?|loans?|options?)\b")
+_ARM_TYPE = re.compile(r"\b(\d{1,2})/\d{1,2}(?:\s+ARM\b|(?i:\s+adjustable[-\s]rate\s+mortgage\b))")
 _FIXED_PERIOD = compile_i(r"\b\d+\s*(?:-\s*)?(?:years?|yrs?|months?)\b")
 _MAY_CHANGE = compile_i(
     r"\b(?:may|can|could|will|then)\s+(?:\w+\s+)?(?:adjust|change|vary|increase|reset)\w*|\badjusts?\b|\badjustable\b"
@@ -124,12 +125,16 @@ def _arm_fixed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
     if not fixed:
         return
     first = fixed[0]
+    # The fixed period comes from the ARM the copy names ("7/6 ARM" is fixed 7 years); there are no mortgage rate
+    # terms to take it from, so without one the suggestion leaves the number out rather than inventing it.
+    arm = _ARM_TYPE.search(text)
+    years = arm.group(1) if arm else None
     if not _ARM_NAME.search(text, 0, first.start()):
         yield Hit(
             Span(first.start(), first.end()),
             'In an adjustable-rate ad, put "ARM" or "Adjustable-Rate Mortgage" before the first "fixed", '
             "at least as prominently.",
-            '"5/1 ARM: rate fixed for the first 5 years, then may adjust annually"',
+            f'"{arm.group(0)}: rate fixed for the first {years} years, then may adjust"' if arm else None,
         )
         return
     for m in fixed:
@@ -141,7 +146,7 @@ def _arm_fixed(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
             yield Hit(
                 Span(m.start(), m.end()),
                 'Next to each "fixed", say how long the rate is fixed and that it may change after that.',
-                '"fixed for the first 5 years, then may adjust annually"',
+                f'"fixed for the first {years} years, then may adjust"' if years else None,
             )
 
 

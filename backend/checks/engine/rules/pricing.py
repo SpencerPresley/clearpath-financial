@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
+from checks.engine.format import apr_bounds, money, pct
 from checks.engine.rule import ALL_PRODUCTS, REGZ_1026_16, URL_1026_24, URL_SH24, Hit, Rule, make_spec
 from checks.engine.text import compile_i
 from checks.engine.types import RuleContext, Span
@@ -68,11 +69,14 @@ def _lowest_rate_claims(a: Analysis, *, standalone: bool) -> list[Span]:
     ]
 
 
-def _as_low_as_range(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+def _as_low_as_range(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if a.has_rate_range:
         return
+    # The range on offer now (walkthrough B2); no terms (mortgage prequal), no numbers to suggest.
+    bounds = apr_bounds(ctx.terms)
+    fix = f'"APRs from {pct(bounds[0])} to {pct(bounds[1])}"' if bounds is not None else None
     for span in _lowest_rate_claims(a, standalone=True):
-        yield Hit(span, "Show the full rate range next to this lowest rate.", '"APRs from 7.49% to 35.99%"')
+        yield Hit(span, "Show the full rate range next to this lowest rate.", fix)
 
 
 def _creditworthiness(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
@@ -86,27 +90,19 @@ def _creditworthiness(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Itera
         )
 
 
-def _pct(value: Decimal) -> str:
-    return f"{value}%"
-
-
-def _money(value: Decimal) -> str:
-    return f"${value:,.0f}" if value == value.to_integral_value() else f"${value:,.2f}"
-
-
 def _outside(value: Decimal, lo: Decimal, hi: Decimal) -> bool:
     return not lo <= value <= hi
 
 
 def _pl_rates(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
-    apr_range = f"{_pct(t.apr_min)}\u2013{_pct(t.apr_max)}"
+    apr_range = f"{pct(t.apr_min)}\u2013{pct(t.apr_max)}"
     for p in a.rates:
         if _outside(p.value, t.apr_min, t.apr_max):
             yield Hit(p.span, f"This APR isn't offered; current APRs are {apr_range}.", apr_range)
 
 
 def _pl_amounts_and_terms(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
-    amount_range = f"{_money(t.amount_min)}\u2013{_money(t.amount_max)}"
+    amount_range = f"{money(t.amount_min)}\u2013{money(t.amount_max)}"
     for m in a.moneys:
         if m.role == "amount" and _outside(m.value, t.amount_min, t.amount_max):
             yield Hit(m.span, f"This loan amount isn't offered; current amounts are {amount_range}.", amount_range)
@@ -117,7 +113,7 @@ def _pl_amounts_and_terms(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
 
 
 def _pl_fees(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
-    fee_range = f"{_pct(t.origination_fee_min_pct)}\u2013{_pct(t.origination_fee_max_pct)}"
+    fee_range = f"{pct(t.origination_fee_min_pct)}\u2013{pct(t.origination_fee_max_pct)}"
     for p in a.percents:
         if (
             p.kind == "fee"
@@ -137,7 +133,7 @@ def _personal_loan_available(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]
 
 
 def _card_rates(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:
-    apr_range = f"{_pct(t.purchase_apr_min)}\u2013{_pct(t.purchase_apr_max)}"
+    apr_range = f"{pct(t.purchase_apr_min)}\u2013{pct(t.purchase_apr_max)}"
     for p in a.rates:
         if p.cash_advance:
             continue
@@ -145,7 +141,7 @@ def _card_rates(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:
             if t.intro_apr is None:
                 yield Hit(p.span, "There's no intro APR in the current card terms.", None)
             elif p.value != t.intro_apr:
-                yield Hit(p.span, f"The current intro APR is {_pct(t.intro_apr)}.", _pct(t.intro_apr))
+                yield Hit(p.span, f"The current intro APR is {pct(t.intro_apr)}.", pct(t.intro_apr))
         elif _outside(p.value, t.purchase_apr_min, t.purchase_apr_max):
             yield Hit(p.span, f"This APR isn't offered; current purchase APRs are {apr_range}.", apr_range)
 
@@ -161,9 +157,9 @@ def _card_claims(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:
             )
             yield Hit(c.span, message, None)
         elif c.field == "balance_transfer_fee_pct" and c.value != t.balance_transfer_fee_pct:
-            yield Hit(c.span, f"The current balance transfer fee is {_pct(t.balance_transfer_fee_pct)}.", None)
+            yield Hit(c.span, f"The current balance transfer fee is {pct(t.balance_transfer_fee_pct)}.", None)
         elif c.field == "annual_fee" and c.value != t.annual_fee:
-            yield Hit(c.span, f"The current annual fee is {_money(t.annual_fee)}.", None)
+            yield Hit(c.span, f"The current annual fee is {money(t.annual_fee)}.", None)
 
 
 def _card_available(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:

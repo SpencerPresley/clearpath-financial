@@ -582,7 +582,8 @@ PL_STORIES: Final = (
                             "llm.pressure_tactics",
                             "Rates this low won't last, so go look before they're gone!",
                             "This urgency line implies rates are about to rise; confirm a real deadline or remove it.",
-                            "Checking your rate takes two minutes.",
+                            # Replaces the urgency line without repeating the sentence before it (walkthrough S12).
+                            "See your rate whenever you're ready.",
                         ),
                     )
                 ),

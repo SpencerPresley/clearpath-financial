@@ -10,6 +10,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from checks.engine.amortization import monthly_payment
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
+from checks.engine.format import apr_bounds, money, pct
 from checks.engine.rule import CLOSED_END, REGZ_1026_24, URL_1026_24, Hit, Rule, make_spec
 from checks.engine.text import compile_i, first_span
 from checks.engine.types import RuleContext, Span
@@ -109,14 +110,24 @@ def _triggers(a: Analysis) -> list[Span]:
     return sorted(spans, key=lambda s: s.start)
 
 
-def _trigger_apr(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+def _trigger_apr(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     triggers = _triggers(a)
     if triggers and not a.apr_rates:
-        yield Hit(
-            triggers[0],
-            "This payment, term or cost figure needs the APR stated with it.",
-            'Add the APR, e.g. "12.99% APR".',
-        )
+        bounds = apr_bounds(ctx.terms)  # the APRs on offer now; none for mortgage prequal (no rate terms)
+        fix = f'Add the APR, e.g. "{pct(bounds[0])}\u2013{pct(bounds[1])} APR".' if bounds is not None else None
+        yield Hit(triggers[0], "This payment, term or cost figure needs the APR stated with it.", fix)
+
+
+def _repayment_fix(a: Analysis) -> str | None:
+    """ "36 monthly payments of $337", computed from the copy's own amount, term and APR when it states all three
+    (and no payment). Otherwise no suggestion: any other figure would be invented."""
+    amount = next((m for m in a.moneys if m.role == "amount"), None)
+    term = next(iter(a.credit_terms), None)
+    apr = next(iter(a.apr_rates), None)
+    if amount is None or term is None or apr is None or any(m.role == "payment" for m in a.moneys):
+        return None
+    payment = monthly_payment(amount.value, apr.value, term.months).quantize(Decimal(1), ROUND_HALF_UP)
+    return f'"{term.months} monthly payments of {money(payment)}"'
 
 
 def _trigger_repayment(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
@@ -126,9 +137,7 @@ def _trigger_repayment(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iter
     if triggers and not (has_payment and has_length):
         missing = "payment amount" if has_length else "number of payments or term"
         yield Hit(
-            triggers[0],
-            f"Show the full repayment terms with this figure; the {missing} is missing.",
-            'e.g. "36 monthly payments of $337".',
+            triggers[0], f"Show the full repayment terms with this figure; the {missing} is missing.", _repayment_fix(a)
         )
 
 
@@ -141,7 +150,8 @@ def _trigger_downpayment(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> It
     )
     if triggers and not stated:
         implied = next((p.span for p in a.percents if p.kind == "financing"), triggers[0])
-        yield Hit(implied, "State the down payment alongside these terms.", 'e.g. "with 20% down".')
+        # No suggestion: nothing says what down payment the offer assumes, so any figure would be invented.
+        yield Hit(implied, "State the down payment alongside these terms.", None)
 
 
 def _rate_may_increase(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:

@@ -12,9 +12,15 @@ CA_LICENSE_PHRASES: tuple[str, ...] = (
 )
 
 
+# The postal address CAN-SPAM suggestions offer: the company's own (the address the demo content uses), kept here so
+# compliance can change it without touching a rule. A rule must never make one up (walkthrough B2's audit).
+POSTAL_ADDRESS = "ClearPath Financial, Inc., 500 Market Street, Suite 1200, San Francisco, CA 94105"
+
+
 @dataclass(frozen=True)
 class EngineConfig:
     ca_license_phrases: tuple[str, ...] = CA_LICENSE_PHRASES
+    postal_address: str = POSTAL_ADDRESS
 
 
 DEFAULT_CONFIG = EngineConfig()
