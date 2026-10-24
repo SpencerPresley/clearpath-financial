@@ -21,8 +21,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree `wsL/demo-seed`) | — | in progress | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree `wsM/drift`) | — | in progress | SSRF-guarded fetch, drift snapshots/reopen, self-hosted demo partner pages |
-| K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
-| J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
+| K assistant (#12) | agent (worktree) | PR #38 | rebasing + system mail in Outbox | live smoke passed (orchestrator); request-scoped runs, custom useStream adapter; injection test; duplicate-send bug found via real-server test and fixed |
+| J screens + metrics (#11) | agent (worktree) | #34 merged (metrics); #35 library+import, #36 terms+partners restacking | in progress | per-source metric figures (no blended numbers); every number drills to its items |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
 | API gaps (queue/mine) | agent (worktree) | PR #32 merged | done (CI failure root-caused: MoreFilters removed the focused submenu mid-selection; fixed in product code) | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
@@ -33,6 +33,12 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: assistant runs are request-scoped (disconnect cancels); useStream consumes our SSE through a custom adapter, not the Agent Server protocol — server-held runs would need a replay buffer across uvicorn workers.
+- Ruling: all Django mail lands in the Outbox (assistant mail + system mail such as password reset, admin-visible); real delivery is a later EMAIL_BACKEND swap.
+
+- Ruling: metrics show native and imported figures side by side, never blended — a blend tracks the data mix, not team speed. Imported history feeds first review, rounds, throughput only.
+- Ruling: reviewers see Partners and Offer terms (read-only) in nav; partner name on the review screen links to the partner page; Library "Expires" replaces "Planned run".
 
 - Ruling: bulk fast-track is Lead-only (spec: bulk actions are Lead); single `POST /items/{id}/fast-track-approve` is open to the assignee reviewer or a lead; the review screen uses the single endpoint with the version it showed; bulk requires `seen_versions` for every item (422 otherwise). Supersedes F's ruling that opened bulk to reviewers. Implemented in PR #33.
 - Ruling: items whose quoted numbers didn't change still go to re-review (approval must point at terms in effect); the UI labels them "Numbers unchanged" so fast-track is a confirm, not a review.
@@ -86,6 +92,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 ## Lessons
 
+- LangChain notes from K: `FetchStreamTransport` in #12 notes is outdated (current useStream takes an adapter); GenericFakeChatModel drops tool calls under v3 streaming (use ToolCallingFakeModel); `respond()` needs `interruptId` after reload.
+- Running live tests: export DB/env vars BEFORE importing settings (settings evaluate Env at import).
+
 - Multi-step shell verification must use `set -e`; a failed edit script once let a commit with pyrefly
   errors through (fixed in `2f6681e`).
 - Ruling: deploy role trusts `<immutable-repo-prefix>:ref:refs/heads/main`, not a GitHub environment — environments and branch protection aren't available for this private repo on the Free plan, so an environment pin would trust any branch declaring it — cost if wrong: anyone with push to main can deploy (true of the original design too).
@@ -99,6 +108,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
+- J follow-ups for other owners: library search by tracker ID (legacy_ref) + search paging (reviews); terms impact API normal-lane count includes expired items (terms); import commit stuck "Importing" if worker dies (imports: add timeout/reconcile like D2's); AppShell.test uses Outbox as an unbuilt example (K must update).
+
 - Accepted from #32: approval_expires_at keeps the latest approval's expiry; Age sort oldest-first; no "In queue" tab (stat links to it); queue exports exclude legacy. Open: wire PATCH /views into ViewBar ("Save changes" on a modified saved view).
 
 - Frontend follow-ups queue: items 1–5 done in PR #33; API-gaps adoption folded into PR #32. Original list: PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
@@ -108,7 +119,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 - Backend gaps from I (bundle into next backend follow-up): ItemRowOut lacks latest decision reason and approval_expires_at (/mine does N fetches; Approved shows no expiry); SubmitItemIn takes no attachments (evidence uploads after create; E's re-check PR #26 now resolves attachment findings on upload); single-item fast-track endpoint (F); shell Viewer from /api/me (H2).
 
-- Deploy wave checklist: set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
+- Deploy wave checklist: CONN_MAX_AGE under ASGI (verify Django docs; likely CONN_MAX_AGE=0 + psycopg pool); set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
 
 - G follow-ups for J/later: stale running jobs if the worker dies (no redelivery), old export files never deleted, Request-ID reuse across files is skipped as duplicate.
 

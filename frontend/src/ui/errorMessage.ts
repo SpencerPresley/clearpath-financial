@@ -24,3 +24,10 @@ export function errorMessage(error: unknown, fallback: string): string {
 export function errorStatus(error: unknown): number | undefined {
   return error instanceof ApiError ? error.status : undefined;
 }
+
+/** Worth a Retry button: the server failed or wasn't reached. A 4xx (not permitted, not found) won't change by
+ * asking again, so the reason is shown instead. */
+export function isRetryable(error: unknown): boolean {
+  const status = errorStatus(error);
+  return status === undefined || status >= 500;
+}

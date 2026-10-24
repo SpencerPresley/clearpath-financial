@@ -26,8 +26,10 @@ import type {
 import type {
   AttachmentOut,
   ErrorOut,
+  ListPartnerFindingsParams,
   ListPartnersParams,
   PartnerDetailOut,
+  PartnerFindingPageOut,
   PartnerIn,
   PartnerRowOut,
   PartnerUpdateIn,
@@ -617,3 +619,120 @@ export const useUploadPartnerAttachment = <TError = ErrorOut,
       > => {
       return useMutation(getUploadPartnerAttachmentMutationOptions(options), queryClient);
     }
+    export const getListPartnerFindingsUrl = (partnerId: number,
+    params?: ListPartnerFindingsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/partners/${partnerId}/findings?${stringifiedParams}` : `/api/partners/${partnerId}/findings`
+}
+
+/**
+ * The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),
+ * newest first. Reviewers, leads, and admins. `next_cursor` is null on the last page.
+ * @summary List Findings
+ */
+export const listPartnerFindings = async (partnerId: number,
+    params?: ListPartnerFindingsParams, options?: Parameters<typeof customFetch>[1]): Promise<PartnerFindingPageOut> => {
+
+  return customFetch<PartnerFindingPageOut>(getListPartnerFindingsUrl(partnerId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPartnerFindingsQueryKey = (partnerId: number,
+    params?: ListPartnerFindingsParams,) => {
+    return [
+    `/api/partners/${partnerId}/findings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPartnerFindingsQueryOptions = <TData = Awaited<ReturnType<typeof listPartnerFindings>>, TError = ErrorOut>(partnerId: number,
+    params?: ListPartnerFindingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPartnerFindingsQueryKey(partnerId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPartnerFindings>>> = ({ signal }) => listPartnerFindings(partnerId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: partnerId !== null && partnerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPartnerFindingsQueryResult = NonNullable<Awaited<ReturnType<typeof listPartnerFindings>>>
+export type ListPartnerFindingsQueryError = ErrorOut
+
+
+export function useListPartnerFindings<TData = Awaited<ReturnType<typeof listPartnerFindings>>, TError = ErrorOut>(
+ partnerId: number,
+    params: undefined |  ListPartnerFindingsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPartnerFindings>>,
+          TError,
+          Awaited<ReturnType<typeof listPartnerFindings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPartnerFindings<TData = Awaited<ReturnType<typeof listPartnerFindings>>, TError = ErrorOut>(
+ partnerId: number,
+    params?: ListPartnerFindingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPartnerFindings>>,
+          TError,
+          Awaited<ReturnType<typeof listPartnerFindings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPartnerFindings<TData = Awaited<ReturnType<typeof listPartnerFindings>>, TError = ErrorOut>(
+ partnerId: number,
+    params?: ListPartnerFindingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Findings
+ */
+
+export function useListPartnerFindings<TData = Awaited<ReturnType<typeof listPartnerFindings>>, TError = ErrorOut>(
+ partnerId: number,
+    params?: ListPartnerFindingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPartnerFindings>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPartnerFindingsQueryOptions(partnerId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

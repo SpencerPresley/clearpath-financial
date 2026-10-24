@@ -91,6 +91,7 @@ class PreviewRow:
     submitted_on: date | None
     partner: str | None
     problem_count: int
+    item_id: int | None  # the item commit created from this row; null before commit and for skipped rows
 
 
 @dataclass(frozen=True)
@@ -183,7 +184,7 @@ def get_import(*, viewer: User, job_id: int) -> ImportJobDetail:
     )
 
 
-def _preview_row(row: ParsedRow) -> PreviewRow:
+def _preview_row(row: ParsedRow, item_id: int | None = None) -> PreviewRow:
     return PreviewRow(
         row_number=row.row_number,
         action=row.action,
@@ -194,6 +195,7 @@ def _preview_row(row: ParsedRow) -> PreviewRow:
         submitted_on=row.submitted_on,
         partner=row.partner_name,
         problem_count=len(row.problems),
+        item_id=item_id,
     )
 
 
@@ -215,18 +217,23 @@ def get_preview(*, viewer: User, job_id: int) -> ImportPreview:
     status = ImportStatus(job.status)
     sheet_problems: tuple[Problem, ...] = ()
     unmapped: tuple[UnmappedValue, ...] = ()
+    item_ids: tuple[int | None, ...]
     if status is ImportStatus.COMMITTED:
-        stored = ImportRow.objects.filter(job=job).order_by("row_number").only("parsed")
-        rows = tuple(_PARSED_ROW.validate_python(r.parsed) for r in stored)
+        stored: list[tuple[object, int | None]] = list(
+            ImportRow.objects.filter(job=job).order_by("row_number").values_list("parsed", "item")
+        )
+        rows = tuple(_PARSED_ROW.validate_python(parsed) for parsed, _ in stored)
+        item_ids = tuple(item_id for _, item_id in stored)
         counts = _counts(rows)
     else:
         result = evaluate(job)
         rows, counts, sheet_problems, unmapped = result.rows, result.counts, result.problems, result.unmapped
+        item_ids = (None,) * len(rows)
     return ImportPreview(
         job_id=job.pk,
         status=status,
         counts=counts,
         problems=sheet_problems + tuple(p for r in rows for p in r.problems),
         unmapped=unmapped,
-        rows=tuple(_preview_row(r) for r in rows),
+        rows=tuple(_preview_row(r, i) for r, i in zip(rows, item_ids, strict=True)),
     )

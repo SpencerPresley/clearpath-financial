@@ -434,6 +434,14 @@ describe('ReviewPage', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
   });
 
+  it("links the partner on the Details tab to the partner's page (agreement and evidence)", async () => {
+    renderReview({
+      path: '/items/1042?tab=details',
+      item: itemFixture({ partner: { id: 7, name: 'LoanFinder' } }),
+    });
+    expect(await screen.findByRole('link', { name: 'LoanFinder' })).toHaveAttribute('href', '/partners/7');
+  });
+
   it('compares versions with a word diff', async () => {
     renderReview({ path: '/items/1042?compare=1' });
     expect(await screen.findByText(/Changes from v1 to v2/)).toBeInTheDocument();

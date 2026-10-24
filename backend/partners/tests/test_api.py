@@ -86,6 +86,7 @@ def test_partner_detail_counts_and_repeat_issues(marketer: User, reviewer: User)
     assert detail["repeat_issues"] == [
         {
             "rule_id": "ftc.material_connection",
+            "rule_title": None,  # not a rule the engine or the AI check knows
             "citation": "16 CFR 255.5",
             "count": 2,
             "items": 2,

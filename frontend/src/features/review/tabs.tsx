@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useMemo, useRef, useState } from 'react';
 
 import {
@@ -171,7 +172,20 @@ export function DetailsTab({ item }: { item: ItemDetailOut }) {
       <dl className="app-details">
         <Row label="Product">{PRODUCT_LABELS[item.product]}</Row>
         <Row label="Channel">{CHANNEL_LABELS[item.channel]}</Row>
-        <Row label="Partner">{item.partner?.name ?? 'None (first-party)'}</Row>
+        <Row label="Partner">
+          {item.partner === null ? (
+            'None (first-party)'
+          ) : (
+            // The partner's page holds the agreement reviewers check affiliate copy against.
+            <Link
+              to="/partners/$partnerId"
+              params={{ partnerId: String(item.partner.id) }}
+              className="app-link"
+            >
+              {item.partner.name}
+            </Link>
+          )}
+        </Row>
         <Row label="Markets">{item.markets.map((m) => MARKET_LABELS[m]).join(', ')}</Row>
         <Row label="Planned run">{run}</Row>
         <Row label="Prescreened offer">{item.is_prescreen ? 'Yes' : 'No'}</Row>

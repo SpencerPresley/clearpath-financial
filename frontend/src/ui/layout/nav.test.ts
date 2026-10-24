@@ -10,8 +10,8 @@ describe('navSectionsFor', () => {
     expect(labels(['marketer'])).toEqual(['My submissions', 'New submission', 'Library', 'Outbox']);
   });
 
-  it('shows a reviewer the queue but not lead or admin sections', () => {
-    expect(labels(['reviewer'])).toEqual(['Queue', 'Library', 'Outbox']);
+  it('shows a reviewer the queue and the read-only offer terms and partners, not metrics or import', () => {
+    expect(labels(['reviewer'])).toEqual(['Queue', 'Library', 'Offer terms', 'Partners', 'Outbox']);
   });
 
   it('shows a lead the queue plus offer terms, partners, and metrics', () => {
@@ -23,7 +23,14 @@ describe('navSectionsFor', () => {
   });
 
   it('unions roles in a stable order, without duplicates', () => {
-    expect(labels(['admin', 'reviewer'])).toEqual(['Queue', 'Library', 'Import', 'Outbox']);
+    expect(labels(['admin', 'reviewer'])).toEqual([
+      'Queue',
+      'Library',
+      'Offer terms',
+      'Partners',
+      'Import',
+      'Outbox',
+    ]);
     expect(labels(['reviewer', 'lead', 'reviewer'])).toEqual(labels(['lead']));
   });
 

@@ -10,10 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ImportRouteImport } from './routes/import'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as MetricsRouteImport } from './routes/metrics'
 import { Route as SubmitRouteImport } from './routes/submit'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DevDesignRouteImport } from './routes/dev/design'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 import { Route as MineIndexRouteImport } from './routes/mine.index'
+import { Route as PartnersIndexRouteImport } from './routes/partners.index'
+import { Route as PartnersPartnerIdRouteImport } from './routes/partners.$partnerId'
 import { Route as MineItemIdResubmitRouteImport } from './routes/mine.$itemId.resubmit'
 
 const IndexRoute = IndexRouteImport.update({
@@ -21,9 +27,29 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ImportRoute = ImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetricsRoute = MetricsRouteImport.update({
+  id: '/metrics',
+  path: '/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubmitRoute = SubmitRouteImport.update({
   id: '/submit',
   path: '/submit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevDesignRoute = DevDesignRouteImport.update({
@@ -41,6 +67,16 @@ const MineIndexRoute = MineIndexRouteImport.update({
   path: '/mine/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartnersIndexRoute = PartnersIndexRouteImport.update({
+  id: '/partners/',
+  path: '/partners/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnersPartnerIdRoute = PartnersPartnerIdRouteImport.update({
+  id: '/partners/$partnerId',
+  path: '/partners/$partnerId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MineItemIdResubmitRoute = MineItemIdResubmitRouteImport.update({
   id: '/mine/$itemId/resubmit',
   path: '/mine/$itemId/resubmit',
@@ -49,62 +85,104 @@ const MineItemIdResubmitRoute = MineItemIdResubmitRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
+  '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
+  '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
+  '/partners/$partnerId': typeof PartnersPartnerIdRoute
   '/mine/': typeof MineIndexRoute
+  '/partners/': typeof PartnersIndexRoute
   '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
+  '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
+  '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
+  '/partners/$partnerId': typeof PartnersPartnerIdRoute
   '/mine': typeof MineIndexRoute
+  '/partners': typeof PartnersIndexRoute
   '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
+  '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
+  '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
+  '/partners/$partnerId': typeof PartnersPartnerIdRoute
   '/mine/': typeof MineIndexRoute
+  '/partners/': typeof PartnersIndexRoute
   '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/import'
+    | '/library'
+    | '/metrics'
     | '/submit'
+    | '/terms'
     | '/dev/design'
     | '/items/$itemId'
+    | '/partners/$partnerId'
     | '/mine/'
+    | '/partners/'
     | '/mine/$itemId/resubmit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/import'
+    | '/library'
+    | '/metrics'
     | '/submit'
+    | '/terms'
     | '/dev/design'
     | '/items/$itemId'
+    | '/partners/$partnerId'
     | '/mine'
+    | '/partners'
     | '/mine/$itemId/resubmit'
   id:
     | '__root__'
     | '/'
+    | '/import'
+    | '/library'
+    | '/metrics'
     | '/submit'
+    | '/terms'
     | '/dev/design'
     | '/items/$itemId'
+    | '/partners/$partnerId'
     | '/mine/'
+    | '/partners/'
     | '/mine/$itemId/resubmit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ImportRoute: typeof ImportRoute
+  LibraryRoute: typeof LibraryRoute
+  MetricsRoute: typeof MetricsRoute
   SubmitRoute: typeof SubmitRoute
+  TermsRoute: typeof TermsRoute
   DevDesignRoute: typeof DevDesignRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
+  PartnersPartnerIdRoute: typeof PartnersPartnerIdRoute
   MineIndexRoute: typeof MineIndexRoute
+  PartnersIndexRoute: typeof PartnersIndexRoute
   MineItemIdResubmitRoute: typeof MineItemIdResubmitRoute
 }
 
@@ -117,11 +195,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/import': {
+      id: '/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof ImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/metrics': {
+      id: '/metrics'
+      path: '/metrics'
+      fullPath: '/metrics'
+      preLoaderRoute: typeof MetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/submit': {
       id: '/submit'
       path: '/submit'
       fullPath: '/submit'
       preLoaderRoute: typeof SubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/design': {
@@ -145,6 +251,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MineIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partners/': {
+      id: '/partners/'
+      path: '/partners'
+      fullPath: '/partners/'
+      preLoaderRoute: typeof PartnersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partners/$partnerId': {
+      id: '/partners/$partnerId'
+      path: '/partners/$partnerId'
+      fullPath: '/partners/$partnerId'
+      preLoaderRoute: typeof PartnersPartnerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mine/$itemId/resubmit': {
       id: '/mine/$itemId/resubmit'
       path: '/mine/$itemId/resubmit'
@@ -157,10 +277,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ImportRoute: ImportRoute,
+  LibraryRoute: LibraryRoute,
+  MetricsRoute: MetricsRoute,
   SubmitRoute: SubmitRoute,
+  TermsRoute: TermsRoute,
   DevDesignRoute: DevDesignRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
+  PartnersPartnerIdRoute: PartnersPartnerIdRoute,
   MineIndexRoute: MineIndexRoute,
+  PartnersIndexRoute: PartnersIndexRoute,
   MineItemIdResubmitRoute: MineItemIdResubmitRoute,
 }
 export const routeTree = rootRouteImport

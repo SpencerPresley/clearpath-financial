@@ -63,9 +63,9 @@ describe('AppShell', () => {
   it('shows unbuilt sections as disabled, not as links to placeholder pages', async () => {
     renderApp();
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const library = within(nav).getByRole('link', { name: 'Library, soon' });
-    expect(library).toHaveAttribute('aria-disabled', 'true');
-    expect(library.tagName).not.toBe('A');
+    const outbox = within(nav).getByRole('link', { name: 'Outbox, soon' });
+    expect(outbox).toHaveAttribute('aria-disabled', 'true');
+    expect(outbox.tagName).not.toBe('A');
   });
 
   it('filters sections by the viewer roles', async () => {
@@ -125,12 +125,12 @@ describe('AppShell', () => {
     window.localStorage.setItem(NAV_COLLAPSED_KEY, 'true');
     renderApp();
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const library = within(nav).getByRole('link', { name: 'Library, soon' });
-    expect(library).toHaveAttribute('aria-disabled', 'true');
-    expect(library).not.toHaveAttribute('href');
-    for (let i = 0; i < 20 && document.activeElement !== library; i += 1) await user.tab();
-    expect(library).toHaveFocus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Library · Soon');
+    const outbox = within(nav).getByRole('link', { name: 'Outbox, soon' });
+    expect(outbox).toHaveAttribute('aria-disabled', 'true');
+    expect(outbox).not.toHaveAttribute('href');
+    for (let i = 0; i < 20 && document.activeElement !== outbox; i += 1) await user.tab();
+    expect(outbox).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Outbox · Soon');
   });
 
   it('collapses the nav, keeps every item named, and remembers the choice', async () => {

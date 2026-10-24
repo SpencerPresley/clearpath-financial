@@ -3,9 +3,9 @@ from ninja import File, Form, Router, Status, UploadedFile
 
 from accounts.api import current_user
 from core.domain import AttachmentKind, PartnerStatus
-from core.schemas import ERRORS
+from core.schemas import ERRORS, PageLimit
 from partners import selectors, services
-from partners.schemas import PartnerDetailOut, PartnerIn, PartnerRowOut, PartnerUpdateIn
+from partners.schemas import PartnerDetailOut, PartnerFindingPageOut, PartnerIn, PartnerRowOut, PartnerUpdateIn
 from reviews import records
 from reviews import services as review_services
 from reviews.schemas import AttachmentOut
@@ -50,6 +50,25 @@ def update_partner(request: HttpRequest, partner_id: int, body: PartnerUpdateIn)
         changes=services.PartnerChanges(**body.model_dump(exclude_unset=True)),
     )
     return selectors.get_partner_detail(partner_id=partner_id, viewer=current_user(request))
+
+
+@router.get(
+    "/partners/{int:partner_id}/findings",
+    response={200: PartnerFindingPageOut, **ERRORS},
+    operation_id="listPartnerFindings",
+)
+def list_findings(
+    request: HttpRequest,
+    partner_id: int,
+    rule_id: str | None = None,
+    cursor: str | None = None,
+    limit: PageLimit = 50,
+) -> selectors.PartnerFindingPage:
+    """The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),
+    newest first. Reviewers, leads, and admins. `next_cursor` is null on the last page."""
+    return selectors.list_partner_findings(
+        partner_id=partner_id, viewer=current_user(request), rule_id=rule_id, cursor=cursor, limit=limit
+    )
 
 
 @router.get(

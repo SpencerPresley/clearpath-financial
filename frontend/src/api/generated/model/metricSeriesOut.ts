@@ -11,5 +11,7 @@ import type { MetricPointOut } from './metricPointOut';
 export interface MetricSeriesOut {
   bucket: MetricBucket;
   metric: MetricName;
+  period_from: string;
+  period_to: string;
   points: MetricPointOut[];
 }

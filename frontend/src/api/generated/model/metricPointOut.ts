@@ -7,6 +7,16 @@
 
 export interface MetricPointOut {
   count: number;
+  /** The bucket clipped to the period; pass as the drill-down period. */
+  from_date: string;
+  imported_count: number;
+  /** The same over imported measurements only. */
+  imported_value: number | null;
+  native_count: number;
+  /** The same over native measurements only. */
+  native_value: number | null;
   period_start: string;
+  to_date: string;
+  /** Median hours (durations), mean rounds, or the decision count. */
   value: number | null;
 }
