@@ -46,7 +46,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     roles: ['marketer'],
     to: '/submit',
   },
-  { id: 'library', label: 'Library', icon: 'nav.library', group: 'reference', roles: 'everyone' },
+  {
+    id: 'library',
+    label: 'Library',
+    icon: 'nav.library',
+    group: 'reference',
+    roles: 'everyone',
+    to: '/library',
+  },
   { id: 'offer-terms', label: 'Offer terms', icon: 'nav.offer_terms', group: 'reference', roles: ['lead'] },
   { id: 'partners', label: 'Partners', icon: 'nav.partners', group: 'reference', roles: ['lead'] },
   {

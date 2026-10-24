@@ -2,6 +2,7 @@
  * Status, severity, source, and risk marks. Every one is icon + label (spec §5.2: color is never the
  * only signal); tone carries the §5.2 color meaning and lives in data-tone so tests and CSS share it.
  */
+import type { DecisionOutcome } from '../api/generated/model';
 import type { FindingSource, ItemStatus, RiskTier, Severity } from './domain';
 import { Icon } from './Icon';
 import type { IconKey } from './icons';
@@ -102,4 +103,19 @@ export function RiskTierBadge({ tier, short = false }: { tier: RiskTier; short?:
       className="app-badge app-badge-outline"
     />
   );
+}
+
+/**
+ * A decision's outcome (precedent hits: how the matched version was decided). Same tone and glyph as the
+ * status it produces, labelled with the outcome's own name ("Approved with edits").
+ */
+export const OUTCOME_META: Record<DecisionOutcome, Meta> = {
+  approved: { label: 'Approved', tone: 'success', icon: 'status.approved' },
+  approved_with_edits: { label: 'Approved with edits', tone: 'success', icon: 'status.approved' },
+  changes_requested: { label: 'Changes requested', tone: 'warning', icon: 'status.changes_requested' },
+  rejected: { label: 'Rejected', tone: 'error', icon: 'status.rejected' },
+};
+
+export function OutcomeBadge({ outcome }: { outcome: DecisionOutcome }) {
+  return <Badge meta={OUTCOME_META[outcome]} />;
 }

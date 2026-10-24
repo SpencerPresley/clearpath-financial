@@ -2303,3 +2303,173 @@
     @apply border-b-0;
   }
 }
+
+/* ---- Library and Import (workstream J: approved list, precedents, export, evidence packs, import steps) ---- */
+@layer components {
+  /* ---- Library page frame: header rows fixed, the data region scrolls (as the queue does). ---------- */
+  .app-library {
+    @apply flex h-full min-h-0 flex-col gap-3;
+  }
+  .app-library-heading {
+    @apply text-lg leading-7 font-semibold text-base-content;
+    text-wrap: balance;
+  }
+  .app-library-tabs {
+    @apply flex min-h-0 flex-1 flex-col gap-3;
+  }
+  .app-library-tabbar {
+    @apply flex min-h-10 items-center justify-between gap-4 border-b border-base-300;
+  }
+  .app-tabs.app-library-tablist {
+    @apply border-b-0 px-0;
+  }
+  .app-library-panel {
+    @apply flex min-h-0 flex-1 flex-col gap-3 outline-none;
+  }
+  .app-library-panel[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-library-region {
+    @apply relative min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-library-region[aria-busy='true'] > * {
+    opacity: 0.6;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-library-region[role='alert'] .app-empty-icon {
+    @apply text-status-error-soft-content;
+  }
+  .app-library-title {
+    @apply flex min-w-0 items-center gap-2;
+  }
+  .app-library-link {
+    @apply min-w-0 truncate rounded-xs font-medium text-base-content underline-offset-2 hover:underline;
+  }
+  .app-library-title .app-badge {
+    @apply shrink-0;
+  }
+
+  /* ---- Evidence pack cell: a note, a button, or a link, all one row tall. --------------------------- */
+  .app-pack-note {
+    @apply block truncate text-meta text-muted;
+  }
+  .app-pack-error {
+    @apply flex min-w-0 items-center gap-1 text-meta text-status-error-soft-content;
+  }
+
+  /* ---- Export: the job's one-line state sits left of the button, so nothing below moves. ------------ */
+  .app-export {
+    @apply flex min-w-0 items-center gap-2;
+  }
+  .app-export-status {
+    @apply flex min-w-0 items-center gap-2 text-meta text-muted;
+  }
+  .app-export-status:empty {
+    @apply hidden;
+  }
+  .app-export-file {
+    @apply max-w-64 truncate font-medium text-base-content;
+  }
+  .app-export-error {
+    @apply text-status-error-soft-content;
+  }
+  .app-export-message {
+    @apply max-w-96 truncate;
+  }
+  .app-export-progress {
+    @apply relative h-1 w-16 overflow-hidden rounded-xs bg-base-300;
+  }
+  .app-export-progress::after {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1/3 bg-primary;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .app-export-progress::after {
+      animation: app-indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+  }
+  .app-menu-item.app-export-option {
+    @apply h-auto flex-col items-start gap-0 py-1.5;
+  }
+  .app-export-option-label {
+    @apply text-ui text-base-content;
+  }
+  .app-export-option-hint {
+    @apply text-meta text-muted;
+  }
+
+  /* ---- Date range chips ------------------------------------------------------------------------- */
+  .app-range {
+    @apply flex w-72 flex-col gap-2 p-2 outline-none;
+  }
+  .app-range-hint {
+    @apply text-meta text-muted;
+  }
+  .app-range-fields {
+    @apply grid grid-cols-2 gap-2;
+  }
+
+  /* ---- Precedent search ------------------------------------------------------------------------- */
+  .app-precedent-bar {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1;
+  }
+  .app-precedent-search {
+    @apply flex h-8 w-[30rem] max-w-full items-center gap-2 rounded-md border border-base-300 bg-base-100 px-2.5;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-precedent-search[data-focus-within] {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+  }
+  .app-precedent-search-input {
+    @apply min-w-0 flex-1 bg-transparent text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-precedent-search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .app-precedent-hint {
+    @apply text-meta text-muted;
+  }
+  .app-precedents {
+    @apply flex flex-col;
+  }
+  .app-precedent {
+    @apply flex flex-col gap-1.5 border-b border-base-300 px-3 py-2.5;
+  }
+  .app-precedent-head {
+    @apply flex min-w-0 items-center gap-2;
+  }
+  .app-precedent-title {
+    @apply flex-1;
+  }
+  .app-precedent-now {
+    @apply ml-auto flex shrink-0 items-center gap-1.5;
+  }
+  .app-precedent-label {
+    @apply text-meta text-muted;
+  }
+  .app-precedent-snippet {
+    @apply max-w-[72ch] text-ui leading-5 text-base-content;
+    text-wrap: pretty;
+  }
+  .app-precedent-meta {
+    @apply flex min-h-7 min-w-0 items-center gap-3 text-meta text-muted;
+  }
+  .app-precedent-version {
+    @apply flex shrink-0 items-center gap-1.5 text-base-content;
+  }
+  .app-precedent-facts {
+    @apply min-w-0 truncate;
+  }
+  .app-precedent-action {
+    @apply ml-auto shrink-0;
+  }
+  /* The matched words: a neutral selection tint and weight, never the browser's yellow (warning amber, §5.2). */
+  .app-snippet-mark {
+    @apply rounded-xs bg-selected px-px font-semibold text-base-content;
+    box-shadow: inset 0 -1px 0 var(--color-primary);
+  }
+}

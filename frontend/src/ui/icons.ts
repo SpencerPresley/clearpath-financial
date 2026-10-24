@@ -36,6 +36,7 @@ import {
   CopyIcon,
   CpuIcon,
   DotsSixVerticalIcon,
+  DownloadSimpleIcon,
   DotsThreeIcon,
   EnvelopeSimpleIcon,
   EqualsIcon,
@@ -161,6 +162,8 @@ export const icons = {
   'action.save_view': regular(BookmarkSimpleIcon),
   'action.reload': regular(ArrowClockwiseIcon),
   'action.drag': bold(DotsSixVerticalIcon),
+  /** Save a built file (export, evidence pack) to disk; action.export starts building it. */
+  'action.download': regular(DownloadSimpleIcon),
   // Column sort state (server-sorted columns only).
   'sort.ascending': regular(ArrowUpIcon),
   'sort.descending': regular(ArrowDownIcon),
