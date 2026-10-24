@@ -50,8 +50,13 @@ the same render against the proposed values.
    v13's tasks drain, the item goes straight to v14 numbers. Idempotency falls out of the same check: once sent
    back, the item isn't `approved`; once fast-tracked, its approval quotes current terms.
 5. **Generated version author and event actor = the lead who published** (`Version.author` is non-null).
-6. **Bulk fast-track is lead-only** (product-spec Roles: leads do bulk actions); single fast-track is the
-   assignee or a lead (E's `require_reviewer_of`). Impact preview and publish: lead only.
+6. **Bulk fast-track is open to reviewers, per item scoped to their own items** (changed during execution: the
+   merged review screen, I #27/#28, calls the bulk endpoint for its single Fast-track button as the assignee).
+   Each item runs the single fast-track's check (assignee or lead), so a reviewer's bulk skips others' items as
+   `not_permitted`. Impact preview and publish: lead only.
+7. **Items already in needs_rereview** whose copy quotes superseded terms (re-review for expiry, or a second terms
+   change before the first was fast-tracked) get a fresh generated version, status unchanged. Without it they can
+   be neither reaffirmed (E's `stale_offer_terms` gate) nor fast-tracked.
 
 ## Review Focus
 

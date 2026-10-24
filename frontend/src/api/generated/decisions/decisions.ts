@@ -66,9 +66,10 @@ export const getBulkFastTrackApproveUrl = () => {
 }
 
 /**
- * Leads only. Approve each item's current generated version, one item at a time; anything that can't be
- * fast-tracked (open findings, not in needs_rereview, a newer version) is listed in `skipped` with its error code
- * and stays in the normal lane (ruling 4).
+ * Reviewers and leads. Approve each item's current generated version, one item at a time, with the single
+ * fast-track's checks (a reviewer only their own items). Anything that can't be fast-tracked (open findings, not
+ * in needs_rereview, a newer version, someone else's item) is listed in `skipped` with its error code and stays in
+ * the normal lane (ruling 4).
  * @summary Bulk Fast Track
  */
 export const bulkFastTrackApprove = async (bulkFastTrackIn: BulkFastTrackIn, options?: Parameters<typeof customFetch>[1]): Promise<BulkResultOut> => {

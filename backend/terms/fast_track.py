@@ -10,9 +10,9 @@ from collections.abc import Iterable
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import DecisionLane, DecisionOutcome, Role
+from core.domain import DecisionLane, DecisionOutcome
 from core.errors import NotFound
-from core.permissions import require_role
+from core.permissions import REVIEW_ROLES, require_role
 from reviews.assignment import BulkResult, run_bulk
 from reviews.decisions import DecisionInput, DecisionResult, record_decision
 from reviews.models import ReviewItem
@@ -45,9 +45,11 @@ def _current_n(item_id: int) -> int:
 def bulk_fast_track_approve(
     *, actor: User, item_ids: Iterable[int], reason: str, clock: Clock = SYSTEM_CLOCK
 ) -> BulkResult:
-    """Leads only (product-spec Roles: bulk actions). Each item's current version is approved in its own
-    transaction; anything that can't be fast-tracked is a skip with its error code, never an exception."""
-    require_role(actor, Role.LEAD)
+    """Reviewers and leads. Each item is the single fast-track in its own transaction, with the same per-item check
+    (the item's assignee or a lead), so a reviewer's bulk approve covers only their own items and the rest come back
+    as `not_permitted` skips. Anything that can't be fast-tracked is a skip with its error code, never an exception.
+    """
+    require_role(actor, *REVIEW_ROLES)
     return run_bulk(
         item_ids,
         lambda item_id: fast_track_approve(

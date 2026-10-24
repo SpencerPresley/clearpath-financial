@@ -11,6 +11,7 @@ from checks.models import Finding
 from core.clock import FixedClock
 from core.domain import DecisionLane, ItemStatus, Role
 from core.errors import NotPermitted
+from reviews.assignment import assign_item
 from reviews.models import Decision, ReviewItem
 from reviews.records import version_diff
 from reviews.services import SubmitItemResult
@@ -109,9 +110,28 @@ def test_bulk_approves_clean_items_and_skips_the_rest(
 
 
 @pytest.mark.django_db
-def test_bulk_is_lead_only(pl_terms: OfferTerms, reviewer: User, clock: FixedClock) -> None:
+def test_bulk_by_a_reviewer_covers_only_their_own_items(
+    pl_terms: OfferTerms,
+    submit: Submit,
+    marketer: User,
+    reviewer: User,
+    lead: User,
+    clock: FixedClock,
+    user_factory: Callable[..., User],
+) -> None:
+    mine = _reopened(submit, reviewer, marketer, lead, clock)
+    theirs = _reopened(submit, reviewer, marketer, lead, clock)
+    publish(lead, clock)
+    _fan_out_all(mine, theirs, clock=clock)
+    other = user_factory(roles=[Role.REVIEWER])
+    assign_item(actor=lead, item_id=theirs.pk, assignee_id=other.pk, clock=clock)
+
+    result = bulk_fast_track_approve(actor=reviewer, item_ids=[mine.pk, theirs.pk], reason=REASON, clock=clock)
+
+    assert result.succeeded == (mine.pk,)
+    assert [(s.item_id, s.code) for s in result.skipped] == [(theirs.pk, "not_permitted")]
     with pytest.raises(NotPermitted):
-        bulk_fast_track_approve(actor=reviewer, item_ids=[1], reason=REASON, clock=clock)
+        bulk_fast_track_approve(actor=marketer, item_ids=[theirs.pk], reason=REASON, clock=clock)
 
 
 @pytest.mark.django_db
@@ -147,6 +167,12 @@ def test_fast_track_api(
     publish(lead, clock)
     _fan_out_all(item, second, clock=clock)
     client = Client()
+    client.force_login(marketer)
+    bulk_refused = client.post(
+        "/api/items/bulk/fast-track-approve",
+        {"item_ids": [second.pk], "reason": REASON},
+        content_type="application/json",
+    )
     client.force_login(reviewer)
 
     stale = client.post(
@@ -155,12 +181,6 @@ def test_fast_track_api(
     single = client.post(
         f"/api/items/{item.pk}/fast-track-approve", {"version_n": 2, "reason": REASON}, content_type="application/json"
     )
-    bulk_refused = client.post(
-        "/api/items/bulk/fast-track-approve",
-        {"item_ids": [second.pk], "reason": REASON},
-        content_type="application/json",
-    )
-    client.force_login(lead)
     bulk = client.post(
         "/api/items/bulk/fast-track-approve",
         {"item_ids": [second.pk], "reason": REASON},
