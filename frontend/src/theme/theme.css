@@ -938,6 +938,11 @@
     text-decoration-line: line-through;
     text-decoration-thickness: 1.5px;
   }
+  /* A replacement ("5.99" → "6.49") reads as two words, not "5.996.49". Diffs are read-only, so the gap
+     can't misalign anything. */
+  .app-diff-del + .app-diff-ins {
+    margin-left: 0.25em;
+  }
 
   /* ---- Finding summary (ui/findings) ------------------------------------------------------------- */
   .app-finding-summary {

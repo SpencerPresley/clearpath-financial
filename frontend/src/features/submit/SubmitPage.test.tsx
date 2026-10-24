@@ -17,7 +17,7 @@ import { MARKETER, NOW, itemFixture, spanOf } from '../../test/fixtures/review';
 import { server } from '../../test/server';
 import { showToast } from '../../ui/toast';
 import { SubmitPage } from './SubmitPage';
-import { renderAtRoute } from './testRouter';
+import { renderAtRoute } from '../../test/router';
 
 // jsdom's File can't go through undici's multipart encoder, so uploads are asserted at the client call.
 vi.mock('../../api/generated/items/items', async (importOriginal) => ({

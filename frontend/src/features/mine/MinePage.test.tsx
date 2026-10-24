@@ -7,7 +7,7 @@ import type { ItemPageOut, ItemRowOut } from '../../api/generated/model';
 import { DECISION_CHANGES, REVIEWER, itemFixture, itemRowFixture } from '../../test/fixtures/review';
 import { server } from '../../test/server';
 import { MinePage } from './MinePage';
-import { renderAtRoute } from './testRouter';
+import { renderAtRoute } from '../../test/router';
 
 const ROWS: ItemRowOut[] = [
   itemRowFixture({ id: 1, key: 'CP-1', title: 'PL promo — email', status: 'changes_requested' }),

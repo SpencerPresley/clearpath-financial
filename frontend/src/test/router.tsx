@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-router';
 import type { ComponentType } from 'react';
 
-import { renderWithQuery } from '../../test/render';
+import { renderWithQuery } from './render';
 
 export function renderAtRoute(Page: ComponentType, { path, url }: { path: string; url?: string }) {
   const root = createRootRoute({ component: Outlet });

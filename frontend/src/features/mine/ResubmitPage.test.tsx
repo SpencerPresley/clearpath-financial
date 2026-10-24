@@ -19,7 +19,7 @@ import { reviewHandlers } from '../../test/fixtures/reviewHandlers';
 import { server } from '../../test/server';
 import { showToast } from '../../ui/toast';
 import { ResubmitPage } from './ResubmitPage';
-import { renderAtRoute } from './testRouter';
+import { renderAtRoute } from '../../test/router';
 
 vi.mock('../../ui/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../ui/toast')>()),
