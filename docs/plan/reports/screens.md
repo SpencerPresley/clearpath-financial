@@ -113,9 +113,10 @@ summary links every imported item without a second lookup. `make schema` regener
 
 ### API gaps (not built here)
 
-- **Approved and Expires columns (L6).** `ItemRowOut` has no `approved_at` or `approval_expires_at`. The
-  approved-date filter exists (`approved_after/before`, on the item's latest approval), so on Precedents the chip
-  says "Item last approved". reviews/ belongs to the API-gaps worker.
+- **Approved and Expires columns (L6): follow-up.** Built before #32; #32 has since added
+  `approval_expires_at` and `latest_decision` to `ItemRowOut`, so this is now UI-only. Adding a column breaks the
+  1280 fit, so it needs a call on what gives way (Planned run is the candidate). On Precedents the date chip says
+  "Item last approved" (it filters on the item's latest approval, not the hit's version).
 - **Tracker IDs aren't searchable (L7).** `q` doesn't match `legacy_ref`, and `ItemRowOut` has no `legacy_ref`, so
   `MCR-26-045` can't be found from the library.
 - **Precedent search has no paging.** `GET /library/search` takes `limit` only; the UI asks for 50 and says "Top 50

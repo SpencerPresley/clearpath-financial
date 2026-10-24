@@ -71,6 +71,9 @@ export function libraryRow(overrides: Partial<ItemRowOut> & { id: number }): Ite
     partner: null,
     owner: { id: 11, name: 'Priya Natarajan' },
     assignee: { id: 21, name: 'Dana Reyes' },
+    approval_expires_at: null,
+    latest_decision: null,
+    notes: '',
     ...overrides,
   };
 }
