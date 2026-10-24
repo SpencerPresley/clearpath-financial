@@ -36,6 +36,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: 'nav.my_submissions',
     group: 'work',
     roles: ['marketer'],
+    to: '/mine',
   },
   {
     id: 'new-submission',
@@ -43,6 +44,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     icon: 'nav.new_submission',
     group: 'work',
     roles: ['marketer'],
+    to: '/submit',
   },
   { id: 'library', label: 'Library', icon: 'nav.library', group: 'reference', roles: 'everyone' },
   { id: 'offer-terms', label: 'Offer terms', icon: 'nav.offer_terms', group: 'reference', roles: ['lead'] },

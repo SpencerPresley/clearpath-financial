@@ -10,11 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as DevDesignRouteImport } from './routes/dev/design'
+import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
+import { Route as MineIndexRouteImport } from './routes/mine.index'
+import { Route as MineItemIdResubmitRouteImport } from './routes/mine.$itemId.resubmit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubmitRoute = SubmitRouteImport.update({
+  id: '/submit',
+  path: '/submit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevDesignRoute = DevDesignRouteImport.update({
@@ -22,31 +31,81 @@ const DevDesignRoute = DevDesignRouteImport.update({
   path: '/dev/design',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ItemsItemIdRoute = ItemsItemIdRouteImport.update({
+  id: '/items/$itemId',
+  path: '/items/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MineIndexRoute = MineIndexRouteImport.update({
+  id: '/mine/',
+  path: '/mine/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MineItemIdResubmitRoute = MineItemIdResubmitRouteImport.update({
+  id: '/mine/$itemId/resubmit',
+  path: '/mine/$itemId/resubmit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/mine/': typeof MineIndexRoute
+  '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/mine': typeof MineIndexRoute
+  '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
+  '/items/$itemId': typeof ItemsItemIdRoute
+  '/mine/': typeof MineIndexRoute
+  '/mine/$itemId/resubmit': typeof MineItemIdResubmitRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev/design'
+  fullPaths:
+    | '/'
+    | '/submit'
+    | '/dev/design'
+    | '/items/$itemId'
+    | '/mine/'
+    | '/mine/$itemId/resubmit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/design'
-  id: '__root__' | '/' | '/dev/design'
+  to:
+    | '/'
+    | '/submit'
+    | '/dev/design'
+    | '/items/$itemId'
+    | '/mine'
+    | '/mine/$itemId/resubmit'
+  id:
+    | '__root__'
+    | '/'
+    | '/submit'
+    | '/dev/design'
+    | '/items/$itemId'
+    | '/mine/'
+    | '/mine/$itemId/resubmit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SubmitRoute: typeof SubmitRoute
   DevDesignRoute: typeof DevDesignRoute
+  ItemsItemIdRoute: typeof ItemsItemIdRoute
+  MineIndexRoute: typeof MineIndexRoute
+  MineItemIdResubmitRoute: typeof MineItemIdResubmitRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +117,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/submit': {
+      id: '/submit'
+      path: '/submit'
+      fullPath: '/submit'
+      preLoaderRoute: typeof SubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/design': {
       id: '/dev/design'
       path: '/dev/design'
@@ -65,12 +131,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevDesignRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/items/$itemId': {
+      id: '/items/$itemId'
+      path: '/items/$itemId'
+      fullPath: '/items/$itemId'
+      preLoaderRoute: typeof ItemsItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mine/': {
+      id: '/mine/'
+      path: '/mine'
+      fullPath: '/mine/'
+      preLoaderRoute: typeof MineIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mine/$itemId/resubmit': {
+      id: '/mine/$itemId/resubmit'
+      path: '/mine/$itemId/resubmit'
+      fullPath: '/mine/$itemId/resubmit'
+      preLoaderRoute: typeof MineItemIdResubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SubmitRoute: SubmitRoute,
   DevDesignRoute: DevDesignRoute,
+  ItemsItemIdRoute: ItemsItemIdRoute,
+  MineIndexRoute: MineIndexRoute,
+  MineItemIdResubmitRoute: MineItemIdResubmitRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

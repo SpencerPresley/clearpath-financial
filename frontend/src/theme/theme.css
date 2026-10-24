@@ -438,6 +438,248 @@
     @apply flex h-row items-center gap-4 border-b border-base-300 px-3;
   }
 
+  /* ==== Review, intake, My submissions (workstream I) ============================================ */
+
+  /* ---- Marketer screens: New submission, My submissions, Resubmit (features/submit, features/mine) */
+  /* (marketer-screen classes go here) */
+
+  /* ---- Form fields (ui/forms/fields.tsx) -------------------------------------------------------- */
+  .app-field {
+    @apply flex min-w-0 flex-col gap-1;
+  }
+  .app-field-label {
+    @apply text-ui font-medium text-base-content;
+  }
+  .app-field-description {
+    @apply text-meta text-muted;
+  }
+  .app-field-error {
+    @apply text-meta font-medium text-status-error-soft-content;
+  }
+  .app-input {
+    @apply h-8 w-full min-w-0 rounded-md border border-base-300 bg-base-100 px-2.5 text-ui text-base-content outline-none placeholder:text-muted;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-input.app-textarea {
+    @apply h-auto py-1.5 leading-5;
+    resize: vertical;
+  }
+  /* Text inputs show focus on mouse focus too: the caret alone is easy to lose. */
+  .app-input[data-focused],
+  .app-select-button[data-focus-visible],
+  .app-select-button[data-pressed] {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+    outline: none;
+  }
+  .app-input[data-invalid],
+  [data-invalid] > .app-select-button {
+    @apply border-status-error;
+  }
+  .app-input[data-disabled] {
+    @apply bg-base-200 text-muted;
+  }
+  .app-select-button {
+    @apply flex h-8 w-full min-w-0 cursor-default items-center justify-between gap-2 rounded-md border border-base-300 bg-base-100 px-2.5 text-left text-ui text-base-content outline-none;
+  }
+  .app-select-button[data-size='sm'] {
+    @apply h-7 px-2;
+  }
+  .app-select-button[data-hovered] {
+    @apply bg-base-200;
+  }
+  .app-select-value {
+    @apply truncate;
+  }
+  .app-select-value[data-placeholder] {
+    @apply text-muted;
+  }
+  .app-select-popover {
+    min-width: var(--trigger-width);
+    @apply max-h-72 overflow-auto;
+  }
+  .app-option[data-selected] {
+    @apply font-medium text-primary;
+  }
+  .app-checkbox-row {
+    @apply flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5;
+  }
+  .app-checkbox {
+    @apply inline-flex cursor-default items-center gap-2 text-ui text-base-content;
+  }
+  .app-checkbox-box {
+    @apply relative inline-flex size-4 shrink-0 rounded-xs border border-base-content/40 bg-base-100;
+    transition-property: background-color, border-color;
+    transition-duration: 120ms;
+  }
+  .app-checkbox[data-selected] .app-checkbox-box {
+    @apply border-primary bg-primary;
+  }
+  /* The tick: two borders of a rotated box (no glyph borrowed from the icon registry). */
+  .app-checkbox[data-selected] .app-checkbox-box::after {
+    content: '';
+    position: absolute;
+    left: 4.5px;
+    top: 1.5px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--color-primary-content);
+    border-width: 0 2px 2px 0;
+    rotate: 45deg;
+  }
+  .app-checkbox[data-focus-visible] .app-checkbox-box {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-checkbox[data-disabled] {
+    @apply text-muted;
+  }
+
+  /* ---- Modal dialogs (ui/Dialog.tsx): confirmations and shortcut help only ------------------------- */
+  .app-modal-overlay {
+    @apply fixed inset-0 z-40 flex items-start justify-center pt-[12vh];
+    background: oklch(25% 0.025 258 / 0.32);
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-modal-overlay[data-entering],
+  .app-modal-overlay[data-exiting] {
+    opacity: 0;
+  }
+  .app-modal {
+    @apply w-[28rem] max-w-[calc(100vw-2rem)] rounded-lg border border-base-300 bg-base-100 shadow-overlay;
+  }
+  .app-modal[data-size='md'] {
+    @apply w-[36rem];
+  }
+  .app-dialog {
+    @apply flex flex-col gap-3 p-4 outline-none;
+  }
+  .app-dialog-header {
+    @apply -mt-1 -mr-1 flex items-center justify-between gap-3;
+  }
+  .app-dialog-title {
+    @apply text-sm font-semibold text-base-content;
+  }
+  .app-dialog-actions {
+    @apply flex justify-end gap-2 pt-1;
+  }
+
+  /* ---- Copy: read-only text, the highlighting editor, diffs (ui/copy) ---------------------------- */
+  /* One set of text metrics for every copy surface, so the editor's backdrop lines up with its textarea. */
+  .app-copy {
+    @apply font-sans text-sm leading-[1.375rem] text-base-content;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+  }
+  /*
+   * Flagged spans (spec §5.2). Severity: blocking = tinted fill + red underline; warning = amber underline,
+   * no fill (so severity also reads without color). Source, by underline shape: code = solid, AI = dashed,
+   * checklist = dotted.
+   */
+  .app-mark {
+    @apply rounded-xs bg-transparent text-inherit;
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    text-decoration-skip-ink: none;
+    transition-property: outline-color, background-color;
+    transition-duration: 120ms;
+  }
+  .app-mark[data-severity='blocking'] {
+    @apply bg-status-error-soft;
+    text-decoration-color: var(--color-status-error-soft-content);
+  }
+  .app-mark[data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+  }
+  .app-mark[data-source='code'] {
+    text-decoration-style: solid;
+  }
+  .app-mark[data-source='llm'] {
+    text-decoration-style: dashed;
+  }
+  .app-mark[data-source='human'] {
+    text-decoration-style: dotted;
+  }
+  .app-mark[data-active] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
+  .app-mark[data-clickable] {
+    cursor: pointer;
+  }
+
+  .app-copy-editor {
+    @apply grid rounded-md border border-base-300 bg-base-100;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-copy-editor:focus-within {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+  }
+  .app-copy-editor[data-invalid] {
+    @apply border-status-error;
+  }
+  .app-copy-editor > .app-copy {
+    grid-area: 1 / 1;
+    @apply min-h-48 px-3 py-2.5;
+  }
+  /* The backdrop draws only fills and underlines; the textarea above it draws the text and caret. */
+  .app-copy-backdrop {
+    color: transparent;
+    pointer-events: none;
+  }
+  .app-copy-input {
+    @apply w-full resize-none overflow-hidden border-0 bg-transparent outline-none placeholder:text-muted;
+  }
+  .app-copy-input:focus-visible {
+    outline: none; /* the editor frame shows focus */
+  }
+
+  /* Diffs: shape, not status color. Insert = underline on a neutral tint; delete = struck, muted. */
+  .app-diff-ins {
+    @apply rounded-xs bg-hover no-underline;
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-base-content);
+  }
+  .app-diff-del {
+    @apply text-muted;
+    text-decoration-line: line-through;
+    text-decoration-thickness: 1.5px;
+  }
+
+  /* ---- Finding summary (ui/findings) ------------------------------------------------------------- */
+  .app-finding-summary {
+    @apply flex min-w-0 flex-col gap-1.5;
+  }
+  .app-finding-tags {
+    @apply flex flex-wrap items-center gap-x-2.5 gap-y-1;
+  }
+  .app-finding-message {
+    @apply text-ui text-base-content;
+  }
+  .app-finding-citation {
+    @apply text-muted;
+  }
+  .app-finding-quote {
+    @apply self-start rounded-xs bg-base-200 px-1 font-mono text-meta text-base-content;
+  }
+  .app-finding-fix {
+    @apply text-meta text-muted;
+  }
+  .app-finding-fix-label {
+    @apply font-medium text-base-content;
+  }
+
+  /* ---- Review screen (features/review) ----------------------------------------------------------- */
+  /* (review classes go here) */
+
   /* ---- App shell ------------------------------------------------------------------------------- */
   .app-shell {
     @apply grid h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
