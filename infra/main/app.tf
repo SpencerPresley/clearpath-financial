@@ -136,11 +136,12 @@ data "aws_iam_policy_document" "app" {
   }
 
   # render-env.sh reads the live CloudFront ranges to build uvicorn's
-  # --forwarded-allow-ips. Public, read-only data.
+  # --forwarded-allow-ips. The action supports the prefix-list resource type
+  # (AWS service reference for ec2), so scope it to that one list.
   statement {
     sid       = "ReadCloudFrontPrefixList"
     actions   = ["ec2:GetManagedPrefixListEntries"]
-    resources = ["*"]
+    resources = [data.aws_ec2_managed_prefix_list.cloudfront_origin_facing.arn]
   }
 
   statement {

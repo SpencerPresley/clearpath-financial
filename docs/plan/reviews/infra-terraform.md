@@ -156,3 +156,35 @@ The same `value_wo` / `password_wo` mechanism would also keep `DJANGO_SECRET_KEY
 
 1. The decoded `sub` from a dry-run token (B1, and S1 option b). Only a workflow run in this repo can produce it.
 2. Whether you want option (a) or (c) for S1. Option (c) costs money.
+
+---
+
+## Resolutions
+
+Fixed on `infra/terraform`. Results: `fmt -check` and `validate` pass on both stacks;
+`terraform plan` (main) gives `Plan: 74 to add, 0 to change, 0 to destroy`, which is 67 plus 7 for WAF
+logging; `actionlint` and `shellcheck` are clean. Nothing was applied: bootstrap is unchanged, main is
+not applied. Details are in `docs/plan/reports/infra-terraform.md`.
+
+| ID | Resolution |
+|---|---|
+| B1 | Trust `sub` is now `${var.github_oidc_sub_prefix}:ref:${var.github_deploy_ref}`, which defaults to `repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/main`. The format was checked empirically: a throwaway workflow on push to `infra/terraform` (run 40094647323) printed `sub=repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/infra/terraform`. The probe workflow was then deleted. `docs/decisions.md` step 2 is outside my paths and still shows the old string; it's flagged for the orchestrator. |
+| S1 | Option (a), per the orchestrator ruling. `environment:` is removed from deploy.yaml, and every job is gated on `github.ref == 'refs/heads/main'`, so a dispatch from another ref is skipped. The trust policy rejects other refs anyway. The github.tf comment and the README now say plainly that there's no environment, reviewer or branch protection, and that anyone who can push to main can deploy. |
+| S2 | The workflow is split into `build-backend` (docker build, collectstatic, `docker save` to an artifact) and `build-frontend` (npm ci and build to an artifact). Neither has `id-token`. `deploy` (`needs` both) is the only job with `id-token: write`: it downloads the artifacts, assumes the role, loads and pushes the image (skipped if the SHA is already in ECR), runs SSM, syncs and invalidates. No npm, Vite or uv code runs in the credentialed job. |
+| S3 | `ANTHROPIC_API_KEY` now uses `value_wo` and `value_wo_version = 1`; `ignore_changes` is removed. Both arguments exist in the aws 6.70.0 schema (`value_wo` is `write_only`). `required_version` is `>= 1.11` in both stacks. The plan shows `value = null`. The README explains how to set the key and warns not to bump `value_wo_version`. |
+| S4 | The rate rule's scope-down is now `POST AND (regex ^/_allauth/[^/]+/v1/auth/ OR STARTS_WITH /django-admin/login)`. It's a regex because the provider allows only leaf statements inside a nested `or`. The app-side fixes (Redis `CACHES` for allauth limits, MFA or `secure_admin_login` on admin) are listed under "App follow-ups" in the report. |
+| S5 | The README uses `-out=main.tfplan`, which `*.tfplan` ignores, with a comment that plan files hold secrets. |
+| N1 | No change. Noted in the report: SSMManagedInstanceCore grants Get/GetParameters on `*`. |
+| N2 | Scoped to `data.aws_ec2_managed_prefix_list.cloudfront_origin_facing.arn`. The AWS service reference shows the action supports the `prefix-list` resource type. |
+| N3 | No change. Noted as a design tradeoff in the report. |
+| N4 | README "Rollback" section: re-run all jobs of the last good Deploy run, or `sudo /srv/clearpath/deploy.sh <repo>:<sha>` from Session Manager. Migrations must be expand-only. |
+| N5 | The poll retries transient API errors, up to 5 in a row, and resets the count on success. `InvocationDoesNotExist` is still treated as Pending, and the 20-minute deadline is unchanged. |
+| N6 | No change. Noted in the report; the first deploy proves it. |
+| N7 | `.github/workflows/deploy.yaml` added to the trigger paths. |
+| N8 | `availability_zone = aws_subnet.private[0].availability_zone`, which plans as us-east-1a. |
+| N9 | `db_skip_final_snapshot` now defaults to `false`, with a final snapshot named `clearpath-prod-final`. The README covers the name collision on a second destroy. |
+| N10 | Added `waf_logs.tf`: an `aws-waf-logs-clearpath-381491937698` bucket with SSE-S3, public access blocked, BucketOwnerEnforced, 14-day expiry, and the documented `delivery.logs.amazonaws.com` policy plus TLS-only. The logging configuration redacts `cookie`, `authorization`, `x-csrftoken` and `x-session-token`. |
+| N11 | `is_ipv6_enabled = false`. Per-address IPv6 aggregation would let a /64 dodge the rate limit, and US users lose nothing. |
+| N12 | No change (cosmetic). |
+| N13 | redis is pinned to `redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541`, the multi-arch index digest from `docker buildx imagetools inspect`. |
+| N14 | No change. |

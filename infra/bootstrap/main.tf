@@ -3,7 +3,7 @@
 # state is ever lost the bucket can be re-adopted with `terraform import`.
 
 terraform {
-  required_version = ">= 1.10"
+  required_version = ">= 1.11"
 
   required_providers {
     aws = {

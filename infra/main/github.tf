@@ -20,13 +20,17 @@ data "aws_iam_policy_document" "deploy_assume" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-    # Only jobs bound to the production environment, so environment protection
-    # rules (required reviewers, branch filters) gate every deploy. StringEquals,
-    # not StringLike: no wildcards.
+    # Pinned to runs on main (push or workflow_dispatch from main, whose sub is
+    # <prefix>:ref:refs/heads/main). Not a GitHub environment: on the Free plan
+    # a private repo gets no environment protection rules or branch protection,
+    # so `environment:` would admit any branch that names it. A pushed branch
+    # or a dispatch from another ref therefore can't assume this role; anyone
+    # who can push to main still can, since main can't be protected on Free.
+    # StringEquals, not StringLike: no wildcards.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:environment:${var.github_environment}"]
+      values   = ["${var.github_oidc_sub_prefix}:ref:${var.github_deploy_ref}"]
     }
   }
 }

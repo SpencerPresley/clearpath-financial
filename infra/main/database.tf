@@ -50,6 +50,8 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.db.id]
   publicly_accessible    = false
   multi_az               = false
+  # Same AZ as the app server: avoids cross-AZ latency and data charges.
+  availability_zone = aws_subnet.private[0].availability_zone
 
   backup_retention_period = var.db_backup_retention_days
   backup_window           = "07:00-07:30" # 2-3am US Eastern

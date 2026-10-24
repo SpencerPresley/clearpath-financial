@@ -37,8 +37,8 @@ the state); DynamoDB locking is deprecated in the S3 backend.
 ```sh
 cd infra/main
 terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
+terraform plan -out=main.tfplan   # *.tfplan is gitignored; plan files hold secrets in plaintext
+terraform apply main.tfplan
 ```
 
 First apply takes ~20–25 min, mostly the CloudFront VPC origin (up to 15 min to deploy) and the
@@ -53,14 +53,27 @@ gh variable set FRONTEND_BUCKET            --body "$(terraform output -raw front
 gh variable set CLOUDFRONT_DISTRIBUTION_ID --body "$(terraform output -raw cloudfront_distribution_id)"
 ```
 
-Also create the `production` environment in the repo settings (the deploy role only trusts jobs in it)
-and optionally add a required reviewer. Until `DEPLOY_ROLE_ARN` is set, the deploy workflow skips its
-job instead of failing.
+Until `DEPLOY_ROLE_ARN` is set, the deploy workflow skips its jobs instead of failing.
+
+**What gates a deploy.** The deploy role trusts only OIDC tokens whose `sub` is
+`repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/main`. That's the
+immutable subject format GitHub uses for repos created after July 2026; the value was confirmed by
+decoding a real token from this repo. So only workflow runs on `main` can deploy. That covers pushes
+and `workflow_dispatch` from main, and the workflow also skips itself on any other ref. There is **no**
+GitHub environment, required reviewer or branch protection behind it: on the Free plan a private repo
+gets none of those. Anyone who can push to `main` can deploy. If the repo moves to a paid plan, the
+`environment:` + required-reviewer route becomes available.
+
+The workflow has two build jobs that run all third-party code (npm, Vite, uv, Docker) without any
+`id-token` permission. A separate `deploy` job, the only one that can mint AWS credentials, runs only
+our checked-in scripts and the AWS CLI.
 
 ## Set the Anthropic API key
 
-Terraform creates `/clearpath/prod/ANTHROPIC_API_KEY` with a placeholder and ignores later value changes,
-so the real key never enters Terraform state or the repo:
+Terraform creates `/clearpath/prod/ANTHROPIC_API_KEY` with a placeholder through the write-only
+`value_wo` argument (Terraform ≥ 1.11). Terraform never stores that value or reads it back, so the real
+key you set by hand doesn't land in state on later refreshes. Don't bump `value_wo_version` in
+`main/config.tf`: that would overwrite the real key with the placeholder. Set the real key once with:
 
 ```sh
 read -rs KEY   # paste, Enter
@@ -70,7 +83,21 @@ unset KEY
 ```
 
 It takes effect on the next deploy (render-env.sh re-reads SSM). To apply it without a code change,
-run the Deploy workflow manually (`gh workflow run deploy.yaml`).
+run the Deploy workflow manually from main (`gh workflow run deploy.yaml --ref main`).
+
+## Rollback
+
+`deploy.sh` stops with the new containers in place if `up --wait` or the health check fails, so prod
+stays down until you act. Migrations run first and aren't reversed, which is why they must be
+expand-only (backward-compatible with the previous release).
+
+- **Preferred:** in GitHub Actions, open the last good Deploy run and click *Re-run all jobs*. It
+  rebuilds that commit, reuses its image (still in ECR, which keeps the last 20), and redeploys that
+  commit's `deploy/` scripts and frontend. Use *all* jobs, not just failed ones: build artifacts are
+  kept for 1 day.
+- **From a shell:** start a session (see Shell access), then run
+  `sudo /srv/clearpath/deploy.sh <ecr_repository_url>:<good-sha>`. This only rolls back the backend
+  image; the frontend stays on whatever was last synced.
 
 ## Runtime configuration
 
@@ -110,10 +137,21 @@ Put both variables in a `terraform.tfvars` once settled so later applies don't d
 cd infra/main && terraform destroy
 ```
 
-With the defaults (`force_destroy_buckets = true`, `db_skip_final_snapshot = true`, RDS deletion
-protection off) this removes everything including bucket contents, images and the database, with no
-final snapshot. Set `-var db_skip_final_snapshot=false` to keep one. The state bucket survives
-(`prevent_destroy`); remove it by deleting that lifecycle block and destroying `bootstrap/`.
+With the defaults, destroy removes everything, including the contents of the frontend, documents and
+WAF-log buckets and the ECR images (`force_destroy_buckets = true`). RDS deletion protection is off,
+but the database leaves a final snapshot named `clearpath-prod-final` (`db_skip_final_snapshot =
+false`). That snapshot outlives the stack and costs storage until you delete it. A second destroy
+fails while a snapshot of that name exists: delete it first (`aws rds delete-db-snapshot
+--db-snapshot-identifier clearpath-prod-final`), or pass `-var db_skip_final_snapshot=true`. The
+state bucket survives (`prevent_destroy`); to remove it, delete that lifecycle block and destroy
+`bootstrap/`.
+
+## Logs
+
+WAF request logs (every request, with `Cookie`, `Authorization`, `X-CSRFToken` and `X-Session-Token`
+redacted) go to `s3://aws-waf-logs-clearpath-381491937698/AWSLogs/…`. They arrive in 5-minute files
+and are kept 14 days (`waf_log_retention_days`). Container logs live on the box only
+(`docker compose -f compose.prod.yaml logs`, json-file driver, 5 × 20 MB per container).
 
 ## Estimated monthly cost (us-east-1, always on, light traffic)
 
@@ -130,7 +168,7 @@ Unit prices from the AWS Price List API (`aws pricing get-products`, queried 202
 | EBS gp3 root, 30 GB | $0.08/GB-mo | 2.40 |
 | RDS gp3 storage, 20 GB | $0.115/GB-mo; backups free up to DB size | 2.30 |
 | ECR | ~20 images × ~0.2 GB at $0.10/GB-mo (*estimate*) | ~0.40 |
-| CloudFront, CloudFront Functions, S3, SSM (standard params) | inside free tiers / pennies at this traffic (*estimate*) | ~0.50 |
+| CloudFront, CloudFront Functions, S3, SSM (standard params), WAF logs to S3 (vended-log delivery charge on a few MB/month) | inside free tiers / pennies at this traffic (*estimate*) | ~0.50 |
 | CloudFront VPC origin | no additional charge (AWS) | 0 |
 | **Total** | | **≈ $93** |
 

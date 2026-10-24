@@ -53,9 +53,9 @@ variable "db_backup_retention_days" {
 }
 
 variable "db_skip_final_snapshot" {
-  description = "Short-lived demo: destroy without a final snapshot unless this is set to false."
+  description = "Destroy (or a forced replacement) takes a final snapshot unless this is true. A snapshot of a demo DB costs pennies."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "force_destroy_buckets" {
@@ -64,21 +64,31 @@ variable "force_destroy_buckets" {
   default     = true
 }
 
-variable "github_repository" {
+# Repos created after GitHub's July 2026 cutover get an immutable OIDC subject:
+# repo:OWNER@OWNER-ID/REPO@REPO-ID:... instead of repo:OWNER/REPO:....
+# Source: `gh api repos/SpencerPresley/clearpath-financial/actions/oidc/customization/sub`
+# (sub_claim_prefix); confirmed by decoding a real token from this repo
+# (docs/plan/reports/infra-terraform.md).
+variable "github_oidc_sub_prefix" {
   type    = string
-  default = "SpencerPresley/clearpath-financial"
+  default = "repo:SpencerPresley@153392395/clearpath-financial@1431827457"
 }
 
-variable "github_environment" {
-  description = "Deploy role trust is pinned to jobs running in this GitHub environment."
+variable "github_deploy_ref" {
+  description = "Only workflow runs on this ref may assume the deploy role."
   type        = string
-  default     = "production"
+  default     = "refs/heads/main"
 }
 
 variable "login_rate_limit" {
-  description = "Max POSTs to allauth /auth/ endpoints per IP per 5 minutes before WAF blocks."
+  description = "Max login-type POSTs (allauth /v1/auth/*, Django admin login) per IP per 5 minutes before WAF blocks."
   type        = number
   default     = 50
+}
+
+variable "waf_log_retention_days" {
+  type    = number
+  default = 14
 }
 
 # Custom domain, two phases because DNS is at Squarespace (no Route 53):

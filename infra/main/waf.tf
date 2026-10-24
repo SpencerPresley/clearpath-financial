@@ -54,9 +54,13 @@ resource "aws_wafv2_web_acl" "edge" {
     }
   }
 
-  # Credential stuffing guard in front of allauth's own per-account limits:
-  # POSTs to /_allauth/{browser,app}/v1/auth/... (login, 2FA authenticate,
-  # password reset, login-by-code).
+  # Credential stuffing guard. Counts POSTs per IP to:
+  #   - /_allauth/{browser,app}/v1/auth/... (login, 2FA authenticate, password
+  #     reset, login-by-code), in front of allauth's own per-account limits;
+  #   - /django-admin/login, which has no other throttle: Django admin calls
+  #     the auth backends directly, bypassing allauth's rate limiting and MFA.
+  # Shape is and(POST, or(...)): the provider allows only leaf statements
+  # inside a scope-down's nested or, hence a regex for the allauth paths.
   rule {
     name     = "auth-post-rate-limit"
     priority = 20
@@ -87,28 +91,31 @@ resource "aws_wafv2_web_acl" "edge" {
               }
             }
             statement {
-              byte_match_statement {
-                search_string         = "/_allauth/"
-                positional_constraint = "STARTS_WITH"
-                field_to_match {
-                  uri_path {}
+              or_statement {
+                statement {
+                  regex_match_statement {
+                    regex_string = "^/_allauth/[^/]+/v1/auth/"
+                    field_to_match {
+                      uri_path {}
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "LOWERCASE"
+                    }
+                  }
                 }
-                text_transformation {
-                  priority = 0
-                  type     = "LOWERCASE"
-                }
-              }
-            }
-            statement {
-              byte_match_statement {
-                search_string         = "/v1/auth/"
-                positional_constraint = "CONTAINS"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "LOWERCASE"
+                statement {
+                  byte_match_statement {
+                    search_string         = "/django-admin/login"
+                    positional_constraint = "STARTS_WITH"
+                    field_to_match {
+                      uri_path {}
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "LOWERCASE"
+                    }
+                  }
                 }
               }
             }

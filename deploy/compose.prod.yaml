@@ -23,7 +23,9 @@ x-backend: &backend
 
 services:
   redis:
-    image: redis:7-alpine
+    # Pinned by multi-arch index digest (`docker buildx imagetools inspect
+    # redis:7-alpine`, 2026-10-24) so a retag on Docker Hub can't change prod.
+    image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
     healthcheck:

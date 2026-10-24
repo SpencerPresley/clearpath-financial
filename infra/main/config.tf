@@ -67,14 +67,14 @@ resource "aws_ssm_parameter" "postgres_password" {
   value = random_password.db.result
 }
 
-# The real key is set by hand (see infra/README.md) and never enters
-# Terraform; ignore_changes keeps apply from resetting it to the placeholder.
+# The real key is set by hand with put-parameter (infra/README.md). value_wo is
+# write-only: Terraform sends the placeholder once and never stores or reads
+# back the value, so refresh can't copy the real key into state (a plain
+# `value` + ignore_changes would: the provider reads SecureStrings decrypted).
+# Bumping value_wo_version would overwrite the real key with the placeholder.
 resource "aws_ssm_parameter" "anthropic_api_key" {
-  name  = "${local.ssm_prefix}/ANTHROPIC_API_KEY"
-  type  = "SecureString"
-  value = "placeholder-set-out-of-band"
-
-  lifecycle {
-    ignore_changes = [value]
-  }
+  name             = "${local.ssm_prefix}/ANTHROPIC_API_KEY"
+  type             = "SecureString"
+  value_wo         = "placeholder-set-out-of-band"
+  value_wo_version = 1
 }

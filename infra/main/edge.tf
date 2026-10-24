@@ -102,9 +102,12 @@ resource "aws_acm_certificate_validation" "custom" {
 # --- Distribution ---
 
 resource "aws_cloudfront_distribution" "main" {
-  enabled             = true
-  comment             = local.name
-  is_ipv6_enabled     = true
+  enabled = true
+  comment = local.name
+  # IPv4 only: the WAF rate rule aggregates per IP, and an IPv6 client can
+  # rotate through a whole /64, so per-address limits would be easy to evade.
+  # US users lose nothing by being served over IPv4.
+  is_ipv6_enabled     = false
   http_version        = "http2and3"
   price_class         = "PriceClass_100" # US/Canada/Europe edges; users are US-only
   default_root_object = "index.html"

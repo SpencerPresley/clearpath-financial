@@ -7,6 +7,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'deploy/**'
+      - '.github/workflows/deploy.yaml'
   workflow_dispatch:
 
 permissions:
@@ -17,14 +18,89 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# Every job carries the same gate:
+# - DEPLOY_ROLE_ARN unset (infra not applied yet) -> skipped, not failed.
+# - Only main deploys. The role's trust policy enforces this too (sub pinned to
+#   ref:refs/heads/main); this just makes a dispatch from another branch a clean skip.
+#
+# Credential isolation: the build jobs run all third-party code (npm install
+# scripts, Vite plugins, uv-installed packages, Docker builds) and have no
+# id-token permission. Only the deploy job can mint AWS credentials, and it
+# runs nothing but our checked-in scripts, the AWS CLI and docker load/push.
+
 jobs:
+  build-backend:
+    name: Build backend image
+    if: vars.DEPLOY_ROLE_ARN != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build --pull --target prod -t "$IMAGE" backend
+
+      # Django admin's CSS/JS. Nothing on the server serves /static/, so it
+      # ships to the frontend bucket and CloudFront's default behavior serves it.
+      # Settings need these two values to import; neither is used.
+      - name: Collect Django static files
+        run: |
+          mkdir -p release
+          docker run --name collectstatic --user 0 \
+            -e CLEARPATH_ENV_FILE= -e DJANGO_SECRET_KEY=collectstatic-only -e POSTGRES_PASSWORD=unused \
+            "$IMAGE" python manage.py collectstatic --noinput
+          docker cp collectstatic:/app/staticfiles release/django-static
+          docker rm collectstatic
+
+      - name: Export image
+        run: docker save "$IMAGE" | gzip -1 > release/backend-image.tar.gz
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend
+          path: release/
+          retention-days: 1
+          compression-level: 0 # image tarball is already gzipped
+          if-no-files-found: error
+
+  build-frontend:
+    name: Build frontend
+    if: vars.DEPLOY_ROLE_ARN != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend
+          path: frontend/dist/
+          retention-days: 1
+          if-no-files-found: error
+
   deploy:
     name: Deploy to production
-    # Repo variables come from `terraform output` (infra/README.md). Until the
-    # stack is applied DEPLOY_ROLE_ARN is unset and the job is skipped, not failed.
-    if: vars.DEPLOY_ROLE_ARN != ''
+    needs: [build-backend, build-frontend]
+    if: vars.DEPLOY_ROLE_ARN != '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: production # the deploy role's trust policy is pinned to this
     timeout-minutes: 40
     permissions:
       contents: read
@@ -37,57 +113,39 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
       IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
     steps:
+      # Only for deploy/*.sh and compose.prod.yaml, shipped to the server below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: backend
+          path: release/backend
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: frontend
+          path: release/frontend
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Log in to ECR
-        run: |
-          aws ecr get-login-password --region "$AWS_REGION" |
-            docker login --username AWS --password-stdin "${ECR_REPOSITORY_URL%%/*}"
-
-      # Tags are immutable git SHAs, so a re-run for the same commit reuses the
-      # image instead of failing the push.
-      - name: Build and push backend image
+      # Tags are immutable git SHAs. A re-run for the same commit keeps the
+      # image already in ECR (the rebuilt one would be rejected anyway).
+      - name: Push backend image
         run: |
           if aws ecr describe-images --repository-name "${ECR_REPOSITORY_URL#*/}" \
               --image-ids "imageTag=${GITHUB_SHA}" >/dev/null 2>&1; then
-            echo "Image ${IMAGE} already in ECR; pulling"
-            docker pull --quiet "$IMAGE"
+            echo "Image ${IMAGE} already in ECR; not pushing"
           else
-            docker build --pull --target prod -t "$IMAGE" backend
+            aws ecr get-login-password --region "$AWS_REGION" |
+              docker login --username AWS --password-stdin "${ECR_REPOSITORY_URL%%/*}"
+            gunzip -c release/backend/backend-image.tar.gz | docker load
             docker push --quiet "$IMAGE"
           fi
-
-      # Django admin's CSS/JS. Nothing on the server serves /static/, so it
-      # ships to the frontend bucket and CloudFront's default behavior serves it.
-      # Settings need these two values to import; neither is used.
-      - name: Collect Django static files
-        run: |
-          docker run --name collectstatic --user 0 \
-            -e CLEARPATH_ENV_FILE= -e DJANGO_SECRET_KEY=collectstatic-only -e POSTGRES_PASSWORD=unused \
-            "$IMAGE" python manage.py collectstatic --noinput
-          docker cp collectstatic:/app/staticfiles ./django-static
-          docker rm collectstatic
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      # Built before touching the server so a broken frontend build stops the
-      # deploy while production is still on the previous release.
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
 
       # Ships deploy/ inline (base64) with the command, so the server always
       # runs the scripts from this commit.
@@ -120,20 +178,31 @@ jobs:
           echo "SSM command ${command_id}"
 
           # Poll to a terminal status; anything but Success fails the job.
+          # Transient API errors (throttling, 5xx) are retried, but at most 5 in
+          # a row, so a persistent failure still ends the job.
           deadline=$((SECONDS + 1200))
+          api_errors=0
           while :; do
             if result=$(aws ssm get-command-invocation --command-id "$command_id" \
                 --instance-id "$APP_INSTANCE_ID" --output json 2>&1); then
+              api_errors=0
               status=$(jq -r .Status <<<"$result")
             elif grep -q InvocationDoesNotExist <<<"$result"; then
               status=Pending # not registered yet right after send-command
             else
-              echo "$result"; exit 1
+              api_errors=$((api_errors + 1))
+              echo "get-command-invocation failed (${api_errors}/5): ${result}"
+              if (( api_errors >= 5 )); then
+                echo "::error::Giving up polling SSM; the command may still be running on the instance"
+                exit 1
+              fi
+              status=Unknown
             fi
             echo "$(date -u +%H:%M:%S) ${status}"
             case "$status" in
-              Pending|InProgress|Delayed) ;;
+              Pending|InProgress|Delayed|Unknown) ;;
               Success)
+                # StandardOutputContent is truncated by the API (24,000 chars).
                 jq -r .StandardOutputContent <<<"$result"
                 exit 0 ;;
               *)
@@ -154,11 +223,11 @@ jobs:
       # is revalidated on each request.
       - name: Upload frontend and admin static files
         run: |
-          aws s3 sync frontend/dist/assets "s3://${FRONTEND_BUCKET}/assets" \
+          aws s3 sync release/frontend/assets "s3://${FRONTEND_BUCKET}/assets" \
             --cache-control "public,max-age=31536000,immutable"
-          aws s3 sync frontend/dist "s3://${FRONTEND_BUCKET}" --delete \
+          aws s3 sync release/frontend "s3://${FRONTEND_BUCKET}" --delete \
             --exclude "assets/*" --exclude "static/*" --cache-control "no-cache"
-          aws s3 sync django-static "s3://${FRONTEND_BUCKET}/static" --delete \
+          aws s3 sync release/backend/django-static "s3://${FRONTEND_BUCKET}/static" --delete \
             --cache-control "public,max-age=3600"
 
       - name: Invalidate CloudFront
