@@ -20,7 +20,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree `wsH/queue`) | — | in progress | table, filters, saved views, board, drawer, /api/me wiring |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
-| I follow-ups | agent (resumed I) | — | in progress | no Reaffirm on terms_changed; remove fetch-URL until endpoint; Pull glyph |
+| I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
 | infra-terraform (#2) | agent (worktree) | PR #16 merged `b7c2ea3` | done (not applied) | 74 resources; sub verified from a real token; app follow-ups in #18 |
 | sample-tracker (#3) | agent (worktree) | PR #17 merged `b01999b` | done | 180 rows; samples/README.md is the import oracle; importer notes in reports/sample-tracker.md |
