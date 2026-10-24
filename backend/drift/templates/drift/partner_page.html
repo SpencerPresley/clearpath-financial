@@ -24,7 +24,12 @@
   </div>
   <header>
     <strong>{{ page.partner }}</strong>
-    <nav><a href="#">Loans</a><a href="#">Credit cards</a><a href="#">Guides</a><a href="#">About</a></nav>
+    <nav>
+      <a href="#">Loans</a>
+      <a href="#">Credit cards</a>
+      <a href="#">Guides</a>
+      <a href="#">About</a>
+    </nav>
   </header>
   <main>
     <h1>{% if edited %}{{ page.edited_headline }}{% else %}{{ page.headline }}{% endif %}</h1>
@@ -49,7 +54,7 @@
         <h4>{% if edited %}Trending now{% else %}Popular guides{% endif %}</h4>
         <ul>
           <li>How credit scores work</li>
-          <li>Fixed vs. variable rates</li>
+          <li>What an APR includes</li>
           {% if edited %}<li>Five ways to save this season</li>{% endif %}
         </ul>
       </aside>

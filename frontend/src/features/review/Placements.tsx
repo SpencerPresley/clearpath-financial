@@ -44,7 +44,7 @@ interface Outcome {
 }
 
 export function checkOutcome(snapshot: SnapshotOut): Outcome {
-  if (isInFlight(snapshot)) return { label: 'Checking…', tone: 'info', icon: 'action.reload' };
+  if (isInFlight(snapshot)) return { label: 'Checking the page…', tone: 'info', icon: 'action.reload' };
   if (snapshot.status === 'failed') return { label: 'Check failed', tone: 'error', icon: 'feedback.error' };
   switch (snapshot.result) {
     case 'unchanged':
@@ -59,6 +59,16 @@ export function checkOutcome(snapshot: SnapshotOut): Outcome {
 function hostOf(url: string): string {
   try {
     return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+/** host + path, without the scheme or a trailing slash: enough to tell two pages on one site apart. */
+export function displayUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname}`.replace(/\/$/, '');
   } catch {
     return url;
   }
@@ -123,10 +133,10 @@ function PageFindings({ snapshot }: { snapshot: SnapshotOut }) {
         {snapshot.findings.map((finding, index) => (
           <li key={`${finding.rule_id}-${String(index)}`} className="app-drift-finding">
             <SeverityBadge severity={finding.severity} />
-            <span>
-              {finding.message}
-              {finding.quote !== null && <q className="app-figure"> {finding.quote}</q>}
-              {finding.new && <span className="app-drift-new"> New on the page</span>}
+            <span className="app-drift-finding-text">
+              <span>{finding.message}</span>
+              {finding.quote !== null && <q className="app-drift-quote">{finding.quote}</q>}
+              {finding.new && <span className="app-drift-new">New on the page</span>}
             </span>
           </li>
         ))}
@@ -176,7 +186,7 @@ function PlacementRow({
       <div className="app-placement-head">
         <p className="app-placement-location">{placement.location}</p>
         <a href={placement.url} className="app-link" target="_blank" rel="noopener noreferrer">
-          {hostOf(placement.url)}
+          {displayUrl(placement.url)}
           <Icon name="action.open_external" size={14} />
         </a>
         <p className="app-timeline-meta">
@@ -205,7 +215,7 @@ function PlacementRow({
                 check.mutate({ placementId: placement.placement_id });
               }}
             >
-              {inFlight || check.isPending ? 'Checking…' : 'Check now'}
+              Check now
             </Button>
           )}
           {demo !== null && canSimulate && (

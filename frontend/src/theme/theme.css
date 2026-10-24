@@ -1369,8 +1369,14 @@
   .app-drift-finding {
     @apply flex items-start gap-2 py-1 text-ui;
   }
+  .app-drift-finding-text {
+    @apply flex min-w-0 flex-col gap-0.5;
+  }
+  .app-drift-quote {
+    @apply font-mono text-meta text-muted;
+  }
   .app-drift-new {
-    @apply font-medium text-base-content;
+    @apply text-meta font-medium text-base-content;
   }
 
   .app-link {

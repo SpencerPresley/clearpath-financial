@@ -81,7 +81,7 @@ describe('checkOutcome', () => {
     expect(checkOutcome(snapshot({ result: 'modified' })).tone).toBe('alert');
     expect(checkOutcome(snapshot({ result: 'missing' })).label).toBe('Copy missing');
     expect(checkOutcome(snapshot({ status: 'failed', result: null })).label).toBe('Check failed');
-    expect(checkOutcome(snapshot({ status: 'pending', result: null })).label).toBe('Checking…');
+    expect(checkOutcome(snapshot({ status: 'pending', result: null })).label).toBe('Checking the page…');
   });
 });
 
@@ -92,7 +92,7 @@ describe('PlacementsSection', () => {
 
     expect(await screen.findByText('Unchanged')).toBeInTheDocument();
     expect(screen.getByText(/Daily check against v1/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /lendcompare\.example/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /lendcompare\.example\/best-loans/ })).toHaveAttribute(
       'rel',
       'noopener noreferrer',
     );
@@ -186,7 +186,8 @@ describe('PlacementsSection', () => {
     await user.click(screen.getByRole('button', { name: 'Check now' }));
 
     expect(posted).toEqual(['3']);
-    expect(await screen.findByRole('button', { name: /Checking/ })).toBeInTheDocument();
+    expect(await screen.findByText('Checking the page…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check now' })).toHaveAttribute('data-pending', 'true');
     await waitFor(
       () => {
         expect(screen.getByText('Copy missing')).toBeInTheDocument();
