@@ -385,7 +385,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
             />
           </TabPanel>
           <TabPanel id="comments" className="app-tab-panel">
-            <CommentsTab itemId={item.id} versionN={shownN} canComment />
+            <CommentsTab itemId={item.id} versionN={shownN} canComment highlightId={search.comment} />
           </TabPanel>
           <TabPanel id="details" className="app-tab-panel">
             <DetailsTab item={item} />

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   getGetItemHistoryQueryKey,
@@ -55,17 +55,31 @@ function PanelError({ what, error, onRetry }: { what: string; error: unknown; on
 
 // ---- Comments ------------------------------------------------------------------------------------
 
+const commentDomId = (id: number) => `comment-${String(id)}`;
+
 export function CommentsTab({
   itemId,
   versionN,
   canComment,
+  highlightId,
 }: {
   itemId: number;
   versionN: number;
   canComment: boolean;
+  /** A linked comment (`?comment=`): scrolled into view, focused and briefly highlighted once it loads. */
+  highlightId?: number;
 }) {
   const queryClient = useQueryClient();
   const comments = useListComments(itemId, { version_n: versionN });
+  const broughtIntoView = useRef<number | null>(null);
+  const linked = highlightId !== undefined && comments.data?.some((c) => c.id === highlightId) === true;
+  useEffect(() => {
+    if (!linked || broughtIntoView.current === highlightId) return;
+    broughtIntoView.current = highlightId;
+    const node = document.getElementById(commentDomId(highlightId));
+    node?.scrollIntoView({ block: 'center' });
+    node?.focus({ preventScroll: true });
+  }, [linked, highlightId]);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const add = useAddComment({
@@ -92,7 +106,14 @@ export function CommentsTab({
       ) : (
         <ol className="app-timeline">
           {comments.data.map((comment) => (
-            <li key={comment.id} className="app-comment">
+            <li
+              key={comment.id}
+              id={commentDomId(comment.id)}
+              className="app-comment"
+              {...(comment.id === highlightId
+                ? { 'data-linked': 'true', tabIndex: -1, 'aria-current': 'true' as const }
+                : {})}
+            >
               <p className="app-timeline-meta">
                 <span className="app-timeline-actor">{comment.author.name}</span>{' '}
                 <RelativeAge at={comment.created_at} />

@@ -434,6 +434,25 @@ describe('ReviewPage', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
   });
 
+  it('brings a linked comment into view: focused and marked (?comment=)', async () => {
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=301' });
+
+    const body = await screen.findByText('Footer disclosure looks right now. Waiting on the APR range.');
+    const comment = body.closest('li');
+    await waitFor(() => {
+      expect(comment).toHaveFocus();
+    });
+    expect(comment).toHaveAttribute('data-linked', 'true');
+    expect(comment).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ignores a linked comment that is not on the version shown', async () => {
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=999' });
+
+    await screen.findByText('Footer disclosure looks right now. Waiting on the APR range.');
+    expect(document.querySelector('[data-linked]')).toBeNull();
+  });
+
   it("links the partner on the Details tab to the partner's page (agreement and evidence)", async () => {
     renderReview({
       path: '/items/1042?tab=details',

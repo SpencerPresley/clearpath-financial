@@ -28,20 +28,25 @@ test('a mention arrives on the next poll, opens its comment, and is marked read'
     name: /Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social/,
   });
 
-  // Navigate (by keyboard: the newest row has focus on open): the item's Comments tab on the comment's version.
+  // Navigate (by keyboard: the newest row has focus on open): the item's Comments tab on the comment's version,
+  // with the mentioned comment itself in view.
   await expect(row).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/items\/1042\?/);
   const url = new URL(page.url());
   expect(url.searchParams.get('tab')).toBe('comments');
   expect(url.searchParams.get('v')).toBe('2');
+  expect(url.searchParams.get('comment')).toBe(String(MENTION_COMMENT.id));
   await expect(page.getByRole('tab', { name: 'Comments', selected: true })).toBeVisible();
-  await expect(page.getByText(MENTION_COMMENT.body)).toBeVisible();
   await expect(dialog).toBeHidden();
-  // Focus lands on the page, not back on the bell (whose tooltip would cover the review header), and stays
+  // Focus lands on the comment, not back on the bell (whose tooltip would cover the review header), and stays
   // there once the popover's exit has run.
+  const comment = page.locator(`#comment-${String(MENTION_COMMENT.id)}`);
   await page.clock.runFor(1_000);
-  await expect(page.locator('#main')).toBeFocused();
+  await expect(comment).toBeFocused();
+  await expect(comment).toHaveAttribute('data-linked', 'true');
+  await expect(comment).toContainText(MENTION_COMMENT.body);
+  await expect(comment).toBeInViewport();
 
   // Read: one receipt, and the bell is quiet again.
   await expect.poll(() => inbox.posted).toEqual(['read 8']);

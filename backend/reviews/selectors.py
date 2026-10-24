@@ -126,7 +126,12 @@ def filter_items(*, viewer: User, filters: ItemFilter, clock: Clock = SYSTEM_CLO
     f = filters
     if f.q:
         key = _KEY.match(f.q)
-        qs = qs.filter(pk=int(key.group(1))) if key else qs.filter(title__icontains=f.q.strip())
+        text = f.q.strip()
+        qs = (
+            qs.filter(pk=int(key.group(1)))
+            if key
+            else qs.filter(Q(title__icontains=text) | Q(legacy_ref__icontains=text))
+        )
     if f.status:
         qs = qs.filter(status__in=f.status)
     if f.product:
@@ -207,6 +212,7 @@ class ItemRow:
     reopen_reason: ReopenReason | None
     llm_check_status: CheckStatus
     is_legacy: bool
+    legacy_ref: str | None  # the old tracker's Request ID (MCR-26-045), for imported items
     markets: tuple[Market, ...]
     tags: tuple[str, ...]
     notes: str
@@ -267,6 +273,7 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
         reopen_reason=ReopenReason(item.reopen_reason) if item.reopen_reason else None,
         llm_check_status=CheckStatus(item.llm_check_status),
         is_legacy=item.is_legacy,
+        legacy_ref=item.legacy_ref,
         markets=tuple(Market(m) for m in item.markets),
         tags=tuple(item.tags),
         notes=item.notes,

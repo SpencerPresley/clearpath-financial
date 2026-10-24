@@ -5010,6 +5010,7 @@
           "reopen_reason",
           "llm_check_status",
           "is_legacy",
+          "legacy_ref",
           "markets",
           "tags",
           "notes",
@@ -5028,7 +5029,6 @@
           "is_prescreen",
           "risk_tier_overridden",
           "source_url",
-          "legacy_ref",
           "legacy_submitter",
           "legacy_reviewer",
           "legacy_history",
@@ -5383,7 +5383,7 @@
                 "type": "null"
               }
             ],
-            "description": "Title contains, or a display key like CP-1042.",
+            "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
             "title": "Q"
           },
           "reopen_reason": {
@@ -6409,6 +6409,18 @@
                 "type": "null"
               }
             ]
+          },
+          "legacy_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The old tracker's Request ID (MCR-26-045) on imported items.",
+            "title": "Legacy Ref"
           },
           "llm_check_status": {
             "$ref": "#/components/schemas/CheckStatus"
@@ -15288,7 +15300,7 @@
         "operationId": "listItems",
         "parameters": [
           {
-            "description": "Title contains, or a display key like CP-1042.",
+            "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -15302,7 +15314,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Title contains, or a display key like CP-1042.",
+              "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
               "title": "Q"
             }
           },
@@ -19060,7 +19072,7 @@
         "operationId": "listLibrary",
         "parameters": [
           {
-            "description": "Title contains, or a display key like CP-1042.",
+            "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -19074,7 +19086,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Title contains, or a display key like CP-1042.",
+              "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
               "title": "Q"
             }
           },
@@ -19631,7 +19643,7 @@
         "operationId": "searchLibrary",
         "parameters": [
           {
-            "description": "Title contains, or a display key like CP-1042.",
+            "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -19645,7 +19657,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Title contains, or a display key like CP-1042.",
+              "description": "Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.",
               "title": "Q"
             }
           },

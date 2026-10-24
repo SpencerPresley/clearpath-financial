@@ -1427,11 +1427,17 @@
     @apply font-normal text-brand-muted;
   }
 
+  /* The quick-jump box (features/search). Focus shows on the whole field, since the input itself is bare. */
   .app-search {
-    @apply flex h-8 w-full max-w-md cursor-not-allowed items-center gap-2 rounded-md border border-brand-muted/25 bg-brand-field px-2.5 text-brand-muted;
+    @apply flex h-8 w-full max-w-md items-center gap-2 rounded-md border border-brand-muted/25 bg-brand-field pr-1.5 pl-2.5 text-brand-muted;
+  }
+  .app-search:focus-within {
+    @apply border-transparent text-primary-content;
+    outline: 2px solid var(--color-focus-on-brand);
+    outline-offset: 0;
   }
   .app-search input {
-    @apply min-w-0 flex-1 cursor-not-allowed bg-transparent text-ui outline-none placeholder:text-brand-muted;
+    @apply min-w-0 flex-1 bg-transparent text-ui text-primary-content outline-none placeholder:text-brand-muted;
   }
 
   .app-topbar-end {
@@ -3837,5 +3843,61 @@
   }
   .app-inbox-foot {
     @apply flex shrink-0 items-center gap-1.5 border-t border-base-300 px-3 py-1.5 text-meta text-muted;
+  }
+}
+
+/* ---- Quick-jump results (features/search) and linked comments (review Comments tab). ----------------- */
+@keyframes app-linked-fade {
+  from {
+    background-color: oklch(38% 0.11 262 / 0.12);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@layer components {
+  .app-jump-hint {
+    @apply flex shrink-0 opacity-80;
+  }
+  .app-search:focus-within .app-jump-hint {
+    @apply hidden;
+  }
+  /* At least as wide as the field; results need room for a title and a status badge. */
+  .app-jump {
+    @apply w-[max(var(--trigger-width),32rem)];
+  }
+  .app-jump-item {
+    @apply grid h-9 grid-cols-[4.5rem_minmax(0,1fr)_auto_auto] gap-2;
+  }
+  .app-jump-key {
+    @apply font-mono text-meta text-muted tabular-nums;
+  }
+  .app-jump-title {
+    @apply min-w-0 truncate;
+  }
+  .app-jump-ref {
+    @apply font-mono text-meta text-muted;
+  }
+  .app-jump-note {
+    @apply flex items-center gap-2 px-2 py-2 text-ui text-muted;
+  }
+  .app-jump-note[data-state='error'] {
+    @apply text-status-error-soft-content;
+  }
+
+  /* A comment opened from a link (?comment=): a lasting bar, plus a tint that fades so the eye finds it. */
+  .app-timeline > li.app-comment[data-linked] {
+    @apply -mx-2 rounded-sm px-2;
+    box-shadow: inset 2px 0 0 var(--color-focus);
+    animation: app-linked-fade 2.4s ease-out 0.2s both;
+  }
+  .app-timeline > li.app-comment[data-linked]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-timeline > li.app-comment[data-linked] {
+      animation: none;
+    }
   }
 }

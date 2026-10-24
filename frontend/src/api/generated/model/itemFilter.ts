@@ -31,7 +31,7 @@ export interface ItemFilter {
   owner_id?: number[];
   partner_id?: number[];
   product?: Product[];
-  /** Title contains, or a display key like CP-1042. */
+  /** Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042. */
   q?: string | null;
   reopen_reason?: ReopenReason[];
   risk_tier?: RiskTier[];

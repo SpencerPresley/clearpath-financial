@@ -73,6 +73,9 @@ class ItemRowOut(Schema):
     reopen_reason: ReopenReason | None
     llm_check_status: CheckStatus
     is_legacy: bool
+    legacy_ref: str | None = Field(
+        default=None, description="The old tracker's Request ID (MCR-26-045) on imported items."
+    )
     markets: list[Market]
     tags: list[str]
     notes: str

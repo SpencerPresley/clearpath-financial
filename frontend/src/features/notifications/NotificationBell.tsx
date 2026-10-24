@@ -8,6 +8,7 @@ import { Button as AriaButton, Dialog, DialogTrigger, Popover } from 'react-aria
 
 import type { NotificationOut } from '../../api/generated/model';
 import { Icon } from '../../ui/Icon';
+import { focusMain } from '../../ui/layout/focusMain';
 import { Tooltip } from '../../ui/Tooltip';
 import { Inbox } from './Inbox';
 import { notificationLink } from './text';
@@ -37,7 +38,7 @@ export function NotificationBell() {
     // Land on the page, not back on the bell (where the popover would restore focus and open its tooltip
     // over the review header). Focus moved out before the popover unmounts isn't restored.
     void navigate({ to: '/items/$itemId', params: { itemId: link.itemId }, search: link.search }).then(() => {
-      document.getElementById('main')?.focus();
+      focusMain();
     });
   };
 

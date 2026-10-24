@@ -13,7 +13,7 @@ import type { ListLibraryStatusItem } from './listLibraryStatusItem';
 
 export type ListLibraryParams = {
 /**
- * Title contains, or a display key like CP-1042.
+ * Title or legacy tracker ID (MCR-26-045) contains, or a display key like CP-1042.
  */
 q?: string | null;
 status?: ListLibraryStatusItem[];

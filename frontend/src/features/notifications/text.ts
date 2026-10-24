@@ -132,11 +132,12 @@ export function describeNotification(n: NotificationOut): NotificationText {
 
 export interface NotificationLink {
   itemId: string;
-  search: { tab?: 'comments' | 'details'; v?: number };
+  search: { tab?: 'comments' | 'details'; v?: number; comment?: number };
 }
 
 /**
- * Where a row goes: the item's review screen. A mention opens Comments on the comment's version; page findings
+ * Where a row goes: the item's review screen. A mention opens Comments on the comment's version, with the comment
+ * itself brought into view; page findings
  * open Details, where the placement shows its attention state.
  */
 export function notificationLink(n: NotificationOut): NotificationLink | null {
@@ -145,6 +146,6 @@ export function notificationLink(n: NotificationOut): NotificationLink | null {
   if (n.kind === 'page_findings') return { itemId, search: { tab: 'details' } };
   if (n.kind !== 'mention') return { itemId, search: {} };
   return n.detail?.kind === 'mention'
-    ? { itemId, search: { tab: 'comments', v: n.detail.version_n } }
+    ? { itemId, search: { tab: 'comments', v: n.detail.version_n, comment: n.detail.comment_id } }
     : { itemId, search: { tab: 'comments' } };
 }
