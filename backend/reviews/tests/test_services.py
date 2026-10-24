@@ -8,6 +8,8 @@ from pytest_django import Settings
 
 from accounts.models import User
 from audit.models import Event
+from checks.contracts import CodeCheckResult, FindingDraft
+from checks.services import PersistedChecks
 from conftest import UserFactory
 from core.clock import FixedClock
 from core.domain import (
@@ -15,10 +17,12 @@ from core.domain import (
     Channel,
     CheckStatus,
     EventType,
+    FindingSource,
     ItemStatus,
     Market,
     Product,
     RiskTier,
+    Severity,
     VersionOrigin,
 )
 from core.errors import InvalidInput, NotFound, NotPermitted
@@ -145,6 +149,32 @@ def test_submit_rolls_back_item_and_event_together(
     assert not ReviewItem.objects.exists()
     assert not Version.objects.exists()
     assert not Event.objects.exists()
+
+
+@pytest.mark.django_db
+def test_submit_takes_open_findings_count_from_the_checks_seam(
+    marketer: User, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The seam knows how many findings stay open after carrying dismissals forward (ruling 4); submit_item
+    # must not recount the raw drafts.
+    drafts = tuple(
+        FindingDraft(
+            rule_id=f"R{n}", citation="Reg Z", source=FindingSource.CODE, severity=Severity.BLOCKING, message="x"
+        )
+        for n in range(3)
+    )
+
+    def two_open(**kwargs: object) -> PersistedChecks:
+        return PersistedChecks(
+            result=CodeCheckResult(findings=drafts, terms_refs=(), ruleset_key="test"), open_findings_count=2
+        )
+
+    monkeypatch.setattr("reviews.services.run_code_checks", two_open)
+
+    result = submit_item(actor=marketer, data=_input(), clock=clock)
+
+    assert result.open_findings_count == 2
+    assert ReviewItem.objects.get(pk=result.item_id).open_findings_count == 2
 
 
 # --- inline field edits ----------------------------------------------------------------------------------------

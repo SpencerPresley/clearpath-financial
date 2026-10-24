@@ -130,7 +130,7 @@ def submit_item(*, actor: User, data: SubmitItemInput, clock: Clock = SYSTEM_CLO
         )
         checks = run_code_checks(version=version, clock=clock)
         item.current_version = version
-        item.open_findings_count = sum(1 for _ in checks.findings)
+        item.open_findings_count = checks.open_findings_count
         item.save(update_fields=["current_version", "open_findings_count"])
         # Seam (workstream E): assign_on_submit(item, clock) here, under pg_advisory_xact_lock, recording
         # ITEM_ASSIGNED with its reason (decisions.md "Reviewer assignment").
