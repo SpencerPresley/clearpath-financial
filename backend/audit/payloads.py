@@ -17,6 +17,7 @@ from core.domain import (
     DecisionOutcome,
     EventType,
     FindingSource,
+    LlmFailureCode,
     PartnerType,
     Product,
     ReopenReason,
@@ -159,19 +160,45 @@ class ChecksCompletedPayload(EventPayload):
 
 class LlmCheckRequestedPayload(EventPayload):
     version_id: int
+    check_run_id: int | None = None
+    retry: bool = False  # a reviewer asked to run a failed check again
+
+
+class LlmCheckStartedPayload(EventPayload):
+    version_id: int
+    check_run_id: int
+    attempt: int  # 1 for the first call; retries after a provider error or unreadable output count up
 
 
 class LlmCheckSucceededPayload(EventPayload):
+    """What one AI pre-review cost and produced (spec §6.4: model, tokens, latency, dropped findings)."""
+
     version_id: int
     check_run_id: int
     findings_count: int
     dropped_findings_count: int
+    model: str = ""
+    ruleset_key: str = ""
+    prompt_version: str = ""
+    latency_ms: int = 0
+    input_tokens: int = 0  # cached tokens included
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+    dropped_by_reason: dict[str, int] = Field(default_factory=dict)
+    adjustments_by_kind: dict[str, int] = Field(default_factory=dict)
+    attempt: int = 1
+    # False: the version was replaced while the call ran. Its findings are stored; the item's status is untouched.
+    current: bool = True
 
 
 class LlmCheckFailedPayload(EventPayload):
     version_id: int
     check_run_id: int
-    error: str
+    error: str  # a plain sentence for the reviewer
+    code: LlmFailureCode = LlmFailureCode.ERROR
+    attempt: int = 1
+    current: bool = True
 
 
 class FindingAcceptedPayload(EventPayload):
@@ -331,6 +358,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.VERSION_CREATED: VersionCreatedPayload,
     EventType.CHECKS_COMPLETED: ChecksCompletedPayload,
     EventType.LLM_CHECK_REQUESTED: LlmCheckRequestedPayload,
+    EventType.LLM_CHECK_STARTED: LlmCheckStartedPayload,
     EventType.LLM_CHECK_SUCCEEDED: LlmCheckSucceededPayload,
     EventType.LLM_CHECK_FAILED: LlmCheckFailedPayload,
     EventType.FINDING_ACCEPTED: FindingAcceptedPayload,

@@ -1,8 +1,8 @@
 from django.http import HttpRequest
-from ninja import Router
+from ninja import Router, Status
 
 from accounts.api import current_user
-from checks import services
+from checks import prereview, services
 from checks.engine import FindingDraft, TermsRefDraft
 from checks.schemas import (
     CheckPreviewIn,
@@ -15,9 +15,9 @@ from checks.schemas import (
 )
 from checks.selectors import FindingRow, get_finding, list_findings
 from core.domain import TermsField
-from core.errors import NotImplementedYet
-from core.schemas import ERRORS, STUB_ERRORS
+from core.schemas import ERRORS
 from reviews.schemas import ItemRowOut, SpanOut
+from reviews.selectors import ItemRow, get_item_row
 
 router = Router(tags=["findings"])
 
@@ -90,9 +90,9 @@ def preview(request: HttpRequest, body: CheckPreviewIn) -> CheckPreviewOut:
     )
 
 
-@router.post(
-    "/items/{int:item_id}/llm-check/retry", response={202: ItemRowOut, **STUB_ERRORS}, operation_id="retryLlmCheck"
-)
-def retry_llm_check(request: HttpRequest, item_id: int) -> ItemRowOut:
-    """Re-run a failed AI check on the current version. [workstream D]"""
-    raise NotImplementedYet("retrying the AI check")
+@router.post("/items/{int:item_id}/llm-check/retry", response={202: ItemRowOut, **ERRORS}, operation_id="retryLlmCheck")
+def retry_llm_check(request: HttpRequest, item_id: int) -> Status[ItemRow]:
+    """Run a failed AI check again on the current version (reviewer or lead, while the item is under review).
+    It starts as `pending`; poll the item for the result."""
+    prereview.retry_check(actor=current_user(request), item_id=item_id)
+    return Status(202, get_item_row(item_id=item_id))

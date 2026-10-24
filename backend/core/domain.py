@@ -110,6 +110,18 @@ class CheckStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class LlmFailureCode(StrEnum):
+    """Why an AI pre-review ended `failed` (LLM_CHECK_FAILED). Approve then needs an override reason."""
+
+    NOT_CONFIGURED = "not_configured"  # no Anthropic API key in this environment
+    PROVIDER_UNAVAILABLE = "provider_unavailable"  # unreachable, rate-limited or 5xx after every retry
+    PROVIDER_REFUSED = "provider_refused"  # a 4xx that retrying can't fix
+    INVALID_OUTPUT = "invalid_output"  # no usable report, twice
+    STUCK = "stuck"  # still running long after any attempt can take: the worker died
+    TIMEOUT = "timeout"
+    ERROR = "error"
+
+
 class RiskTier(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"
@@ -248,6 +260,7 @@ class EventType(StrEnum):
     VERSION_CREATED = "version.created"
     CHECKS_COMPLETED = "checks.completed"
     LLM_CHECK_REQUESTED = "llm_check.requested"
+    LLM_CHECK_STARTED = "llm_check.started"
     LLM_CHECK_SUCCEEDED = "llm_check.succeeded"
     LLM_CHECK_FAILED = "llm_check.failed"
     FINDING_ACCEPTED = "finding.accepted"
