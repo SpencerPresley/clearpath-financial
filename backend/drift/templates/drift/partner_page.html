@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{{ page.title }}</title>
+  <style>
+    body { font-family: Georgia, "Times New Roman", serif; margin: 0; color: #222; background: #fafaf7; }
+    .demo-banner { font-family: system-ui, sans-serif; background: #1f2a44; color: #fff; padding: .6rem 1rem; font-size: .9rem; }
+    header, main, footer { max-width: 56rem; margin: 0 auto; padding: 1rem; }
+    nav a { margin-right: 1rem; color: #345; }
+    .layout { display: grid; grid-template-columns: {% if edited %}1fr 2fr{% else %}2fr 1fr{% endif %}; gap: 2rem; }
+    .offer { border: 1px solid #ccc; background: #fff; padding: 1rem; border-radius: .25rem; }
+    .offer h3 { margin-top: 0; }
+    .muted { color: #666; font-size: .9rem; }
+    .copy { white-space: pre-line; }
+  </style>
+</head>
+<body>
+  <div class="demo-banner">
+    Demo partner page, hosted by ClearPath for the drift monitor demo. {{ page.partner }} is not a real site.
+    Variant: {% if edited %}edited{% else %}original{% endif %}.
+  </div>
+  <header>
+    <strong>{{ page.partner }}</strong>
+    <nav><a href="#">Loans</a><a href="#">Credit cards</a><a href="#">Guides</a><a href="#">About</a></nav>
+  </header>
+  <main>
+    <h1>{% if edited %}{{ page.edited_headline }}{% else %}{{ page.headline }}{% endif %}</h1>
+    <p class="muted">Updated {{ today|date:"F j, Y" }} · {{ reads }} readers this week</p>
+    <div class="layout">
+      <section>
+        {% if copy %}
+        <div class="offer">
+          <h3>ClearPath</h3>
+          <p class="copy">{{ copy }}</p>
+          <p><a href="#">Check your rate</a></p>
+        </div>
+        {% else %}
+        <div class="offer">
+          <h3>Northwind Card</h3>
+          <p>Earn rewards on everyday purchases. See issuer site for rates and fees.</p>
+        </div>
+        {% endif %}
+        <p>Shopping for credit? Compare offers side by side, read the terms, and check your rate before you apply.</p>
+      </section>
+      <aside>
+        <h4>{% if edited %}Trending now{% else %}Popular guides{% endif %}</h4>
+        <ul>
+          <li>How credit scores work</li>
+          <li>Fixed vs. variable rates</li>
+          {% if edited %}<li>Five ways to save this season</li>{% endif %}
+        </ul>
+      </aside>
+    </div>
+  </main>
+  <footer class="muted">Advertiser disclosure: {{ page.partner }} may be compensated by companies on this page. © {{ today|date:"Y" }} {{ page.partner }} (demo).</footer>
+</body>
+</html>

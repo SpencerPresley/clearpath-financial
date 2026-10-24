@@ -2,6 +2,8 @@ export * from './admin/admin.zod';
 export * from './assistant/assistant.zod';
 export * from './core/core.zod';
 export * from './decisions/decisions.zod';
+export * from './demo/demo.zod';
+export * from './drift/drift.zod';
 export * from './exports/exports.zod';
 export * from './findings/findings.zod';
 export * from './imports/imports.zod';

@@ -1625,6 +1625,90 @@
         "title": "DecisionSummaryOut",
         "type": "object"
       },
+      "DemoPageOut": {
+        "properties": {
+          "edit_summary": {
+            "title": "Edit Summary",
+            "type": "string"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          },
+          "partner": {
+            "title": "Partner",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "partner",
+          "url",
+          "edited",
+          "edit_summary",
+          "expected"
+        ],
+        "title": "DemoPageOut",
+        "type": "object"
+      },
+      "DemoPageRefOut": {
+        "properties": {
+          "edit_summary": {
+            "title": "Edit Summary",
+            "type": "string"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          },
+          "partner": {
+            "title": "Partner",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "partner",
+          "edited",
+          "edit_summary",
+          "expected"
+        ],
+        "title": "DemoPageRefOut",
+        "type": "object"
+      },
+      "DemoPageUpdateIn": {
+        "properties": {
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "edited"
+        ],
+        "title": "DemoPageUpdateIn",
+        "type": "object"
+      },
       "DemoResetEventOut": {
         "properties": {
           "actor": {
@@ -1775,6 +1859,266 @@
         ],
         "title": "DoneEventOut",
         "type": "object"
+      },
+      "DriftCheckRequestedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DriftCheckRequestedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "placement.drift_check_requested",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "DriftCheckRequestedEventOut",
+        "type": "object"
+      },
+      "DriftCheckRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "integer"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DriftTrigger"
+          }
+        },
+        "required": [
+          "placement_id",
+          "snapshot_id",
+          "trigger"
+        ],
+        "title": "DriftCheckRequestedPayload",
+        "type": "object"
+      },
+      "DriftCheckedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DriftCheckedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "placement.drift_checked",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "DriftCheckedEventOut",
+        "type": "object"
+      },
+      "DriftCheckedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "compared_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compared Version Id"
+          },
+          "error_code": {
+            "default": "",
+            "title": "Error Code",
+            "type": "string"
+          },
+          "findings_count": {
+            "default": 0,
+            "title": "Findings Count",
+            "type": "integer"
+          },
+          "new_findings_count": {
+            "default": 0,
+            "title": "New Findings Count",
+            "type": "integer"
+          },
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "placement_id",
+          "snapshot_id",
+          "status"
+        ],
+        "title": "DriftCheckedPayload",
+        "type": "object"
+      },
+      "DriftResult": {
+        "enum": [
+          "unchanged",
+          "modified",
+          "missing"
+        ],
+        "title": "DriftResult",
+        "type": "string"
+      },
+      "DriftTrigger": {
+        "description": "What started a drift check: the daily sweep, or someone's \"Check now\".",
+        "enum": [
+          "scheduled",
+          "manual"
+        ],
+        "title": "DriftTrigger",
+        "type": "string"
       },
       "DurationStatOut": {
         "properties": {
@@ -4429,6 +4773,27 @@
         "title": "ItemDetailOut",
         "type": "object"
       },
+      "ItemDriftOut": {
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "placements": {
+            "items": {
+              "$ref": "#/components/schemas/PlacementDriftOut"
+            },
+            "title": "Placements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "placements"
+        ],
+        "title": "ItemDriftOut",
+        "type": "object"
+      },
       "ItemExpiredEventOut": {
         "properties": {
           "actor": {
@@ -4892,6 +5257,8 @@
                   "llm_check.succeeded": "#/components/schemas/LlmCheckSucceededEventOut",
                   "partner.created": "#/components/schemas/PartnerCreatedEventOut",
                   "partner.updated": "#/components/schemas/PartnerUpdatedEventOut",
+                  "placement.drift_check_requested": "#/components/schemas/DriftCheckRequestedEventOut",
+                  "placement.drift_checked": "#/components/schemas/DriftCheckedEventOut",
                   "placement.recorded": "#/components/schemas/PlacementRecordedEventOut",
                   "placement.takedown_confirmed": "#/components/schemas/TakedownConfirmedEventOut",
                   "placement.takedown_requested": "#/components/schemas/TakedownRequestedEventOut",
@@ -4989,6 +5356,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/TakedownConfirmedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/DriftCheckRequestedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/DriftCheckedEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/AttachmentAddedEventOut"
@@ -5379,6 +5752,17 @@
           },
           "reason": {
             "$ref": "#/components/schemas/ReopenReason"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
           }
         },
         "required": [
@@ -7458,6 +7842,64 @@
         "title": "OutboxEmailOut",
         "type": "object"
       },
+      "PageFindingOut": {
+        "description": "A code finding on the fetched page's text (not stored as a Finding: it belongs to no version).",
+        "properties": {
+          "citation": {
+            "title": "Citation",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "new": {
+            "description": "The rule doesn't fire on the approved copy itself.",
+            "title": "New",
+            "type": "boolean"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "suggested_fix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Fix"
+          }
+        },
+        "required": [
+          "rule_id",
+          "citation",
+          "severity",
+          "message",
+          "suggested_fix",
+          "quote",
+          "new"
+        ],
+        "title": "PageFindingOut",
+        "type": "object"
+      },
       "PartnerCreatedEventOut": {
         "properties": {
           "actor": {
@@ -8056,6 +8498,62 @@
           "origination_fee_max_pct"
         ],
         "title": "PersonalLoanTerms",
+        "type": "object"
+      },
+      "PlacementDriftOut": {
+        "properties": {
+          "demo_page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DemoPageRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when the URL is one of this site's demo pages."
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "monitored": {
+            "title": "Monitored",
+            "type": "boolean"
+          },
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "placement_id",
+          "location",
+          "url",
+          "monitored",
+          "is_live",
+          "latest",
+          "demo_page"
+        ],
+        "title": "PlacementDriftOut",
         "type": "object"
       },
       "PlacementIn": {
@@ -8992,6 +9490,191 @@
         ],
         "title": "Severity",
         "type": "string"
+      },
+      "SnapshotOut": {
+        "description": "One drift check of a placement's page.",
+        "properties": {
+          "compared_version_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest approved version the page was compared with.",
+            "title": "Compared Version N"
+          },
+          "diff": {
+            "description": "Approved copy -> page, for a modified result.",
+            "items": {
+              "$ref": "#/components/schemas/DiffSegmentOut"
+            },
+            "title": "Diff",
+            "type": "array"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why a failed check failed (e.g. timeout, address_not_allowed).",
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "final_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Url"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/PageFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "reopened_item": {
+            "description": "This check sent the item to re-review.",
+            "title": "Reopened Item",
+            "type": "boolean"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for the daily sweep."
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when status is succeeded."
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0-100: how much of the approved copy the page keeps.",
+            "title": "Score"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DriftTrigger"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "placement_id",
+          "status",
+          "trigger",
+          "requested_by",
+          "requested_at",
+          "finished_at",
+          "url",
+          "final_url",
+          "http_status",
+          "title",
+          "compared_version_n",
+          "result",
+          "score",
+          "diff",
+          "findings",
+          "error_code",
+          "error_message",
+          "reopened_item"
+        ],
+        "title": "SnapshotOut",
+        "type": "object"
       },
       "SnippetPartOut": {
         "properties": {
@@ -11586,6 +12269,206 @@
         ]
       }
     },
+    "/api/demo/partner-pages": {
+      "get": {
+        "description": "The demo partner pages and whether each shows its edited variant (demo only).",
+        "operationId": "listDemoPages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DemoPageOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "List Demo Pages",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/demo/partner-pages/{slug}": {
+      "put": {
+        "description": "Lead or admin: \"Simulate edit\" publishes the page's edited variant; `edited: false` restores it (demo only).",
+        "operationId": "setDemoPageEdited",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoPageUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoPageOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Set Demo Page",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
     "/api/exports": {
       "post": {
         "description": "Build an xlsx of the filtered view in the background; poll `getExport`. Reviewers, leads, admins.",
@@ -13766,7 +14649,7 @@
     },
     "/api/items/fetch-url": {
       "post": {
-        "description": "Fetch a page's visible text to paste as copy. [workstream I/M: httpx + text extraction]",
+        "description": "Fetch a public page's visible text and title to prefill the copy. Static HTML or plain text only (no\nJavaScript rendering), through the SSRF guard (`drift.fetcher`). A refused or failed fetch is a 422 on `url`\nwith `details.reason`.",
         "operationId": "fetchCopyFromUrl",
         "parameters": [],
         "requestBody": {
@@ -13849,16 +14732,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15143,6 +16016,104 @@
         "summary": "Get Diff",
         "tags": [
           "items"
+        ]
+      }
+    },
+    "/api/items/{item_id}/drift": {
+      "get": {
+        "description": "The item's placements that have a web address, each with its latest drift check.",
+        "operationId": "getItemDrift",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDriftOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Item Drift",
+        "tags": [
+          "drift"
         ]
       }
     },
@@ -19634,6 +20605,104 @@
         "summary": "Confirm Takedown",
         "tags": [
           "items"
+        ]
+      }
+    },
+    "/api/placements/{placement_id}/drift-checks": {
+      "post": {
+        "description": "Check now: queue a check of the placement's page (the one in flight, if any). Poll `getItemDrift`.",
+        "operationId": "checkPlacementDrift",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "placement_id",
+            "required": true,
+            "schema": {
+              "title": "Placement Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotOut"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Check Now",
+        "tags": [
+          "drift"
         ]
       }
     },

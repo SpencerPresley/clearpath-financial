@@ -291,7 +291,9 @@ export const BulkAssignItemsResponse = zod.object({
 })
 
 /**
- * Fetch a page's visible text to paste as copy. [workstream I/M: httpx + text extraction]
+ * Fetch a public page's visible text and title to prefill the copy. Static HTML or plain text only (no
+ * JavaScript rendering), through the SSRF guard (`drift.fetcher`). A refused or failed fetch is a 422 on `url`
+ * with `details.reason`.
  * @summary Fetch Copy
  */
 export const fetchCopyFromUrlBodyUrlMin = 8;
@@ -1029,8 +1031,11 @@ export const getItemHistoryResponseEntriesItemTwofourPayloadEngineVersionDefault
 export const getItemHistoryResponseEntriesItemTwofourPayloadEvidenceAttachmentIdsDefault = [];
 export const getItemHistoryResponseEntriesItemTwofourPayloadLlmOverrideReasonDefault = ``;
 export const getItemHistoryResponseEntriesItemTwofourPayloadTermsVersionIdsDefault = [];
-export const getItemHistoryResponseEntriesItemThreezeroPayloadAffectedItemIdsDefault = [];
-export const getItemHistoryResponseEntriesItemFourzeroPayloadSeededItemsDefault = 0;
+export const getItemHistoryResponseEntriesItemThreezeroPayloadErrorCodeDefault = ``;
+export const getItemHistoryResponseEntriesItemThreezeroPayloadFindingsCountDefault = 0;
+export const getItemHistoryResponseEntriesItemThreezeroPayloadNewFindingsCountDefault = 0;
+export const getItemHistoryResponseEntriesItemThreetwoPayloadAffectedItemIdsDefault = [];
+export const getItemHistoryResponseEntriesItemFourtwoPayloadSeededItemsDefault = 0;
 
 export const GetItemHistoryResponse = zod.object({
   "entries": zod.array(zod.union([zod.object({
@@ -1152,7 +1157,8 @@ export const GetItemHistoryResponse = zod.object({
   "payload": zod.object({
   "generated_version_id": zod.union([zod.int(),zod.null()]).optional(),
   "offer_terms_id": zod.union([zod.int(),zod.null()]).optional(),
-  "reason": zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')
+  "reason": zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),
+  "snapshot_id": zod.union([zod.int(),zod.null()]).optional()
 }).describe('approved -> needs_rereview (live content).'),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("item.reopened").meta({ title: 'Type' })
@@ -1564,6 +1570,46 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "placement_id": zod.int(),
+  "snapshot_id": zod.int(),
+  "trigger": zod.enum(['scheduled', 'manual']).describe('What started a drift check: the daily sweep, or someone\'s "Check now".')
+}),
+  "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "type": zod.literal("placement.drift_check_requested").meta({ title: 'Type' })
+}),zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Null for system actions (sweeps, fan-out).'),
+  "at": zod.iso.datetime({"offset":true}),
+  "entity": zod.enum(['item', 'version', 'finding', 'comment', 'decision', 'placement', 'attachment', 'offer_terms', 'partner', 'user', 'import', 'export', 'email', 'system']).describe('What an Event is about.'),
+  "entity_id": zod.int(),
+  "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "id": zod.int(),
+  "payload": zod.object({
+  "compared_version_id": zod.union([zod.int(),zod.null()]).optional(),
+  "error_code": zod.string().default(getItemHistoryResponseEntriesItemThreezeroPayloadErrorCodeDefault),
+  "findings_count": zod.int().default(getItemHistoryResponseEntriesItemThreezeroPayloadFindingsCountDefault),
+  "new_findings_count": zod.int().default(getItemHistoryResponseEntriesItemThreezeroPayloadNewFindingsCountDefault),
+  "placement_id": zod.int(),
+  "result": zod.union([zod.enum(['unchanged', 'modified', 'missing']),zod.null()]).optional(),
+  "score": zod.union([zod.number(),zod.null()]).optional(),
+  "snapshot_id": zod.int(),
+  "status": zod.enum(['succeeded', 'failed'])
+}),
+  "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "type": zod.literal("placement.drift_checked").meta({ title: 'Type' })
+}),zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Null for system actions (sweeps, fan-out).'),
+  "at": zod.iso.datetime({"offset":true}),
+  "entity": zod.enum(['item', 'version', 'finding', 'comment', 'decision', 'placement', 'attachment', 'offer_terms', 'partner', 'user', 'import', 'export', 'email', 'system']).describe('What an Event is about.'),
+  "entity_id": zod.int(),
+  "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "id": zod.int(),
+  "payload": zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
   "owner_id": zod.int(),
@@ -1583,7 +1629,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemThreezeroPayloadAffectedItemIdsDefault),
+  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemThreetwoPayloadAffectedItemIdsDefault),
   "offer_terms_id": zod.int(),
   "previous_offer_terms_id": zod.union([zod.int(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
@@ -1756,7 +1802,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourzeroPayloadSeededItemsDefault)
+  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourtwoPayloadSeededItemsDefault)
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("demo.reset").meta({ title: 'Type' })

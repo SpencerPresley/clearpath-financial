@@ -81,7 +81,7 @@ whole-page diff); issue #14 brief.
 | `backend/drift/views.py` + `templates/drift/partner_page.html` | the public demo pages |
 | `backend/drift/api.py`, `schemas.py` | drift + demo routers |
 | `backend/drift/tasks.py` | `drift.run_check`, `drift.sweep` (daily), `drift.reconcile` |
-| `backend/drift/management/commands/seed_drift_demo.py` | approved demo items with monitored placements |
+| `backend/drift/demo.py` `seed_placement` | a monitored placement on a demo page, for L's demo seed |
 | `backend/reviews/models.py`, `migrations/0008_snapshot_drift.py` | Snapshot fields |
 | `backend/reviews/api.py` | `fetch-url` becomes async and real |
 | `frontend/src/features/submit/FetchFromUrl.tsx` | restored control |
@@ -193,7 +193,7 @@ reconcile(*, clock) -> ReconcileResult   # running > 10 min -> failed(stuck); pe
 `GET /items/{id}/drift` → `ItemDriftOut{placements: [PlacementDriftOut{placement_id, location, url, monitored,
 is_live, latest: SnapshotOut | null, demo_page: DemoPageOut | null}]}`; `POST /placements/{id}/drift-checks` → 202
 `SnapshotOut`; `GET /demo/partner-pages`, `PUT /demo/partner-pages/{slug}` `{edited}` (lead/admin). Public
-`GET /demo-partners/<slug>/` (Django view, no auth). `seed_drift_demo` command. `edge.tf` path pattern.
+`GET /demo-partners/<slug>/` (Django view, no auth). `demo.seed_placement` for L's seed. `edge.tf` path pattern.
 
 - [ ] Tests: API happy paths and 401/403/404/409/422; demo page shows original/edited copy; unknown slug 404;
   query count on `GET /items/{id}/drift`; contract test stub list updated; `make schema`.

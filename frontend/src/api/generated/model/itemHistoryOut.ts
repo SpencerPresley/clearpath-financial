@@ -10,6 +10,8 @@ import type { ChecksCompletedEventOut } from './checksCompletedEventOut';
 import type { CommentAddedEventOut } from './commentAddedEventOut';
 import type { DecisionRecordedEventOut } from './decisionRecordedEventOut';
 import type { DemoResetEventOut } from './demoResetEventOut';
+import type { DriftCheckedEventOut } from './driftCheckedEventOut';
+import type { DriftCheckRequestedEventOut } from './driftCheckRequestedEventOut';
 import type { EmailSentEventOut } from './emailSentEventOut';
 import type { ExportCreatedEventOut } from './exportCreatedEventOut';
 import type { FindingAcceptedEventOut } from './findingAcceptedEventOut';
@@ -46,5 +48,5 @@ import type { UserRolesChangedEventOut } from './userRolesChangedEventOut';
 import type { VersionCreatedEventOut } from './versionCreatedEventOut';
 
 export interface ItemHistoryOut {
-  entries: (ItemSubmittedEventOut | ItemResubmittedEventOut | ItemAssignedEventOut | ItemReviewStartedEventOut | ItemFieldsUpdatedEventOut | ItemRiskTierOverriddenEventOut | ItemReopenedEventOut | ItemExpiredEventOut | ApprovalExpiringEventOut | ItemWithdrawnEventOut | ItemNewRoundStartedEventOut | ItemImportedEventOut | VersionCreatedEventOut | ChecksCompletedEventOut | LlmCheckRequestedEventOut | LlmCheckStartedEventOut | LlmCheckRetryScheduledEventOut | LlmCheckSucceededEventOut | LlmCheckFailedEventOut | FindingAcceptedEventOut | FindingDismissedEventOut | FindingReopenedEventOut | CommentAddedEventOut | DecisionRecordedEventOut | PlacementRecordedEventOut | PlacementUpdatedEventOut | TakedownRequestedEventOut | TakedownConfirmedEventOut | AttachmentAddedEventOut | TermsPublishedEventOut | PartnerCreatedEventOut | PartnerUpdatedEventOut | UserAvailabilityChangedEventOut | UserCreatedEventOut | UserRolesChangedEventOut | UserActiveChangedEventOut | ImportCommittedEventOut | ExportCreatedEventOut | EmailSentEventOut | DemoResetEventOut)[];
+  entries: (ItemSubmittedEventOut | ItemResubmittedEventOut | ItemAssignedEventOut | ItemReviewStartedEventOut | ItemFieldsUpdatedEventOut | ItemRiskTierOverriddenEventOut | ItemReopenedEventOut | ItemExpiredEventOut | ApprovalExpiringEventOut | ItemWithdrawnEventOut | ItemNewRoundStartedEventOut | ItemImportedEventOut | VersionCreatedEventOut | ChecksCompletedEventOut | LlmCheckRequestedEventOut | LlmCheckStartedEventOut | LlmCheckRetryScheduledEventOut | LlmCheckSucceededEventOut | LlmCheckFailedEventOut | FindingAcceptedEventOut | FindingDismissedEventOut | FindingReopenedEventOut | CommentAddedEventOut | DecisionRecordedEventOut | PlacementRecordedEventOut | PlacementUpdatedEventOut | TakedownRequestedEventOut | TakedownConfirmedEventOut | DriftCheckRequestedEventOut | DriftCheckedEventOut | AttachmentAddedEventOut | TermsPublishedEventOut | PartnerCreatedEventOut | PartnerUpdatedEventOut | UserAvailabilityChangedEventOut | UserCreatedEventOut | UserRolesChangedEventOut | UserActiveChangedEventOut | ImportCommittedEventOut | ExportCreatedEventOut | EmailSentEventOut | DemoResetEventOut)[];
 }

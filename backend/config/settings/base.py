@@ -52,6 +52,9 @@ class Env(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     frontend_base_url: str = "http://localhost:5173"
+    # Where the demo partner pages are reachable, as the drift worker fetches them. Defaults to the frontend's
+    # origin: in production that is the CloudFront site, which routes /demo-partners/* to the app.
+    demo_partners_base_url: str | None = None
 
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
@@ -239,3 +242,4 @@ LOGGING = {
 # Exact "host:port" origins exempt from the fetcher's private-address and port rules. Empty everywhere except dev
 # (config/settings/dev.py), where the local stack fetches its own demo partner pages.
 DRIFT_FETCH_PRIVATE_ORIGINS: list[str] = []
+DEMO_PARTNERS_BASE_URL = env.demo_partners_base_url or env.frontend_base_url

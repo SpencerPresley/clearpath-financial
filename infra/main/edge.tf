@@ -3,8 +3,10 @@ locals {
   app_origin_id = "app-ec2"
 
   # Everything Django serves. Same-origin with the SPA, so session cookies and
-  # CSRF work without CORS.
-  app_path_patterns = ["/api/*", "/_allauth/*", "/accounts/*", "/django-admin/*"]
+  # CSRF work without CORS. /demo-partners/* are the drift monitor's public
+  # demo affiliate pages (plain Django views); the drift worker fetches them
+  # through this distribution like any partner page.
+  app_path_patterns = ["/api/*", "/_allauth/*", "/accounts/*", "/django-admin/*", "/demo-partners/*"]
 
   custom_domain_enabled = var.custom_domain != ""
 }

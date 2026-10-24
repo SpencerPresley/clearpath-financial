@@ -1,17 +1,17 @@
-"""Items, decisions, and library routers. Thin: parse, call a service or selector, return a schema.
-Stubs validate input and raise NotImplementedYet; the owning workstream is named in each."""
+"""Items, decisions, and library routers. Thin: parse, call a service or selector, return a schema."""
 
 from typing import Annotated
 
 from django.http import FileResponse, HttpRequest
 from ninja import File, Form, Query, Router, Status, UploadedFile
+from ninja.throttling import UserRateThrottle
 
 from accounts.api import current_user
 from audit.schemas import ItemHistoryOut
 from core.clock import SYSTEM_CLOCK
 from core.domain import AttachmentKind
-from core.errors import NotImplementedYet
-from core.schemas import ERRORS, STUB_ERRORS, PageLimit
+from core.schemas import ERRORS, PageLimit
+from drift import intake
 from reviews import assignment, decisions, placements, records, search, selectors, services, versions
 from reviews.filters import ItemFilter, ItemSort
 from reviews.schemas import (
@@ -100,10 +100,19 @@ def submit_item(request: HttpRequest, body: SubmitItemIn) -> Status[records.Item
     return Status(201, records.get_item_detail(item_id=result.item_id))
 
 
-@items_router.post("/items/fetch-url", response={200: FetchedCopyOut, **STUB_ERRORS}, operation_id="fetchCopyFromUrl")
-def fetch_copy(request: HttpRequest, body: FetchCopyIn) -> FetchedCopyOut:
-    """Fetch a page's visible text to paste as copy. [workstream I/M: httpx + text extraction]"""
-    raise NotImplementedYet("fetching copy from a URL")
+# Async: awaits the fetch on the event loop instead of holding the process's one sync thread (drift.intake).
+@items_router.post(
+    "/items/fetch-url",
+    response={200: FetchedCopyOut, **ERRORS},
+    operation_id="fetchCopyFromUrl",
+    throttle=[UserRateThrottle("20/m")],
+)
+async def fetch_copy(request: HttpRequest, body: FetchCopyIn) -> FetchedCopyOut:
+    """Fetch a public page's visible text and title to prefill the copy. Static HTML or plain text only (no
+    JavaScript rendering), through the SSRF guard (`drift.fetcher`). A refused or failed fetch is a 422 on `url`
+    with `details.reason`."""
+    copy = await intake.fetch_copy(body.url)
+    return FetchedCopyOut(url=copy.url, title=copy.title, content_text=copy.content_text)
 
 
 # --- item record -----------------------------------------------------------------------------------------------

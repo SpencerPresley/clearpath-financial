@@ -482,7 +482,9 @@ export const useBulkAssignItems = <TError = ErrorOut,
 }
 
 /**
- * Fetch a page's visible text to paste as copy. [workstream I/M: httpx + text extraction]
+ * Fetch a public page's visible text and title to prefill the copy. Static HTML or plain text only (no
+ * JavaScript rendering), through the SSRF guard (`drift.fetcher`). A refused or failed fetch is a 422 on `url`
+ * with `details.reason`.
  * @summary Fetch Copy
  */
 export const fetchCopyFromUrl = async (fetchCopyIn: FetchCopyIn, options?: Parameters<typeof customFetch>[1]): Promise<FetchedCopyOut> => {

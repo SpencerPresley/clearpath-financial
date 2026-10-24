@@ -13,4 +13,6 @@ urlpatterns = [
     path("_allauth/", include("allauth.headless.urls")),
     path("accounts/", include("allauth.urls")),
     path("django-admin/", admin.site.urls),
+    # Demo affiliate pages for the drift monitor (public, demo-only; CloudFront routes /demo-partners/* here).
+    path("demo-partners/", include("drift.urls")),
 ]
