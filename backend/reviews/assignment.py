@@ -106,11 +106,12 @@ def _loads(user_ids: Iterable[int], *, excluding_item_id: int) -> dict[int, int]
 
 
 def _previous_reviewer(item: ReviewItem) -> User | None:
-    """Who reviewed it last: the latest decision's approver, else whoever it's assigned to."""
+    """Who it goes back to: its current assignee (which respects a lead's manual reassignment while the item sat
+    with the marketer), else the approver of its latest decision (e.g. after the assignee was unassigned)."""
+    if item.assignee is not None:
+        return item.assignee
     decision = Decision.objects.filter(item=item).select_related("approver").order_by("-decided_at", "-pk").first()
-    if decision is not None:
-        return decision.approver
-    return item.assignee
+    return decision.approver if decision is not None else None
 
 
 def _can_review(user: User, item: ReviewItem) -> bool:

@@ -111,26 +111,43 @@ def test_nobody_eligible_goes_to_the_pool(submit: Submit, lead: User) -> None:
 
 
 @pytest.mark.django_db
-def test_sticky_returns_to_the_previous_reviewer(marketer: User, dana: User, sam: User, clock: FixedClock) -> None:
+def test_sticky_returns_to_the_previous_reviewer_despite_load(
+    marketer: User, dana: User, sam: User, clock: FixedClock
+) -> None:
     _load(dana, RiskTier.HIGH, RiskTier.HIGH)
-    item = make_item(marketer, assignee=sam, status=ItemStatus.SUBMITTED)
-    version = make_version(item)
-    Decision.objects.create(
-        item=item,
-        version=version,
-        outcome="changes_requested",
-        approver=dana,
-        reason="Fix",
-        ruleset_date="2026-07-21",
-        decided_at=clock.now(),
-    )
+    item = make_item(marketer, assignee=dana, status=ItemStatus.SUBMITTED)
 
     with transaction.atomic():
         result = auto_assign(item=item, actor=marketer, clock=clock, sticky=True)
 
     assert (result.assignee_id, result.mode) == (dana.pk, AssignmentMode.STICKY)
     assert result.reason == "Back to Dana, who reviewed it before"
-    assert _assigned(item.pk)[0]["previous_assignee_id"] == sam.pk
+    assert _assigned(item.pk)[0]["previous_assignee_id"] == dana.pk  # recorded anyway: it notifies her
+
+
+@pytest.mark.django_db
+def test_sticky_respects_a_manual_reassignment_then_falls_back_to_the_approver(
+    marketer: User, dana: User, sam: User, clock: FixedClock
+) -> None:
+    reassigned = make_item(marketer, assignee=sam, status=ItemStatus.SUBMITTED)
+    unassigned = make_item(marketer, status=ItemStatus.SUBMITTED)
+    for item in (reassigned, unassigned):
+        Decision.objects.create(
+            item=item,
+            version=make_version(item),
+            outcome="changes_requested",
+            approver=dana,
+            reason="Fix",
+            ruleset_date="2026-07-21",
+            decided_at=clock.now(),
+        )
+
+    with transaction.atomic():
+        to_sam = auto_assign(item=reassigned, actor=marketer, clock=clock, sticky=True)
+        to_dana = auto_assign(item=unassigned, actor=marketer, clock=clock, sticky=True)
+
+    assert (to_sam.assignee_id, to_sam.mode) == (sam.pk, AssignmentMode.STICKY)
+    assert (to_dana.assignee_id, to_dana.mode) == (dana.pk, AssignmentMode.STICKY)
 
 
 @pytest.mark.django_db
