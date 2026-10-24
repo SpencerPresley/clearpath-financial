@@ -3761,6 +3761,18 @@
           "action": {
             "$ref": "#/components/schemas/RowAction"
           },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The item commit created from this row; null before commit or if skipped.",
+            "title": "Item Id"
+          },
           "legacy_ref": {
             "anyOf": [
               {
@@ -3844,7 +3856,8 @@
           "outcome",
           "submitted_on",
           "partner",
-          "problem_count"
+          "problem_count",
+          "item_id"
         ],
         "title": "ImportPreviewRowOut",
         "type": "object"

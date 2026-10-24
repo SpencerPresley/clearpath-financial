@@ -140,6 +140,7 @@ class ImportPreviewRowOut(Schema):
     submitted_on: date | None
     partner: str | None
     problem_count: int
+    item_id: int | None = Field(description="The item commit created from this row; null before commit or if skipped.")
 
 
 class ImportPreviewOut(Schema):

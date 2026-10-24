@@ -2,17 +2,19 @@
  * Status, severity, source, and risk marks. Every one is icon + label (spec §5.2: color is never the
  * only signal); tone carries the §5.2 color meaning and lives in data-tone so tests and CSS share it.
  */
+import type { DecisionOutcome } from '../api/generated/model';
 import type { FindingSource, ItemStatus, RiskTier, Severity } from './domain';
 import { Icon } from './Icon';
 import type { IconKey } from './icons';
 
 export type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'error' | 'alert';
 
-interface Meta {
+export interface BadgeMeta {
   label: string;
   tone: Tone;
   icon: IconKey;
 }
+type Meta = BadgeMeta;
 
 export const STATUS_META: Record<ItemStatus, Meta> = {
   draft: { label: 'Draft', tone: 'neutral', icon: 'status.draft' },
@@ -44,7 +46,8 @@ export const RISK_META: Record<RiskTier, { label: string; icon: IconKey }> = {
   low: { label: 'Low risk', icon: 'risk.low' },
 };
 
-function Badge({ meta, className = 'app-badge' }: { meta: Meta; className?: string }) {
+/** Any icon + label mark with a §5.2 tone; the named badges below are this with a fixed vocabulary. */
+export function Badge({ meta, className = 'app-badge' }: { meta: Meta; className?: string }) {
   return (
     <span className={className} data-tone={meta.tone}>
       <Icon name={meta.icon} size={14} />
@@ -102,4 +105,19 @@ export function RiskTierBadge({ tier, short = false }: { tier: RiskTier; short?:
       className="app-badge app-badge-outline"
     />
   );
+}
+
+/**
+ * A decision's outcome (precedent hits: how the matched version was decided). Same tone and glyph as the
+ * status it produces, labelled with the outcome's own name ("Approved with edits").
+ */
+export const OUTCOME_META: Record<DecisionOutcome, Meta> = {
+  approved: { label: 'Approved', tone: 'success', icon: 'status.approved' },
+  approved_with_edits: { label: 'Approved with edits', tone: 'success', icon: 'status.approved' },
+  changes_requested: { label: 'Changes requested', tone: 'warning', icon: 'status.changes_requested' },
+  rejected: { label: 'Rejected', tone: 'error', icon: 'status.rejected' },
+};
+
+export function OutcomeBadge({ outcome }: { outcome: DecisionOutcome }) {
+  return <Badge meta={OUTCOME_META[outcome]} />;
 }

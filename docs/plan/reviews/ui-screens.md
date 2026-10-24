@@ -44,3 +44,48 @@ Found after the fixes, in the recaptured real-data screenshots, and fixed:
 - The drill heading stole focus on page load.
 - "Takedown unconfirmed" wrapped in a 7rem column, which is now 10rem.
 - The custom tooltip had no surface.
+
+## Library (`/library`)
+
+Screenshots: `library-<state>-<width>.png` and `import-<state>-<width>.png`, stubbed API states (`frontend/e2e/screenshots-library-import.spec.ts`), recaptured after the fixes. The review marked each finding FIX, PARTIAL or DEFER and flagged L1 and I1 as blockers; the other severities are the builder's.
+
+| ID | Severity | Finding | Resolution |
+|---|---|---|---|
+| L1 | blocker | `.app-chip-btn` sets `outline-style:none` in `@layer components`, so the global `[data-focus-visible]` ring in `@layer base` loses and tabbing through the chips shows nothing. | Fixed. `.app-chip-btn[data-focus-visible]` gets a 2px `--color-focus` outline inset by 2px, in J's theme section. The queue's own chip has the same bug; queue files untouched, reported to the J owner. |
+| L2 | should-fix | The export job id lived in `useState` inside `ExportControl`, which mounts only on the approved tab. Switching to Precedents and back lost "Building…" and the download. A row's pack state was lost the same way when a filter removed the row. | Fixed. `exportJobs.tsx` holds one record per key (`export`, `pack:<id>`) in a provider above `<Tabs>`. The mutation's own `onMutate`/`onSuccess`/`onError` write the record, so a control that unmounts mid-request still lands its job. `ExportStatus` renders on both tabs; the Export menu stays approved-only. Page state, not sessionStorage: a reload loses the job. Tests: tab switch keeps running → download; a row filtered away and back keeps its pack link. |
+| L3 | should-fix | The Legacy chip on Precedents: search covers only ever-approved versions and legacy items have none, so "Only" is always empty and "Exclude" does nothing. | Fixed. The chip is hidden on Precedents, `toSearchParams` never sends `is_legacy`, and `hasFilters` ignores the legacy choice there (a stale `legacy=only` in the URL can't show "Clear filters"). Tested. |
+| L4 | should-fix | The pack button sat in the "Matched v1 · Approved" row, reading as v1's pack, but the backend packs the item's latest approving decision. | Fixed. It sits in the head row after "Now [status]", labelled "Build item pack". |
+| L5 | should-fix | The "Running" chip filters on Placement dates while the column shows the intake planned run. | Renamed to "Placement running"; the column stays "Planned run". The two still measure different things (placements vs. the submitter's planned dates); that mismatch is recorded in the report. |
+| L6 | should-fix | On Precedents the Approved chip filters on the item's latest `approved_at`, not the matched version's date. Approved and Expires columns are missing. | Partly fixed. On Precedents the chip reads "Item last approved" with that description. The columns are deferred: `ItemRowOut` has no `approved_at` or `approval_expires_at`, and reviews/ belongs to the API-gaps worker. Recorded as an API gap. |
+| L7 | should-fix | `q` doesn't match `legacy_ref`, and `ItemRowOut` has no `legacy_ref`, so `MCR-26-045` can't be found. | Deferred: backend work in reviews/. Recorded as an API gap. |
+| L8 | should-fix | Label in Name: visible "Build pack", accessible name "Evidence pack for CP-1088". | Fixed. The accessible name is the visible label plus the key: "Build pack for CP-1088" in the table, "Build item pack for CP-1088" on a precedent. |
+| L9 | should-fix | Layout shift at 1280: with chips set, "Clear filters" wrapped and dropped the table 34px; Phrase→Text wrapped the long hint and dropped results 20px. | Fixed. The filter row is `flex-nowrap`; empty chips keep their labels, set chips shrink (`max-w-56 min-w-24`, truncating), and "Clear filters" is `ml-auto shrink-0` at the row's end. The mode hint has its own `h-4` truncating line under the search box in both modes. |
+| L10 | should-fix | Product (7.5rem) truncated "Mortgage preq…"; title links had no full text. | Fixed with a deviation: Product is 8.5rem, but the rem came from Channel (7.5→7rem; "Affiliate page" still fits), not Partner or Evidence pack, because the pack cell's "Download" link needs 7.5rem. "Mortgage prequalification" still truncates at 8.5rem, so the cell keeps its `title`. Title links (table and precedents) carry `title`. Total fixed width unchanged (46.5rem), so 1280 doesn't scroll sideways. |
+| L11 | should-fix | Precedent skeleton 93px per hit against 121px real. | Fixed. The skeleton has the head row with the pack slot, two 20px snippet lines and a badge-height meta row: 121px per hit, measured on the recaptured screenshot. |
+| L12 | nit | The chip read "Legacy: Exclude legacy". | Fixed. Options are "Excluded" and "Only". |
+| L13 | nit | `title` on the non-focusable Legacy badge. | Fixed. Removed. |
+| L14 | nit | Three names for one view: "Precedents", "Search past approvals", "Search approved copy". | Fixed. The field is "Search precedents"; the idle state is "Search precedents" and defines a precedent. |
+| L15 | should-fix | "Retry export" re-ran with the current filters. | Fixed. The store keeps the failed request body (`ExportIn`) and Retry re-sends it. Tested: export with Email, change the filter to SMS, Retry posts the Email body. |
+| L16 | nit | The FilterChip check mark used `action.approve`, the decision glyph. | Fixed. New `action.check` key (CheckFat, bold), used in `ui/FilterChip.tsx` only. |
+| L17 | nit | (taste) | Left as is, as asked. |
+
+## Import (`/import`)
+
+| ID | Severity | Finding | Resolution |
+|---|---|---|---|
+| I1 | blocker | Same lost focus ring on `.app-import-steps-btn`. | Fixed with the same rule (one selector list with L1's). |
+| I2 | should-fix | The Warnings header said "Imported with a note", but the backend files skipped rows (duplicate, not-a-data-row, already-imported) as warnings and info. | Fixed. Group effect text is gone. Problem tables have an Outcome column, Imported or Skipped, from `preview.rows[].action` by `row_number`; "—" for sheet-level problems. Tested on the Info group (row 19 → Skipped). |
+| I3 | should-fix | Import status badges were label-only, and "Imported" used approval green. | Fixed. They go through the shared `Badge` (now exported from `ui/badges.tsx`) with new `job.*` glyphs: Uploaded/Mapped neutral with a dashed circle, Importing info with an hourglass, Imported neutral with a checked square, Failed error with a crossed square. |
+| I4 | should-fix | After commit the summary showed only created rows; the post-commit warnings vanished. | Fixed. Below the items table, collapsed: "Skipped (n)" (row, Request ID, title, why) and "Warnings (n)" (the problem table with outcomes). Tested both collapsed and the skipped reasons. |
+| I5 | should-fix | "Open in library" lands on Approved to run with legacy=only: 145 of 178 items. | Fixed. "Approved legacy items (n)", n = created rows whose status is approved (the approved view's scope is current status approved, `reviews/selectors.py` `LibraryScope.APPROVED_TO_RUN`). Hidden when n is 0. Caveat: the link shows every approved legacy item, so after two different imports it lists more than this import's n. |
+| I6 | should-fix | Recent imports didn't poll. | Fixed. `refetchInterval` 2s while any row is committing, off otherwise. Tested: a committing row turns into its result, then polling stops. |
+| I7 | should-fix | The error copy says "map it or the row is skipped", but the only route to Values was the step list, and clickable steps looked like the others. | Fixed. "Map N values" (secondary) sits next to the import button while `preview.unmapped` is non-empty and goes to the Values step (tested). Pickable steps are primary text and underline on hover. |
+| I8 | nit | "Importing 178 rows…". | Fixed. "Importing 178 items…". |
+| I9 | nit | Done steps showed a number. | Fixed. A check glyph, plus sr-only "Done:". |
+| I10 | nit | Severity group headers had no glyph. | Fixed. feedback.error, severity.warning, feedback.info, tinted by severity. |
+| I11 | should-fix | Problem messages truncated. | Fixed. The message cell wraps (`whitespace-normal`, `text-wrap: pretty`). |
+| I12 | should-fix | "Save and continue" sat below the fold with 18 columns. | Fixed. The columns step's actions are a sticky footer at the bottom of the scrolling main. |
+| I13 | nit | "with the usual mess" and a hard-coded 180. | Fixed. "The team's 2025–26 review tracker, with the tracker's known inconsistencies." No count (no API returns it before loading). |
+| I14 | should-fix (orchestrator) | `import-preview-errors` showed "4 Blocked by errors" and "4 rows with errors are skipped" above an Errors table listing 2 rows. | Fixed. The cause was the fixture: its counts were typed by hand (`blocked: 4`) next to 2 error problems. The backend cannot produce this: a row is BLOCKED exactly when it has an ERROR problem (`normalize.py` `_action`), and the preview returns every row's problems. `test_preview_blocked_count_equals_the_rows_its_errors_name` checks this with 3 errors on 2 rows. The fixture now derives `blocked` from its own error rows (6 errors on 5 rows, matching its unmapped-value counts). The group header names rows when a row has more than one problem ("Errors · 6 in 5 rows"), so it agrees with "5 rows with errors are skipped"; a test checks that the listed row numbers equal `blocked`. |
+
+Found while recapturing, and fixed: the shrinking filter row first truncated empty chips ("Prod…"); only set chips shrink now. The pack column's "Download" link overflowed 7rem.

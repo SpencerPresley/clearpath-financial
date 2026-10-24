@@ -10,6 +10,8 @@ import type { RowAction } from './rowAction';
 
 export interface ImportPreviewRowOut {
   action: RowAction;
+  /** The item commit created from this row; null before commit or if skipped. */
+  item_id: number | null;
   legacy_ref: string | null;
   outcome: DecisionOutcome | null;
   partner: string | null;

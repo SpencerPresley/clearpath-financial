@@ -162,6 +162,32 @@ def test_committed_preview_shows_what_commit_did(committed: int, admin_user: Use
     }
 
 
+def test_committed_preview_links_each_created_row_to_its_item(committed: int, admin_user: User) -> None:
+    preview = selectors.get_preview(viewer=admin_user, job_id=committed)
+
+    created = [r for r in preview.rows if r.action is RowAction.CREATE]
+    assert len(created) == 178
+    items = {i.pk: i.legacy_ref for i in ReviewItem.objects.only("legacy_ref")}
+    assert all(r.item_id is not None and items[r.item_id] == r.legacy_ref for r in created)
+    assert all(r.item_id is None for r in preview.rows if r.action is not RowAction.CREATE)
+
+
+def test_committed_preview_reads_item_ids_in_one_query(
+    committed: int, admin_user: User, django_assert_max_num_queries: Callable[..., AbstractContextManager[Any]]
+) -> None:
+    with django_assert_max_num_queries(3):  # the job, its stored rows, nothing per row
+        selectors.get_preview(viewer=admin_user, job_id=committed)
+
+
+def test_preview_before_commit_has_no_item_ids(admin_user: User, clock: FixedClock) -> None:
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+
+    preview = selectors.get_preview(viewer=admin_user, job_id=job_id)
+
+    assert preview.rows
+    assert all(r.item_id is None for r in preview.rows)
+
+
 @pytest.mark.parametrize("app_spelling", ["lendcompare", "Lend Compare", "Lend-Compare"])
 def test_existing_partners_are_reused_not_duplicated(
     admin_user: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit, app_spelling: str
@@ -294,6 +320,25 @@ def test_commit_refuses_blocked_rows_unless_skipping(
     assert ReviewItem.objects.count() == 177
     assert not ReviewItem.objects.filter(legacy_ref="MCR-25-001").exists()
     assert ImportRow.objects.get(job_id=job_id, row_number=2).action == RowAction.BLOCKED.value
+
+
+def test_preview_blocked_count_equals_the_rows_its_errors_name(admin_user: User, clock: FixedClock) -> None:
+    """The preview's "blocked" count and its error list describe the same rows, even when one row has two errors
+    (the frontend shows "3 errors · 2 rows" and "2 rows with errors are skipped" from these)."""
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+    job = ImportJob.objects.get(pk=job_id)
+    tracker = job.workbook["tracker"]
+    status, title = tracker["headers"].index("Status"), tracker["headers"].index("Asset Name / File Link")
+    tracker["rows"][0]["cells"][status] = {"text": "On hold"}  # r2: one error
+    tracker["rows"][1]["cells"][status] = {"text": "On hold"}  # r3: two errors
+    tracker["rows"][1]["cells"][title] = {}  # blank, as the reader stores it
+    job.save()
+
+    preview = selectors.get_preview(viewer=admin_user, job_id=job_id)
+    errors = [p for p in preview.problems if p.severity.value == "error"]
+    assert len(errors) == 3
+    assert preview.counts.blocked == len({p.row_number for p in errors}) == 2
+    assert {r.row_number for r in preview.rows if r.action is RowAction.BLOCKED} == {2, 3}
 
 
 def test_a_failed_commit_rolls_back_and_can_be_retried(

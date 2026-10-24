@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ImportRouteImport } from './routes/import'
+import { Route as LibraryRouteImport } from './routes/library'
 import { Route as MetricsRouteImport } from './routes/metrics'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as DevDesignRouteImport } from './routes/dev/design'
@@ -20,6 +22,16 @@ import { Route as MineItemIdResubmitRouteImport } from './routes/mine.$itemId.re
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportRoute = ImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MetricsRoute = MetricsRouteImport.update({
@@ -55,6 +67,8 @@ const MineItemIdResubmitRoute = MineItemIdResubmitRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
@@ -64,6 +78,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
@@ -74,6 +90,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/import': typeof ImportRoute
+  '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
   '/submit': typeof SubmitRoute
   '/dev/design': typeof DevDesignRoute
@@ -85,6 +103,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/import'
+    | '/library'
     | '/metrics'
     | '/submit'
     | '/dev/design'
@@ -94,6 +114,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/import'
+    | '/library'
     | '/metrics'
     | '/submit'
     | '/dev/design'
@@ -103,6 +125,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/import'
+    | '/library'
     | '/metrics'
     | '/submit'
     | '/dev/design'
@@ -113,6 +137,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ImportRoute: typeof ImportRoute
+  LibraryRoute: typeof LibraryRoute
   MetricsRoute: typeof MetricsRoute
   SubmitRoute: typeof SubmitRoute
   DevDesignRoute: typeof DevDesignRoute
@@ -128,6 +154,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import': {
+      id: '/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof ImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/metrics': {
@@ -177,6 +217,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ImportRoute: ImportRoute,
+  LibraryRoute: LibraryRoute,
   MetricsRoute: MetricsRoute,
   SubmitRoute: SubmitRoute,
   DevDesignRoute: DevDesignRoute,
