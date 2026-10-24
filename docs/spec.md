@@ -104,7 +104,60 @@ most:
 - **The event log doubles as the outbox.** Side effects are dispatched from events. Handlers are
   idempotent, keyed by event id, because delivery is at least once.
 
-### 4.2 Feature areas and acceptance
+### 4.2 Rulings from the builder check
+
+The builder check's questions are in `plan/reviews/spec-builder-check.md`. These are the orchestrator's
+calls; each can be reversed cheaply.
+
+1. **Offer terms in copy are detected, not tokenized.**
+   - All copy is literal text. Affiliate copy can't contain our tokens.
+   - A code check extracts rate, fee, and representative-example claims as `TermsRef(field, span, value)`.
+     An item "quotes v12" if it has `TermsRef`s to v12.
+   - Fast-track replaces those spans and recomputes the example payment.
+   - `OfferTerms.values` is validated by a per-product typed schema:
+     - **PL:** APR min/max, amount min/max, terms in months, origination fee range.
+     - **CC:** purchase APR min/max (variable), intro APR and months, balance-transfer fee, annual fee.
+     - **MTG prequal:** no rate terms; mortgage ads are checked by rules only.
+2. **Live and not live.**
+   - An item is live if it has a placement with `first_run <= today <= (last_run or ∞)` and no confirmed
+     takedown.
+   - The marketer records placements after approval.
+   - On a terms change or approval expiry: live → `needs_rereview`, not live → `expired`.
+3. **Severity and gates.**
+   - Rules and findings carry `severity: blocking | warning`.
+   - Human checklist items are findings with `source=human`.
+   - **Approve and Approve with edits** require every finding, warnings included, to be accepted or dismissed
+     with a reason. The record must show everything was looked at.
+   - **Request changes and Reject** don't require triage.
+   - Approve is blocked while the AI check is pending. If it failed, the reviewer can approve with a recorded
+     override reason.
+4. **Checks on generated and reviewer-authored versions.**
+   - Code checks run on every version, synchronously.
+   - Reviewer-authored versions also get the AI check.
+   - Fast-track versions skip the AI check, since the diff is numeric spans that code verified. The decision
+     records "AI review carried from vN".
+   - A finding identical to one already dismissed (same rule, same quote) carries the dismissal forward,
+     marked as carried.
+   - Bulk fast-track approve skips any item with open findings. Those go to the normal lane.
+5. **Risk tier, no manual priority.**
+   - `risk_tier` (high/medium/low) is derived at intake: affiliate/partner channels, mortgage, and prescreen
+     are high; paid ads and landing pages are medium; the rest are low.
+   - Reviewers and leads can override it inline, which records an event.
+   - Queue order is computed (see Review below).
+6. **Pulled content.** Pull requests a takedown, and the item goes to `withdrawn` (neutral, with a distinct
+   icon). "Time to fix live content" stops at the confirmed takedown or the approval. The marketer can start a
+   new round from `withdrawn`.
+7. **Legacy imports and which rules apply.**
+   - Imported items are metadata-only (`is_legacy`). They feed metrics, the archive, and partner history,
+     and are excluded from the expiry sweep and terms fan-out.
+   - Demo richness comes from seed items with real copy (workstream L).
+   - "Applicable" rules are those checkable in text for California:
+     - Regs-table rows 12 and 17 are human checklist items.
+     - Row 13 (NMLS) is out.
+     - Rows 10, 11, and 14 check for an evidence attachment of the right `kind`, so the rule context includes
+       attachment kinds as well as the text.
+
+### 4.3 Feature areas and acceptance
 
 Each area below is a workstream (§8). The acceptance lines are what "done" means.
 
@@ -127,7 +180,7 @@ Each area below is a workstream (§8). The acceptance lines are what "done" mean
 - **Every check result says where it came from:** code, AI, or human.
 
 **Review (reviewer)**
-- The queue opens to "My queue", sorted by priority then age. Re-reviews of live content come first.
+- The queue opens to "My queue", sorted by: re-reviews of live content first, then risk tier, then age.
 - The review screen shows the copy with highlighted spans and the findings panel (accept, or dismiss with a
   reason), plus comments, version compare, the linked offer terms, evidence, and history.
 - Decisions: Approve, Approve with edits, Request changes, Reject. Each needs a reason. Approve needs zero

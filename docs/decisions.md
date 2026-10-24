@@ -82,14 +82,14 @@ Why: code is exact and free for numbers. It's also immune to prompt injection. A
 No model has a tool or output field that changes status. Submitted content is passed to models as marked data, never as instructions. Only a human records a decision.
 
 ### Approvals are tied to offer terms (the differentiator)
-Each `Decision` records the `OfferTerms` versions the item quotes. When terms change, every approved item still on the old version is flagged for re-review.
+Each `Decision` records the `OfferTerms` versions the item quotes. When terms change, every approved item quoting the old version is affected: live items go to re-review, items not live expire (spec §4.2).
 
 None of the roughly 14 vendors surveyed documents this (see `research/market.md`). That's absence from their marketing pages, not proof nobody does it.
 
 It also falls out of a compliance requirement. Reg N 1014.5 requires nonbank mortgage advertisers to keep records of the products and terms available when the ad ran, plus every materially different version, for 24 months **from the last date the ad ran**. So placements need run dates.
 
 ### Rates are stored once, but terms changes are never auto-published
-Offer values are tokens (`{{PL_APR_FLOOR}}`). A terms change generates v+1 of each affected item, with values substituted and representative examples recomputed. For example, $10,000 / 36 months / 12.99% APR comes to $337/mo, so a new APR means a new payment amount.
+Offer values are detected in the copy, not typed as tokens: affiliate copy arrives as literal text ("12.99% APR"), so a code check extracts each rate/fee/example claim into a `TermsRef` (field + span). A terms change generates v+1 of each affected item by replacing those spans, with representative examples recomputed. For example, $10,000 / 36 months / 12.99% APR comes to $337/mo, so a new APR means a new payment amount.
 
 Those versions go to a **fast-track lane**: the diff shows only the token changes, and the reviewer approves with one click.
 
@@ -134,7 +134,7 @@ The reviewer's edits create v+1 authored by the reviewer, and that's the version
 ### Ergonomics: don't lose to the spreadsheet
 Friction only where compliance requires it, which means only at the decision.
 - The queue is a dense table: every column sortable and filterable, column chooser, saved views.
-- Low-stakes fields (assignee, priority, tags, notes) are edited inline.
+- Low-stakes fields (assignee, tags, notes) are edited inline; risk tier by reviewers and leads, with an event.
 - Bulk assign and bulk fast-track approval.
 - **Export any view to xlsx.** Don't compete with Excel on analysis.
 - The decision form is prefilled from accepted findings and the item's attachments.

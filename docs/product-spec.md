@@ -24,15 +24,18 @@ A user's roles are stored as a list, so a future `partner` role is an addition, 
 ```
 User(name, email, roles[])
 Partner(name, type: affiliate | lead_gen | marketplace, status)
-OfferTerms(product, version, apr_floor, apr_ceiling, fees{}, effective_from, effective_to)
-Rule(id, citation, kind: code | llm | human, jurisdiction, products[], channels[], effective_from)
-ReviewItem(title, product, channel, partner_id?, markets[], owner, assignee, status, round,
+OfferTerms(product, version, effective_range, values)   -- values validated by a per-product typed schema (see spec §4.2)
+TermsRef(version_id, terms_id, field, span, quoted_value)  -- a rate/fee/example claim found in the copy
+Rule(id, citation, kind: code | llm | human, severity: blocking | warning, jurisdiction, products[], channels[],
+     effective_from)
+ReviewItem(title, product, channel, partner_id?, markets[], owner, assignee, status, round, risk_tier,
+           is_legacy, legacy_ref?, llm_check_status,
            tags[], notes, reopen_reason?)
 Version(item_id, n, content_text, author, created_at, terms_refs[])
 Attachment(owner: item | version | partner | decision,
            kind: creative | substantiation | agreement | rate_sheet | criteria | screenshot | other,
            file, sha256, uploaded_by, at)                      -- immutable; "replace" adds a row
-Finding(version_id, rule_id, source: code | llm, span, quote, message, suggested_fix,
+Finding(version_id, rule_id, source: code | llm | human, severity, span?, quote?, message, suggested_fix,
         state: open | accepted | dismissed, reason, resolved_by)
 Comment(version_id, span?, author, body)
 Decision(version_id, outcome: approved | approved_with_changes | changes_requested | rejected,
@@ -53,7 +56,9 @@ draft → submitted → in_review → changes_requested → (new version) → su
                               ↘ approved | rejected
 approved → needs_rereview     (automatic: terms changed, approval expiring, drift found; only if live)
 approved → expired            (approval expired with no active placement)
-needs_rereview → fast-track approve | pull (takedown) | reaffirm (same version) | in_review
+needs_rereview → fast-track approve | pull (→ withdrawn) | reaffirm (same version) | in_review
+approved (not live) → expired  (terms changed or approval expired)
+withdrawn → draft v+1 → submitted   (marketer starts a new round)
 ```
 
 - **Approve-with-changes:** the reviewer's edits create v+1, authored by the reviewer, and that version is the one approved.
@@ -63,7 +68,7 @@ needs_rereview → fast-track approve | pull (takedown) | reaffirm (same version
 
 | Screen | Who | What it does |
 |---|---|---|
-| **Queue** | Reviewer, Lead | A dense table: every column sortable and filterable, column chooser, saved views (my queue, unassigned, waiting >3 days, needs re-review). Shows each item's age and open-finding count. Low-stakes fields (assignee, priority, tags, notes) are edited inline. Bulk actions. A stats strip at the top. Clicking a row opens a **preview drawer**. **Board toggle** (see below). |
+| **Queue** | Reviewer, Lead | A dense table: every column sortable and filterable, column chooser, saved views (my queue, unassigned, waiting >3 days, needs re-review). Shows each item's age and open-finding count. Low-stakes fields (assignee, tags, notes; risk tier for reviewers and leads) are edited inline. Bulk actions. A stats strip at the top. Clicking a row opens a **preview drawer**. **Board toggle** (see below). |
 | **New submission** | Marketer | Product, channel, partner, markets, planned run dates, copy (pasted, or fetched from a URL), optional mockup, evidence uploads. **Code checks run live as the marketer types.** |
 | **My submissions** | Marketer | What's waiting on me, and why. Replaces "any update?" emails. |
 | **Review** | Reviewer | See the layout below. |
@@ -102,7 +107,7 @@ The only drag allowed is Submitted → In review ("claim"). Every other move ope
 | Submit, or new version | Code checks run synchronously. LLM checks run as a background job (a few seconds). Quoted rates are linked to `OfferTerms` versions. Resubmitting bumps the round. The assignee is notified. |
 | Finding accepted | It becomes a required change in the request-changes message. |
 | Decision | Blocked while any finding is open. Records terms versions, rule-set date, evidence, and expiry. Notifies the submitter. |
-| New `OfferTerms` version | Generates v+1 for affected live items (tokens substituted, representative examples recomputed). Sets them to `needs_rereview(terms_changed)` in the fast-track lane. |
+| New `OfferTerms` version | For every approved, non-legacy item with `TermsRef`s to the old version: generate v+1 by replacing the referenced spans and recomputing representative examples. Live items → `needs_rereview(terms_changed)` in the fast-track lane; not-live items → `expired(terms_changed)`, with the generated version offered when the marketer resubmits. |
 | Daily sweep | Expiry warnings at 30 days. Expired items move to `needs_rereview` (if live) or `expired`. Retention dates updated. Drift fetch (stretch). |
 | Every action | Writes an `Event`, which feeds the audit trail, notifications, and metrics. |
 
