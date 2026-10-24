@@ -166,7 +166,9 @@ def item_message(ctx: RuleContext, rules: Sequence[LlmRule], code_findings: Sequ
         ctx.text,
         f"</{tag}>",
         "",
-        f"The ad copy is over. Review the text inside <{tag}> against the applicable rules and call "
-        f"{REPORT_TOOL_NAME}.",
+        (
+            f"The ad copy is over. Review the text inside <{tag}> against the applicable rules and call "
+            f"{REPORT_TOOL_NAME}."
+        ),
     ]
     return HumanMessage(content="\n".join(sections))

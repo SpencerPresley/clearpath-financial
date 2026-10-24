@@ -45,7 +45,7 @@ class LlmRule:
     partner_only: bool = False  # applies only to partner content (mirrors endorsement.material_connection)
 
 
-def _spec(
+def _spec(  # noqa: PLR0913 - keywords mirror RuleSpec's facets
     rule_id: str,
     *,
     title: str,
@@ -98,10 +98,10 @@ CREDIT_INQUIRY_SCOPE = LlmRule(
     ),
     guidance=(
         "Checking a rate uses a soft inquiry that does not affect credit scores; applying for or accepting the "
-        "credit involves a hard inquiry that can. Flag a credit-impact claim (\"won't affect your credit\", \"no "
+        'credit involves a hard inquiry that can. Flag a credit-impact claim ("won\'t affect your credit", "no '
         'credit check", "zero impact on your score", or any paraphrase) that is worded to cover applying, '
         'approval or the whole process: "Apply with no impact to your credit", "Get approved without a credit '
-        "check\". Do not flag a claim explicitly limited to checking a rate or prequalifying (\"Checking your rate "
+        'check". Do not flag a claim explicitly limited to checking a rate or prequalifying ("Checking your rate '
         "won't affect your credit score\"). Quote the claim."
     ),
     default_message="This credit-impact claim may reach past the soft-pull step; limit it to checking a rate.",
@@ -120,7 +120,7 @@ MATERIAL_CONNECTION = LlmRule(
         "This content is published by a partner (affiliate, lead generator, marketplace or influencer) that is "
         "paid by ClearPath. Flag when that paid relationship is not disclosed clearly and before or beside the "
         'endorsement: a vague disclosure ("we work with partners", "#sp", "#collab", "thanks ClearPath"), one '
-        "placed only after the endorsement or behind a link, or a claim that contradicts it (\"unbiased\", "
+        'placed only after the endorsement or behind a link, or a claim that contradicts it ("unbiased", '
         '"independent review", "not sponsored"). Influencer posts need wording like "#ad" or "Paid partnership '
         'with ClearPath" near the start. Do not flag a clear disclosure placed before or beside the endorsement. '
         "Quote the inadequate disclosure or the contradicting claim; if there is no disclosure at all, quote the "
@@ -156,15 +156,13 @@ NET_IMPRESSION = LlmRule(
     spec=_spec(
         "llm.net_impression",
         title="Overall impression matches the actual offer",
-        citation=(
-            "12 U.S.C. 5531, 5536(a)(1)(B); Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3"
-        ),
+        citation=("12 U.S.C. 5531, 5536(a)(1)(B); Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3"),
         url=URL_5536,
         effective_from=REGZ_1026_16,
     ),
     guidance=(
         "Judge what a reasonable consumer takes away from the copy as a whole. Flag a specific express or implied "
-        "claim likely to mislead about the cost, availability, speed or nature of the credit: \"free money\" or "
+        'claim likely to mislead about the cost, availability, speed or nature of the credit: "free money" or '
         '"cash gift" for a loan; "instant approval" or "money in minutes" stated without limits; "no fees" or '
         '"no hidden fees" when the offer terms include a fee; "bad credit OK" or "everyone qualifies" implying '
         'approval regardless of credit; "lowest rates anywhere" or "#1 lender" with no stated basis; "wipe out '
@@ -245,7 +243,5 @@ def _is_partner_content(ctx: RuleContext) -> bool:
 
 def applicable_rules(ctx: RuleContext) -> tuple[LlmRule, ...]:
     return tuple(
-        rule
-        for rule in LLM_RULES
-        if applies(rule.spec, ctx) and (not rule.partner_only or _is_partner_content(ctx))
+        rule for rule in LLM_RULES if applies(rule.spec, ctx) and (not rule.partner_only or _is_partner_content(ctx))
     )

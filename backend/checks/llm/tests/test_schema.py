@@ -76,7 +76,7 @@ def test_tool_is_anthropic_format_with_descriptions():
 def test_parses_valid_call():
     parsed = parse_report(_report(_item()))
     assert parsed.output_valid
-    assert parsed.items == (RawFinding(**_item()),)
+    assert parsed.items == (RawFinding.model_validate(_item()),)
     assert parsed.dropped == ()
 
 
@@ -94,7 +94,7 @@ def test_bad_item_dropped_others_kept():
     not_an_object = "llm.net_impression free money"
     parsed = parse_report(_report(good, missing_quote, wrong_type, not_an_object))  # type: ignore[arg-type]
     assert parsed.output_valid
-    assert parsed.items == (RawFinding(**good),)
+    assert parsed.items == (RawFinding.model_validate(good),)
     assert [d.reason for d in parsed.dropped] == [DropReason.MALFORMED] * 3
     assert parsed.dropped[0].rule_id == "llm.net_impression"
     assert parsed.dropped[1].quote == "free money"

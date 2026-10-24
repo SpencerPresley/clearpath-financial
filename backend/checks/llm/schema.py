@@ -10,6 +10,7 @@ or string constraints, no `anyOf`. Turning on `strict` is then a flag, not a sch
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -65,7 +66,7 @@ class ParsedOutput:
 _STRING = "string"
 
 
-def report_tool() -> dict[str, object]:
+def report_tool() -> dict[str, Any]:
     """Anthropic-format tool definition (passed through `bind_tools` unchanged)."""
     item = {
         "type": "object",
@@ -135,7 +136,9 @@ def _parse_items(findings: list[object]) -> tuple[list[RawFinding], list[Dropped
         except ValidationError as error:
             dropped.append(
                 DroppedFinding(
-                    DropReason.MALFORMED, _str_or_none(raw, "rule_id"), _str_or_none(raw, "quote"),
+                    DropReason.MALFORMED,
+                    _str_or_none(raw, "rule_id"),
+                    _str_or_none(raw, "quote"),
                     _validation_detail(error),
                 )
             )

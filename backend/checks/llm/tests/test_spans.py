@@ -60,9 +60,12 @@ def test_empty_quote_dropped():
 @pytest.mark.parametrize(
     ("text", "quote"),
     [
-        ("Rates won’t affect your score", "won't affect"),  # curly apostrophe in copy, straight in quote
-        ("Borrow up to $50,000", "up to $50,000"),  # NBSP in copy, space in quote
-        ("APRs 7.49%–35.99%", "7.49%-35.99%"),  # en dash in copy, hyphen in quote
+        (
+            "Rates won\N{RIGHT SINGLE QUOTATION MARK}t affect your score",
+            "won't affect",
+        ),  # curly apostrophe in copy, straight in quote
+        ("Borrow up to\N{NO-BREAK SPACE}$50,000", "up to $50,000"),  # NBSP in copy, space in quote
+        ("APRs 7.49%\N{EN DASH}35.99%", "7.49%-35.99%"),  # en dash in copy, hyphen in quote
     ],
     ids=["apostrophe", "nbsp", "dash"],
 )
@@ -85,9 +88,9 @@ def test_emoji_itself_is_quotable():
 
 
 def test_combining_characters_are_separate_code_points():
-    text = "Se habla español"  # n + combining tilde, not the precomposed ñ
-    assert anchor_quote(text, "español", 9, 16) is SpanRejection.QUOTE_NOT_FOUND
-    assert anchor_quote(text, "español", 9, 17) == Anchor(Span(9, 17), reanchored=False)
+    text = "Se habla espan\N{COMBINING TILDE}ol"  # n + combining tilde, not the precomposed letter
+    assert anchor_quote(text, "espa\N{LATIN SMALL LETTER N WITH TILDE}ol", 9, 16) is SpanRejection.QUOTE_NOT_FOUND
+    assert anchor_quote(text, "espan\N{COMBINING TILDE}ol", 9, 17) == Anchor(Span(9, 17), reanchored=False)
 
 
 def test_case_sensitive():
