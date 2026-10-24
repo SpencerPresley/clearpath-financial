@@ -7,6 +7,16 @@
 > oracle and drift on problem kinds and severities. Export and evidence packs share the job model and download
 > path. One fresh reviewer over the whole branch before the PR supplies the independent read.
 
+> **Deviations after review** (detail in `docs/plan/reviews/import-export.md`):
+> - Upload cap 5 MB (not 10); reads bounded to the header's width, and a used range over 10,000 rows below the
+>   header is refused.
+> - `reviews/selectors.py` (E's): the implicit queue excludes legacy items, matching `queue_stats`.
+> - `ImportMappingIn.status_values` / `value_mappings`: omitted or null keeps the saved list; two columns on one
+>   field are refused.
+> - Marketers' evidence packs list partner-owned evidence by hash only (ledger attachment ruling).
+> - Tasks have `soft_time_limit=270`; a `running` export older than the hard limit is reclaimed.
+> - Exported strings are always text (`data_type="s"`), illegal control characters stripped.
+
 **Goal:** Admins migrate the legacy Excel tracker into legacy items (upload or "Load sample tracker", map
 columns and values, preview problems, commit as a background job); reviewers export any filtered view to xlsx
 and download a per-item evidence pack zip.

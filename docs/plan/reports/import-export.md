@@ -133,38 +133,45 @@ tracker's submitter and reviewer.
 
 ## Verification
 
-At the head of `wsG/import-export` after the review fix pass (test DB suffix `wsG`; Postgres and Redis from compose).
+At the head of `wsG/import-export` after the review fix pass and a rebase onto `origin/main` (`efd4cc0`, which
+brought in the LLM core, #23). Test DB suffix `wsG`; Postgres and Redis from compose.
 
 ```
-$ uv run pytest -q                                   # backend/
-881 passed in 16.14s
+$ uv lock --check && uv run pytest -q                 # backend/
+1016 passed, 1 deselected in 17.56s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group lint ruff format --check .
-203 files already formatted
+228 files already formatted
 $ uv run --group typecheck pyrefly check
- INFO 0 errors (123 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
+ INFO 0 errors (132 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
 $ manage.py makemigrations --check --dry-run
 No changes detected
 $ manage.py check --fail-level WARNING
 System check identified no issues (0 silenced).
-$ make schema && git status --porcelain -- frontend/openapi frontend/src/api/generated
-(no drift after committing the regenerated client)
+$ make schema; echo $?; git status --porcelain -- frontend/openapi frontend/src/api/generated | wc -l
+0
+0
 $ npm run typecheck && npm run lint && npm run format:check && npm run test:run   # frontend/
-tsc -b: ok; eslint: ok; All matched files use Prettier code style!; Tests 145 passed (145)
+All matched files use Prettier code style!
+      Tests  145 passed (145)
 $ make semgrep
-Ran 273 rules on 551 files: 0 findings.
+Ran 273 rules on 564 files: 0 findings.
 ```
 
-881 = 622 on main − 9 removed G contract-stub tests + 268 new tests in imports/exports. The oracle tests were mutation-checked: deleting the `"needs changes"` alias, or disabling
-unique-prefix partner matching, fails 8 tests each.
+This branch removes 9 G contract-stub tests and adds 268 in imports/exports. The 1 deselected test is main's
+opt-in live LLM eval. The oracle tests were mutation-checked: deleting the `"needs changes"` alias, or
+disabling unique-prefix partner matching, fails 8 tests each.
 
-**Live broker check** (not just eager mode). A Celery worker from this worktree ran on a private dev DB
-(`clearpath_wsg`, since dropped) and Redis DB 7, so the compose worker on DB 0, running main's code, couldn't
-take the tasks. `create_sample_import` + `request_commit` → `imports.commit` ran on the worker in 235 ms:
-committed, created 178, skipped 2, 8 partners. `request_export(is_legacy=True)` → `exports.run` in 86 ms:
-ready, 178 rows, stored as `exports/2026/10/<uuid>.xlsx`. The worker log has the start, outcome, and
-duration line for each task. `app.tasks` lists `imports.commit` and `exports.run` under autodiscovery.
+**Live broker check at this head** (not just eager mode). A Celery worker from this worktree ran on a private
+dev DB (`clearpath_wsg`, since dropped) and Redis DB 7, so the compose worker on DB 0, running main's code,
+couldn't take the tasks.
+- `create_sample_import` + `request_commit` → `imports.commit` on the worker: committed in 248 ms, created 178,
+  skipped 2, 8 partners.
+- `request_export(is_legacy=True)` → `exports.run`: ready in 74 ms, 178 rows, stored as
+  `exports/2026/10/<uuid>.xlsx`.
+- The worker logged start, outcome, and duration for each task. Autodiscovery lists `imports.commit` and
+  `exports.run` in `app.tasks`.
 
 ## Deviations from the brief and contract, and why
 
