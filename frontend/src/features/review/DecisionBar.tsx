@@ -46,15 +46,19 @@ const DECIDED_STATUS: Record<DecisionOutcome, ItemStatus> = {
 /**
  * The latest decision, worded by whether it's still the item's state. Once the item has moved on it reads as
  * history, so the header never shows two current states ("Submitted" beside "Changes requested v2"): after a
- * resubmission or a new round it's the last round's outcome; after a pull, an expiry or a reopen it's what
- * the item was.
+ * resubmission or a new round it's the last round's outcome; after a pull or an expiry it's what the item
+ * was. During a re-review the approval is still in force, so it reads as current.
  */
 export function latestDecisionText(item: ItemDetailOut): string | null {
   const decision = item.latest_decision;
   if (decision === null) return null;
   const outcome = OUTCOME_LABELS[decision.outcome];
   const n = `v${String(decision.version_n)}`;
-  if (item.status === DECIDED_STATUS[decision.outcome]) return `${outcome} ${n} by ${decision.approver.name}`;
+  // A re-review's approval is still the one in force while the content runs: current, not history.
+  const inForce = item.status === 'needs_rereview' && DECIDED_STATUS[decision.outcome] === 'approved';
+  if (item.status === DECIDED_STATUS[decision.outcome] || inForce) {
+    return `${outcome} ${n} by ${decision.approver.name}`;
+  }
   if (item.status === 'submitted' || item.status === 'in_review') {
     return `Last round: ${outcome.toLowerCase()} on ${n} by ${decision.approver.name}`;
   }

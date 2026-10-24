@@ -40,6 +40,7 @@ import type { ReviewHandlerOptions } from '../../test/fixtures/reviewHandlers';
 import { server } from '../../test/server';
 import { ROLES } from '../../ui/domain';
 import type { Role } from '../../ui/domain';
+import { latestDecisionText } from './DecisionBar';
 import { LLM_POLL_MS } from './useReviewData';
 
 interface Posted {
@@ -905,6 +906,21 @@ describe('ReviewPage after the walkthrough', () => {
     });
     expect(await screen.findByText(/Last round: changes requested on v1 by Dana Reyes/)).toBeInTheDocument();
     expect(screen.queryByText(/^Changes requested v1/)).not.toBeInTheDocument();
+  });
+
+  it('words the header decision by whether it is still in force (S17)', () => {
+    const at = (overrides: Partial<ItemDetailOut>) => latestDecisionText(itemFixture(overrides));
+    expect(at({ status: 'approved', latest_decision: DECISION_APPROVED })).toBe('Approved v2 by Dana Reyes');
+    // Live content in re-review still runs under its approval.
+    expect(at({ status: 'needs_rereview', latest_decision: DECISION_APPROVED })).toBe(
+      'Approved v2 by Dana Reyes',
+    );
+    expect(at({ status: 'withdrawn', latest_decision: DECISION_APPROVED })).toBe(
+      'Was approved v2 by Dana Reyes',
+    );
+    expect(at({ status: 'in_review', latest_decision: DECISION_CHANGES })).toBe(
+      'Last round: changes requested on v1 by Dana Reyes',
+    );
   });
 
   it('opens the decision forms from the keyboard without recording anything (S8)', async () => {
