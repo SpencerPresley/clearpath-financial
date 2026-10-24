@@ -51,7 +51,20 @@ def test_text_is_capped() -> None:
 
 
 def test_deep_nesting_does_not_raise() -> None:
-    visible_text("<div>" * 10_000 + "deep" + "</div>" * 10_000)
+    assert visible_text("<div>" * 10_000 + "deep" + "</div>" * 10_000).text == "deep"
+
+
+def test_deep_nesting_is_linear_not_quadratic() -> None:
+    # 400 KB of unclosed divs took 73 s when every block was mutated in the tree (O(depth) per insert).
+    started = time.monotonic()
+    visible_text("<div>" * 80_000 + "x")
+    assert time.monotonic() - started < 3.0
+
+
+def test_comments_doctype_and_cdata() -> None:
+    page = visible_text("<!doctype html><p>a<!-- hidden note -->b</p><p><![CDATA[c]]></p>")
+    assert "hidden note" not in page.text
+    assert "doctype" not in page.text.lower()
 
 
 def test_plain_text_and_empty_documents() -> None:

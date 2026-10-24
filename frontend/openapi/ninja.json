@@ -2051,6 +2051,17 @@
             "title": "Findings Count",
             "type": "integer"
           },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
           "new_findings_count": {
             "default": 0,
             "title": "New Findings Count",

@@ -6,7 +6,7 @@ from ninja import Router, Status
 from accounts.api import current_user
 from core.domain import DriftTrigger
 from core.schemas import ERRORS
-from drift import demo, selectors, services
+from drift import demo, selectors, services, throttles
 from drift.schemas import DemoPageOut, DemoPageUpdateIn, ItemDriftOut, SnapshotOut
 
 router = Router(tags=["drift"])
@@ -23,6 +23,7 @@ def item_drift(request: HttpRequest, item_id: int) -> selectors.ItemDrift:
     "/placements/{int:placement_id}/drift-checks",
     response={202: SnapshotOut, **ERRORS},
     operation_id="checkPlacementDrift",
+    throttle=[throttles.check_now_throttle()],
 )
 def check_now(request: HttpRequest, placement_id: int) -> Status[selectors.SnapshotView]:
     """Check now: queue a check of the placement's page (the one in flight, if any). Poll `getItemDrift`."""

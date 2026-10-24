@@ -1590,6 +1590,7 @@ export const GetItemHistoryResponse = zod.object({
   "compared_version_id": zod.union([zod.int(),zod.null()]).optional(),
   "error_code": zod.string().default(getItemHistoryResponseEntriesItemThreezeroPayloadErrorCodeDefault),
   "findings_count": zod.int().default(getItemHistoryResponseEntriesItemThreezeroPayloadFindingsCountDefault),
+  "http_status": zod.union([zod.int(),zod.null()]).optional(),
   "new_findings_count": zod.int().default(getItemHistoryResponseEntriesItemThreezeroPayloadNewFindingsCountDefault),
   "placement_id": zod.int(),
   "result": zod.union([zod.enum(['unchanged', 'modified', 'missing']),zod.null()]).optional(),

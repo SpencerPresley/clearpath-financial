@@ -4,14 +4,13 @@ from typing import Annotated
 
 from django.http import FileResponse, HttpRequest
 from ninja import File, Form, Query, Router, Status, UploadedFile
-from ninja.throttling import UserRateThrottle
 
 from accounts.api import current_user
 from audit.schemas import ItemHistoryOut
 from core.clock import SYSTEM_CLOCK
 from core.domain import AttachmentKind
 from core.schemas import ERRORS, PageLimit
-from drift import intake
+from drift import intake, throttles
 from reviews import assignment, decisions, placements, records, search, selectors, services, versions
 from reviews.filters import ItemFilter, ItemSort
 from reviews.schemas import (
@@ -105,7 +104,7 @@ def submit_item(request: HttpRequest, body: SubmitItemIn) -> Status[records.Item
     "/items/fetch-url",
     response={200: FetchedCopyOut, **ERRORS},
     operation_id="fetchCopyFromUrl",
-    throttle=[UserRateThrottle("20/m")],
+    throttle=[throttles.fetch_url_throttle()],
 )
 async def fetch_copy(request: HttpRequest, body: FetchCopyIn) -> FetchedCopyOut:
     """Fetch a public page's visible text and title to prefill the copy. Static HTML or plain text only (no

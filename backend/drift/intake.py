@@ -29,7 +29,9 @@ async def fetch_copy(url: str) -> FetchedCopy:
     except FetchError as error:
         raise _url_problem(error.message, str(error.code)) from error
     if page.content_type == "text/html":
-        text = await asyncio.to_thread(visible_text, page.text)  # parsing is CPU: keep it off the event loop
+        text = await asyncio.to_thread(
+            visible_text, page.text
+        )  # CPU-bound and holds the GIL, so this shares the loop rather than freeing it; linear in page size (2 MB cap)
     else:
         text = PageText(title=None, text=page.text[:MAX_TEXT_CHARS].strip())
     if not text.text:

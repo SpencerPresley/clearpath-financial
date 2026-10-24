@@ -2,6 +2,8 @@
 was checked. No test touches the network: the resolver and the transport are injected."""
 
 import asyncio
+import ssl
+import time
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
 
@@ -101,6 +103,12 @@ def refused(url: str, handler: Callable[[httpx2.Request], Any] | None = None, **
         "64:ff9b::a9fe:a9fe",  # NAT64 of 169.254.169.254
         "2002:7f00:1::",  # 6to4 of 127.0.0.1
         "2002:a00:1::",  # 6to4 of 10.0.0.1
+        "64:ff9b:1::a9fe:a9fe",  # local-use NAT64 (RFC 8215)
+        "::a9fe:a9fe",  # IPv4-compatible
+        "::127.0.0.1",
+        "::ffff:0:7f00:1",  # IPv4-translated
+        "3fff::1",  # documentation (RFC 9637)
+        "5f00::1",  # SRv6
     ],
 )
 def test_denied_addresses(address: str) -> None:
@@ -153,13 +161,23 @@ def test_garbage_url_is_invalid() -> None:
 
 def test_private_resolution_is_refused() -> None:
     error = refused("https://partner.example/", table={"partner.example": ["10.1.2.3"]})
-    assert error.code is FetchFailure.ADDRESS_NOT_ALLOWED
+    assert error.code is FetchFailure.HOST_NOT_REACHABLE
+    assert error.detail is FetchFailure.ADDRESS_NOT_ALLOWED
     assert not error.transient
+
+
+def test_unresolvable_and_private_names_look_the_same_to_the_caller() -> None:
+    # Otherwise the endpoint maps names that exist only on the internal resolver (*.ec2.internal, RDS endpoints).
+    table = {"payments-admin.internal": ["10.0.3.7"]}
+    private = refused("http://payments-admin.internal/", table=table)
+    missing = refused("http://nothing-here.internal/", table=table)
+    assert (private.code, private.message) == (missing.code, missing.message)
+    assert (private.detail, missing.detail) == (FetchFailure.ADDRESS_NOT_ALLOWED, FetchFailure.DNS_FAILED)
 
 
 def test_any_private_address_in_the_answer_refuses_the_host() -> None:
     error = refused("https://partner.example/", table={"partner.example": [PUBLIC, "127.0.0.1"]})
-    assert error.code is FetchFailure.ADDRESS_NOT_ALLOWED
+    assert error.detail is FetchFailure.ADDRESS_NOT_ALLOWED
 
 
 def test_metadata_ip_literal_is_refused() -> None:
@@ -172,12 +190,13 @@ def test_ipv6_loopback_literal_is_refused() -> None:
 
 def test_localhost_name_is_refused_through_resolution() -> None:
     error = refused("http://localhost/", table={"localhost": ["127.0.0.1", "::1"]})
-    assert error.code is FetchFailure.ADDRESS_NOT_ALLOWED
+    assert error.detail is FetchFailure.ADDRESS_NOT_ALLOWED
 
 
 def test_dns_failure_is_transient() -> None:
     error = refused("https://nowhere.example/", table={})
-    assert error.code is FetchFailure.DNS_FAILED
+    assert error.code is FetchFailure.HOST_NOT_REACHABLE
+    assert error.detail is FetchFailure.DNS_FAILED
     assert error.transient
 
 
@@ -272,7 +291,7 @@ def test_redirect_to_metadata_is_refused() -> None:
 def test_redirect_to_a_private_name_is_refused() -> None:
     table = {"partner.example": [PUBLIC], "internal.partner.example": ["10.0.0.7"]}
     error = refused("https://partner.example/", lambda r: redirect("https://internal.partner.example/"), table=table)
-    assert error.code is FetchFailure.ADDRESS_NOT_ALLOWED
+    assert error.detail is FetchFailure.ADDRESS_NOT_ALLOWED
 
 
 def test_redirect_to_a_disallowed_scheme_is_refused() -> None:
@@ -504,6 +523,61 @@ def test_undeclared_bad_bytes_fall_back_to_replacement() -> None:
     assert page.text.endswith(" end")
 
 
+@pytest.mark.parametrize("charset", ["punycode", "idna", "undefined", "utf-7", "unicode_escape", "rot13"])
+def test_non_web_charsets_decode_as_utf8(charset: str) -> None:
+    # The page picks the codec: punycode is quadratic (300 KB took 12 s, past any deadline), idna and undefined
+    # raise instead of replacing, the rest aren't text encodings.
+    body = b"-" + b"9" * 300_000
+    started = time.monotonic()
+    page = fetch(
+        "https://partner.example/",
+        lambda r: httpx2.Response(200, headers={"content-type": f"text/html; charset={charset}"}, content=body),
+    )
+    assert time.monotonic() - started < 2.0
+    assert page.text == body.decode()
+
+
+def test_meta_punycode_charset_is_ignored() -> None:
+    body = b'<meta charset="punycode">' + b"9" * 200_000
+    started = time.monotonic()
+    fetch(
+        "https://partner.example/", lambda r: httpx2.Response(200, headers={"content-type": "text/html"}, content=body)
+    )
+    assert time.monotonic() - started < 2.0
+
+
+def test_tls_failure_is_its_own_permanent_error() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        try:
+            raise ssl.SSLCertVerificationError("certificate verify failed: Hostname mismatch")
+        except ssl.SSLError as exc:
+            raise httpx2.ConnectError("tls", request=request) from exc
+
+    error = refused("https://partner.example/", handler)
+    assert error.code is FetchFailure.TLS_FAILED
+    assert not error.transient
+
+
+def test_each_redirect_hop_gets_a_fresh_connection_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pooled connections are keyed by (scheme, IP, port): a second name on the same IP must not reuse a TLS
+    # session verified for the first.
+    clients: list[httpx2.AsyncClient] = []
+    real = fetcher._client
+
+    def counting(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
+        clients.append(real(transport))
+        return clients[-1]
+
+    monkeypatch.setattr(fetcher, "_client", counting)
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return redirect("https://b.example/") if request.headers["host"] == "a.example" else html_response()
+
+    fetch("https://a.example/", handler, table={"a.example": [PUBLIC], "b.example": [PUBLIC]})
+    assert len(clients) == 2
+    assert all(c.is_closed for c in clients)
+
+
 def test_unknown_charset_falls_back_to_utf8() -> None:
     page = fetch(
         "https://partner.example/",
@@ -539,9 +613,34 @@ def test_allowlist_is_per_origin_not_per_host() -> None:
     assert error.code is FetchFailure.PORT_NOT_ALLOWED
 
 
+def test_allowlist_covers_only_the_demo_pages() -> None:
+    error = refused(
+        "http://localhost:8000/admin/", table={"localhost": ["127.0.0.1"]}, private_origins=("localhost:8000",)
+    )
+    assert error.code is FetchFailure.PORT_NOT_ALLOWED
+    error = refused(
+        "http://localhost/api/health", table={"localhost": ["127.0.0.1"]}, private_origins=("localhost:80",)
+    )
+    assert error.detail is FetchFailure.ADDRESS_NOT_ALLOWED
+
+
+def test_settings_allowlist_is_ignored_outside_debug(settings: Any) -> None:
+    settings.DRIFT_FETCH_PRIVATE_ORIGINS = ["localhost:8000"]
+    settings.DEBUG = False  # e.g. a deployed box that fell back to dev settings but has DEBUG off
+    with pytest.raises(FetchError) as caught:
+        run(
+            fetch_page(
+                "http://localhost:8000/demo-partners/lendcompare/",
+                resolver=resolver_for({"localhost": ["127.0.0.1"]}),
+                transport=httpx2.MockTransport(lambda r: html_response()),
+            )
+        )
+    assert caught.value.code is FetchFailure.PORT_NOT_ALLOWED
+
+
 def test_allowlisted_origin_still_has_the_content_rules() -> None:
     error = refused(
-        "http://localhost:8000/x",
+        "http://localhost:8000/demo-partners/x/",
         lambda r: httpx2.Response(200, headers={"content-type": "application/json"}, content=b"{}"),
         table={"localhost": ["127.0.0.1"]},
         private_origins=("localhost:8000",),
@@ -551,7 +650,7 @@ def test_allowlisted_origin_still_has_the_content_rules() -> None:
 
 def test_redirect_from_allowlisted_origin_to_a_private_one_is_refused() -> None:
     error = refused(
-        "http://localhost:8000/x",
+        "http://localhost:8000/demo-partners/x/",
         lambda r: redirect("http://127.0.0.1/admin"),
         table={"localhost": ["127.0.0.1"]},
         private_origins=("localhost:8000",),

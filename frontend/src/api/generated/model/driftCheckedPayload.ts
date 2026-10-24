@@ -11,6 +11,7 @@ export interface DriftCheckedPayload {
   compared_version_id?: number | null;
   error_code?: string;
   findings_count?: number;
+  http_status?: number | null;
   new_findings_count?: number;
   placement_id: number;
   result?: DriftResult | null;

@@ -300,6 +300,7 @@ class DriftCheckedPayload(EventPayload):
     findings_count: int = 0  # code findings on the whole page
     new_findings_count: int = 0  # ... of rules that don't fire on the approved copy
     error_code: str = ""  # drift.fetcher.FetchFailure, or "stuck" / "error"
+    http_status: int | None = None  # the page's status when the failure was an HTTP error
 
 
 class AttachmentAddedPayload(EventPayload):

@@ -216,6 +216,20 @@ def test_check_now_refusals(
     assert Client().post(f"/api/placements/{placement.pk}/drift-checks").status_code == 401
 
 
+def test_check_now_is_rate_limited_on_its_own_budget(
+    placement: Placement, reviewer: User, enqueued: list[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_fetch(monkeypatch, FetchError(FetchFailure.TIMEOUT))
+    client = signed_in(reviewer)
+    codes = [client.post(f"/api/placements/{placement.pk}/drift-checks").status_code for _ in range(11)]
+    fetch_url = client.post("/api/items/fetch-url", {"url": "https://x.example/"}, content_type="application/json")
+
+    assert codes[:10] == [202] * 10  # the in-flight check comes back again; no new rows
+    assert codes[10] == 429
+    assert fetch_url.status_code == 422  # its own scope: Check now didn't spend the fetch-url budget
+    assert Snapshot.objects.filter(placement=placement).count() == 1
+
+
 def test_query_count_of_item_drift(
     placement: Placement,
     approved: ReviewItem,

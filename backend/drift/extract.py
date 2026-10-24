@@ -10,21 +10,23 @@ import re
 from dataclasses import dataclass
 from typing import Final
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, CData, NavigableString, PageElement, Tag
 
 MAX_TEXT_CHARS: Final = 100_000  # the intake copy limit (SubmitItemIn.content_text)
 
-_DROP: Final = (
-    "script",
-    "style",
-    "noscript",
-    "template",
-    "svg",
-    "iframe",
-    "object",
-    "embed",
-    "canvas",
-    "head",
+_DROP: Final = frozenset(
+    (
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "svg",
+        "iframe",
+        "object",
+        "embed",
+        "canvas",
+        "head",
+    )
 )
 _BLOCK: Final = frozenset(
     [
@@ -72,6 +74,7 @@ _BLOCK: Final = frozenset(
         "ul",
     ]
 )
+_TEXT: Final = (NavigableString, CData)  # exact types: bs4's Comment, Doctype, Script... subclass NavigableString
 _HIDDEN_STYLE: Final = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.IGNORECASE)
 _SPACES: Final = re.compile(r"[^\S\n]+")
 
@@ -96,19 +99,34 @@ def _cap(text: str) -> str:
     return text[: cut if cut > 0 else MAX_TEXT_CHARS]
 
 
+def _text_of(root: Tag) -> str:
+    """Visible strings in document order, with a line break around each block. One iterative pass over the tree
+    that never mutates it: bs4's insert/decompose are O(depth) each, so mutating every block of a deeply nested
+    page (80 000 nested divs) is quadratic, minutes of CPU from a 400 KB page."""
+    out: list[str] = []
+    stack: list[tuple[PageElement, bool]] = [(root, False)]
+    while stack:
+        node, closing = stack.pop()
+        if closing:
+            out.append("\n")
+        elif type(node) in _TEXT:  # not comments, doctypes, script/style strings
+            out.append(str(node))
+        elif isinstance(node, Tag):
+            if node.name in _DROP or _hidden(node):
+                continue
+            if node.name == "br":
+                out.append("\n")
+                continue
+            if node.name in _BLOCK:
+                out.append("\n")
+                stack.append((node, True))
+            stack.extend((child, False) for child in reversed(node.contents))
+    return "".join(out)
+
+
 def visible_text(html: str) -> PageText:
     soup = BeautifulSoup(html, "html.parser")
     title_tag = soup.find("title")
     title = title_tag.get_text(" ", strip=True) or None if title_tag is not None else None
-    for tag in soup.find_all(_DROP):
-        tag.decompose()
-    for tag in soup.find_all(_hidden):
-        if not tag.decomposed:
-            tag.decompose()
-    for tag in soup.find_all("br"):
-        tag.replace_with("\n")
-    for tag in soup.find_all(_BLOCK):
-        tag.insert_before("\n")
-        tag.insert_after("\n")
-    lines = (_SPACES.sub(" ", line).strip() for line in soup.get_text().splitlines())
+    lines = (_SPACES.sub(" ", line).strip() for line in _text_of(soup).splitlines())
     return PageText(title=title, text=_cap("\n".join(line for line in lines if line)))

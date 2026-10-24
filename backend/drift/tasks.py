@@ -57,10 +57,10 @@ def run_check(self: Task, snapshot_id: int) -> str:
     except FetchError as error:
         if services.should_retry(claim=claim, error=error):
             services.release(claim=claim, clock=clock)
-            retry, outcome = True, f"retry {error.code}"
+            retry, outcome = True, f"retry {error.detail}"
         else:
             services.fail(claim=claim, error=error, clock=clock)
-            outcome = f"failed {error.code}"
+            outcome = f"failed {error.detail}"
     except SoftTimeLimitExceeded:
         services.fail(claim=claim, code="timeout", message="The check took too long.", clock=clock)
     except Exception:

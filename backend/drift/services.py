@@ -318,6 +318,7 @@ def _record_failure(
             snapshot_id=snapshot.pk,
             status=CheckStatus.FAILED,
             error_code=code,
+            http_status=http_status,
         ),
         actor=None,
         at=at,

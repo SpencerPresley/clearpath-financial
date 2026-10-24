@@ -17,14 +17,21 @@ Used by intake's "Fetch from a URL" and by the drift monitor. The rules, each wi
 
 Static HTML only: there is no JavaScript rendering on the server, so copy injected by client-side scripts isn't seen.
 
-`settings.DRIFT_FETCH_PRIVATE_ORIGINS` (dev only, empty elsewhere) lists exact `host:port` origins exempt from the
-address and port rules, so a local stack can fetch its own demo partner pages. Every other rule still applies.
+`settings.DRIFT_FETCH_PRIVATE_ORIGINS` (dev only, empty elsewhere, and ignored unless DEBUG) lists exact `host:port`
+origins whose `/demo-partners/` pages are exempt from the address and port rules, so a local stack can fetch its own
+demo pages. Every other rule still applies, on every hop.
+
+A host name that doesn't resolve and one that resolves to a denied address both come back as HOST_NOT_REACHABLE, so
+the error can't be used to discover names on the internal resolver. Declared charsets are limited to web text
+encodings (some Python codecs are quadratic or not text codecs at all).
 """
 
 import asyncio
+import codecs
 import ipaddress
 import re
 import socket
+import ssl
 from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
@@ -41,6 +48,38 @@ USER_AGENT: Final = "ClearPathComplianceBot/1.0 (+drift monitor; compliance revi
 ALLOWED_CONTENT_TYPES: Final = frozenset({"text/html", "text/plain"})
 DEFAULT_PORTS: Final = {"http": 80, "https": 443}
 _REDIRECTS: Final = frozenset({301, 302, 303, 307, 308})
+PRIVATE_ORIGIN_PATH: Final = "/demo-partners/"  # the only path a dev-allowlisted origin is exempt for
+_WEB_CODECS: Final = frozenset(
+    codecs.lookup(name).name
+    for name in (
+        "utf-8",
+        "utf-8-sig",
+        "utf-16",
+        "utf-16-le",
+        "utf-16-be",
+        "utf-32",
+        "utf-32-le",
+        "utf-32-be",
+        "ascii",
+        "latin-1",
+        *(f"iso8859-{n}" for n in (2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16)),
+        *(f"cp125{n}" for n in range(9)),
+        "koi8-r",
+        "koi8-u",
+        "mac-roman",
+        "shift_jis",
+        "cp932",
+        "euc_jp",
+        "iso2022_jp",
+        "gb2312",
+        "gbk",
+        "gb18030",
+        "big5",
+        "big5hkscs",
+        "euc_kr",
+        "cp949",
+    )
+)
 _META_CHARSET: Final = re.compile(rb"""<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9_\-:.]+)""", re.IGNORECASE)
 
 _DENIED_V4: Final = tuple(
@@ -66,11 +105,15 @@ _DENIED_V4: Final = tuple(
 _DENIED_V6: Final = tuple(
     ipaddress.IPv6Network(n)
     for n in (
-        "::/128",
-        "::1/128",
+        "::/96",  # IPv4-compatible (deprecated), incl. :: and ::1
+        "::ffff:0:0/96",  # IPv4-mapped (also unwrapped below)
+        "::ffff:0:0:0/96",  # IPv4-translated
+        "64:ff9b:1::/48",  # local-use NAT64 (RFC 8215): could front internal IPv4
         "100::/64",
         "2001::/23",  # IETF protocol assignments (incl. Teredo 2001::/32)
         "2001:db8::/32",
+        "3fff::/20",  # documentation (RFC 9637)
+        "5f00::/16",  # SRv6 SIDs
         "fc00::/7",
         "fe80::/10",
         "fec0::/10",
@@ -87,6 +130,10 @@ class FetchFailure(StrEnum):
     CREDENTIALS_IN_URL = "credentials_in_url"
     DNS_FAILED = "dns_failed"
     ADDRESS_NOT_ALLOWED = "address_not_allowed"
+    # What a caller sees for a host *name* that didn't resolve or resolved to a denied address: one answer for both,
+    # so the endpoint can't map names that exist only on the internal resolver. FetchError.detail keeps which.
+    HOST_NOT_REACHABLE = "host_not_reachable"
+    TLS_FAILED = "tls_failed"
     TOO_MANY_REDIRECTS = "too_many_redirects"
     CONNECT_FAILED = "connect_failed"
     TIMEOUT = "timeout"
@@ -103,6 +150,8 @@ _MESSAGES: Final = {
     FetchFailure.CREDENTIALS_IN_URL: "Remove the username and password from the address.",
     FetchFailure.DNS_FAILED: "That site's name didn't resolve. Check the address.",
     FetchFailure.ADDRESS_NOT_ALLOWED: "That address points to a private or internal network, so it can't be fetched.",
+    FetchFailure.HOST_NOT_REACHABLE: "That address can't be fetched: its name doesn't lead to a public website.",
+    FetchFailure.TLS_FAILED: "The site's security certificate didn't check out.",
     FetchFailure.TOO_MANY_REDIRECTS: "The page redirected too many times.",
     FetchFailure.CONNECT_FAILED: "The site didn't accept a connection.",
     FetchFailure.TIMEOUT: "The site took too long to respond.",
@@ -115,23 +164,33 @@ _TRANSIENT: Final = frozenset({FetchFailure.DNS_FAILED, FetchFailure.CONNECT_FAI
 
 
 class FetchError(Exception):
-    """A refused or failed fetch. `transient` says whether trying again later could succeed."""
+    """A refused or failed fetch. `code` and `message` are safe to show the person who asked; `detail` is the
+    underlying cause, for logs (it differs from `code` only for HOST_NOT_REACHABLE). `transient`: could trying
+    again later succeed?"""
 
-    def __init__(self, code: FetchFailure, *, http_status: int | None = None, message: str | None = None) -> None:
+    def __init__(
+        self,
+        code: FetchFailure,
+        *,
+        http_status: int | None = None,
+        message: str | None = None,
+        detail: FetchFailure | None = None,
+    ) -> None:
         self.code = code
+        self.detail = detail or code
         self.http_status = http_status
         if message is None:
             message = _MESSAGES[code]
             if http_status is not None:
                 message = f"{message} (HTTP {http_status})"
         self.message = message
-        super().__init__(f"{code}: {message}")
+        super().__init__(f"{code} ({self.detail}): {message}")
 
     @property
     def transient(self) -> bool:
         if self.code is FetchFailure.HTTP_ERROR:
             return self.http_status is not None and (self.http_status >= 500 or self.http_status == 429)  # noqa: PLR2004
-        return self.code in _TRANSIENT
+        return self.detail in _TRANSIENT
 
 
 @dataclass(frozen=True)
@@ -164,7 +223,7 @@ def is_denied_address(address: str) -> bool:
             embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
         if embedded is not None:
             return is_denied_address(str(embedded))
-        return any(ip in net for net in _DENIED_V6) or ip.is_multicast or ip.is_unspecified
+        return any(ip in net for net in _DENIED_V6) or ip.is_multicast or ip.is_unspecified or ip.is_reserved
     return any(ip in net for net in _DENIED_V4) or ip.is_multicast or ip.is_unspecified
 
 
@@ -174,7 +233,7 @@ class _Target:
     scheme: str
     host: str  # ASCII (IDNA) host, no brackets
     port: int
-    origin: str  # "host:port", lower-case: the allowlist key
+    exempt: bool  # a dev-allowlisted origin's demo page: skips the address and port rules
 
     @property
     def host_header(self) -> str:
@@ -204,26 +263,38 @@ def _target(raw: str | httpx2.URL, private_origins: Collection[str]) -> _Target:
     if not host:
         raise FetchError(FetchFailure.INVALID_URL)
     port = url.port or DEFAULT_PORTS[scheme]
-    origin = f"{host}:{port}"
-    if port != DEFAULT_PORTS[scheme] and origin not in private_origins:
+    exempt = f"{host}:{port}" in private_origins and url.path.startswith(PRIVATE_ORIGIN_PATH)
+    if port != DEFAULT_PORTS[scheme] and not exempt:
         raise FetchError(FetchFailure.PORT_NOT_ALLOWED)
-    return _Target(url=url, scheme=scheme, host=host, port=port, origin=origin)
+    return _Target(url=url, scheme=scheme, host=host, port=port, exempt=exempt)
 
 
-async def _addresses(target: _Target, resolver: Resolver, private_origins: Collection[str]) -> list[str]:
-    """The addresses to connect to, all checked. Resolved exactly once per hop."""
+async def _addresses(target: _Target, resolver: Resolver) -> list[str]:
+    """The addresses to connect to, all checked. Resolved exactly once per hop. A name that doesn't resolve and a
+    name that resolves to a denied address get the same public answer (HOST_NOT_REACHABLE)."""
     if target.is_ip_literal:
-        addresses = [target.host]
-    else:
-        try:
-            addresses = await resolver(target.host, target.port)
-        except OSError as exc:
-            raise FetchError(FetchFailure.DNS_FAILED) from exc
-        if not addresses:
-            raise FetchError(FetchFailure.DNS_FAILED)
-    if target.origin not in private_origins and any(is_denied_address(a) for a in addresses):
-        raise FetchError(FetchFailure.ADDRESS_NOT_ALLOWED)
+        if not target.exempt and is_denied_address(target.host):
+            raise FetchError(FetchFailure.ADDRESS_NOT_ALLOWED)
+        return [target.host]
+    try:
+        addresses = await resolver(target.host, target.port)
+    except OSError as exc:
+        raise FetchError(FetchFailure.HOST_NOT_REACHABLE, detail=FetchFailure.DNS_FAILED) from exc
+    if not addresses:
+        raise FetchError(FetchFailure.HOST_NOT_REACHABLE, detail=FetchFailure.DNS_FAILED)
+    if not target.exempt and any(is_denied_address(a) for a in addresses):
+        raise FetchError(FetchFailure.HOST_NOT_REACHABLE, detail=FetchFailure.ADDRESS_NOT_ALLOWED)
     return addresses
+
+
+def _tls_failure(exc: BaseException) -> bool:
+    """A certificate or handshake failure somewhere in the exception chain (httpcore wraps ssl errors)."""
+    seen: BaseException | None = exc
+    while seen is not None:
+        if isinstance(seen, ssl.SSLError):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
 
 
 async def _send(client: httpx2.AsyncClient, target: _Target, addresses: list[str]) -> httpx2.Response:
@@ -242,7 +313,9 @@ async def _send(client: httpx2.AsyncClient, target: _Target, addresses: list[str
         )
         try:
             return await client.send(request, stream=True)
-        except httpx2.ConnectError:
+        except httpx2.ConnectError as exc:
+            if _tls_failure(exc):  # the address answered and its certificate is wrong: not worth retrying
+                raise FetchError(FetchFailure.TLS_FAILED) from exc
             continue  # try the next checked address
         except httpx2.TimeoutException as exc:
             raise FetchError(FetchFailure.TIMEOUT) from exc
@@ -281,30 +354,49 @@ async def _read_capped(response: httpx2.Response) -> bytes:
     return bytes(body)
 
 
+def _codec(charset: str | None) -> str:
+    """The declared charset if it's a web text encoding, else UTF-8. Not any Python codec: the page picks it, and
+    `punycode` is quadratic (a 300 KB body took 12 s, uninterruptible by the deadline), `idna` refuses
+    errors="replace", and `unicode_escape` / `utf-7` decode more than text."""
+    if charset is None:
+        return "utf-8"
+    try:
+        name = codecs.lookup(charset).name
+    except LookupError:
+        return "utf-8"
+    return name if name in _WEB_CODECS else "utf-8"
+
+
 def _decode(body: bytes, response: httpx2.Response) -> str:
     charset = response.charset_encoding
     if charset is None and _media_type(response) == "text/html":
         found = _META_CHARSET.search(body[:4096])
         charset = found.group(1).decode("ascii") if found else None
     try:
-        return body.decode(charset or "utf-8", errors="replace")
-    except LookupError:  # an unknown charset name
+        return body.decode(_codec(charset), errors="replace")
+    except (LookupError, UnicodeError):  # belt and braces: every allowlisted codec takes errors="replace"
         return body.decode("utf-8", errors="replace")
+
+
+def _client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
+    """A fresh client and connection pool per hop: pooled TLS connections are keyed by (scheme, IP, port), so a
+    redirect to another name on the same IP could reuse a session verified for the first name."""
+    return httpx2.AsyncClient(
+        transport=transport or httpx2.AsyncHTTPTransport(retries=0, trust_env=False),
+        follow_redirects=False,
+        trust_env=False,
+        timeout=TIMEOUT,
+    )
 
 
 async def _fetch(
     url: str, resolver: Resolver, transport: httpx2.AsyncBaseTransport | None, private_origins: Collection[str]
 ) -> FetchedPage:
-    async with httpx2.AsyncClient(
-        transport=transport or httpx2.AsyncHTTPTransport(retries=0, trust_env=False),
-        follow_redirects=False,
-        trust_env=False,
-        timeout=TIMEOUT,
-    ) as client:
-        current: str | httpx2.URL = url
-        for _ in range(MAX_REDIRECTS + 1):
-            target = _target(current, private_origins)
-            addresses = await _addresses(target, resolver, private_origins)
+    current: str | httpx2.URL = url
+    for _ in range(MAX_REDIRECTS + 1):
+        target = _target(current, private_origins)
+        addresses = await _addresses(target, resolver)
+        async with _client(transport) as client:
             response = await _send(client, target, addresses)
             try:
                 if response.status_code in _REDIRECTS:
@@ -339,9 +431,9 @@ async def fetch_page(
     deadline: float = TOTAL_DEADLINE,
 ) -> FetchedPage:
     """GET `url` under the rules in the module docstring. Raises `FetchError` for every refusal and failure."""
-    origins = frozenset(
-        o.lower() for o in (settings.DRIFT_FETCH_PRIVATE_ORIGINS if private_origins is None else private_origins)
-    )
+    if private_origins is None:  # the dev allowlist never applies outside DEBUG, whatever the settings say
+        private_origins = settings.DRIFT_FETCH_PRIVATE_ORIGINS if settings.DEBUG else ()
+    origins = frozenset(o.lower() for o in private_origins)
     try:
         async with asyncio.timeout(deadline):
             return await _fetch(url, resolver, transport, origins)
