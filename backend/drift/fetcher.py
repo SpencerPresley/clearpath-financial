@@ -184,7 +184,8 @@ class FetchError(Exception):
             if http_status is not None:
                 message = f"{message} (HTTP {http_status})"
         self.message = message
-        super().__init__(f"{code} ({self.detail}): {message}")
+        cause = f" ({self.detail})" if self.detail is not code else ""
+        super().__init__(f"{code}{cause}: {message}")
 
     @property
     def transient(self) -> bool:

@@ -105,14 +105,17 @@ found; one Critical and two Important, all fixed with tests:
 ## Verification
 
 - After merging main (J's screens, metrics; one conflict in `config/tests/test_contract.py`, where each side had
-  removed its own stub): backend `pytest` 1608 passed (drift: 176); ruff, ruff format, pyrefly (`--group
+  removed its own stub): backend `pytest` 1608 passed (drift: 175); ruff, ruff format, pyrefly (`--group
   typecheck`) clean; no missing migrations; schema and client regenerated with no diff.
 - Frontend: typecheck, eslint, prettier clean; vitest 563 passed.
-- CI on PR #37 green at `e008c11` (Backend CI, Frontend CI incl. e2e unit, API contract `drift`, semgrep).
+- CI on PR #37 green at `e008c11` and re-run on the final head (Backend CI, Frontend CI incl. e2e unit, API contract `drift`, semgrep).
 - Live (dev stack, one uvicorn worker): fetch-url of the BudgetBee demo page fills the form in ~90 ms (no
   self-deadlock); `169.254.169.254` refused; `1.2.3.4` times out with a message. Drift: unchanged → Simulate edit →
   Check now → modified with a diff and the item reopened (`drift_detected`, reassigned); CardScout → missing; a
-  `.invalid` placement → failed. Screenshots in `docs/plan/reviews/ui/drift/`.
+  `.invalid` placement → failed. Screenshots in `docs/plan/reviews/ui/drift/`, captured before the review fixes:
+  a host name that doesn't resolve now reads "That address can't be fetched: its name doesn't lead to a public
+  website." instead of "That site's name didn't resolve." (`placement-missing-and-failed*`); IP-literal refusals
+  are unchanged.
 
 ## Limitations and open risks
 
