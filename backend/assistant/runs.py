@@ -40,7 +40,7 @@ from pydantic import ValidationError
 
 from accounts.models import User
 from assistant import services
-from assistant.agent import RunUsage, build_agent, reject_message, state_graph
+from assistant.agent import RunUsage, build_agent, kv, reject_message, state_graph
 from assistant.checkpointer import open_checkpointer
 from assistant.llm import AssistantNotConfigured, get_assistant_model
 from assistant.schemas import AssistantThreadStateOut
@@ -145,19 +145,17 @@ async def _pending(agent: CompiledStateGraph, thread_id: UUID) -> bool:
 
 
 def _log_run(thread_id: UUID, terminal: LifecycleEvent, usage: RunUsage) -> None:
-    logger.info(
-        "assistant run",
-        extra={
-            "thread_id": str(thread_id),
-            "outcome": terminal,
-            "model_calls": usage.model_calls,
-            "input_tokens": usage.tokens.input_tokens,
-            "output_tokens": usage.tokens.output_tokens,
-            "cache_read_tokens": usage.tokens.cache_read_tokens,
-            "cache_creation_tokens": usage.tokens.cache_creation_tokens,
-            "latency_ms": usage.latency_ms,
-        },
-    )
+    fields = {
+        "thread_id": str(thread_id),
+        "outcome": terminal,
+        "model_calls": usage.model_calls,
+        "input_tokens": usage.tokens.input_tokens,
+        "output_tokens": usage.tokens.output_tokens,
+        "cache_read_tokens": usage.tokens.cache_read_tokens,
+        "cache_creation_tokens": usage.tokens.cache_creation_tokens,
+        "latency_ms": usage.latency_ms,
+    }
+    logger.info("assistant run %s", kv(fields), extra=fields)
 
 
 async def _produce(  # noqa: C901  # one decision per phase of the run, each with its own failure handling

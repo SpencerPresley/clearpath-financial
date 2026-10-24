@@ -266,13 +266,19 @@ def test_model_calls_and_the_run_total_are_logged(
     with caplog.at_level(logging.INFO):
         async_to_sync(run)()
 
-    calls = [r for r in caplog.records if r.getMessage() == "assistant model call"]
+    calls = [r for r in caplog.records if r.getMessage().startswith("assistant model call ")]
     assert len(calls) == 2
+    # The numbers are in the text too: the console formatter drops `extra`.
+    assert "cache_read_tokens=100" in calls[0].getMessage()
+    assert "input_tokens=120" in calls[0].getMessage()
     first = calls[0].__dict__
     assert (first["thread_id"], first["model"]) == (str(thread.pk), "ToolCallingFakeModel")
     assert (first["input_tokens"], first["output_tokens"], first["cache_read_tokens"]) == (120, 8, 100)
     assert isinstance(first["latency_ms"], int)
-    (total,) = [r.__dict__ for r in caplog.records if r.getMessage() == "assistant run"]
+    (record,) = [r for r in caplog.records if r.getMessage().startswith("assistant run ")]
+    assert "outcome=completed" in record.getMessage()
+    assert "cache_read_tokens=200" in record.getMessage()
+    total = record.__dict__
     assert (total["outcome"], total["model_calls"], total["input_tokens"], total["cache_read_tokens"]) == (
         "completed",
         2,

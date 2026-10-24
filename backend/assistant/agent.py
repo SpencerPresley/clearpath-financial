@@ -17,7 +17,7 @@
 
 import logging
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
@@ -105,6 +105,11 @@ def _ai_message(result: ModelResult) -> AIMessage | None:
     return next((m for m in response.result if isinstance(m, AIMessage)), None)
 
 
+def kv(fields: Mapping[str, object]) -> str:
+    """`key=value` pairs for a log line."""
+    return " ".join(f"{key}={value}" for key, value in fields.items())
+
+
 def _model_name(model: BaseChatModel) -> str:
     return str(getattr(model, "model", None) or getattr(model, "model_name", None) or type(model).__name__)
 
@@ -122,18 +127,18 @@ class UsageLogMiddleware(AgentMiddleware):
         self.usage.model_calls += 1
         self.usage.tokens += tokens
         self.usage.latency_ms += latency_ms
-        logger.info(
-            "assistant model call",
-            extra={
-                "thread_id": self.thread_id,
-                "model": _model_name(request.model),
-                "input_tokens": tokens.input_tokens,
-                "output_tokens": tokens.output_tokens,
-                "cache_read_tokens": tokens.cache_read_tokens,
-                "cache_creation_tokens": tokens.cache_creation_tokens,
-                "latency_ms": latency_ms,
-            },
-        )
+        fields = {
+            "thread_id": self.thread_id,
+            "model": _model_name(request.model),
+            "input_tokens": tokens.input_tokens,
+            "output_tokens": tokens.output_tokens,
+            "cache_read_tokens": tokens.cache_read_tokens,
+            "cache_creation_tokens": tokens.cache_creation_tokens,
+            "latency_ms": latency_ms,
+        }
+        # In the text as well as `extra`: the plain console formatter drops `extra`, and these numbers are the
+        # only evidence prompt caching engages (spec §6.4).
+        logger.info("assistant model call %s", kv(fields), extra=fields)
 
     def wrap_model_call(
         self, request: ModelRequest[Any], handler: Callable[[ModelRequest[Any]], ModelResponse[Any]]
