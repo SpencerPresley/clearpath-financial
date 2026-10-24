@@ -26,9 +26,10 @@ describe('canOpen', () => {
     ['/submit', ['admin'], false],
     ['/import', ['admin'], true],
     ['/import', ['lead', 'reviewer'], false],
-    ['/terms', ['marketer'], false],
-    ['/partners/3', ['reviewer'], true],
-    ['/partners/3', ['marketer'], false],
+    // Offer terms and partners are read-only for everyone signed in (the nav shows them to reviewers only).
+    ['/terms', ['marketer'], true],
+    ['/partners/3', ['marketer'], true],
+    ['/queue', ['admin'], false],
     // Metrics reads are open to reviewers, leads and admins (backend metrics selectors), wider than the nav.
     ['/metrics', ['reviewer'], true],
     ['/metrics', ['admin'], true],

@@ -2754,6 +2754,13 @@
   .app-import-panel {
     @apply min-w-0 overflow-x-auto rounded-lg border border-base-300 bg-base-100;
   }
+  /* A page this role can't use (ui/layout/RoleGate): the same panel as Import's own role gate. */
+  .app-gate {
+    @apply flex max-w-[80rem] flex-col gap-4 pb-8;
+  }
+  .app-gate-panel {
+    @apply rounded-lg border border-base-300 bg-base-100;
+  }
   .app-import-start {
     @apply flex flex-col gap-6;
   }

@@ -4,7 +4,6 @@
  * role), unless they arrived on a link to a screen they can open.
  */
 import type { Role } from '../domain';
-import { NAV_SECTIONS } from './nav';
 
 export type Landing = '/queue' | '/mine' | '/import' | '/library';
 
@@ -15,25 +14,36 @@ export function landingFor(roles: readonly Role[]): Landing {
   return '/library';
 }
 
-/** Metrics reads are allowed to reviewers (so leads) and admins (backend metrics selectors), wider than the nav. */
-export const METRICS_ROLES: readonly Role[] = ['reviewer', 'lead', 'admin'];
+/**
+ * Pages only some roles can use, by first path segment, matching what the server allows (not the nav, which
+ * is narrower: Metrics is in a lead's nav, but reviewers and admins may read it). Every other page is open to
+ * anyone signed in: Library, Outbox, and the read-only Offer terms and Partners; an item page shows the server's
+ * own 403 or 404.
+ */
+export const PAGE_ROLES = {
+  queue: ['reviewer', 'lead'],
+  mine: ['marketer'],
+  submit: ['marketer'],
+  import: ['admin'],
+  metrics: ['reviewer', 'lead', 'admin'],
+} as const satisfies Record<string, readonly Role[]>;
 
-/** Who may open a section's pages, by its first path segment; New submission shares the marketer's area. */
-function sectionRoles(segment: string): readonly Role[] | 'everyone' | undefined {
-  if (segment === 'metrics') return METRICS_ROLES;
-  if (segment === 'mine') return NAV_SECTIONS.find((s) => s.to === '/mine')?.roles;
-  return NAV_SECTIONS.find((s) => s.to === `/${segment}`)?.roles;
+export const LANDING_LABELS: Record<Landing, string> = {
+  '/queue': 'Queue',
+  '/mine': 'My submissions',
+  '/import': 'Import',
+  '/library': 'Library',
+};
+
+export function hasAnyRole(roles: readonly Role[], allowed: readonly Role[]): boolean {
+  return allowed.some((role) => roles.includes(role));
 }
 
-/**
- * Whether these roles can open the screen at `pathname`. Screens outside the nav's sections (an item, `/`, the
- * design gallery) count as open: the item page itself says when the server refuses or can't find it.
- */
+/** Whether these roles can use the page at `pathname`. */
 export function canOpen(pathname: string, roles: readonly Role[]): boolean {
   const segment = pathname.split('/')[1] ?? '';
-  const allowed = sectionRoles(segment);
-  if (allowed === undefined || allowed === 'everyone') return true;
-  return allowed.some((role) => roles.includes(role));
+  const allowed: readonly Role[] | undefined = (PAGE_ROLES as Record<string, readonly Role[]>)[segment];
+  return allowed === undefined || hasAnyRole(roles, allowed);
 }
 
 /**
