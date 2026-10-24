@@ -1,12 +1,23 @@
 import hashlib
 import json
+from datetime import date
+from decimal import Decimal
 
-from checks.engine import FindingDraft, Span, run_code_checks
+from checks.engine import FindingDraft, RuleContext, Span, run_code_checks
 from checks.engine.tests.conftest import make_ctx
 from checks.llm.prompt import PROMPT_VERSION, copy_tag, item_message, system_message
 from checks.llm.rules import LLM_RULES, applicable_rules
 from checks.llm.schema import report_tool
-from core.domain import AttachmentKind, Channel, FindingSource, Market, PartnerType, Product, Severity
+from core.domain import (
+    AttachmentKind,
+    Channel,
+    FindingSource,
+    Market,
+    PartnerType,
+    PersonalLoanTerms,
+    Product,
+    Severity,
+)
 
 AFFILIATE_TEXT = (
     "Top Personal Loans of 2026\n\nClearPath loans start as low as 5.99% APR. "
@@ -47,7 +58,25 @@ PROMPT_FINGERPRINTS = {
 
 
 def _fingerprint() -> str:
-    ctx = make_ctx("Example ad copy.", channel=Channel.AFFILIATE_PAGE, partner_type=PartnerType.AFFILIATE)
+    # Built explicitly, not with the engine's make_ctx, so a change to that shared fixture can't flip this.
+    ctx = RuleContext(
+        text="Example ad copy.",
+        product=Product.PERSONAL_LOAN,
+        channel=Channel.AFFILIATE_PAGE,
+        markets=frozenset({Market.NATIONAL}),
+        partner_type=PartnerType.AFFILIATE,
+        attachment_kinds=frozenset(),
+        terms=PersonalLoanTerms(
+            apr_min=Decimal("7.49"),
+            apr_max=Decimal("35.99"),
+            amount_min=Decimal(1000),
+            amount_max=Decimal(50000),
+            term_months=(24, 36, 48, 60),
+            origination_fee_min_pct=Decimal(0),
+            origination_fee_max_pct=Decimal(8),
+        ),
+        today=date(2026, 10, 24),
+    )
     code = (
         FindingDraft("claims.guaranteed", FindingSource.CODE, Severity.BLOCKING, "m", "c", None, Span(0, 7), "Example"),
         FindingDraft("ca.license_disclosure", FindingSource.CODE, Severity.BLOCKING, "m", "c", None, None, None),
