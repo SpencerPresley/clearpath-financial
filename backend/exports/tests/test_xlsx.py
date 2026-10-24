@@ -57,7 +57,7 @@ def test_headers_and_readable_values() -> None:
     assert row[:10] == (
         "CP-12",
         "Spring PL email",
-        "Re-review",
+        "Needs re-review",
         "Personal loan",
         "Paid social",
         "LendCompare",

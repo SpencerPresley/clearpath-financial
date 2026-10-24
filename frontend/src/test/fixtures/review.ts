@@ -123,6 +123,9 @@ export function itemFixture(overrides: Partial<ItemDetailOut> = {}): ItemDetailO
     versions: [v1Summary, v2Summary],
     latest_decision: null,
     live_placements_count: 0,
+    numbers_change: null,
+    llm_check_failure_code: null,
+    llm_check_failure_reason: null,
     ...overrides,
   };
 }

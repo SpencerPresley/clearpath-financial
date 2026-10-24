@@ -13,7 +13,7 @@ const EXPECTED: Record<ItemStatus, [label: string, tone: string]> = {
   changes_requested: ['Changes requested', 'warning'],
   approved: ['Approved', 'success'],
   rejected: ['Rejected', 'error'],
-  needs_rereview: ['Re-review', 'alert'],
+  needs_rereview: ['Needs re-review', 'alert'],
   expired: ['Expired', 'neutral'],
   withdrawn: ['Withdrawn', 'neutral'],
 };

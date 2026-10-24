@@ -76,7 +76,7 @@ export const COLUMN_LABELS: Record<Exclude<ColumnId, 'select'>, string> = {
 
 /**
  * Hidden until chosen, so the default set fits 1280px without sideways scrolling. Product and channel are in
- * the preview drawer; re-review reason is implied by the Re-review status badge.
+ * the preview drawer; re-review reason is implied by the Needs re-review status badge.
  */
 export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   product: false,

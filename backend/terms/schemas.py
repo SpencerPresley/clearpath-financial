@@ -92,11 +92,11 @@ class BulkFastTrackIn(Schema):
     item_ids: list[int] = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=2000)
     seen_versions: list[SeenVersionIn] = Field(
-        default_factory=list,
+        min_length=1,
         max_length=500,
         description=(
-            "The generated version each item showed when the reviewer chose it. Send it: an item listed here is "
-            "approved only at that version (else skipped as stale_version); an item without an entry is approved "
-            "at whatever version is current, which a later terms change may have replaced unseen."
+            "The generated version each item showed when the lead chose it, one entry per item in item_ids (else 422 "
+            "on seen_versions, nothing approved). An item is approved only at that version, else skipped as "
+            "stale_version."
         ),
     )

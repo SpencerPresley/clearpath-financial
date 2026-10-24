@@ -1,5 +1,5 @@
 """Readable labels for exported files. Status labels are the UI's (frontend/src/ui/badges.tsx STATUS_META), so a
-spreadsheet says "Re-review" where the queue does (spec §5.4: one term per concept)."""
+spreadsheet says "Needs re-review" where the queue does (spec §5.4: one term per concept)."""
 
 from collections.abc import Mapping
 from typing import Final
@@ -13,7 +13,7 @@ STATUS_LABELS: Final[Mapping[ItemStatus, str]] = {
     ItemStatus.CHANGES_REQUESTED: "Changes requested",
     ItemStatus.APPROVED: "Approved",
     ItemStatus.REJECTED: "Rejected",
-    ItemStatus.NEEDS_REREVIEW: "Re-review",
+    ItemStatus.NEEDS_REREVIEW: "Needs re-review",
     ItemStatus.EXPIRED: "Expired",
     ItemStatus.WITHDRAWN: "Withdrawn",
 }

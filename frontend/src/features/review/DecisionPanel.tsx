@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import {
   getListDecisionsQueryKey,
-  useBulkFastTrackApprove,
+  useFastTrackApprove,
   usePullItem,
   useReaffirmApproval,
   useRecordDecision,
@@ -124,6 +124,13 @@ export interface DecisionPanelProps {
   onNeedsTriage: (message: string) => void;
 }
 
+/** 409 stale_version on fast-track: a terms change generated a newer version after the screen loaded. */
+function newerVersionMessage(error: unknown): string {
+  const currentN = apiErrorBody(error)?.details?.current_n;
+  const which = typeof currentN === 'number' ? `A newer version, v${String(currentN)},` : 'A newer version';
+  return `${which} arrived while you had this open. Check it, then fast-track again.`;
+}
+
 function LivePlacements({ itemId }: { itemId: number }) {
   const placements = useListPlacements(itemId);
   const live = (placements.data ?? []).filter((p) => p.is_live);
@@ -204,6 +211,10 @@ export function DecisionPanel({
       onNeedsTriage(apiErrorMessage(error));
       return;
     }
+    if (code === 'stale_version' && mode === 'fast_track') {
+      setErrors({ form: newerVersionMessage(error) });
+      return;
+    }
     setErrors({ form: apiErrorMessage(error) });
   };
 
@@ -215,15 +226,12 @@ export function DecisionPanel({
       onError: fail,
     },
   });
-  const fastTrack = useBulkFastTrackApprove({
+  // The single endpoint, at the version on screen: if a later terms change generated a newer one, it's a 409
+  // stale_version, never an approval of copy the reviewer didn't see.
+  const fastTrack = useFastTrackApprove({
     mutation: {
-      onSuccess: (result) => {
-        const skipped = result.skipped.find((s) => s.item_id === item.id);
-        if (skipped !== undefined) {
-          setErrors({ form: `Not fast-tracked: ${skipped.message}` });
-          return;
-        }
-        settle(currentN);
+      onSuccess: (d) => {
+        settle(d.version_n);
       },
       onError: fail,
     },
@@ -258,7 +266,7 @@ export function DecisionPanel({
     const trimmed = reason.trim();
     switch (mode) {
       case 'fast_track':
-        fastTrack.mutate({ data: { item_ids: [item.id], reason: trimmed } });
+        fastTrack.mutate({ itemId: item.id, data: { version_n: currentN, reason: trimmed } });
         return;
       case 'reaffirm':
         reaffirm.mutate({ itemId: item.id, data: { reason: trimmed } });
@@ -344,7 +352,11 @@ export function DecisionPanel({
               setReason(value);
               setErrors((e) => ({ ...e, reason: undefined }));
             }}
-            placeholder={copy.placeholder}
+            placeholder={
+              mode === 'fast_track' && item.numbers_change === false
+                ? 'e.g. Numbers unchanged; confirmed against the new terms'
+                : copy.placeholder
+            }
             errorMessage={errors.reason}
             rows={mode === 'changes_requested' ? 4 : 2}
             autoFocus={mode !== 'approved_with_edits'}

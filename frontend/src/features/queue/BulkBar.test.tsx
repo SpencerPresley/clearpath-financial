@@ -20,7 +20,7 @@ const REVIEWER: Viewer = { id: 2, name: 'Dana Whitfield', email: 'dana@x', roles
 const ROWS = [
   makeRow({ id: 1, status: 'submitted' }),
   makeRow({ id: 2, status: 'in_review' }),
-  makeRow({ id: 3, status: 'needs_rereview', reopen_reason: 'terms_changed' }),
+  makeRow({ id: 3, status: 'needs_rereview', reopen_reason: 'terms_changed', current_version_n: 4 }),
 ];
 
 function setup(viewer: Viewer, selectedIds = [1, 2, 3]) {
@@ -102,7 +102,7 @@ describe('BulkBar', () => {
     expect(screen.queryByRole('button', { name: /Fast-track/ })).toBeNull();
   });
 
-  it('fast-tracks only the re-review items, with a required reason', async () => {
+  it('fast-tracks only the re-review items, at the versions the rows showed, with a required reason', async () => {
     const bodies: BulkFastTrackIn[] = [];
     server.use(
       getBulkFastTrackApproveMockHandler(async ({ request }) => {
@@ -120,7 +120,14 @@ describe('BulkBar', () => {
     );
     await userEvent.click(confirm);
     await waitFor(() => {
-      expect(bodies).toEqual([{ item_ids: [3], reason: 'Only the APR changed (terms v13).' }]);
+      expect(bodies).toEqual([
+        {
+          item_ids: [3],
+          reason: 'Only the APR changed (terms v13).',
+          // A version generated after the queue loaded is skipped (stale_version), not approved unseen.
+          seen_versions: [{ item_id: 3, version_n: 4 }],
+        },
+      ]);
     });
     expect(await screen.findByText('Fast-tracked 1 item')).toBeInTheDocument();
   });

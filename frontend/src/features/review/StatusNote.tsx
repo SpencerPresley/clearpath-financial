@@ -39,6 +39,8 @@ export function StatusNote({
   }
   if (item.status === 'needs_rereview') {
     const approvedN = item.latest_decision?.version_n;
+    // The generated version quotes the new terms but none of its numbers moved: fast-track is a confirmation.
+    const numbersUnchanged = fastTrackAvailable(item) && item.numbers_change === false;
     const reason =
       item.reopen_reason === null ? 'Sent back for review' : REOPEN_REASON_LABELS[item.reopen_reason];
     return (
@@ -49,25 +51,35 @@ export function StatusNote({
           {item.live_placements_count > 0
             ? `Live in ${plural(item.live_placements_count, 'placement')}.`
             : 'No live placements.'}{' '}
-          {fastTrackAvailable(item)
-            ? `v${String(item.current_version_n)} was generated with the new numbers.`
-            : item.reopen_reason === 'terms_changed'
-              ? `v${String(item.current_version_n)} quotes the old terms and no updated version could be generated. Review it, or pull it.`
-              : item.reopen_reason === 'approval_expired' && item.approval_expires_at !== null
-                ? `Approval expired ${formatDate(item.approval_expires_at)}.`
-                : ''}
+          {numbersUnchanged ? (
+            <>
+              <strong>Numbers unchanged.</strong>{' '}
+              {`v${String(item.current_version_n)} matches approved v${String(approvedN)}; fast-track confirms it against the new terms.`}
+            </>
+          ) : fastTrackAvailable(item) ? (
+            `v${String(item.current_version_n)} was generated with the new numbers.`
+          ) : item.reopen_reason === 'terms_changed' ? (
+            `v${String(item.current_version_n)} quotes the old terms and no updated version could be generated. Review it, or pull it.`
+          ) : item.reopen_reason === 'approval_expired' && item.approval_expires_at !== null ? (
+            `Approval expired ${formatDate(item.approval_expires_at)}.`
+          ) : (
+            ''
+          )}
         </span>
-        {approvedN !== undefined && approvedN !== item.current_version_n && compareN !== approvedN && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={() => {
-              onCompareApproved(approvedN);
-            }}
-          >
-            Compare with approved v{approvedN}
-          </Button>
-        )}
+        {approvedN !== undefined &&
+          approvedN !== item.current_version_n &&
+          compareN !== approvedN &&
+          !numbersUnchanged && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                onCompareApproved(approvedN);
+              }}
+            >
+              Compare with approved v{approvedN}
+            </Button>
+          )}
       </div>
     );
   }
