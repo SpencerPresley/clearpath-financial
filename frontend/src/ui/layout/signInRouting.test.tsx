@@ -93,16 +93,23 @@ describe('sign-in routing', () => {
     backend('reviewer@clearpath.demo');
     const { router, queryClient } = renderApp('/queue?view=mine');
     expect(await screen.findByRole('heading', { name: 'Queue', level: 1 })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem('clearpath.queueTrail')).not.toBeNull();
+    });
 
     await signOut();
-    expect(router.state.location.href).toBe('/');
     // Only the (signed-out) session query is left: nothing of Dana's is cached for the next person.
-    expect(
-      queryClient
-        .getQueryCache()
-        .getAll()
-        .map((q) => q.queryKey[0]),
-    ).toEqual(['/api/me']);
+    await waitFor(() => {
+      expect(router.state.location.href).toBe('/');
+      expect(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.queryKey[0]),
+      ).toEqual(['/api/me']);
+    });
+    // Nor Dana's queue order in this tab: "Next item" would walk her view.
+    expect(window.sessionStorage.getItem('clearpath.queueTrail')).toBeNull();
 
     await signInAs('marketer@clearpath.demo');
     await waitFor(() => {

@@ -11,6 +11,7 @@ import { getGetMeQueryKey, getMe, useGetMe } from '../../api/generated/me/me';
 import type { MeOut } from '../../api/generated/model';
 import { Button } from '../Button';
 import { errorMessage, errorStatus } from '../errorMessage';
+import { forgetQueueTrail } from '../queueTrail';
 import { SignIn } from './SignIn';
 import { ViewerProvider } from './Viewer';
 import type { Viewer } from './Viewer';
@@ -47,6 +48,17 @@ export function SessionGate({ children, onSignedIn }: SessionGateProps) {
   useEffect(() => {
     if (shownId !== undefined) lastUserId.current = shownId;
   }, [shownId]);
+
+  // Signed out (sign-out or an expired session): nothing of the previous person stays, neither cached data nor
+  // their queue order in this tab. An effect, so it runs after the pages have unmounted; a still-mounted page
+  // would re-create what is dropped.
+  const signedOut = me.isError && isSignedOut(me.error);
+  useEffect(() => {
+    if (!signedOut) return;
+    queryClient.getMutationCache().clear();
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== getGetMeQueryKey()[0] });
+    forgetQueueTrail();
+  }, [signedOut, queryClient]);
 
   const enter = async () => {
     let next: MeOut;

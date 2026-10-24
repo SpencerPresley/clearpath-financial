@@ -7,6 +7,7 @@ import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'r
 import { getGetMeQueryKey } from '../../api/generated/me/me';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
+import { forgetQueueTrail } from '../queueTrail';
 import { showToast } from '../toast';
 import { signOut } from './session';
 import { landingFor } from './landing';
@@ -27,11 +28,9 @@ export function UserMenu() {
     setPending(true);
     signOut().then(
       async () => {
-        // Drop everything cached for this person, then let SessionGate find no session and show sign-in. Only
-        // then clear the URL: at "/" while still signed in, the index route would bounce to this person's
-        // landing. The next person starts from "/", not from this person's screen.
-        qc.getMutationCache().clear();
-        qc.removeQueries({ predicate: (q) => q.queryKey[0] !== getGetMeQueryKey()[0] });
+        // SessionGate finds no session, shows sign-in and drops what this person left behind. Then clear the URL
+        // (at "/" while still signed in, the index route would bounce to this person's landing): the next person
+        // starts from "/", not from this person's screen.
         await qc.resetQueries({ queryKey: getGetMeQueryKey() });
         await router.navigate({ to: '/', replace: true });
       },
@@ -53,6 +52,7 @@ export function UserMenu() {
     const notMe = (q: Query) => q.queryKey[0] !== getGetMeQueryKey()[0];
     await router.navigate({ to: landingFor(viewer.roles), replace: true });
     qc.getMutationCache().clear();
+    forgetQueueTrail(); // its rows were deleted with the old data
     qc.removeQueries({ type: 'inactive', predicate: notMe });
     await qc.resetQueries({ predicate: notMe });
   };
