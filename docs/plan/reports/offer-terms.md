@@ -188,11 +188,11 @@ Outbox handler: terms.fan_out (TERMS_PUBLISHED)
 
 ## Verification
 
-At the branch head, rebased on `origin/main` (`cd966ba`), test DB suffix `wsF`.
+At the branch head, rebased on `origin/main` (`7680525`, includes the LLM wiring #30), test DB suffix `wsF`.
 
 ```
 $ uv run pytest -q
-1250 passed, 1 deselected
+1283 passed, 2 deselected
 $ uv run --group lint ruff check . && uv run --group lint ruff format --check .
 All checks passed!
 $ uv run --group typecheck pyrefly check
