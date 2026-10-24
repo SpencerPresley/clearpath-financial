@@ -352,7 +352,11 @@ export function DecisionPanel({
               setReason(value);
               setErrors((e) => ({ ...e, reason: undefined }));
             }}
-            placeholder={copy.placeholder}
+            placeholder={
+              mode === 'fast_track' && item.numbers_change === false
+                ? 'e.g. Numbers unchanged; confirmed against the new terms'
+                : copy.placeholder
+            }
             errorMessage={errors.reason}
             rows={mode === 'changes_requested' ? 4 : 2}
             autoFocus={mode !== 'approved_with_edits'}
