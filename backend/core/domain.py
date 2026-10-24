@@ -69,6 +69,47 @@ class AttachmentKind(StrEnum):
     OTHER = "other"
 
 
+class ItemStatus(StrEnum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    IN_REVIEW = "in_review"
+    CHANGES_REQUESTED = "changes_requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    NEEDS_REREVIEW = "needs_rereview"
+    EXPIRED = "expired"
+    WITHDRAWN = "withdrawn"
+
+
+class DecisionOutcome(StrEnum):
+    APPROVED = "approved"
+    APPROVED_WITH_EDITS = "approved_with_edits"
+    CHANGES_REQUESTED = "changes_requested"
+    REJECTED = "rejected"
+
+
+class FindingState(StrEnum):
+    OPEN = "open"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
+
+
+class ReopenReason(StrEnum):
+    """Why an approved item came back: the reason carried by needs_rereview / expired."""
+
+    TERMS_CHANGED = "terms_changed"
+    APPROVAL_EXPIRED = "approval_expired"
+    DRIFT_DETECTED = "drift_detected"
+
+
+class CheckStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class RiskTier(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"
