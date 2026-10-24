@@ -1,0 +1,170 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'deploy/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at once, and never cancel one halfway through a migration.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # Repo variables come from `terraform output` (infra/README.md). Until the
+    # stack is applied DEPLOY_ROLE_ARN is unset and the job is skipped, not failed.
+    if: vars.DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    environment: production # the deploy role's trust policy is pinned to this
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+      APP_INSTANCE_ID: ${{ vars.APP_INSTANCE_ID }}
+      FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+      IMAGE: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" |
+            docker login --username AWS --password-stdin "${ECR_REPOSITORY_URL%%/*}"
+
+      # Tags are immutable git SHAs, so a re-run for the same commit reuses the
+      # image instead of failing the push.
+      - name: Build and push backend image
+        run: |
+          if aws ecr describe-images --repository-name "${ECR_REPOSITORY_URL#*/}" \
+              --image-ids "imageTag=${GITHUB_SHA}" >/dev/null 2>&1; then
+            echo "Image ${IMAGE} already in ECR; pulling"
+            docker pull --quiet "$IMAGE"
+          else
+            docker build --pull --target prod -t "$IMAGE" backend
+            docker push --quiet "$IMAGE"
+          fi
+
+      # Django admin's CSS/JS. Nothing on the server serves /static/, so it
+      # ships to the frontend bucket and CloudFront's default behavior serves it.
+      # Settings need these two values to import; neither is used.
+      - name: Collect Django static files
+        run: |
+          docker run --name collectstatic --user 0 \
+            -e CLEARPATH_ENV_FILE= -e DJANGO_SECRET_KEY=collectstatic-only -e POSTGRES_PASSWORD=unused \
+            "$IMAGE" python manage.py collectstatic --noinput
+          docker cp collectstatic:/app/staticfiles ./django-static
+          docker rm collectstatic
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Built before touching the server so a broken frontend build stops the
+      # deploy while production is still on the previous release.
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # Ships deploy/ inline (base64) with the command, so the server always
+      # runs the scripts from this commit.
+      - name: Deploy backend via SSM Run Command
+        run: |
+          b64() { base64 -w0 "$1"; }
+          params=$(jq -n \
+            --arg compose "$(b64 deploy/compose.prod.yaml)" \
+            --arg render "$(b64 deploy/render-env.sh)" \
+            --arg deploy "$(b64 deploy/deploy.sh)" \
+            --arg image "$IMAGE" \
+            '{
+              executionTimeout: ["900"],
+              commands: [
+                "set -eu",
+                "install -d -m 0750 /srv/clearpath",
+                "echo \($compose) | base64 -d > /srv/clearpath/compose.prod.yaml",
+                "echo \($render) | base64 -d > /srv/clearpath/render-env.sh",
+                "echo \($deploy) | base64 -d > /srv/clearpath/deploy.sh",
+                "chmod 0750 /srv/clearpath/render-env.sh /srv/clearpath/deploy.sh",
+                "/srv/clearpath/deploy.sh \($image)"
+              ]
+            }')
+          command_id=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --instance-ids "$APP_INSTANCE_ID" \
+            --comment "deploy ${GITHUB_SHA::12}" \
+            --parameters "$params" \
+            --query Command.CommandId --output text)
+          echo "SSM command ${command_id}"
+
+          # Poll to a terminal status; anything but Success fails the job.
+          deadline=$((SECONDS + 1200))
+          while :; do
+            if result=$(aws ssm get-command-invocation --command-id "$command_id" \
+                --instance-id "$APP_INSTANCE_ID" --output json 2>&1); then
+              status=$(jq -r .Status <<<"$result")
+            elif grep -q InvocationDoesNotExist <<<"$result"; then
+              status=Pending # not registered yet right after send-command
+            else
+              echo "$result"; exit 1
+            fi
+            echo "$(date -u +%H:%M:%S) ${status}"
+            case "$status" in
+              Pending|InProgress|Delayed) ;;
+              Success)
+                jq -r .StandardOutputContent <<<"$result"
+                exit 0 ;;
+              *)
+                echo "--- stdout"; jq -r .StandardOutputContent <<<"$result"
+                echo "--- stderr"; jq -r .StandardErrorContent <<<"$result"
+                echo "::error::SSM deploy ended with status ${status} ($(jq -r .StatusDetails <<<"$result"))"
+                exit 1 ;;
+            esac
+            if (( SECONDS > deadline )); then
+              echo "::error::SSM deploy still ${status} after 20 minutes"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      # Hashed assets are immutable and never deleted, so a tab still running
+      # the previous index.html can lazy-load its old chunks. Everything else
+      # is revalidated on each request.
+      - name: Upload frontend and admin static files
+        run: |
+          aws s3 sync frontend/dist/assets "s3://${FRONTEND_BUCKET}/assets" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync frontend/dist "s3://${FRONTEND_BUCKET}" --delete \
+            --exclude "assets/*" --exclude "static/*" --cache-control "no-cache"
+          aws s3 sync django-static "s3://${FRONTEND_BUCKET}/static" --delete \
+            --cache-control "public,max-age=3600"
+
+      - name: Invalidate CloudFront
+        run: |
+          invalidation_id=$(aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths '/*' \
+            --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --id "$invalidation_id"
