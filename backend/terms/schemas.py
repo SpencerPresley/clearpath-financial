@@ -28,6 +28,10 @@ class OfferTermsPublishIn(Schema):
 
     product: Product
     values: OfferTermsValues
+    based_on_terms_id: int | None = Field(
+        description="The version in effect when the lead opened the form (null for a product's first terms). If "
+        "another version was published since, the save is refused with 409 conflict: re-run the preview."
+    )
     note: str = Field(default="", max_length=2000)
 
 
@@ -77,3 +81,22 @@ class ImpactPreviewOut(Schema):
 class FastTrackIn(Schema):
     version_n: int = Field(description="The generated version the reviewer looked at; stale if a newer one exists.")
     reason: str = Field(min_length=1, max_length=2000)
+
+
+class SeenVersionIn(Schema):
+    item_id: int
+    version_n: int
+
+
+class BulkFastTrackIn(Schema):
+    item_ids: list[int] = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=1, max_length=2000)
+    seen_versions: list[SeenVersionIn] = Field(
+        default_factory=list,
+        max_length=500,
+        description=(
+            "The generated version each item showed when the reviewer chose it. Send it: an item listed here is "
+            "approved only at that version (else skipped as stale_version); an item without an entry is approved "
+            "at whatever version is current, which a later terms change may have replaced unseen."
+        ),
+    )

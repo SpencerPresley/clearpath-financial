@@ -2,6 +2,8 @@
 
 import re
 from collections.abc import Callable
+from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from django.test import Client
@@ -9,16 +11,17 @@ from django.test import Client
 from accounts.models import User
 from checks.models import Finding
 from core.clock import FixedClock
-from core.domain import DecisionLane, ItemStatus, Role
-from core.errors import NotPermitted
+from core.domain import DecisionLane, ItemStatus, ReopenReason, Role
+from core.errors import Conflict, NotPermitted
 from reviews.assignment import assign_item
 from reviews.models import Decision, ReviewItem
 from reviews.records import version_diff
+from reviews.rereview import send_back
 from reviews.services import SubmitItemResult
 from terms.fanout import fan_out_item
 from terms.fast_track import bulk_fast_track_approve, fast_track_approve
 from terms.models import OfferTerms
-from terms.tests.conftest import UNQUALIFIED, WORKED_EXAMPLE, approve, go_live, publish
+from terms.tests.conftest import NEW_FLOOR, UNQUALIFIED, WORKED_EXAMPLE, approve, go_live, publish
 
 type Submit = Callable[..., SubmitItemResult]
 
@@ -198,3 +201,38 @@ def test_fast_track_api(
     assert bulk_refused.status_code == 403
     assert bulk.status_code == 200
     assert bulk.json() == {"succeeded": [second.pk], "skipped": []}
+
+
+@pytest.mark.django_db
+def test_bulk_skips_an_item_whose_version_changed_since_it_was_seen(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    """The reviewer saw v2 (12.99%); a second terms change regenerated v3 (9.99%) before the click. Approving v3 in
+    their name would record a decision on copy they never saw."""
+    item = _reopened(submit, reviewer, marketer, lead, clock)
+    publish(lead, clock)
+    _fan_out_all(item, clock=clock)
+    clock.advance(timedelta(minutes=5))
+    publish(lead, clock, NEW_FLOOR.model_copy(update={"apr_min": Decimal("9.99")}))
+    _fan_out_all(item, clock=clock)
+
+    result = bulk_fast_track_approve(
+        actor=reviewer, item_ids=[item.pk], reason=REASON, seen_versions={item.pk: 2}, clock=clock
+    )
+
+    assert result.succeeded == ()
+    assert [(s.item_id, s.code) for s in result.skipped] == [(item.pk, "stale_version")]
+    assert ReviewItem.objects.get(pk=item.pk).status == ItemStatus.NEEDS_REREVIEW
+
+
+@pytest.mark.django_db
+def test_only_a_generated_version_can_be_fast_tracked(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item = _reopened(submit, reviewer, marketer, lead, clock)
+    send_back(item_id=item.pk, reason=ReopenReason.APPROVAL_EXPIRED, clock=clock)  # no terms change: v1 current
+
+    with pytest.raises(Conflict) as caught:
+        fast_track_approve(actor=reviewer, item_id=item.pk, version_n=1, reason=REASON, clock=clock)
+
+    assert caught.value.code == "conflict"

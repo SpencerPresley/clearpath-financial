@@ -13,6 +13,8 @@ import type { Product } from './product';
  * instant. Values identical to the version in effect are refused (422 on `values`).
  */
 export interface OfferTermsPublishIn {
+  /** The version in effect when the lead opened the form (null for a product's first terms). If another version was published since, the save is refused with 409 conflict: re-run the preview. */
+  based_on_terms_id: number | null;
   /** @maxLength 2000 */
   note?: string;
   product: Product;

@@ -9,6 +9,7 @@ from core.domain import PersonalLoanTerms
 from reviews.models import ReviewItem
 from reviews.placements import PlacementInput, record_placement
 from reviews.tests.conftest import PL_VALUES, approve, approved, pl_terms, submit
+from terms.selectors import terms_in_effect
 from terms.services import PublishTermsInput, publish_terms
 
 __all__ = ["PL_VALUES", "approve", "approved", "pl_terms", "submit"]
@@ -31,7 +32,12 @@ NEW_FLOOR = PL_VALUES.model_copy(update={"apr_min": Decimal("12.99")})
 
 
 def publish(lead: User, clock: FixedClock, values: PersonalLoanTerms = NEW_FLOOR) -> int:
-    return publish_terms(actor=lead, data=PublishTermsInput(product=values.product, values=values), clock=clock)
+    """Publish as the lead, based on whatever version is in effect (the form was just loaded)."""
+    current = terms_in_effect(product=values.product, clock=clock)
+    data = PublishTermsInput(
+        product=values.product, values=values, based_on_terms_id=current.pk if current is not None else None
+    )
+    return publish_terms(actor=lead, data=data, clock=clock)
 
 
 def go_live(item: ReviewItem, marketer: User, clock: FixedClock) -> None:

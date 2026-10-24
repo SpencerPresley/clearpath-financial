@@ -8,7 +8,7 @@ from accounts.models import User
 from audit.models import Event
 from core.clock import FixedClock
 from core.domain import EventType, Product
-from core.errors import InvalidInput, NotPermitted
+from core.errors import Conflict, InvalidInput, NotPermitted
 from reviews.tests.conftest import CC_VALUES, PL_VALUES
 from terms.models import OfferTerms
 from terms.services import PublishTermsInput, publish_terms
@@ -38,7 +38,7 @@ def test_publish_closes_previous_and_opens_new(pl_terms: OfferTerms, lead: User,
 
 @pytest.mark.django_db
 def test_first_publish_has_no_previous(pl_terms: OfferTerms, lead: User, clock: FixedClock) -> None:
-    data = PublishTermsInput(product=Product.CREDIT_CARD, values=CC_VALUES)
+    data = PublishTermsInput(product=Product.CREDIT_CARD, values=CC_VALUES, based_on_terms_id=None)
     new_id = publish_terms(actor=lead, data=data, clock=clock)
 
     new = OfferTerms.objects.get(pk=new_id)
@@ -57,8 +57,10 @@ def test_identical_values_refused(pl_terms: OfferTerms, lead: User, clock: Fixed
 
 @pytest.mark.django_db
 def test_values_must_match_product(pl_terms: OfferTerms, lead: User, clock: FixedClock) -> None:
+    data = PublishTermsInput(product=Product.CREDIT_CARD, values=PL_VALUES, based_on_terms_id=None)
+
     with pytest.raises(InvalidInput):
-        publish_terms(actor=lead, data=PublishTermsInput(product=Product.CREDIT_CARD, values=PL_VALUES), clock=clock)
+        publish_terms(actor=lead, data=data, clock=clock)
 
 
 @pytest.mark.django_db
@@ -95,3 +97,34 @@ def test_versions_keep_counting(pl_terms: OfferTerms, lead: User, clock: FixedCl
 
     assert OfferTerms.objects.get(pk=third).version == 3
     assert OfferTerms.objects.filter(product="personal_loan", effective_range__upper_inf=True).count() == 1
+
+
+@pytest.mark.django_db
+def test_stale_base_is_refused_instead_of_reverting_another_leads_change(
+    pl_terms: OfferTerms, lead: User, clock: FixedClock
+) -> None:
+    """Leads A and B both open the form at v1. A publishes a 12.99% floor (v2). B's fee change, built on v1's
+    values, would put 7.49% back; it's refused so B re-runs the preview on v2."""
+    publish(lead, clock)  # A
+    b_values = PL_VALUES.model_copy(update={"origination_fee_max_pct": Decimal(7)})
+
+    with pytest.raises(Conflict) as caught:
+        publish_terms(
+            actor=lead,
+            data=PublishTermsInput(product=Product.PERSONAL_LOAN, values=b_values, based_on_terms_id=pl_terms.pk),
+            clock=clock,
+        )
+
+    assert "v2 is in effect now" in caught.value.message
+    assert OfferTerms.objects.filter(product="personal_loan").count() == 2
+    assert Event.objects.filter(type=EventType.TERMS_PUBLISHED).count() == 1
+
+
+@pytest.mark.django_db
+def test_first_publish_must_say_there_was_no_base(pl_terms: OfferTerms, lead: User, clock: FixedClock) -> None:
+    with pytest.raises(Conflict):
+        publish_terms(
+            actor=lead,
+            data=PublishTermsInput(product=Product.CREDIT_CARD, values=CC_VALUES, based_on_terms_id=pl_terms.pk),
+            clock=clock,
+        )

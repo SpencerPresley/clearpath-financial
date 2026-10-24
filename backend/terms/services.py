@@ -18,7 +18,7 @@ from audit.services import record_event
 from core.clock import SYSTEM_CLOCK, Clock
 from core.db import constraint_name
 from core.domain import CreditCardTerms, EntityType, EventType, PersonalLoanTerms, Product, Role
-from core.errors import InvalidInput, TermsRangeOverlap
+from core.errors import Conflict, InvalidInput, TermsRangeOverlap
 from core.permissions import require_role
 from terms.models import OfferTerms
 from terms.selectors import affected_approvals
@@ -32,6 +32,7 @@ TERMS_LOCK_CLASS: Final = 0x4350_5452
 class PublishTermsInput:
     product: Product
     values: PersonalLoanTerms | CreditCardTerms
+    based_on_terms_id: int | None  # the version the lead's form showed; None for a product's first terms
     note: str = ""
 
 
@@ -44,20 +45,26 @@ def publish_terms(*, actor: User, data: PublishTermsInput, clock: Clock = SYSTEM
     """A new version of `data.product`'s terms, in effect from now; the previous version's range closes at the
     same instant. Leads only. Returns the new OfferTerms id.
 
-    Refused: values for another product, and values identical to the version in effect (publishing them would send
-    every quoting item to re-review for nothing). The event lists the approved items quoting the now-superseded
+    Refused: values for another product; values identical to the version in effect (publishing them would send
+    every quoting item to re-review for nothing); and a stale `based_on_terms_id` (409 conflict: another lead
+    published since this lead's form and impact preview loaded, and saving would silently revert their change).
+    The event lists the items quoting the now-superseded
     version; the fan-out handler recomputes that list when it runs, so the payload is the audit record, not the
     work queue.
     """
     require_role(actor, Role.LEAD)
     if data.values.product != data.product:
         raise InvalidInput.for_field("values", f"These values are for {data.values.product}, not {data.product}.")
-    now = clock.now()
     with transaction.atomic():
-        _lock(data.product)
-        previous = (
-            OfferTerms.objects.select_for_update().filter(product=data.product, effective_range__upper_inf=True).first()
-        )
+        _lock(data.product)  # serializes publishers; no row lock, which would stall ref inserts (FK key-share)
+        now = clock.now()  # after the lock: a publisher that waited must not close a range before it opened
+        previous = OfferTerms.objects.filter(product=data.product, effective_range__upper_inf=True).first()
+        if (previous.pk if previous is not None else None) != data.based_on_terms_id:
+            current = f"v{previous.version}" if previous is not None else "no version"
+            raise Conflict(
+                f"The offer terms changed since you opened this ({current} is in effect now). Review the impact again.",
+                details={"current_terms_id": previous.pk if previous is not None else None},
+            )
         if previous is not None and previous.typed_values == data.values:
             raise InvalidInput.for_field("values", f"Nothing changed: these are v{previous.version}'s values.")
         if previous is not None:

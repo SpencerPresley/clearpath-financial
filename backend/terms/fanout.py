@@ -67,8 +67,8 @@ def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
         lead = terms.created_by
         try:
             text = render_fast_track(approval.content_text, approval.refs, terms.typed_values)
-        except StaleTermsRef:  # decide here: this item can't be fast-tracked, so it goes to the normal lane
-            logger.info("fan-out item_id=%d: refs don't fit the approved text; normal lane", item_id, exc_info=True)
+        except StaleTermsRef as exc:  # decide here: this item can't be fast-tracked, so it goes to the normal lane
+            logger.info("fan-out item_id=%d: refs don't fit the approved text (%s); normal lane", item_id, exc)
             generated = None
         else:
             based_on = Version.objects.get(pk=approval.version_id)

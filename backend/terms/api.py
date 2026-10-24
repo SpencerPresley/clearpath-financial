@@ -5,9 +5,16 @@ from accounts.api import current_user
 from core.domain import Product
 from core.schemas import ERRORS
 from reviews import assignment, records
-from reviews.schemas import BulkFastTrackIn, BulkResultOut, DecisionOut
+from reviews.schemas import BulkResultOut, DecisionOut
 from terms import fast_track, impact, selectors, services
-from terms.schemas import FastTrackIn, ImpactPreviewIn, ImpactPreviewOut, OfferTermsOut, OfferTermsPublishIn
+from terms.schemas import (
+    BulkFastTrackIn,
+    FastTrackIn,
+    ImpactPreviewIn,
+    ImpactPreviewOut,
+    OfferTermsOut,
+    OfferTermsPublishIn,
+)
 
 router = Router(tags=["terms"])
 # Fast-track approval is a decision; it lives here with the fan-out that creates the versions it approves.
@@ -40,10 +47,13 @@ def impact_preview(request: HttpRequest, body: ImpactPreviewIn) -> impact.Impact
 def publish_terms(request: HttpRequest, body: OfferTermsPublishIn) -> Status[selectors.OfferTermsRow]:
     """Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
     generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
-    the rest to expired(terms_changed). Unchanged values are 422 on `values`."""
+    the rest to expired(terms_changed). Unchanged values are 422 on `values`; a stale `based_on_terms_id` (another
+    version was published since the form loaded) is 409 conflict."""
     terms_id = services.publish_terms(
         actor=current_user(request),
-        data=services.PublishTermsInput(product=body.product, values=body.values, note=body.note),
+        data=services.PublishTermsInput(
+            product=body.product, values=body.values, based_on_terms_id=body.based_on_terms_id, note=body.note
+        ),
     )
     return Status(201, selectors.get_offer_terms(terms_id=terms_id))
 
@@ -73,4 +83,9 @@ def bulk_fast_track(request: HttpRequest, body: BulkFastTrackIn) -> assignment.B
     fast-track's checks (a reviewer only their own items). Anything that can't be fast-tracked (open findings, not
     in needs_rereview, a newer version, someone else's item) is listed in `skipped` with its error code and stays in
     the normal lane (ruling 4)."""
-    return fast_track.bulk_fast_track_approve(actor=current_user(request), item_ids=body.item_ids, reason=body.reason)
+    return fast_track.bulk_fast_track_approve(
+        actor=current_user(request),
+        item_ids=body.item_ids,
+        reason=body.reason,
+        seen_versions={v.item_id: v.version_n for v in body.seen_versions},
+    )

@@ -628,6 +628,15 @@
             "minLength": 1,
             "title": "Reason",
             "type": "string"
+          },
+          "seen_versions": {
+            "description": "The generated version each item showed when the reviewer chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.",
+            "items": {
+              "$ref": "#/components/schemas/SeenVersionIn"
+            },
+            "maxItems": 500,
+            "title": "Seen Versions",
+            "type": "array"
           }
         },
         "required": [
@@ -7198,6 +7207,18 @@
       "OfferTermsPublishIn": {
         "description": "A new version of a product's terms. It takes effect now and closes the current version's range at the same\ninstant. Values identical to the version in effect are refused (422 on `values`).",
         "properties": {
+          "based_on_terms_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version in effect when the lead opened the form (null for a product's first terms). If another version was published since, the save is refused with 409 conflict: re-run the preview.",
+            "title": "Based On Terms Id"
+          },
           "note": {
             "default": "",
             "maxLength": 2000,
@@ -7228,7 +7249,8 @@
         },
         "required": [
           "product",
-          "values"
+          "values",
+          "based_on_terms_id"
         ],
         "title": "OfferTermsPublishIn",
         "type": "object"
@@ -8733,6 +8755,24 @@
           "hits"
         ],
         "title": "SearchResultsOut",
+        "type": "object"
+      },
+      "SeenVersionIn": {
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "version_n": {
+            "title": "Version N",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "version_n"
+        ],
+        "title": "SeenVersionIn",
         "type": "object"
       },
       "Severity": {
@@ -19462,7 +19502,7 @@
         ]
       },
       "post": {
-        "description": "Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a\ngenerated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),\nthe rest to expired(terms_changed). Unchanged values are 422 on `values`.",
+        "description": "Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a\ngenerated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),\nthe rest to expired(terms_changed). Unchanged values are 422 on `values`; a stale `based_on_terms_id` (another\nversion was published since the form loaded) is 409 conflict.",
         "operationId": "publishOfferTerms",
         "parameters": [],
         "requestBody": {

@@ -59,7 +59,8 @@ export const ListOfferTermsResponse = zod.array(ListOfferTermsResponseItem)
 /**
  * Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
  * generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
- * the rest to expired(terms_changed). Unchanged values are 422 on `values`.
+ * the rest to expired(terms_changed). Unchanged values are 422 on `values`; a stale `based_on_terms_id` (another
+ * version was published since the form loaded) is 409 conflict.
  * @summary Publish Terms
  */
 export const publishOfferTermsBodyNoteDefault = ``;
@@ -73,6 +74,7 @@ export const publishOfferTermsBodyValuesTwoProductDefault = `credit_card`;
 export const publishOfferTermsBodyValuesTwoPurchaseAprVariableDefault = true;
 
 export const PublishOfferTermsBody = zod.object({
+  "based_on_terms_id": zod.union([zod.int(),zod.null()]).describe('The version in effect when the lead opened the form (null for a product\'s first terms). If another version was published since, the save is refused with 409 conflict: re-run the preview.'),
   "note": zod.string().max(publishOfferTermsBodyNoteMax).default(publishOfferTermsBodyNoteDefault),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
   "values": zod.union([zod.object({

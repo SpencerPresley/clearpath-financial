@@ -173,7 +173,8 @@ export const getPublishOfferTermsUrl = () => {
 /**
  * Save a new version, in effect now. Leads only. Every approved item quoting the previous version then gets a
  * generated fast-track version (in the background, seconds): live items go to needs_rereview(terms_changed),
- * the rest to expired(terms_changed). Unchanged values are 422 on `values`.
+ * the rest to expired(terms_changed). Unchanged values are 422 on `values`; a stale `based_on_terms_id` (another
+ * version was published since the form loaded) is 409 conflict.
  * @summary Publish Terms
  */
 export const publishOfferTerms = async (offerTermsPublishIn: OfferTermsPublishIn, options?: Parameters<typeof customFetch>[1]): Promise<OfferTermsOut> => {

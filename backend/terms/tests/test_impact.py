@@ -159,3 +159,18 @@ def test_preview_api(world: dict[str, ReviewItem], lead: User, reviewer: User) -
     assert data["will_need_rereview"] == 2
     assert {i["lane"] for i in data["items"]} == {"fast_track", "normal"}
     assert data["items"][0]["item"]["key"].startswith("CP-")
+
+
+@pytest.mark.django_db
+def test_normal_lane_rereviews_are_not_promised_new_numbers(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item = _approved(submit, reviewer, clock)
+    go_live(item, marketer, clock)
+    TermsRef.objects.filter(version=item.current_version, field="apr_max").update(quoted_value=Decimal("34.99"))
+    send_back(item_id=item.pk, reason=ReopenReason.APPROVAL_EXPIRED, clock=clock)
+
+    preview = impact_preview(viewer=lead, product=Product.PERSONAL_LOAN, values=NEW_FLOOR, clock=clock)
+
+    assert (preview.already_in_rereview, preview.normal_lane) == (1, 1)
+    assert preview.summary == "No approved items quote v1."

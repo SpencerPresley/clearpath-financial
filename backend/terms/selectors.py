@@ -145,13 +145,16 @@ def affected_approvals(
     clock: Clock = SYSTEM_CLOCK,
     item_ids: Iterable[int] | None = None,
     if_published_now: bool = False,
+    statuses: Iterable[ItemStatus] = AFFECTED_STATUSES,
 ) -> tuple[AffectedApproval, ...]:
     """Non-legacy items of `product` (optionally only `item_ids`) whose copy quotes a terms version not in effect
     now (see `AffectedApproval`), ordered by item id. Four queries whatever the item count.
 
     `if_published_now` (the impact preview): as if a new version took effect now, so every version counts as
-    superseded and any quoted terms make the item affected."""
-    items = ReviewItem.objects.filter(status__in=[s.value for s in AFFECTED_STATUSES], is_legacy=False, product=product)
+    superseded and any quoted terms make the item affected. `statuses` narrows the statuses considered (a subset of
+    `AFFECTED_STATUSES`)."""
+    wanted_statuses = [s.value for s in statuses if s in AFFECTED_STATUSES]
+    items = ReviewItem.objects.filter(status__in=wanted_statuses, is_legacy=False, product=product)
     if item_ids is not None:
         items = items.filter(pk__in=list(item_ids))
     candidates = _candidates(items)

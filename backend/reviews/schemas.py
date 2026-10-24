@@ -357,11 +357,6 @@ class PullIn(Schema):
     placement_ids: list[int] = Field(default_factory=list, description="Defaults to every live placement.")
 
 
-class BulkFastTrackIn(Schema):
-    item_ids: list[int] = Field(min_length=1, max_length=500)
-    reason: str = Field(min_length=1, max_length=2000)
-
-
 # --- saved views -----------------------------------------------------------------------------------------------
 
 

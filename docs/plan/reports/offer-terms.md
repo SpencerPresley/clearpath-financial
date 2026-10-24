@@ -35,13 +35,19 @@ on E's lock-order and gate contracts.
 
 ### `POST /api/terms` (`publishOfferTerms`, tag terms). Lead only.
 
-Body: `OfferTermsPublishIn {product, values, note?}`. **`effective_from` was removed**: a version takes effect now
-(ruling 1 below).
+Body: `OfferTermsPublishIn {product, values, based_on_terms_id, note?}`.
+- **`effective_from` was removed**: a version takes effect now (ruling 1 below).
+- **`based_on_terms_id` is required**: the id of the version in effect when the form and preview loaded
+  (`GET /terms/current`), or `null` for a product's first terms. If another lead published since, the save is a
+  409 `conflict` ("The offer terms changed since you opened this (v3 is in effect now). Review the impact
+  again."). On that 409, reload the terms and re-run the preview. Without this check, B's save would silently
+  put back the rate A just changed.
 - 201: `OfferTermsOut` (the new version, `is_current: true`).
 - 403 `not_permitted` for anyone but a lead.
 - 422 `invalid_input` with `fields[0].loc = ["body","values"]`, in two cases: the values match the version in
   effect ("Nothing changed: these are v3's values."), or the values are for another product.
-- 409 `terms_range_overlap` only on a clock anomaly.
+- 409 `conflict` for a stale `based_on_terms_id` (above). 409 `terms_range_overlap` should not occur: `now` is
+  read after the per-product lock.
 
 The fan-out runs in the background, typically within seconds (outbox beat every 2 s). Invalidate the queue,
 item, and terms queries after a publish.
@@ -86,11 +92,19 @@ Body: `FastTrackIn {version_n, reason}`. Send the generated version's `n`, the o
 
 ### `POST /api/items/bulk/fast-track-approve` (`bulkFastTrackApprove`). Reviewers and leads.
 
-Body: `{item_ids (1–500), reason}`. Returns 200 `BulkResultOut {succeeded[], skipped[{item_id, code, message}]}`.
+Body: `{item_ids (1–500), reason, seen_versions?: [{item_id, version_n}]}`. Returns 200
+`BulkResultOut {succeeded[], skipped[{item_id, code, message}]}`.
+
+**Send `seen_versions`** with the `current_version_n` each row or screen showed. An item listed there is approved
+only at that version, else it is skipped as `stale_version`. An item without an entry is approved at its current
+version. That version may be one a later terms change generated after the page loaded, so the reviewer would be
+recorded approving copy they never saw.
+
+**Action for I/J:** the review screen's Fast-track button (`DecisionPanel.tsx`) calls bulk without
+`seen_versions`. Either add `seen_versions: [{item_id, version_n: currentN}]`, or switch it to `fastTrackApprove`.
 Each item gets the single endpoint's checks, so a reviewer's bulk skips other reviewers' items with
 `not_permitted`. Other skip codes: `open_findings_block_decision` (send these to the normal lane),
-`invalid_transition`, `stale_version`, `not_found`. The review screen (I) already calls this for its single
-Fast-track button and works unchanged. The single endpoint is there for a cleaner 409 on one item.
+`invalid_transition`, `stale_version`, `not_found`. The single endpoint gives a cleaner 409 on one item.
 
 ### Diff
 
@@ -108,14 +122,15 @@ J or I should drop Reaffirm whenever `fastTrackAvailable` holds.
 ## Backend interfaces
 
 ```python
-terms.services.publish_terms(*, actor, data: PublishTermsInput(product, values, note=""), clock) -> int
+terms.services.publish_terms(*, actor, data: PublishTermsInput(product, values, based_on_terms_id, note=""), clock) -> int
 terms.selectors.terms_in_effect(*, product, clock) -> OfferTerms | None
-terms.selectors.affected_approvals(*, product, clock, item_ids=None, if_published_now=False) -> tuple[AffectedApproval]
+terms.selectors.affected_approvals(*, product, clock, item_ids=None, if_published_now=False, statuses=AFFECTED_STATUSES)
+  -> tuple[AffectedApproval]
   AffectedApproval(item_id, status, version_id, version_n, content_text, refs: tuple[TermsRefDraft], quoted_terms_ids)
 terms.fanout.fan_out_item(*, item_id, clock) -> FanOutOutcome
   # reopened_fast_track | reopened_normal_lane | expired | expired_normal_lane | regenerated | regenerate_failed | skipped
 terms.fast_track.fast_track_approve(*, actor, item_id, version_n, reason, clock) -> DecisionResult
-terms.fast_track.bulk_fast_track_approve(*, actor, item_ids, reason, clock) -> BulkResult
+terms.fast_track.bulk_fast_track_approve(*, actor, item_ids, reason, seen_versions=None, clock) -> BulkResult
 terms.impact.impact_preview(*, viewer, product, values, clock) -> ImpactPreview
 Celery: terms.fan_out_item(item_id) (autoretry), terms.reconcile_fan_out (beat, 900 s)
 Outbox handler: terms.fan_out (TERMS_PUBLISHED)
@@ -148,7 +163,9 @@ Outbox handler: terms.fan_out (TERMS_PUBLISHED)
    reaffirmed nor fast-tracked; it can only be claimed into a full review. The new version is always rendered
    from the approved text, never from an earlier generated one. Cost if wrong: drop needs_rereview from
    `AFFECTED_STATUSES`.
-8. Ruling: the handler enqueues on commit, and a 15-minute reconcile beat backs it up. The handler runs inside
+8. Ruling: the handler enqueues on commit (`robust=True`, so one broker error doesn't drop the rest), and a
+   15-minute reconcile beat backs it up. The reconcile covers approved items only: a needs_rereview item whose refs
+   don't fit its copy would otherwise be re-run every pass. The handler runs inside
    its receipt's transaction, and a direct `.delay` under eager mode would nest every item in one transaction.
    The reconcile closes the window where a worker dies between the receipt's commit and the enqueue: nothing else
    leaves an approval quoting superseded terms. Cost if wrong: one beat entry.
@@ -157,6 +174,8 @@ Outbox handler: terms.fan_out (TERMS_PUBLISHED)
 
 - `backend/reviews/api.py`: removed the `bulkFastTrackApprove` stub and its schema import. The operation id, path
   and tag are unchanged; it now lives in `terms/api.py`.
+- `backend/reviews/schemas.py`: `BulkFastTrackIn` moved to `terms/schemas.py`, gaining optional `seen_versions`.
+  The generated model name and the existing `{item_ids, reason}` calls are unchanged.
 - `backend/config/api.py`: registers `terms.api.fast_track_router`.
 - `backend/config/settings/base.py`: beat entry `terms-fan-out-reconcile`.
 - `backend/config/tests/test_contract.py`: removed the three implemented stubs and the now-dead terms body
@@ -195,6 +214,11 @@ Tests (52 in `terms/tests`):
 
 ## Open risks / follow-ups
 
+- **A claimed re-review loses the fast-track lane on a later terms change.** Once claimed, the item is in_review,
+  which isn't in `AFFECTED_STATUSES`, so a second publish doesn't regenerate it. It isn't stuck: approve-with-edits
+  and request-changes work. Review M3.
+- **The publish event's `affected_item_ids` is unbounded.** That's fine at demo scale. Cap it, or store a count,
+  if volume grows (review M5).
 - **In-flight reviews quoting the old terms** (submitted or in_review when terms change) aren't touched. E's
   `stale_offer_terms` gate then refuses Approve, so the reviewer has to Approve with edits (v+1 is checked against
   the new terms) or Request changes. This is out of F's scope as briefed. A cheap option: the fan-out adds a

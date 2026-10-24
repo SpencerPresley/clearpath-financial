@@ -18,11 +18,17 @@ export const bulkFastTrackApproveBodyItemIdsMax = 500;
 
 export const bulkFastTrackApproveBodyReasonMax = 2000;
 
+export const bulkFastTrackApproveBodySeenVersionsMax = 500;
+
 
 
 export const BulkFastTrackApproveBody = zod.object({
   "item_ids": zod.array(zod.int()).min(1).max(bulkFastTrackApproveBodyItemIdsMax),
-  "reason": zod.string().min(1).max(bulkFastTrackApproveBodyReasonMax)
+  "reason": zod.string().min(1).max(bulkFastTrackApproveBodyReasonMax),
+  "seen_versions": zod.array(zod.object({
+  "item_id": zod.int(),
+  "version_n": zod.int()
+})).max(bulkFastTrackApproveBodySeenVersionsMax).optional().describe('The generated version each item showed when the reviewer chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.')
 })
 
 export const BulkFastTrackApproveResponse = zod.object({

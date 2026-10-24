@@ -1,6 +1,7 @@
 """TERMS_PUBLISHED → one fan-out task per affected item, through the real outbox; and the reconcile safety net."""
 
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -8,11 +9,13 @@ import pytest
 from accounts.models import User
 from audit.models import Event
 from audit.outbox import EventRecord, deliver, dispatch_pending
+from checks.models import TermsRef
 from core.clock import FixedClock
 from core.domain import DecisionLane, EventType, ItemStatus
 from reviews.models import Decision, ReviewItem
 from reviews.services import SubmitItemResult
 from terms import handlers, tasks
+from terms.fanout import FanOutOutcome, fan_out_item
 from terms.fast_track import fast_track_approve
 from terms.models import OfferTerms
 from terms.tests.conftest import WORKED_EXAMPLE, approve, go_live, publish
@@ -106,6 +109,30 @@ def test_reconcile_picks_up_items_a_lost_enqueue_left_behind(
     enqueued: list[int] = []
     monkeypatch.setattr(tasks, "enqueue_fan_out", enqueued.append)
 
-    count = tasks.reconcile_fan_out()
+    count = tasks.reconcile_fan_out(clock=clock)
 
     assert (count, enqueued) == (1, [item_id])
+
+
+@pytest.mark.django_db
+def test_reconcile_leaves_normal_lane_rereviews_alone(
+    pl_terms: OfferTerms,
+    submit: Submit,
+    marketer: User,
+    reviewer: User,
+    lead: User,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An item whose refs didn't fit its copy went to needs_rereview without a generated version. Its copy still
+    quotes the old terms, but retrying can't help: the reconcile must not re-run it every pass."""
+    item_id = _approved(submit, reviewer, clock)
+    item = ReviewItem.objects.get(pk=item_id)
+    go_live(item, marketer, clock)
+    TermsRef.objects.filter(version=item.current_version, field="apr_max").update(quoted_value=Decimal("34.99"))
+    publish(lead, clock)
+    assert fan_out_item(item_id=item_id, clock=clock) is FanOutOutcome.REOPENED_NORMAL_LANE
+    enqueued: list[int] = []
+    monkeypatch.setattr(tasks, "enqueue_fan_out", enqueued.append)
+
+    assert (tasks.reconcile_fan_out(clock=clock), enqueued) == (0, [])

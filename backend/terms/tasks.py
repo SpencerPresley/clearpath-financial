@@ -6,7 +6,7 @@ import time
 from celery import shared_task
 
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import Product
+from core.domain import ItemStatus, Product
 from terms.fanout import fan_out_item
 from terms.selectors import affected_approvals
 
@@ -39,13 +39,15 @@ def enqueue_fan_out(item_id: int) -> None:
 
 
 @shared_task(name="terms.reconcile_fan_out")
-def reconcile_fan_out() -> int:
-    """Beat safety net: enqueue every approval still quoting superseded terms. The handler enqueues on commit, so a
-    worker dying between its receipt's commit and the enqueue would otherwise leave those items approved on old
-    numbers. Nothing else leaves an approval in that state, so this is a no-op when the fan-out is healthy."""
+def reconcile_fan_out(*, clock: Clock = SYSTEM_CLOCK) -> int:
+    """Beat safety net: enqueue every *approved* item still quoting superseded terms. The handler enqueues on
+    commit, so a worker dying between its receipt's commit and the enqueue would otherwise leave those items
+    approved on old numbers. Nothing else leaves an approval in that state, so this is a no-op when the fan-out is
+    healthy. Items already in needs_rereview are not retried here: the handler regenerates them once per publish,
+    and one whose refs don't fit its copy (normal lane) would otherwise be re-run every pass, forever."""
     count = 0
     for product in (Product.PERSONAL_LOAN, Product.CREDIT_CARD):
-        for affected in affected_approvals(product=product):
+        for affected in affected_approvals(product=product, clock=clock, statuses=(ItemStatus.APPROVED,)):
             enqueue_fan_out(affected.item_id)
             count += 1
     if count:

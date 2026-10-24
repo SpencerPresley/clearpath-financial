@@ -25,4 +25,5 @@ def fan_out_terms_change(event: EventRecord) -> None:
         raise TypeError(f"expected TermsPublishedPayload, got {type(payload).__name__}")
     item_ids = {*payload.affected_item_ids, *(a.item_id for a in affected_approvals(product=payload.product))}
     for item_id in sorted(item_ids):
-        transaction.on_commit(partial(enqueue_fan_out, item_id))
+        # robust: one broker error must not drop the rest of the batch (the reconcile beat retries the one)
+        transaction.on_commit(partial(enqueue_fan_out, item_id), robust=True)

@@ -246,6 +246,7 @@ export * from './searchLibraryRiskTierItem';
 export * from './searchLibraryStatusItem';
 export * from './searchMode';
 export * from './searchResultsOut';
+export * from './seenVersionIn';
 export * from './severity';
 export * from './snippetPartOut';
 export * from './spanOut';

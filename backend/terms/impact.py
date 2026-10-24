@@ -133,7 +133,8 @@ def impact_preview(
     approved = [i for i in items if i.item.status is ItemStatus.APPROVED]
     rereview = sum(1 for i in approved if i.will_become is ItemStatus.NEEDS_REREVIEW)
     expire = len(approved) - rereview
-    already = len(items) - len(approved)
+    in_rereview = [i for i in items if i.item.status is ItemStatus.NEEDS_REREVIEW]
+    already = sum(1 for i in in_rereview if i.lane is FastTrackLane.FAST_TRACK)  # get the new numbers
     partners: dict[int, tuple[PartyRef, int]] = {}
     for i in items:
         if i.item.partner is not None:
@@ -152,7 +153,7 @@ def impact_preview(
         approved_items_quoting=len(approved),
         will_need_rereview=rereview,
         will_expire=expire,
-        already_in_rereview=already,
+        already_in_rereview=len(in_rereview),
         normal_lane=sum(1 for i in items if i.lane is FastTrackLane.NORMAL),
         changed_fields=changed,
         summary=summary,

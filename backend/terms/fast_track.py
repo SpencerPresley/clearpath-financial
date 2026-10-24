@@ -6,7 +6,7 @@ review carried from vN". Bulk runs one item per transaction through `run_bulk`, 
 back as a skip (`open_findings_block_decision`) and goes to the normal lane; the others are approved.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
@@ -43,16 +43,25 @@ def _current_n(item_id: int) -> int:
 
 
 def bulk_fast_track_approve(
-    *, actor: User, item_ids: Iterable[int], reason: str, clock: Clock = SYSTEM_CLOCK
+    *,
+    actor: User,
+    item_ids: Iterable[int],
+    reason: str,
+    seen_versions: Mapping[int, int] | None = None,
+    clock: Clock = SYSTEM_CLOCK,
 ) -> BulkResult:
     """Reviewers and leads. Each item is the single fast-track in its own transaction, with the same per-item check
     (the item's assignee or a lead), so a reviewer's bulk approve covers only their own items and the rest come back
     as `not_permitted` skips. Anything that can't be fast-tracked is a skip with its error code, never an exception.
+
+    `seen_versions` maps an item to the version the reviewer saw; that item is approved only at that version (else
+    `stale_version`). An item without an entry is approved at its current version.
     """
     require_role(actor, *REVIEW_ROLES)
+    seen = dict(seen_versions or {})
     return run_bulk(
         item_ids,
         lambda item_id: fast_track_approve(
-            actor=actor, item_id=item_id, version_n=_current_n(item_id), reason=reason, clock=clock
+            actor=actor, item_id=item_id, version_n=seen.get(item_id) or _current_n(item_id), reason=reason, clock=clock
         ),
     )
