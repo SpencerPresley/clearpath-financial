@@ -1844,6 +1844,29 @@
     @apply font-medium;
   }
 
+  /* ---- Modal (shortcuts help, bulk fast-track reason) ------------------------------------------ */
+  .app-modal-overlay {
+    @apply fixed inset-0 z-40 flex items-start justify-center bg-neutral/20 pt-[12vh];
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-modal-overlay[data-entering],
+  .app-modal-overlay[data-exiting] {
+    opacity: 0;
+  }
+  .app-modal {
+    @apply max-w-[calc(100vw-2rem)] rounded-lg border border-base-300 bg-base-100 p-4 text-base-content shadow-overlay outline-none;
+  }
+  .app-modal-head {
+    @apply mb-3 flex items-center justify-between gap-3;
+  }
+  .app-shortcuts {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-shortcut {
+    @apply grid grid-cols-[4.5rem_1fr] items-center gap-3;
+  }
+
   .app-table-footer {
     @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
   }
