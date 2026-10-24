@@ -64,7 +64,7 @@ function LoadMore({
 
 /** Key (+ Legacy), title, status, open findings, submitted. Channel rides after the title (partners are mostly
  * one). */
-const ITEM_COLUMNS = ['9.5rem', 'auto', '9rem', '7rem', '7rem'] as const;
+const ITEM_COLUMNS = ['9rem', 'auto', '9rem', '7rem', '7rem'] as const;
 
 export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
   const { query, rows } = usePartnerItems(partner.id);
@@ -322,7 +322,11 @@ export function RepeatIssues({ partner }: { partner: PartnerDetailOut }): ReactN
                 >
                   {issue.rule_title ?? issue.rule_id}
                 </Link>
-                {issue.rule_title !== null && <span className="app-tp-rule-id">{issue.rule_id}</span>}
+                {issue.rule_title !== null && (
+                  <span className="app-tp-rule-id" title={issue.rule_id}>
+                    {issue.rule_id}
+                  </span>
+                )}
               </td>
               <td className="app-tp-cell-title" title={issue.citation}>
                 {issue.citation}
