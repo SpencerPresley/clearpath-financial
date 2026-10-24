@@ -30,6 +30,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
   our stack (React + TanStack, SSE). Verified so far: `HumanInTheLoopMiddleware` (requires a checkpointer),
   `langgraph-checkpoint-postgres` (`PostgresSaver`/`AsyncPostgresSaver`, call `.setup()` once),
   `GenericFakeChatModel` accepts `AIMessage`s with `tool_calls` for tests.
+- **K runtime:** request-scoped SSE of `stream_events(version="v3")`, state only from the Postgres
+  checkpointer (never rebuild history per request), thread ownership check, 15s SSE keepalive for CloudFront's
+  60s origin timeout. Full notes on issue #11.
+- **Long requests behind CloudFront:** anything that can exceed ~60s (import commit, evidence-pack export)
+  runs as a Celery job with a status endpoint, not inline in the request.
 - **Prompts/tools for D and K:** invoke the prompt-engineering and context-engineering skills.
 - **UI work:** make-interfaces-feel-better skill; Playwright MCP or CLI for screenshots.
 
