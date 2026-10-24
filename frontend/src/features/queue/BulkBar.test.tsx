@@ -20,8 +20,22 @@ const REVIEWER: Viewer = { id: 2, name: 'Dana Whitfield', email: 'dana@x', roles
 const ROWS = [
   makeRow({ id: 1, status: 'submitted' }),
   makeRow({ id: 2, status: 'in_review' }),
-  makeRow({ id: 3, status: 'needs_rereview', reopen_reason: 'terms_changed', current_version_n: 4 }),
+  makeRow({
+    id: 3,
+    status: 'needs_rereview',
+    reopen_reason: 'terms_changed',
+    current_version_n: 4,
+    fast_track_eligible: true,
+  }),
 ];
+// An offer-terms re-review whose partner page changed: the server's lane refuses it (drift_not_restored).
+const DRIFTED = makeRow({
+  id: 9,
+  status: 'needs_rereview',
+  reopen_reason: 'terms_changed',
+  current_version_n: 2,
+  fast_track_eligible: false,
+});
 
 function setup(viewer: Viewer, selectedIds = [1, 2, 3], rows = ROWS) {
   const onSelectionChange = vi.fn();
@@ -45,16 +59,16 @@ describe('BulkBar', () => {
     const button = screen.getByRole('button', { name: 'Fast-track' });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(
-      'Only offer-terms re-reviews can be fast-tracked, and none is selected.',
+      'None of the selected items can be fast-tracked: only an offer-terms re-review whose live page shows the approved copy can.',
     );
     // The reason is also on a trigger of its own (a disabled button gets no hover).
     expect(screen.getByRole('button', { name: 'Why fast-track is off' })).toBeInTheDocument();
   });
 
-  it('keeps fast-track on when one selected re-review qualifies', () => {
+  it('keeps fast-track on when one selected re-review qualifies, and counts only those', () => {
     const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
-    setup(LEAD, [3, 16], [...ROWS, expiry]);
-    expect(screen.getByRole('button', { name: 'Fast-track 2 re-reviews…' })).toBeEnabled();
+    setup(LEAD, [3, 16, 9], [...ROWS, expiry, DRIFTED]);
+    expect(screen.getByRole('button', { name: 'Fast-track 1 re-review…' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Why fast-track is off' })).not.toBeInTheDocument();
   });
 
@@ -65,6 +79,35 @@ describe('BulkBar', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Sam Okafor, out of office' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Dana Whitfield' })).toBeInTheDocument();
+  });
+
+  it('follows the row flag, not the reopen reason: a drifted terms re-review is off', () => {
+    setup(LEAD, [9], [DRIFTED]);
+    const button = screen.getByRole('button', { name: 'Fast-track' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      'None of the selected items can be fast-tracked: only an offer-terms re-review whose live page shows the approved copy can.',
+    );
+  });
+
+  it('sends only the eligible items and keeps the rest selected', async () => {
+    const bodies: BulkFastTrackIn[] = [];
+    server.use(
+      getBulkFastTrackApproveMockHandler(async ({ request }) => {
+        bodies.push((await request.json()) as BulkFastTrackIn);
+        return { succeeded: [3], skipped: [] };
+      }),
+    );
+    const { onSelectionChange } = setup(LEAD, [3, 9], [...ROWS, DRIFTED]);
+    await userEvent.click(screen.getByRole('button', { name: 'Fast-track 1 re-review…' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Reason' }), 'Only the APR changed.');
+    await userEvent.click(screen.getByRole('button', { name: 'Fast-track approve' }));
+    await waitFor(() => {
+      expect(bodies.map((b) => b.item_ids)).toEqual([[3]]);
+    });
+    await waitFor(() => {
+      expect(onSelectionChange).toHaveBeenLastCalledWith([9]);
+    });
   });
 
   it('assigns the selection to a reviewer and clears it', async () => {

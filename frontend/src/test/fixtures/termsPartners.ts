@@ -125,6 +125,7 @@ function affectedRow(o: Partial<ItemRowOut> & { id: number; title: string }): It
     assignee: reviewer,
     open_findings_count: 0,
     age_days: 30,
+    fast_track_eligible: false,
     round: 1,
     reopen_reason: null,
     llm_check_status: 'succeeded',

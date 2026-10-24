@@ -143,6 +143,8 @@ describe('useLiveChecks', () => {
               severity: 'blocking',
               message: 'Rate claim needs the full APR range',
               suggested_fix: '',
+              fix_kind: null,
+              replacement_text: null,
               span: { start, end: start + 9 },
               quote: 'as low as',
             },

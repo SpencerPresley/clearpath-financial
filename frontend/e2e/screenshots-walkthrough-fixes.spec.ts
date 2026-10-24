@@ -265,6 +265,8 @@ function literalPreview(
           severity: 'blocking' as const,
           message,
           suggested_fix: '9.99%',
+          fix_kind: 'replace' as const,
+          replacement_text: '9.99%',
           span: spanOf(text, '5.99%'),
           quote: '5.99%',
         },
@@ -492,7 +494,12 @@ const shots: Shot[] = [
     stub: {
       // triaged() accepts the 1st and 3rd: the credit claim (a literal fix) must change.
       findings: triaged([
-        { ...FINDING_CREDIT, suggested_fix: '"Checking your rate won’t affect your credit score."' },
+        {
+          ...FINDING_CREDIT,
+          suggested_fix: '"Checking your rate won’t affect your credit score."',
+          fix_kind: 'replace',
+          replacement_text: 'Checking your rate won’t affect your credit score.',
+        },
         FINDING_QUALIFIER,
         FINDING_RATE,
       ] as FindingOut[]),

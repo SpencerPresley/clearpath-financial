@@ -58,6 +58,7 @@ function row(o: Partial<Row> & { id: number }, days: number): Row {
     assignee: dana,
     open_findings_count: 2,
     age_days: days,
+    fast_track_eligible: false,
     round: 1,
     reopen_reason: null,
     llm_check_status: 'succeeded',

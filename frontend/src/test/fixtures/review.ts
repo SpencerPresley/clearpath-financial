@@ -103,6 +103,7 @@ export function itemFixture(overrides: Partial<ItemDetailOut> = {}): ItemDetailO
     updated_at: '2026-10-23T16:30:00Z',
     queue_entered_at: '2026-10-20T14:00:00Z',
     age_days: 4,
+    fast_track_eligible: false,
     planned_first_run: '2026-11-01',
     planned_last_run: '2026-12-15',
     current_version_n: 2,
@@ -152,6 +153,7 @@ const ROW_KEYS = [
   'updated_at',
   'queue_entered_at',
   'age_days',
+  'fast_track_eligible',
   'planned_first_run',
   'planned_last_run',
   'current_version_n',
@@ -183,6 +185,8 @@ const BASE_FINDING = {
   carried_from_id: null,
   created_at: '2026-10-23T16:30:01Z',
   suggested_fix: '',
+  fix_kind: null,
+  replacement_text: null,
 } as const;
 
 export const FINDING_RATE: FindingOut = {
@@ -196,6 +200,8 @@ export const FINDING_RATE: FindingOut = {
   quote: 'as low as 5.99% APR',
   message: 'Rate claim needs the full APR range',
   suggested_fix: 'Show the range: 5.99%–35.99% APR',
+  fix_kind: 'instruction',
+  replacement_text: null,
 };
 
 export const FINDING_QUALIFIER: FindingOut = {
@@ -209,6 +215,8 @@ export const FINDING_QUALIFIER: FindingOut = {
   quote: 'as low as',
   message: '“As low as” may need a creditworthiness qualifier',
   suggested_fix: 'Add “for borrowers with excellent credit”',
+  fix_kind: 'instruction',
+  replacement_text: null,
   created_at: '2026-10-23T16:30:09Z',
 };
 
@@ -223,6 +231,8 @@ export const FINDING_CREDIT: FindingOut = {
   quote: 'no impact on your credit score',
   message: 'Credit-impact claim should be limited to checking your rate',
   suggested_fix: 'Checking your rate won’t affect your credit score.',
+  fix_kind: 'instruction',
+  replacement_text: null,
 };
 
 export const FINDING_CHECKLIST: FindingOut = {

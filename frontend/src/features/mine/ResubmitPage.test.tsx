@@ -62,7 +62,9 @@ function previewHandler() {
               source: 'code',
               severity: 'blocking',
               message: FINDING_RATE.message,
-              suggested_fix: '9.99%–35.99%',
+              suggested_fix: '9.99%',
+              fix_kind: 'replace',
+              replacement_text: '9.99%',
               span: spanOf(body.content_text, '5.99%'),
               quote: '5.99%',
             },
@@ -120,8 +122,8 @@ describe('ResubmitPage', () => {
     const user = userEvent.setup();
     await renderResubmit(CHANGES_ITEM);
     const live = await screen.findByRole('region', { name: 'Code checks' });
-    await user.click(await within(live).findByRole('button', { name: 'Apply suggestion: 9.99%–35.99%' }));
-    expect(screen.getByLabelText('Copy')).toHaveValue(COPY_V2.replace('5.99%', '9.99%–35.99%'));
+    await user.click(await within(live).findByRole('button', { name: 'Apply suggestion: 9.99%' }));
+    expect(screen.getByLabelText('Copy')).toHaveValue(COPY_V2.replace('5.99%', '9.99%'));
     expect(await within(live).findByText('No code findings.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Resubmit' })).toBeEnabled();
   });

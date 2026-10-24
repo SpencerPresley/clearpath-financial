@@ -1069,13 +1069,23 @@ describe('ReviewPage after the walkthrough', () => {
       ...FINDING_CREDIT,
       state: 'accepted' as const,
       suggested_fix: '"Checking your rate won’t affect your credit score."',
+      fix_kind: 'replace' as const,
+      replacement_text: 'Checking your rate won’t affect your credit score.',
     };
-    renderReview({ findings: [credit] });
+    // Same wording, but the API calls it advice: no Apply (the button follows fix_kind, not the text).
+    const advice = {
+      ...credit,
+      id: credit.id + 100,
+      fix_kind: 'instruction' as const,
+      replacement_text: null,
+    };
+    renderReview({ findings: [credit, advice] });
     await screen.findByRole('heading', { name: /Fall personal loan/ });
     // Nothing to apply into until there's an edit.
     expect(screen.queryByRole('button', { name: /^Apply suggestion/ })).not.toBeInTheDocument();
     await userEvent.keyboard('e');
     const editor = await screen.findByLabelText('Edited copy (v3)');
+    // getByRole throws on two matches: only the replace finding has an Apply.
     await userEvent.click(
       screen.getByRole('button', {
         name: 'Apply suggestion: "Checking your rate won’t affect your credit score."',
