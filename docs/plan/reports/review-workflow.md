@@ -242,7 +242,45 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
 
 ## Verification
 
-Filled in after the review fix pass (below).
+Run at the branch head after the review fix pass, with test DB suffix `wsE`, Postgres from compose on 55432, and
+Redis on 56379. That is 807 backend tests: Foundation's and C's 622 plus 185 new.
+
+```
+$ uv run pytest -q
+807 passed in 13.76s
+$ uv run --group lint ruff check .
+All checks passed!
+$ uv run --group lint ruff format --check .
+196 files already formatted
+$ uv run --group typecheck pyrefly check
+ INFO 0 errors (139 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
+$ manage.py makemigrations --check --dry-run
+No changes detected
+$ manage.py check --fail-level WARNING
+System check identified no issues (0 silenced).
+$ make schema && git status --porcelain -- frontend/openapi frontend/src/api/generated
+(no drift)
+$ npm run typecheck
+tsc -b: ok
+$ npm run test:run
+      Tests  145 passed (145)
+$ npm run lint
+eslint: ok
+$ npm run format:check
+All matched files use Prettier code style!
+```
+
+Tests that were run RED first:
+
+- **Concurrency.** `test_concurrent_assignment_never_picks_from_a_stale_load` is parametrized:
+  - With the lock, T2 waits on the advisory lock, observed in `pg_locks`, then picks Sam:
+    `Sam: load 0 vs Dana 1`.
+  - Without the lock (control), T2 reads Dana's committed load of 0 and double-picks her.
+  - Mutation check: with `_acquire_lock()` moved to after the load query, the with-lock case fails
+    (`assert 2 == 3`). The test proves load is computed after the lock.
+- **Review fixes.** All six were run against the pre-fix code and failed (6 failed), then passed.
+- **Redis cache.** Checked against compose Redis with dev settings: `cache.set/get` round-trips and the key is
+  stored as `clearpath:1:probe`.
 
 ## Open risks
 
