@@ -15,7 +15,9 @@ systemctl enable --now docker
 # AL2023's repos ship the docker engine but not the compose v2 plugin.
 # Pinned version + checksum from the GitHub release.
 install -d -m 0755 /usr/local/lib/docker/cli-plugins
-curl -fsSL -o /tmp/docker-compose \
+# Retries: the first boot can race the NAT route (dnf succeeds through the S3
+# gateway endpoint, GitHub needs the NAT); the instance also depends_on the route.
+curl -fsSL --retry 10 --retry-all-errors --retry-delay 15 --connect-timeout 10 -o /tmp/docker-compose \
   "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-x86_64"
 echo "${compose_sha256}  /tmp/docker-compose" | sha256sum -c -
 install -m 0755 /tmp/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
