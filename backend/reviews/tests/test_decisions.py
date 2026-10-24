@@ -37,7 +37,6 @@ from core.errors import (
 )
 from reviews.decisions import (
     DecisionInput,
-    add_months,
     approval_expiry,
     pull_item,
     reaffirm,
@@ -45,6 +44,7 @@ from reviews.decisions import (
 )
 from reviews.errors import AcceptedFindingsBlockApproval, FindingsNeedTriage, StaleOfferTerms, StaleVersion
 from reviews.models import Decision, ExpiryPolicy, Placement, ReviewItem, Version
+from reviews.months import add_months
 from reviews.services import AttachmentOwner, add_attachment
 from reviews.tests.conftest import RATE_COPY, Submit, ai_done, dismiss_all
 from reviews.tests.factories import make_partner

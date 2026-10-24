@@ -10,7 +10,6 @@ Request changes and Reject need only a reason. Every decision records the exact 
 versions it quotes, the rule-set date and engine version, evidence hashes, the approver, and (approvals) expiry.
 """
 
-import calendar
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -60,6 +59,7 @@ from reviews.models import (
     ReviewItem,
     Version,
 )
+from reviews.months import add_months
 from reviews.selectors import live_placements_q
 from reviews.transitions import Action, apply_transition, require_transition, start_review
 from reviews.versions import create_version
@@ -69,13 +69,6 @@ DEFAULT_EXPIRY_MONTHS: Final = 6
 
 
 # --- expiry ----------------------------------------------------------------------------------------------------
-
-
-def add_months(at: datetime, months: int) -> datetime:
-    """Same day-of-month N months later, clamped to the month's last day (Jan 31 + 1 month = Feb 28/29)."""
-    years, month_index = divmod(at.month - 1 + months, 12)
-    year, month = at.year + years, month_index + 1
-    return at.replace(year=year, month=month, day=min(at.day, calendar.monthrange(year, month)[1]))
 
 
 def approval_expiry(

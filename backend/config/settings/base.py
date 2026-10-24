@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any
 
+from celery.schedules import crontab
 from pydantic import BeforeValidator, Field, SecretStr
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -190,6 +191,9 @@ CELERY_BEAT_SCHEDULE = {
     # The event log is the outbox (decisions.md "Data"): poll it often; Redis is disposable.
     "dispatch-outbox": {"task": "audit.dispatch_outbox", "schedule": 2.0},
     "redeliver-stale-events": {"task": "audit.redeliver_stale_events", "schedule": 300.0},
+    # Approval expiry and 30-day warnings (product-spec "Automation": daily sweep). 06:00 UTC = before the
+    # US working day, so items land in the morning queue.
+    "expiry-sweep": {"task": "reviews.expiry_sweep", "schedule": crontab(hour=6, minute=0)},
 }
 
 LOGGING = {

@@ -4,7 +4,12 @@ from collections.abc import Iterable
 
 from accounts.models import User
 from audit.outbox import EventRecord, handles
-from audit.payloads import CommentAddedPayload, DecisionRecordedPayload, ItemAssignedPayload
+from audit.payloads import (
+    ApprovalExpiringPayload,
+    CommentAddedPayload,
+    DecisionRecordedPayload,
+    ItemAssignedPayload,
+)
 from core.domain import AssignmentMode, DecisionOutcome, EventType, NotificationKind, Role
 from notifications.models import Notification
 from reviews.models import ReviewItem
@@ -78,6 +83,20 @@ def notify_submitter_of_decision(event: EventRecord) -> None:
         NotificationKind.DECISION,
         [item.owner_id],  # pyrefly: ignore[missing-attribute]
         f"{item.key} {item.title}: {_OUTCOME_WORDS[payload.outcome]}",
+    )
+
+
+@handles(EventType.APPROVAL_EXPIRING, name="notifications.expiry_warning")
+def notify_expiry_warning(event: EventRecord) -> None:
+    """30 days before an approval lapses: the submitter (to plan a refresh) and the reviewer."""
+    payload = event.payload
+    assert isinstance(payload, ApprovalExpiringPayload)  # noqa: S101
+    item = _item(event)
+    _notify(
+        event,
+        NotificationKind.EXPIRY_WARNING,
+        [item.owner_id, item.assignee_id],  # pyrefly: ignore[missing-attribute]
+        f"{item.key} {item.title}: approval expires {payload.expires_at:%Y-%m-%d}",
     )
 
 

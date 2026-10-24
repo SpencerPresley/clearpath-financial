@@ -69,6 +69,27 @@ def ai_done(item_id: int, status: CheckStatus = CheckStatus.SUCCEEDED) -> None:
     ReviewItem.objects.filter(pk=item_id).update(llm_check_status=status)
 
 
+def approve(item_id: int, reviewer: User, clock: FixedClock) -> int:
+    """Triage everything, finish the AI check, and approve the current version through the services."""
+    from core.domain import DecisionOutcome
+    from reviews.decisions import DecisionInput, record_decision
+
+    dismiss_all(item_id, reviewer, clock)
+    ai_done(item_id)
+    item = ReviewItem.objects.select_related("current_version").get(pk=item_id)
+    n = item.current_version.n if item.current_version else 0
+    data = DecisionInput(outcome=DecisionOutcome.APPROVED, version_n=n, reason="Meets policy")
+    return record_decision(actor=reviewer, item_id=item_id, data=data, clock=clock).decision_id
+
+
+@pytest.fixture
+def approved(submit: "Submit", reviewer: User, clock: FixedClock) -> ReviewItem:
+    """An approved landing page (12-month expiry), assigned to `reviewer`, no placements yet."""
+    item_id = submit().item_id
+    approve(item_id, reviewer, clock)
+    return ReviewItem.objects.get(pk=item_id)
+
+
 @pytest.fixture
 def submit(marketer: User, clock: FixedClock) -> Submit:
     """Submit through the real service; keyword overrides go to SubmitItemInput."""

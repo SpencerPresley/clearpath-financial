@@ -46,6 +46,11 @@ def live_placements_q(today: date, prefix: str = "") -> Q:
     )
 
 
+def is_item_live(*, item_id: int, today: date) -> bool:
+    """Whether the item's content is running today (ruling 2): decides needs_rereview vs expired."""
+    return Placement.objects.filter(live_placements_q(today), item_id=item_id).exists()
+
+
 # --- filtering -------------------------------------------------------------------------------------------------
 
 

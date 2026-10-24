@@ -93,6 +93,13 @@ class ItemExpiredPayload(EventPayload):
     generated_version_id: int | None = None
 
 
+class ApprovalExpiringPayload(EventPayload):
+    """The daily sweep's warning, 30 days ahead; one per approving decision."""
+
+    decision_id: int
+    expires_at: datetime
+
+
 class ItemWithdrawnPayload(EventPayload):
     reason: str
     placement_ids: tuple[int, ...]
@@ -317,6 +324,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.ITEM_RISK_TIER_OVERRIDDEN: ItemRiskTierOverriddenPayload,
     EventType.ITEM_REOPENED: ItemReopenedPayload,
     EventType.ITEM_EXPIRED: ItemExpiredPayload,
+    EventType.APPROVAL_EXPIRING: ApprovalExpiringPayload,
     EventType.ITEM_WITHDRAWN: ItemWithdrawnPayload,
     EventType.ITEM_NEW_ROUND_STARTED: ItemNewRoundStartedPayload,
     EventType.ITEM_IMPORTED: ItemImportedPayload,
