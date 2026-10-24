@@ -5,9 +5,11 @@ We don't diff the whole page: navigation, dates and ads change constantly (decis
 1. Normalize both texts (Unicode compatibility forms, straight quotes and dashes, one space for any whitespace), so
    markup, line breaks and typography don't count as edits.
 2. The approved copy appears verbatim → `unchanged`.
-3. Otherwise `rapidfuzz.fuzz.partial_ratio_alignment` finds the page region that best matches the copy. The region
-   is widened (an inserted sentence pushes the end of the copy past the aligned window), word-diffed against the
-   approved copy, and the page-only text at either end is trimmed off.
+3. Otherwise `rapidfuzz.fuzz.partial_ratio_alignment` finds the page window that best matches the copy. The region
+   compared is the whole page lines (blocks) that window touches, so an edit at either end of the copy stays in the
+   diff while neighbouring blocks (navigation, other offers) stay out. When a line runs far past the window (a page
+   that is one long block), the region is clamped to the window plus some slack and page-only text at the clamped
+   end is dropped from the diff.
 4. The score is `fuzz.ratio(approved, region)`: how much of the approved copy survives there. At or above
    `MISSING_BELOW` the copy is `modified` (with the diff); below it the copy is `missing`.
 """
@@ -48,27 +50,46 @@ def normalize(text: str) -> str:
     return _WHITESPACE.sub(" ", folded).strip()
 
 
-def _snap(text: str, start: int, end: int) -> tuple[int, int]:
-    """Widen [start, end) to whole words."""
-    if start > 0:
-        start = text.rfind(" ", 0, start) + 1
-    if end < len(text):
-        found = text.find(" ", end)
-        end = len(text) if found < 0 else found
-    return start, end
+def _region(lines: str, start: int, end: int, slack: int) -> tuple[int, int, bool, bool]:
+    """[start, end) widened to whole lines; clamped to `slack` (on word boundaries) where a line runs further.
+    Returns the bounds and whether each end was clamped."""
+    lo = lines.rfind("\n", 0, start) + 1
+    hi = lines.find("\n", end)
+    hi = len(lines) if hi < 0 else hi
+    clamp_lo, clamp_hi = start - lo > slack, hi - end > slack
+    if clamp_lo:
+        lo = lines.rfind(" ", 0, start - slack) + 1
+    if clamp_hi:
+        found = lines.find(" ", end + slack)
+        hi = len(lines) if found < 0 else found
+    return lo, hi, clamp_lo, clamp_hi
+
+
+def _shed_edge_lines(copy: str, lines: str, lo: int, hi: int) -> tuple[int, int]:
+    """Drop whole lines at either end of the region while that makes it match the copy better (a heading the window
+    grazed, the next block's first words)."""
+
+    def score(a: int, b: int) -> float:
+        return fuzz.ratio(copy, lines[a:b].replace("\n", " "))
+
+    while (cut := lines.find("\n", lo, hi)) >= 0 and score(cut + 1, hi) > score(lo, hi):
+        lo = cut + 1
+    while (cut := lines.rfind("\n", lo, hi)) >= 0 and score(lo, cut) > score(lo, hi):
+        hi = cut
+    return lo, hi
 
 
 def _is_filler(segment: DiffSegment) -> bool:
     return segment.op is DiffOp.EQUAL and _FILLER.fullmatch(segment.text) is not None
 
 
-def _tidy(segments: tuple[DiffSegment, ...]) -> tuple[DiffSegment, ...]:
-    """Make the word diff readable and drop page-only text at either end.
+def _tidy(segments: tuple[DiffSegment, ...], *, drop_leading: bool, drop_trailing: bool) -> tuple[DiffSegment, ...]:
+    """Make the word diff readable and, at a clamped end, drop page-only text.
 
     Spaces and punctuation that happen to match between two changed words ("Checking your rate" against "Advertiser
     disclosure") are folded into the change, so each changed stretch reads as one deletion and one insertion.
-    Insertions before the first and after the last kept word of the approved copy are the rest of the page, not
-    edits, and are dropped.
+    At a clamped end (see `_region`), insertions before the first or after the last kept word of the approved copy
+    are the rest of a long block, not edits, and are dropped.
     """
     n = len(segments)
     kept_words = [i for i, s in enumerate(segments) if s.op is DiffOp.EQUAL and not _is_filler(s)]
@@ -96,7 +117,7 @@ def _tidy(segments: tuple[DiffSegment, ...]) -> tuple[DiffSegment, ...]:
         while j < n and in_change[j]:
             j += 1
         run = segments[i:j]
-        at_edge = i < first_kept or j - 1 > last_kept
+        at_edge = (drop_leading and i < first_kept) or (drop_trailing and j - 1 > last_kept)
         deleted = "".join(s.text for s in run if s.op is not DiffOp.INSERT)
         inserted = "".join(s.text for s in run if s.op is not DiffOp.DELETE)
         if deleted.strip():
@@ -112,17 +133,20 @@ def _missing(score: float) -> Comparison:
 
 
 def compare(approved: str, page: str) -> Comparison:
-    copy, text = normalize(approved), normalize(page)
-    if copy in text:
+    copy = normalize(approved)
+    lines = "\n".join(line for line in (normalize(raw) for raw in page.splitlines()) if line)
+    flat = lines.replace("\n", " ")  # same offsets as `lines`
+    if copy in flat:
         return Comparison(result=DriftResult.UNCHANGED, score=100.0, matched_text=copy, diff=())
-    if not text:
+    if not flat:
         return _missing(0.0)
-    alignment = fuzz.partial_ratio_alignment(copy, text)
+    alignment = fuzz.partial_ratio_alignment(copy, flat)
     if alignment is None:  # only with a score_cutoff; kept for the type
         return _missing(0.0)
     slack = max(40, len(copy) // 4)
-    start, end = _snap(text, max(0, alignment.dest_start - slack), min(len(text), alignment.dest_end + slack))
-    diff = _tidy(diff_texts(copy, text[start:end]))
+    lo, hi, clamp_lo, clamp_hi = _region(lines, alignment.dest_start, alignment.dest_end, slack)
+    lo, hi = _shed_edge_lines(copy, lines, lo, hi)
+    diff = _tidy(diff_texts(copy, flat[lo:hi]), drop_leading=clamp_lo, drop_trailing=clamp_hi)
     region = "".join(s.text for s in diff if s.op is not DiffOp.DELETE).strip()
     score = float(fuzz.ratio(copy, region))
     if score < MISSING_BELOW:

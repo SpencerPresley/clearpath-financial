@@ -391,19 +391,62 @@ class Placement(models.Model):
 
 
 class Snapshot(models.Model):
-    """A fetched copy of a monitored placement's page (drift monitor, stretch)."""
+    """One drift check of a monitored placement's page (drift monitor; written only by `drift.services`).
+
+    pending -> running -> succeeded (with a result) | failed (with an error code). A fetch failure is never a
+    result: only a page that was actually read can be unchanged, modified, or missing.
+    """
 
     placement = models.ForeignKey(Placement, on_delete=models.PROTECT, related_name="snapshots")
-    fetched_at = models.DateTimeField()
-    text = models.TextField()
-    result = models.CharField(max_length=20)
-    diff = models.TextField(blank=True)
+    status = models.CharField(max_length=20, default=CheckStatus.PENDING.value)
+    trigger = models.CharField(max_length=20)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    requested_at = models.DateTimeField()
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    url = models.URLField(max_length=2000)  # the placement's URL when the check was requested
+    final_url = models.URLField(max_length=2000, blank=True)  # after redirects
+    http_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    title = models.CharField(max_length=500, blank=True)
+    text = models.TextField(blank=True)  # visible page text
+    content_sha256 = models.CharField(max_length=64, blank=True)
+    compared_version = models.ForeignKey(
+        Version, null=True, blank=True, on_delete=models.PROTECT, related_name="drift_snapshots"
+    )
+    result = models.CharField(max_length=20, null=True, blank=True)  # noqa: DJ001  # null until succeeded
+    score = models.FloatField(null=True, blank=True)
+    matched_text = models.TextField(blank=True)
+    diff = models.JSONField(default=list, blank=True)  # [{op, text}]: approved copy -> page region
+    findings = models.JSONField(default=list, blank=True)  # code findings on the page text, see drift.services
+    error_code = models.CharField(max_length=40, blank=True)
+    error_message = models.CharField(max_length=500, blank=True)
+    reopen_event = models.ForeignKey("audit.Event", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
-        indexes = [models.Index(fields=["placement", "-fetched_at"], name="snapshot_placement_idx")]
+        indexes = [models.Index(fields=["placement", "-requested_at"], name="snapshot_placement_idx")]
+        constraints = [
+            # Double-clicking "Check now" or a sweep racing it can't start two checks of one page.
+            models.UniqueConstraint(
+                fields=["placement"],
+                condition=Q(status__in=[CheckStatus.PENDING.value, CheckStatus.RUNNING.value]),
+                name="snapshot_one_in_flight",
+            ),
+            models.CheckConstraint(
+                condition=(Q(status=CheckStatus.SUCCEEDED.value) & Q(result__isnull=False))
+                | (~Q(status=CheckStatus.SUCCEEDED.value) & Q(result__isnull=True)),
+                name="snapshot_result_iff_succeeded",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status=CheckStatus.FAILED.value) | ~Q(error_code=""),
+                name="snapshot_failure_has_code",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.placement_id} @ {self.fetched_at:%Y-%m-%d}"
+        return f"{self.placement_id} @ {self.requested_at:%Y-%m-%d} {self.status}"
 
 
 class ExpiryPolicy(models.Model):

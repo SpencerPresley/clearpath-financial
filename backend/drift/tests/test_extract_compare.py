@@ -166,3 +166,34 @@ def test_compare_is_fast_on_a_long_page() -> None:
     result = compare(APPROVED, page)
     assert time.monotonic() - started < 2.0
     assert result.result is DriftResult.MODIFIED
+
+
+def test_an_edit_at_the_end_of_the_copy_stays_in_the_diff() -> None:
+    page = visible_text(
+        PAGE.replace("won't affect your credit score.", "never hurts your credit. Guaranteed approval!")
+    ).text
+
+    result = compare(APPROVED, page)
+
+    assert result.result is DriftResult.MODIFIED
+    inserted = "".join(s.text for s in result.diff if s.op is DiffOp.INSERT)
+    assert "Guaranteed approval!" in inserted
+    assert "Advertiser" not in inserted  # the footer is another block
+
+
+def test_an_edit_at_the_start_of_the_copy_stays_in_the_diff() -> None:
+    page = visible_text(PAGE.replace("<p>Personal loans from", "<p>NEW! Loans from")).text
+
+    result = compare(APPROVED, page)
+
+    assert result.result is DriftResult.MODIFIED
+    assert [(s.op, s.text.strip()) for s in result.diff if s.op is not DiffOp.EQUAL][:2] == [
+        (DiffOp.DELETE, "Personal loans"),
+        (DiffOp.INSERT, "NEW! Loans"),
+    ]
+
+
+def test_verbatim_copy_with_text_added_around_it_is_unchanged() -> None:
+    # The approved copy is intact; what the partner put next to it is the page code checks' job.
+    page = visible_text(PAGE.replace("credit score.", "credit score. Guaranteed approval!")).text
+    assert compare(APPROVED, page).result is DriftResult.UNCHANGED
