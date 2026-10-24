@@ -64,7 +64,7 @@ function LoadMore({
 
 /** Key (+ Legacy), title, status, open findings, submitted. Channel rides after the title (partners are mostly
  * one). */
-const ITEM_COLUMNS = ['9rem', 'auto', '9rem', '7rem', '7rem'] as const;
+export const ITEM_COLUMNS = ['9rem', 'auto', '9rem', '7rem', '7rem'] as const;
 
 export function PartnerItems({ partner }: { partner: PartnerDetailOut }) {
   const { query, rows } = usePartnerItems(partner.id);

@@ -37,7 +37,7 @@ import { partnerFormFrom, patchBody, websiteHref, websiteLabel } from './partner
 import { PartnerForm } from './PartnerForm';
 import { usePartnerFindings } from './pages';
 import type { PartnerTab } from './partnersSearch';
-import { FindingsHistory, PartnerItems, RepeatIssues } from './PartnerTabs';
+import { FindingsHistory, ITEM_COLUMNS, PartnerItems, RepeatIssues } from './PartnerTabs';
 
 export interface PartnerDetailPageProps {
   partnerId: number;
@@ -216,7 +216,11 @@ function DetailSkeleton() {
           <div className="app-tabs app-partner-skeleton-tabs">
             <SkeletonText width="16rem" />
           </div>
-          <SkeletonTable rows={4} columns={['6.5rem', '1fr', '9rem', '5rem', '7rem']} label="Loading items" />
+          <SkeletonTable
+            rows={4}
+            columns={ITEM_COLUMNS.map((w) => (w === 'auto' ? '1fr' : w))}
+            label="Loading items"
+          />
         </div>
         <div className="app-partner-side">
           {[5, 4].map((lines, box) => (
