@@ -9,6 +9,11 @@ from reviews.schemas import DecisionOut, EvidenceOut, ItemRowOut, VersionOut
 from terms.schemas import OfferTermsOut
 
 
+class ExportKind(StrEnum):
+    ITEMS_XLSX = "items_xlsx"
+    EVIDENCE_PACK = "evidence_pack"
+
+
 class ExportStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"

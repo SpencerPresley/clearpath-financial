@@ -2,55 +2,13 @@
 Workstream G owns behavior and models; refine these with samples/README.md's list of intended messes."""
 
 from datetime import datetime
-from enum import StrEnum
+from imports.domain import ImportProblemKind, ImportStatus, ImportTargetField
 
 from ninja import Schema
 from pydantic import Field
 
 from core.domain import DecisionOutcome, ItemStatus
 from reviews.schemas import PartyRefOut
-
-
-class ImportStatus(StrEnum):
-    UPLOADED = "uploaded"
-    MAPPED = "mapped"
-    COMMITTING = "committing"
-    COMMITTED = "committed"
-    FAILED = "failed"
-
-
-class ImportTargetField(StrEnum):
-    """What a tracker column maps onto."""
-
-    LEGACY_REF = "legacy_ref"
-    TITLE = "title"
-    PRODUCT = "product"
-    CHANNEL = "channel"
-    PARTNER = "partner"
-    SUBMITTER = "submitter"
-    REVIEWER = "reviewer"
-    SUBMITTED_ON = "submitted_on"
-    DECIDED_ON = "decided_on"
-    STATUS = "status"
-    EXPIRES_ON = "expires_on"
-    FIRST_RUN = "first_run"
-    LAST_RUN = "last_run"
-    RISK_TIER = "risk_tier"
-    MARKETS = "markets"
-    COMMENTS = "comments"
-    NOTES = "notes"
-    ASSET_LINK = "asset_link"
-    IGNORE = "ignore"
-
-
-class ImportProblemKind(StrEnum):
-    MISSING_VALUE = "missing_value"
-    UNPARSEABLE_DATE = "unparseable_date"
-    UNMAPPED_STATUS = "unmapped_status"
-    UNKNOWN_VALUE = "unknown_value"
-    DUPLICATE_REF = "duplicate_ref"
-    ALREADY_IMPORTED = "already_imported"
-    UNKNOWN_PARTNER = "unknown_partner"
 
 
 class ImportColumnOut(Schema):
