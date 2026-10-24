@@ -24,7 +24,7 @@ one worktree would have seen each other's half-edited `theme.css`.
 | `forms/` | RAC fields (`TextInput`, `TextAreaField`, `SelectField`, `CheckboxGroupField`, `CheckboxField`); `apiErrorBody`, `apiErrorMessage`, `fieldErrorsFrom` (422 `loc` → form field), `fieldErrorText`. |
 | `useHotkeys.ts` | Single-key shortcuts; ignored in text fields, with modifiers, and under a modal. RAC toasts are `role="alertdialog" aria-modal="false"`: the first guard treated them as modal and the shortcuts went dead for 5 s after every decision toast (caught by a test, fixed, pinned). |
 | `Dialog.tsx`, `ButtonLink.tsx`, `labels.ts` | `ModalDialog` (confirmations and shortcut help only); router link styled as a button; enum labels, `plural`, `formatDate`, `formatBytes`. |
-| `icons.ts` | Two keys: `action.pull` (Minus, the bare sibling of `status.withdrawn`'s MinusCircle, as Approve/Approved) and `action.shortcuts` (Keyboard). |
+| `icons.ts` | Two keys: `action.pull` (EyeSlash: take it out of public view; follow-up PR replaced the first choice, a bare minus, which didn't read as takedown) and `action.shortcuts` (Keyboard). |
 
 ### Review screen (`/items/$itemId`, `features/review/`)
 
@@ -54,9 +54,11 @@ one worktree would have seen each other's half-edited `theme.css`.
   reason, required) / Reopen. Older versions are read-only. AI status row: queued / running (indeterminate bar,
   "Approve unlocks when it finishes"), failed (+ Retry), skipped on fast-track ("AI review carried from v1"),
   finished. The item polls every 3 s while the check is in flight and refetches findings when it lands.
-- **needs_rereview**: alert-toned note with the reopen reason and live placements; Fast-track approve vN
-  (only when the current version is a generated `fast_track` version newer than the approval), Reaffirm,
-  Pull (confirm). "Compare with approved v1" one click away.
+- **needs_rereview**: alert-toned note with the reopen reason and live placements, and actions by reason
+  (`rereviewActions`): terms changed → Fast-track approve vN when a version was generated, otherwise Review
+  (claim → normal lane); expired or drifted → Reaffirm vN. Pull (confirm) always. Reaffirm is never offered
+  after a terms change: it re-runs code checks against the new terms (`reviews/decisions.py` `reaffirm`), so
+  it could only be refused. "Compare with approved v1" one click away.
 - **withdrawn**: neutral note with takedown state ("Takedown confirmed for 1 placement. The marketer can start
   a new round with fixed copy.").
 - **Tabs**: Comments (per version, add), Details (fields + "Offer terms quoted" grouped by terms version),
@@ -74,9 +76,9 @@ From the subagent (Tasks 4–6), reviewed and merged:
   channel, and market to run checks."), checking, unavailable, none. Submit with open findings shows an inline
   strip first ("4 open findings (4 blocking). Reviewers will see them." Submit anyway / Keep editing). Then
   create → upload each queued file (mockup = kind `creative`) → navigate to the item; a failed upload toasts
-  its filename. 422s land on fields (`errorMap.onServer`), cleared on edit. Fetch from URL is wired; the
-  backend returns 501 today and the form says "Fetching from a URL isn't available yet. Paste the copy
-  instead."
+  its filename. 422s land on fields (`errorMap.onServer`), cleared on edit. Fetch from a URL was built
+  and then removed in the follow-up PR: the endpoint returns 501, and controls that don't work don't ship
+  (ledger ruling); workstream M adds it back with the endpoint.
 - **My submissions**: sections Waiting on you / With compliance / Approved / Closed with counts; each row
   says who has the ball ("Changes requested by Dana Reyes: Add the full APR r…", "Dana Reyes is reviewing",
   "Back in review: Offer terms changed") and the next action (Resubmit / Start new round). Skeleton, error +
@@ -138,8 +140,8 @@ Nothing under `frontend/src/api/generated` or the OpenAPI was edited. What the U
    version still waiting from a refused edit (`reviews/decisions.py` `_edited_version`); the UI posts
    `edited_content_text: null` in exactly that case (tested).
 7. **Still stubs on `main`: `POST /items/fetch-url` and `POST /items/bulk/fast-track-approve`** (501,
-   `NotImplementedYet`; F owns the latter). The UI is wired to the generated clients and shows the
-   server's message on one line; behavior tested with MSW. `POST /items/{id}/versions` and `/new-round` are
+   `NotImplementedYet`; F owns the latter). Fetch from a URL is no longer in the UI (see above); Fast-track
+   shows the server's message on one line if it refuses, tested with MSW. `POST /items/{id}/versions` and `/new-round` are
    real now and match the UI's calls.
 8. **`MeOut.id` exists now, but the shell's `Viewer` is still `DEMO_VIEWER`** (foundation-owned, all
    roles, no id). So Claim and the decision buttons are gated by role only; the server enforces
@@ -189,7 +191,8 @@ Fresh reviewer subagent; full table in `docs/plan/reviews/ui-review.md`. 1 block
 - **Accepted vs dismissed spans** were identical; accepted keeps its severity color. Triaged cards' severity
   pills go outline-only, so a finished panel stops looking alarming.
 - **Keyboard:** ⌘/Ctrl+Enter submits the open decision from its fields or the Approve-with-edits editor.
-- **Re-review:** "Reaffirm v1", plus a warning under `terms_changed` that v1 quotes the old terms.
+- **Re-review:** "Reaffirm v1" with its version (and, in the follow-up, no Reaffirm at all after a terms
+  change).
 - Declined: regrouping checklist items by severity (the order is the brief's) and moving the decision panel
   into a drawer (it would cover the copy the reason is about). Partly: the Approve-with-edits form stays above
   the editor (Mod+Enter instead), the terms banner can't name versions (gap 11), no visible age header.

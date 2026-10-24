@@ -51,9 +51,11 @@ export function StatusNote({
             : 'No live placements.'}{' '}
           {fastTrackAvailable(item)
             ? `v${String(item.current_version_n)} was generated with the new numbers.`
-            : item.reopen_reason === 'approval_expired' && item.approval_expires_at !== null
-              ? `Approval expired ${formatDate(item.approval_expires_at)}.`
-              : ''}
+            : item.reopen_reason === 'terms_changed'
+              ? `v${String(item.current_version_n)} quotes the old terms and no updated version could be generated. Review it, or pull it.`
+              : item.reopen_reason === 'approval_expired' && item.approval_expires_at !== null
+                ? `Approval expired ${formatDate(item.approval_expires_at)}.`
+                : ''}
         </span>
         {approvedN !== undefined && approvedN !== item.current_version_n && compareN !== approvedN && (
           <Button

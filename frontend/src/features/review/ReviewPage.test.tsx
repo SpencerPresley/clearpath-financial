@@ -362,7 +362,7 @@ describe('ReviewPage', () => {
     expect(document.querySelector('ins')?.textContent).toContain('Terms 24–60 months.');
   });
 
-  it('offers fast-track, reaffirm, and pull on a re-review with a generated version', async () => {
+  it('offers fast-track and pull, not reaffirm, when terms changed and a version was generated', async () => {
     const { posted } = renderReview({
       item: itemFixture({
         status: 'needs_rereview',
@@ -376,7 +376,8 @@ describe('ReviewPage', () => {
     });
     expect(await screen.findByText(/Re-review: Offer terms changed\./)).toBeInTheDocument();
     expect(screen.getByText('AI review carried from v1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reaffirm v1' })).toBeInTheDocument();
+    // Reaffirm would re-check v1 against the new terms and be refused (reviews/decisions.py reaffirm).
+    expect(screen.queryByRole('button', { name: /Reaffirm/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Fast-track approve v2' }));
     await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');
@@ -389,7 +390,7 @@ describe('ReviewPage', () => {
     });
   });
 
-  it('does not offer fast-track when no version was generated', async () => {
+  it('offers reaffirm and pull, not fast-track, when the approval expired', async () => {
     renderReview({
       item: itemFixture({
         status: 'needs_rereview',
@@ -400,6 +401,32 @@ describe('ReviewPage', () => {
     });
     await screen.findByText(/Re-review: Approval expired\./);
     expect(screen.queryByRole('button', { name: /Fast-track/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reaffirm v2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
+  });
+
+  it('sends a terms change with no generated version to the normal lane', async () => {
+    const { posted } = renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'terms_changed',
+        latest_decision: DECISION_APPROVED,
+      }),
+      findings: [],
+    });
+    server.use(
+      http.post('*/api/items/:id/claim', ({ request }) => {
+        posted.push({ path: new URL(request.url).pathname, body: null });
+        return HttpResponse.json({});
+      }),
+    );
+    expect(await screen.findByText(/no updated version could be generated/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reaffirm|Fast-track|Claim/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await waitFor(() => {
+      expect(posted.map((p) => p.path)).toContain('/api/items/1042/claim');
+    });
   });
 
   it('explains a withdrawn item', async () => {

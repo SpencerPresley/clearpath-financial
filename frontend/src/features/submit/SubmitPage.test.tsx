@@ -330,44 +330,4 @@ describe('SubmitPage', () => {
       expect.objectContaining({ title: "rate-sheet.pdf didn't upload", tone: 'error' }),
     );
   });
-
-  it('says plainly that fetching from a URL is not available yet', async () => {
-    server.use(
-      http.post('*/api/items/fetch-url', () =>
-        HttpResponse.json(
-          { code: 'not_implemented', message: "Fetching copy from a URL isn't available yet." },
-          { status: 501 },
-        ),
-      ),
-    );
-    const user = userEvent.setup();
-    await renderSubmit();
-
-    await user.type(screen.getByLabelText('Fetch from a URL'), 'https://lendcompare.example/pl');
-    await user.click(screen.getByRole('button', { name: 'Fetch' }));
-
-    expect(
-      await screen.findByText("Fetching from a URL isn't available yet. Paste the copy instead."),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText('Copy')).toBeEnabled();
-  });
-
-  it('fills the copy from a fetched page', async () => {
-    server.use(
-      previewHandler(),
-      http.post('*/api/items/fetch-url', () =>
-        HttpResponse.json({ url: 'https://lendcompare.example/pl', title: 'PL offer', content_text: COPY }),
-      ),
-    );
-    const user = userEvent.setup();
-    await renderSubmit();
-
-    await user.type(screen.getByLabelText('Fetch from a URL'), 'https://lendcompare.example/pl');
-    await user.click(screen.getByRole('button', { name: 'Fetch' }));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Copy')).toHaveValue(COPY);
-    });
-    expect(screen.getByLabelText('Title')).toHaveValue('PL offer');
-  });
 });

@@ -10,7 +10,7 @@ import { ItemKey } from '../../ui/ItemKey';
 import { OUTCOME_LABELS, formatDate } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { showToast } from '../../ui/toast';
-import { fastTrackAvailable } from './decisionModes';
+import { rereviewActions } from './decisionModes';
 import type { DecisionMode } from './decisionModes';
 import type { DecisionGate } from './gate';
 
@@ -59,12 +59,16 @@ export function approveNote(gate: DecisionGate): string | null {
 export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }: DecisionBarProps) {
   const pressed = (m: DecisionMode) => (mode === m ? true : undefined);
   const showDecisions = isDecider && gate.canDecide;
-  const showRereview = isDecider && item.status === 'needs_rereview';
+  const rereview = isDecider ? rereviewActions(item) : [];
+  const showRereview = rereview.length > 0;
   const note = showDecisions ? approveNote(gate) : null;
   const approvedN = item.latest_decision?.version_n;
   // Only the assignee (or a lead) may decide; an unassigned item is claimed first (decisions.md, assignment).
+  // A re-review that offers the normal lane claims through its Review button instead.
   const showClaim =
-    isDecider && item.assignee === null && (item.status === 'submitted' || item.status === 'needs_rereview');
+    isDecider &&
+    item.assignee === null &&
+    (item.status === 'submitted' || (item.status === 'needs_rereview' && !rereview.includes('review')));
   const queryClient = useQueryClient();
   const claim = useClaimItem({
     mutation: {
@@ -153,7 +157,7 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
           )}
           {showRereview && (
             <>
-              {fastTrackAvailable(item) && (
+              {rereview.includes('fast_track') && (
                 <Button
                   variant={mode === 'fast_track' ? 'secondary' : 'primary'}
                   icon="action.approve"
@@ -165,15 +169,29 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
                   Fast-track approve v{item.current_version_n}
                 </Button>
               )}
-              <Button
-                icon="action.approve"
-                aria-pressed={pressed('reaffirm')}
-                onPress={() => {
-                  onMode('reaffirm');
-                }}
-              >
-                {approvedN === undefined ? 'Reaffirm' : `Reaffirm v${String(approvedN)}`}
-              </Button>
+              {rereview.includes('review') && (
+                <Button
+                  variant="primary"
+                  icon="action.assign"
+                  isDisabled={claim.isPending}
+                  onPress={() => {
+                    claim.mutate({ itemId: item.id });
+                  }}
+                >
+                  Review
+                </Button>
+              )}
+              {rereview.includes('reaffirm') && (
+                <Button
+                  icon="action.approve"
+                  aria-pressed={pressed('reaffirm')}
+                  onPress={() => {
+                    onMode('reaffirm');
+                  }}
+                >
+                  {approvedN === undefined ? 'Reaffirm' : `Reaffirm v${String(approvedN)}`}
+                </Button>
+              )}
               <Button
                 icon="action.pull"
                 aria-pressed={pressed('pull')}

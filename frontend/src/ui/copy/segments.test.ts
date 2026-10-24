@@ -60,17 +60,17 @@ describe('segmentText', () => {
     ]);
   });
 
-  it('handles a nested AI span inside a code span, blocking first', () => {
-    const outer = mark('code', 5, 30, { severity: 'warning', source: 'code' });
-    const inner = mark('ai', 10, 20, { severity: 'blocking', source: 'llm' });
+  it('handles a blocking code span nested in an AI warning span, blocking first', () => {
+    const outer = mark('ai', 5, 30, { severity: 'warning', source: 'llm' });
+    const inner = mark('code', 10, 20, { severity: 'blocking', source: 'code' });
     const text = 'x'.repeat(40);
     const segments = segmentText(text, [outer, inner]);
 
     expect(segments.map((s) => [s.start, s.end, s.marks.map((m) => m.id)])).toEqual([
       [0, 5, []],
-      [5, 10, ['code']],
-      [10, 20, ['ai', 'code']],
-      [20, 30, ['code']],
+      [5, 10, ['ai']],
+      [10, 20, ['code', 'ai']],
+      [20, 30, ['ai']],
       [30, 40, []],
     ]);
     // Every character renders exactly once.
