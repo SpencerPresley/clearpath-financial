@@ -279,6 +279,26 @@ export const STATS = {
   by_status: [],
 };
 
+/** GET /users/workload (the lead's panel on the queue): heaviest first. */
+export const WORKLOAD = [
+  {
+    user_id: 3,
+    name: 'Sam Okafor',
+    is_available: true,
+    auto_assigned: true,
+    open_items: 3,
+    weighted_load: 7,
+  },
+  {
+    user_id: 2,
+    name: 'Dana Whitfield',
+    is_available: true,
+    auto_assigned: true,
+    open_items: 2,
+    weighted_load: 4,
+  },
+];
+
 export const USERS = [
   {
     id: 2,
@@ -456,6 +476,7 @@ export async function stubApi(page: Page, opts: StubOptions = {}) {
       return fulfill(route, opts.views ?? []);
     }
     if (path === '/api/users') return fulfill(route, USERS);
+    if (path === '/api/users/workload') return fulfill(route, WORKLOAD);
     if (path === '/api/partners') return fulfill(route, PARTNERS);
     if (/^\/api\/items\/\d+\/findings$/.test(path)) return fulfill(route, FINDINGS);
     const item = /^\/api\/items\/(\d+)$/.exec(path);
