@@ -370,6 +370,7 @@ function detail(r: Row) {
     numbers_change: null,
     llm_check_failure_code: null,
     llm_check_failure_reason: null,
+    drift_rereview: null,
     notes: 'Partner asked for a rush; launch is 11/1.',
     retention_until: null,
     risk_tier_overridden: false,

@@ -203,8 +203,9 @@ export function DecisionPanel({
   const fail = (error: unknown) => {
     setConfirming(false);
     const code = apiErrorBody(error)?.code;
-    // The item moved on under us (a new version, or new findings on the reviewer's edit): reload it.
-    if (code === 'findings_need_triage' || code === 'stale_version') {
+    // The item moved on under us (a new version, new findings on the reviewer's edit, or a drift check that
+    // found the partner page changed again after Reaffirm was offered): reload it.
+    if (code === 'findings_need_triage' || code === 'stale_version' || code === 'drift_not_restored') {
       refresh();
     }
     if (code === 'findings_need_triage') {
