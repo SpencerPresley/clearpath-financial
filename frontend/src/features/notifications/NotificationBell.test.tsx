@@ -327,4 +327,24 @@ describe('polling', () => {
 
     expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
   });
+
+  it('keeps focus on the row being read when a poll brings in a newer one', async () => {
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    serveInbox(pageOf(ROWS));
+    renderBell();
+    await user.click(await screen.findByRole('button', { name: 'Notifications, 3 unread' }));
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Dana Reyes requested changes/ })).toHaveFocus();
+    });
+    await user.keyboard('{ArrowDown}');
+    const reading = screen.getByRole('option', { name: /Sam Okafor mentioned you/ });
+    expect(reading).toHaveFocus();
+
+    const newer = notificationFixture({ id: 99, created_at: new Date(NOW.getTime() - 60_000).toISOString() });
+    server.use(http.get('*/api/notifications', () => HttpResponse.json(pageOf([newer, ...ROWS]))));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    expect(await screen.findByText('4 unread')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Sam Okafor mentioned you/ })).toHaveFocus();
+  });
 });

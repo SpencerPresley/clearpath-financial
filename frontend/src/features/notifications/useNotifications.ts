@@ -28,20 +28,21 @@ function useOptimisticRead() {
   const queryClient = useQueryClient();
   const key = getListNotificationsQueryKey();
 
-  const apply = async (read: (id: number) => boolean): Promise<Snapshot> => {
+  /** `read` picks the rows to mark; null marks everything, including unread rows beyond the loaded page. */
+  const apply = async (read: ((id: number) => boolean) | null): Promise<Snapshot> => {
     await queryClient.cancelQueries({ queryKey: key });
     const previous = queryClient.getQueryData<NotificationPageOut>(key);
     if (previous !== undefined) {
       const at = new Date().toISOString();
       let marked = 0;
       const rows = previous.rows.map((row) => {
-        if (row.read_at !== null || !read(row.id)) return row;
+        if (row.read_at !== null || (read !== null && !read(row.id))) return row;
         marked += 1;
         return { ...row, read_at: at };
       });
       queryClient.setQueryData<NotificationPageOut>(key, {
         rows,
-        unread_count: Math.max(0, previous.unread_count - marked),
+        unread_count: read === null ? 0 : Math.max(0, previous.unread_count - marked),
       });
     }
     return { previous };
@@ -74,7 +75,7 @@ export function useMarkAllRead() {
   const { apply, rollback, settle } = useOptimisticRead();
   return useMarkAllNotificationsRead<unknown, Snapshot>({
     mutation: {
-      onMutate: () => apply(() => true),
+      onMutate: () => apply(null),
       onError: (_error, _vars, context) => {
         rollback(context);
         showToast({
