@@ -179,7 +179,7 @@ errors.
 ## UI review
 
 Fresh reviewer subagent; full table in `docs/plan/reviews/ui-review.md`. 1 blocker, 11 should-fix, 7 nits;
-16 fixed, 3 declined with reasons. The ones that changed the design:
+17 fixed (3 in part), 2 declined with reasons. The ones that changed the design:
 
 - **Blocker:** at 1280 the "why can't I approve" note painted over the item's key/status line. It now sits on
   its own line under the buttons, and names the way out when only accepted findings block ("2 accepted
@@ -190,8 +190,9 @@ Fresh reviewer subagent; full table in `docs/plan/reviews/ui-review.md`. 1 block
   pills go outline-only, so a finished panel stops looking alarming.
 - **Keyboard:** ⌘/Ctrl+Enter submits the open decision from its fields or the Approve-with-edits editor.
 - **Re-review:** "Reaffirm v1", plus a warning under `terms_changed` that v1 quotes the old terms.
-- Declined: regrouping checklist items by severity (the order is the brief's), moving the decision panel into
-  a drawer (it would cover the copy the reason is about), a visible age header on My submissions.
+- Declined: regrouping checklist items by severity (the order is the brief's) and moving the decision panel
+  into a drawer (it would cover the copy the reason is about). Partly: the Approve-with-edits form stays above
+  the editor (Mod+Enter instead), the terms banner can't name versions (gap 11), no visible age header.
 
 Follow-ups the review surfaced (not built): "use last dismissal reason"; "next item" after a decision (needs
 the queue's order, H2).

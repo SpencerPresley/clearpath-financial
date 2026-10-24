@@ -17,7 +17,8 @@ appears: fixed before merge).
 
 ## Findings and resolutions
 
-1 blocker, 11 should-fix, 7 nits. Fixed: 16. Declined with reasons: 3.
+1 blocker, 11 should-fix, 7 nits. Fixed: 17 (3 of them in part: layout in #7, terms versions in #10,
+age header in #12). Declined with reasons: 2.
 
 | # | Sev | Finding | Resolution |
 |---|---|---|---|
@@ -27,7 +28,7 @@ appears: fixed before merge).
 | 4 | should | Overlapping findings: the AI warning inside the blocking code span drew no line. | **Fixed.** The second finding on a segment renders its own underline 7px below the first (nested inline decorations both paint), in its own severity color and source style. Visible in `review-open-findings` as the dashed amber line under "as low as". Tested. |
 | 5 | should | Accepted spans (must change) looked like dismissed ones. | **Fixed.** Accepted spans keep their severity color on the 1.5px line; dismissed go muted. `data-accepted`, tested. |
 | 6 | should | The suggested fix was hidden on accepted cards and in the edit's findings, exactly when the reviewer types the fix. | **Fixed.** Shown on accepted (not dismissed) cards and in "code findings in your edit". |
-| 7 | should | Approve with edits: the form sits above the editor, so keyboard submit meant Shift+Tab backwards; no Mod+Enter anywhere. | **Fixed (keyboard).** ⌘/Ctrl+Enter submits the open decision from its fields or the editor (ignored in other text fields, under a modal, or while the submit is disabled); shown next to the submit and in the shortcuts dialog. Tested. Layout kept: moving the form under the editor would split the decision form across two scroll regions for one mode. |
+| 7 | should | Approve with edits: the form sits above the editor, so keyboard submit meant Shift+Tab backwards; no Mod+Enter anywhere. | **Fixed (keyboard).** ⌘/Ctrl+Enter submits the open decision when focus is in its form or the editor (nowhere else, not under a modal, not while the submit is disabled); shown next to the submit and in the shortcuts dialog. Tested. Layout kept: moving the form under the editor would split the decision form across two scroll regions for one mode. |
 | 8 | should | Triaged cards kept full red "Blocking" pills, so a finished panel still looked alarming. | **Fixed.** Non-open cards render the severity pill outline-only and muted (glyph and word keep the severity). |
 | 9 | should | Withdrawn item: bar said "Approved v2 by Dana Reyes" beside the "Withdrawn" chip. | **Fixed.** Withdrawn/expired read "Was approved v2 by Dana Reyes 4h". |
 | 10 | should | "Reaffirm" had no version; under terms_changed it re-approves copy quoting superseded terms. | **Fixed.** Button "Reaffirm v1", panel title "Reaffirm the approval of v1", and under `terms_changed` an alert line: "v1 quotes the offer terms that changed. Reaffirm only if those numbers are still offered; otherwise fast-track the updated version or pull it." Naming the terms versions in the banner needs data the item doesn't carry (API gap list). |

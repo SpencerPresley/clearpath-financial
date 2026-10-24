@@ -296,14 +296,14 @@ export function DecisionPanel({
     send();
   };
 
-  // ⌘/Ctrl+Enter submits from anywhere in the decision form or the Approve-with-edits editor, so the
-  // keyboard path doesn't run backwards from the editor to the button (spec §5.7).
+  // ⌘/Ctrl+Enter submits when focus is in the decision form or the Approve-with-edits editor, so the
+  // keyboard path doesn't run backwards from the editor to the button (spec §5.7). Nowhere else: a
+  // prefilled Request changes must not post from a finding card.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target : null;
-      const editable = target?.closest('input, textarea, select, [contenteditable="true"]') ?? null;
-      if (editable !== null && editable.closest('.app-decision-panel, .app-edit-pane') === null) return;
+      if (target?.closest('.app-decision-panel, .app-edit-pane') == null) return;
       if (confirming || document.querySelector('[aria-modal="true"]') !== null) return;
       if (pending || blocked || noEdits) return;
       event.preventDefault();
