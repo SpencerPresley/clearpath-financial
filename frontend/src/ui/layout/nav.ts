@@ -64,7 +64,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     roles: ['lead'],
     to: '/metrics',
   },
-  { id: 'import', label: 'Import', icon: 'nav.import', group: 'operations', roles: ['admin'] },
+  { id: 'import', label: 'Import', icon: 'nav.import', group: 'operations', roles: ['admin'], to: '/import' },
   { id: 'outbox', label: 'Outbox', icon: 'nav.outbox', group: 'operations', roles: 'everyone' },
 ];
 
