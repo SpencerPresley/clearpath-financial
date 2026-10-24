@@ -22,7 +22,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
 | J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
-| API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
+| API gaps (queue/mine) | agent (worktree) | PR #32 merged | done (CI failure root-caused: MoreFilters removed the focused submenu mid-selection; fixed in product code) | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
@@ -96,6 +96,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- Accepted from #32: approval_expires_at keeps the latest approval's expiry; Age sort oldest-first; no "In queue" tab (stat links to it); queue exports exclude legacy. Open: wire PATCH /views into ViewBar ("Save changes" on a modified saved view).
 
 - Frontend follow-ups queue: items 1–5 done in PR #33; API-gaps adoption folded into PR #32. Original list: PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
 - Deploy wave: prod settings require ANTHROPIC_API_KEY.
