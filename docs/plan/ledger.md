@@ -12,7 +12,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | shared domain vocabulary | orchestrator | main `44e7264` | done | backend/core/domain.py enums + offer-terms schemas; per-worktree test DB suffix |
 | 0 foundation (#1) | agent (worktree) | PR #22 merged `1da02c7` | done | 296 tests; Interfaces in reports/foundation.md; dev DBs recreated (custom user model) |
 | C rules engine (#4) | agent (worktree) | PR #21 merged | done | 42 code rules + 4 human items; 326 tests; ENGINE_VERSION in cache keys; ~3 ms per 5 KB ad |
-| D llm core (#5, phase 1) | agent (worktree `wsD/llm-core`) | — | in progress | pure module: LLM rules, structured findings, span validation, eval corpus; phase 2 wiring after Foundation |
+| D llm core (#5, phase 1) | agent (worktree) | PR #23 merged `f126747` | done | 7 LLM rules; live eval: recall 100%, precision 72%, 0/5 clean FPs, injection resisted, $0.00025/review (reports/llm-core-live-eval.md) |
 | E review workflow (#6, +#18) | agent (worktree `wsE/review-workflow`) | — | in progress | checks wiring, assignment, transitions, decisions/gates, placements, expiry, library selector |
 | G import/export (#8) | agent (worktree `wsG/import-export`) | — | in progress | legacy import per samples oracle, xlsx export, evidence pack (Celery jobs) |
 | H2 queue (#9, part 2) | agent (worktree `wsH/queue`) | — | in progress | table, filters, saved views, board, drawer, /api/me wiring |
@@ -68,7 +68,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
-- Next after merges: F offer terms (after E), D phase 2 wiring (after D1 + E), J secondary screens + metrics, K assistant (useStream spike first; revise the Foundation assistant stub contract), L demo seed, then deploy wave (terraform apply approved), then full UI walkthrough per role.
+- Next after merges: F offer terms (after E), D phase 2 wiring (after E; note: engine `rule.py` `to_finding` labels every non-code rule HUMAN, so phase 2 must build LLM findings itself or fix that; offsets are Python str indices, frontend I must convert to UTF-16), J secondary screens + metrics, K assistant (useStream spike first; revise the Foundation assistant stub contract), L demo seed, then deploy wave (terraform apply approved), then full UI walkthrough per role.
 
 - Resolved: the backend's typed settings read the 1Password-mounted `.env` non-interactively (verified by
   printing only a has-key boolean). The orchestrator runs the live LLM eval after the LLM-core PR merges;
