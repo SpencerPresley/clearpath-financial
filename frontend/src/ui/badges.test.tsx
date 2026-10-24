@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { RiskTierBadge, SeverityBadge, SourceTag, STATUS_META, StatusBadge } from './badges';
+import { RiskTierBadge, SeverityBadge, SourceTag, STATUS_META, StatusBadge, StatusMark } from './badges';
 import { ITEM_STATUSES } from './domain';
 import type { ItemStatus } from './domain';
 
@@ -76,5 +76,17 @@ describe('RiskTierBadge', () => {
     const badge = screen.getByText(label).closest('[data-tone]');
     expect(badge).toHaveAttribute('data-tone', 'neutral');
     expect(badge?.querySelector(`svg[data-icon="risk.${tier}"]`)).not.toBeNull();
+  });
+});
+
+describe('StatusMark (dense cells, spec §5.2a)', () => {
+  it.each(ITEM_STATUSES)('%s is an icon named by its label, with the §5.2 tone and no tab stop', (status) => {
+    const [label, tone] = EXPECTED[status];
+    render(<StatusMark status={status} />);
+    const mark = screen.getByRole('img', { name: label });
+    expect(mark).toHaveAttribute('data-tone', tone);
+    expect(mark).toHaveAttribute('title', label);
+    expect(mark).not.toHaveAttribute('tabindex');
+    expect(mark.querySelector(`svg[data-icon="status.${status}"]`)).not.toBeNull();
   });
 });

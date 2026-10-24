@@ -57,6 +57,26 @@ export function StatusBadge({ status }: { status: ItemStatus }) {
   return <Badge meta={STATUS_META[status]} />;
 }
 
+/**
+ * Icon-only status for dense cells (board cards, narrow columns), spec §5.2a: tone + glyph, named by its label
+ * for assistive tech and by `title` on hover. No tooltip trigger: inside a keyboard-navigated row a per-cell
+ * tab stop would break j/k navigation, so the row is the tab stop and this is announced with it.
+ */
+export function StatusMark({ status }: { status: ItemStatus }) {
+  const meta = STATUS_META[status];
+  return (
+    <span
+      role="img"
+      aria-label={meta.label}
+      title={meta.label}
+      className="app-status-mark"
+      data-tone={meta.tone}
+    >
+      <Icon name={meta.icon} size={14} />
+    </span>
+  );
+}
+
 export function SeverityBadge({ severity }: { severity: Severity }) {
   return <Badge meta={SEVERITY_META[severity]} />;
 }

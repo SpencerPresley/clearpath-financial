@@ -1491,3 +1491,29 @@
     translate: 300% 0;
   }
 }
+
+/* ---- Queue (workstream H part 2: table, filters, board, preview drawer) ----------------------------- */
+@layer components {
+  /* Icon-only status for dense cells: tone carried by glyph color, label by aria-label/title. */
+  .app-status-mark {
+    @apply inline-flex size-5 items-center justify-center rounded-sm border;
+  }
+  .app-status-mark[data-tone='neutral'] {
+    @apply border-status-neutral-line bg-status-neutral-soft text-status-neutral-soft-content;
+  }
+  .app-status-mark[data-tone='info'] {
+    @apply border-status-info-line bg-status-info-soft text-status-info-soft-content;
+  }
+  .app-status-mark[data-tone='warning'] {
+    @apply border-status-warning-line bg-status-warning-soft text-status-warning-soft-content;
+  }
+  .app-status-mark[data-tone='success'] {
+    @apply border-status-success-line bg-status-success-soft text-status-success-soft-content;
+  }
+  .app-status-mark[data-tone='error'] {
+    @apply border-status-error-line bg-status-error-soft text-status-error-soft-content;
+  }
+  .app-status-mark[data-tone='alert'] {
+    @apply border-status-alert bg-status-alert text-status-alert-content;
+  }
+}
