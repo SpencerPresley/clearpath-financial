@@ -40,7 +40,7 @@ test('nav follows the signed-in roles from /api/me', async ({ page }) => {
 
   const nav = page.getByRole('navigation', { name: 'Primary' });
   await expect(nav.getByRole('link', { name: 'Queue' })).toBeVisible();
-  await expect(nav).not.toContainText('Offer terms');
+  await expect(nav).not.toContainText('Metrics');
   await expect(nav).not.toContainText('Import');
 });
 

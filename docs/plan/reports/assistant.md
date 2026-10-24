@@ -95,6 +95,15 @@ same transaction. Sends are idempotent per `(thread_id, tool_call_id)`: a send w
 stored email, whatever the user answers on the re-shown card. The tool result's artifact says what happened (`sent`,
 `declined` or `blocked`), set in code; the panel renders it rather than the model's prose.
 
+**System mail (ruling 1).** `EMAIL_BACKEND` is global, so the Outbox backend also takes every other email the app
+sends. allauth's password reset renders through its adapter and goes out via `django.core.mail` and `EMAIL_BACKEND`
+like any Django email; there's no separate path. A message without the assistant's metadata becomes a
+`source=system` row: every recipient (to, cc, bcc), no requester, approver or thread. A check constraint pins both
+row shapes. Only admins see system rows (list and detail; to anyone else the detail is a 404). The page labels them
+System, and the detail says "System mail, not drafted by the assistant". Tests: a plain `EmailMultiAlternatives`,
+and `POST /_allauth/browser/v1/auth/password/request` returning 200 with the row in the Outbox (before this it
+was a 500).
+
 ## Prompt design
 
 I used the prompt-engineering and context-engineering skills. The prompt goes to `claude-haiku-5-5` through
@@ -127,7 +136,8 @@ has none (scratchpad `cache_check.py`). Whether the cache actually hits is only 
 - `ModelCallLimitMiddleware(run_limit=12)` caps model calls per run, and hitting it gives a product-copy message.
 - `aprune(keep_latest)` runs after each completed run.
 - Every model call is logged with model, tokens (including cache reads and writes) and latency, plus a total per run
-  (spec §6.4).
+  (spec §6.4). The numbers are in the message text (`assistant model call thread_id=… cache_read_tokens=…`) as
+  well as `extra`, because the console formatter drops `extra`. That's why the orchestrator's live run showed none.
 
 ## Injection posture (spec §7)
 
@@ -145,19 +155,19 @@ has none (scratchpad `cache_check.py`). Whether the cache actually hits is only 
 
 ## Verification
 
-All of this was run at the branch head after rebasing onto `origin/main` (`c0543c6`).
+All of this was run at the branch head after rebasing onto `origin/main` (`78ed50f`, after #34, #35 and #36).
 
 ```
-backend$ uv run pytest -q                      1469 passed, 3 deselected   (assistant + notifications: 122)
-backend$ ruff check . / ruff format --check .  All checks passed! / 297 files already formatted
+backend$ uv run pytest -q                      1544 passed, 3 deselected
+backend$ ruff check . / ruff format --check .  All checks passed! / 306 files already formatted
 backend$ pyrefly check                         0 errors
 backend$ manage.py makemigrations --check      No changes detected
 backend$ manage.py check --fail-level WARNING  no issues
 repo$    make schema                           no drift
 frontend$ typecheck / lint / format:check      clean
-frontend$ npm run test:run                     51 files, 475 passed
+frontend$ npm run test:run                     63 files, 612 passed
 frontend$ npm run build                        built
-frontend$ npx playwright test                  13 passed (incl. assistant e2e), screenshot specs skipped
+frontend$ npx playwright test                  19 passed (incl. assistant e2e), screenshot specs skipped
 ```
 
 **Real-server smoke** (scratchpad `asgi_smoke.py` + `smoke_run*.sh`: uvicorn, a scripted slow model, curl):
@@ -173,11 +183,11 @@ frontend$ npx playwright test                  13 passed (incl. assistant e2e), 
 - **Lock leak.** The reviewer found that a body closed before its first read leaked the lock for 10 minutes. Fixed with
   the K1 lease.
 
-**Not run:**
-- The live smoke test `assistant/tests/test_live.py` (`-m live`): one real Haiku turn that must call
-  `get_queue_stats` and complete. It's left for the orchestrator.
-- Nothing has been run against the real model, so the prompt's real-model behavior (tool choice, refusing injected
-  instructions) is unmeasured.
+**Live:**
+- The orchestrator ran `assistant/tests/test_live.py` (`-m live`) against Haiku. It passed: 3 model calls, one run,
+  5.4 s. The cache hit is still unverified, because the usage numbers weren't in the log text then. They are now:
+  `cache_read_tokens` above 0 on the second call means block 1 hit.
+- Refusing injected instructions has only been tested with the obeying fake model, not the real one.
 
 **One flaky test seen once:** `audit/tests/test_outbox.py::test_cursor_does_not_skip_late_committing_event` failed in
 one full run and passed in isolation and in two reruns. That is the Foundation-documented cluster-wide
@@ -190,7 +200,8 @@ autocommit connections.
 |---|---|
 | `backend/config/settings/base.py` | Assistant block: model, key, email domain, team aliases, `EMAIL_BACKEND`, `DEFAULT_FROM_EMAIL`, `FRONTEND_BASE_URL` |
 | `backend/config/tests/test_contract.py` | assistant rows removed from `STUBS` |
-| `backend/notifications/{models,schemas,selectors}.py`, `migrations/0003`, `0004`, `email_backend.py`, tests | `html_body`, `tool_call_id` (unique per thread), the Outbox email backend |
+| `backend/notifications/{models,schemas,selectors,api}.py`, `migrations/0003`–`0005`, `email_backend.py`, tests | `html_body`, `tool_call_id` (unique per thread), `source` (assistant/system; system mail admin-only), the Outbox email backend |
+| `backend/core/domain.py` | `OutboxSource` enum |
 | `backend/pyproject.toml`, `uv.lock` | `langgraph-checkpoint-postgres` 3.2.0 |
 | `frontend/package.json`, lock | `@langchain/react` 1.2.7, `@langchain/core` |
 | `frontend/src/api/mutator.ts` | `streamFetch`, sharing the CSRF and credentials code |
@@ -200,6 +211,8 @@ autocommit connections.
 | `frontend/src/theme/theme.css` | `app-assistant-*`, `app-outbox-*`; `.app-main` becomes a container for the layout beside the panel |
 | `frontend/src/features/queue/QueuePage.tsx` | one hook call: step columns aside while the panel is open, as with the drawer |
 | `frontend/src/routes/outbox.tsx`, `routeTree.gen.ts`, `src/test/server.ts`, `e2e/*` | Outbox route (`?email=`), default MSW handler, e2e + screenshot specs |
+| `frontend/src/ui/layout/AppShell.test.tsx` | Its "unbuilt section" example was Outbox. Every real section has a page now, so the test mocks in a made-up "Reports" section to keep the "Soon" rendering covered (ruling 2) |
+| `frontend/e2e/shell.spec.ts` | Already failing on main: #36 opened Offer terms to reviewers, and this spec still asserted reviewers don't see it. It now asserts Metrics (lead-only). CI doesn't run Playwright, which is why nobody saw it |
 
 ## Open items and risks
 
@@ -207,12 +220,10 @@ autocommit connections.
   tool, and the approval card is the draft: `send_email` pauses before anything is sent, and the user sends, edits or
   declines it. A second tool would only add a step the model could skip.
 
-- **Non-assistant email fails.** `EMAIL_BACKEND` is global, and the Outbox backend refuses messages without the
-  assistant's metadata, so an allauth password-reset email would raise. Before this branch the SMTP default had no
-  server either, and real outbound email is a spec non-goal. If reset email matters, give allauth its own backend.
-  That needs a decision.
-- **Workstream J overlap.** The brief gave K the Outbox page; spec §8.1 also lists "outbox" under J. J should drop it
-  so it isn't built twice.
+- **Resolved by ruling:** app mail lands in the Outbox as admin-only system mail (ruling 1), and the Outbox stays
+  with K (ruling 2).
+- **CI doesn't run e2e.** `frontend-ci` has no Playwright job, so a broken spec on main (`shell.spec.ts`, above)
+  stays invisible. That's for whoever owns CI.
 - **v3 streaming is marked experimental** (`LangChainBetaWarning`). The wire translation is pinned by tests in
   `test_wire.py` and the frontend fixtures, so a LangGraph bump that changes event shapes fails CI.
 - **Known gaps:**

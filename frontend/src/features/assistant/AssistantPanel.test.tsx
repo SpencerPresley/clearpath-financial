@@ -64,7 +64,8 @@ function setup({
 }
 
 async function panel() {
-  return screen.findByRole('complementary', { name: 'Assistant' });
+  // The first wait covers the session gate and the whole route tree loading, which can pass 1 s under load.
+  return screen.findByRole('complementary', { name: 'Assistant' }, { timeout: 5000 });
 }
 
 /** A run that reads CP-1042 (tool result links the item) and answers in Markdown. */
