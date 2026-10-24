@@ -37,6 +37,10 @@ wire"; `docs/plan/reports/review-workflow.md` "D2"; `docs/plan/reports/foundatio
 
 ## Rulings made in this plan
 
+- **AI findings are always `warning`** (orchestrator ruling, arrived mid-task): coerced in `complete` and
+  backed by the `finding_llm_is_warning` CHECK constraint (migration `checks.0004_llm_runs`, which also adds
+  `CheckRun.attempts`).
+
 - **No API key → `failed` (code `not_configured`), not `skipped`.** E's gate passes `skipped`, and
   `create_version(origin=FAST_TRACK)` plus legacy imports rely on that (ruling 4: fast-track needs no override).
   Making `skipped` demand an override breaks F's bulk fast-track. `skipped` = the check isn't needed;
@@ -90,12 +94,12 @@ FailureCode = Literal["not_configured", "provider_unavailable", "provider_refuse
                       "stuck", "timeout", "error"]
 STUCK_AFTER: Final = timedelta(minutes=10)
 def ruleset_key(model_name: str) -> str
-def request_check(*, version: Version, actor: User | None, clock: Clock, retry: bool = False) -> CheckRun
+def request_check(*, item: ReviewItem, version: Version, actor: User | None, clock: Clock, retry: bool = False) -> CheckRun
     # caller's txn, item locked by caller; pending CheckRun, item pending if current, REQUESTED event,
     # transaction.on_commit(enqueue(version.pk))
 enqueue: Callable[[int], None]   # module-level seam; default delays checks.run_llm_prereview
 @dataclass(frozen=True) class Claim: run_id: int; version_id: int; item_id: int; attempt: int
-def claim(*, version_id: int, attempt: int, clock: Clock) -> Claim | None   # None: nothing pending
+def claim(*, version_id: int, clock: Clock) -> Claim | None   # None: nothing pending; attempt = ++CheckRun.attempts
 def requeue(*, claim: Claim, error: str, clock: Clock) -> None    # run -> pending; item stays running
 def fail(*, claim: Claim, code: FailureCode, error: str, clock: Clock) -> None
 def complete(*, claim: Claim, result: LlmReviewResult, clock: Clock) -> None
