@@ -1,12 +1,16 @@
+import base64
+import json
 from dataclasses import dataclass
 from datetime import date, datetime
 
 from django.db.models import Count, Max, Q, Sum
 
 from accounts.models import User
+from checks.engine.registry import RULES
+from checks.llm.rules import LLM_RULES_BY_ID
 from checks.models import Finding
-from core.domain import FindingState, ItemStatus, PartnerStatus, PartnerType
-from core.errors import NotFound
+from core.domain import FindingSource, FindingState, ItemStatus, PartnerStatus, PartnerType, Severity
+from core.errors import InvalidInput, NotFound, NotPermitted
 from partners.models import Partner
 from reviews.records import AttachmentRow, can_read_partner_attachments, list_partner_attachments
 
@@ -28,10 +32,21 @@ class RepeatIssue:
     """A rule that keeps firing on this partner's content: the "repeat issues" panel."""
 
     rule_id: str
+    rule_title: str | None
     citation: str
     count: int
     items: int
     last_seen_at: datetime
+
+
+def rule_title(rule_id: str) -> str | None:
+    """The rule's plain-English title from the code/checklist registry or the AI check's rules; None for a rule
+    neither knows (retired, or imported history)."""
+    spec = RULES.get(rule_id)
+    if spec is not None:
+        return spec.title
+    llm = LLM_RULES_BY_ID.get(rule_id)
+    return llm.spec.title if llm is not None else None
 
 
 @dataclass(frozen=True)
@@ -95,6 +110,7 @@ def repeat_issues(*, partner_id: int, limit: int = 10) -> tuple[RepeatIssue, ...
     return tuple(
         RepeatIssue(
             rule_id=r["rule_id"],
+            rule_title=rule_title(r["rule_id"]),
             citation=r["citation"],
             count=r["count"],
             items=r["items"],
@@ -121,4 +137,90 @@ def get_partner_detail(*, partner_id: int, viewer: User) -> PartnerDetail:
         if can_read_partner_attachments(viewer)
         else (),
         repeat_issues=repeat_issues(partner_id=partner_id),
+    )
+
+
+# --- findings history ----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PartnerFindingRow:
+    """One finding on one version of one of the partner's items: the partner's findings history."""
+
+    id: int
+    item_id: int
+    item_key: str
+    item_title: str
+    item_is_legacy: bool
+    version_n: int
+    rule_id: str
+    citation: str
+    source: FindingSource
+    severity: Severity
+    state: FindingState
+    message: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class PartnerFindingPage:
+    rows: tuple[PartnerFindingRow, ...]
+    next_cursor: str | None
+
+
+def _encode_finding_cursor(finding: Finding) -> str:
+    raw = json.dumps({"at": finding.created_at.isoformat(), "id": finding.pk}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_finding_cursor(cursor: str) -> tuple[datetime, int]:
+    try:
+        data = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+        return datetime.fromisoformat(data["at"]), int(data["id"])
+    except (ValueError, KeyError, TypeError) as exc:  # binascii.Error is a ValueError
+        raise InvalidInput(
+            "This page link is out of date. Reload the list.", fields=[], details={"field": "cursor"}
+        ) from exc
+
+
+def list_partner_findings(
+    *, partner_id: int, viewer: User, rule_id: str | None = None, cursor: str | None = None, limit: int = 50
+) -> PartnerFindingPage:
+    """Every finding on any version of the partner's items (or one rule's), newest first (ties by id), one page.
+
+    Reviewers, leads, and admins (as for partner agreements: the history is a review tool). Two queries: the
+    partner's existence and the page."""
+    if not can_read_partner_attachments(viewer):
+        raise NotPermitted("A partner's findings history is for reviewers and leads.")
+    if not Partner.objects.filter(pk=partner_id).exists():
+        raise NotFound.entity("partner", partner_id)
+    qs = Finding.objects.filter(version__item__partner_id=partner_id)
+    if rule_id:
+        qs = qs.filter(rule_id=rule_id)
+    if cursor is not None:
+        at, pk = _decode_finding_cursor(cursor)
+        qs = qs.filter(Q(created_at__lt=at) | Q(created_at=at, pk__lt=pk))
+    findings = list(qs.select_related("version__item").order_by("-created_at", "-pk")[: limit + 1])
+    has_more = len(findings) > limit
+    findings = findings[:limit]
+    return PartnerFindingPage(
+        rows=tuple(
+            PartnerFindingRow(
+                id=f.pk,
+                item_id=f.version.item.pk,
+                item_key=f.version.item.key,
+                item_title=f.version.item.title,
+                item_is_legacy=f.version.item.is_legacy,
+                version_n=f.version.n,
+                rule_id=f.rule_id,
+                citation=f.citation,
+                source=FindingSource(f.source),
+                severity=Severity(f.severity),
+                state=FindingState(f.state),
+                message=f.message,
+                created_at=f.created_at,
+            )
+            for f in findings
+        ),
+        next_cursor=_encode_finding_cursor(findings[-1]) if has_more and findings else None,
     )

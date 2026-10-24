@@ -11,4 +11,6 @@ export interface RepeatIssueOut {
   items: number;
   last_seen_at: string;
   rule_id: string;
+  /** The rule's title; null for a rule the registry doesn't know. */
+  rule_title: string | null;
 }

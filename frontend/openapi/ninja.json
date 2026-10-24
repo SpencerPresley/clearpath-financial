@@ -7989,6 +7989,116 @@
         "title": "PartnerDetailOut",
         "type": "object"
       },
+      "PartnerFindingOut": {
+        "properties": {
+          "citation": {
+            "examples": [
+              "16 CFR 255.5"
+            ],
+            "title": "Citation",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "item_is_legacy": {
+            "title": "Item Is Legacy",
+            "type": "boolean"
+          },
+          "item_key": {
+            "examples": [
+              "CP-1042"
+            ],
+            "title": "Item Key",
+            "type": "string"
+          },
+          "item_title": {
+            "title": "Item Title",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "rule_id": {
+            "examples": [
+              "ftc.material_connection"
+            ],
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FindingSource",
+            "description": "code, llm (shown as 'AI suggestion'), or human checklist."
+          },
+          "state": {
+            "$ref": "#/components/schemas/FindingState"
+          },
+          "version_n": {
+            "title": "Version N",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "item_id",
+          "item_key",
+          "item_title",
+          "item_is_legacy",
+          "version_n",
+          "rule_id",
+          "citation",
+          "source",
+          "severity",
+          "state",
+          "message",
+          "created_at"
+        ],
+        "title": "PartnerFindingOut",
+        "type": "object"
+      },
+      "PartnerFindingPageOut": {
+        "properties": {
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` for the next page; null on the last page.",
+            "title": "Next Cursor"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerFindingOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "next_cursor"
+        ],
+        "title": "PartnerFindingPageOut",
+        "type": "object"
+      },
       "PartnerIn": {
         "properties": {
           "agreement_signed_on": {
@@ -8968,10 +9078,23 @@
           "rule_id": {
             "title": "Rule Id",
             "type": "string"
+          },
+          "rule_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rule's title; null for a rule the registry doesn't know.",
+            "title": "Rule Title"
           }
         },
         "required": [
           "rule_id",
+          "rule_title",
           "citation",
           "count",
           "items",
@@ -20033,6 +20156,148 @@
           }
         ],
         "summary": "Upload Attachment",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/partners/{partner_id}/findings": {
+      "get": {
+        "description": "The findings history: every finding on any version of the partner's items (or one rule's, `rule_id`),\nnewest first. Reviewers, leads, and admins. `next_cursor` is null on the last page.",
+        "operationId": "listPartnerFindings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerFindingPageOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "List Findings",
         "tags": [
           "partners"
         ]

@@ -164,3 +164,129 @@ Private database, migrated and seeded, then dropped. Sample import: preview 178 
 commit created 178, skipped 2, made 8 partners. `/library?legacy=only` loaded 50 + Load more. Export: 145 items, a
 17 KB xlsx (`PK` magic). No API response ≥400. Not exercised live: upload, the values step, building an evidence
 pack, precedent hits, export with packs, 422 paths, non-admin roles.
+
+## Offer terms + Partners (PR 3)
+
+Branch `wsJ/terms-partners`, stacked on `wsJ/library-import`. Built by a subagent in its own worktree; UI review
+fixes in `reviews/ui-screens.md` (Offer terms, Partners). Both screens are lead-only in the nav.
+
+### What's built
+
+**Offer terms (`/terms`)**, product tabs in the URL (`?product=`). Mortgage prequalification gets a sentence (no
+rate terms, spec §4.2 ruling 1).
+- *In effect*: version, date, publisher, note, the values (credit card intro as "0% for 15 months"), and every
+  version with what it changed against the one before.
+- *Edit* (leads): a typed form per product, field | value in effect | new value, with per-kind validation (zod,
+  mirroring `core.domain`'s ranges) and %/$ adornments. Edits debounce (300 ms) into
+  `POST /terms/impact-preview`; the panel shows the server's summary, the outcome counts, the quoted fields that
+  change, partners, and every affected item (live or not, quotes, what it becomes, lane, whether its numbers
+  change).
+- *Publish* is gated twice: the values must differ from the base (the backend refuses identical values), and the
+  preview on screen must be for exactly these values on exactly this base. A confirm dialog repeats the counts and
+  the changes. `based_on_terms_id` is the version the editor opened on; if another lead publishes first (a 409, or
+  a refetch), the editor rebases: untouched fields take the new values, the lead's edits stay, and Publish waits
+  for a fresh preview (T1).
+- Unsaved edits lock the other product tabs; impact links open a new tab.
+
+**Partners (`/partners`, `/partners/$partnerId`)**.
+- *List*: name search (debounced) and status in the URL; type, status, items, approved, open findings, last
+  submitted. Leads create partners inline (422s land on their fields, e.g. a duplicate name).
+- *Detail*: facts (leads edit inline; PATCH sends only changed fields) and agreement and evidence (leads upload;
+  agreements listed first). Tabs, each loading and failing on its own: Items (every status, Legacy marked),
+  Findings history (keyset pages, narrowed to one rule by `?rule=`), Repeat issues (rule title linking to its
+  findings).
+
+### Backend endpoint(s) (`backend/partners/`, tag `partners`)
+
+- `GET /api/partners/{id}/findings` (`listPartnerFindings`): every finding on any version of the partner's items,
+  newest first (ties by id), keyset cursor on (`created_at`, id), `limit` (`PageLimit`, default 50), optional
+  `rule_id`. Reviewers, leads and admins (`can_read_partner_attachments`; 403 otherwise), 404 for an unknown
+  partner, 422 for a bad cursor. Fixed query count (`select_related`), tested with 2 rows and with 10.
+- `RepeatIssueOut.rule_title`: the rule's title from the engine registry (`checks.engine.registry.RULES`) or the AI
+  check's rules (`checks.llm.rules.LLM_RULES_BY_ID`); null for an id neither knows (retired, or imported history).
+- `make schema` regenerated `ninja.json` and the client; no drift after the rebase onto `wsJ/library-import`.
+
+### API gaps (not built here)
+
+- **`normal_lane` isn't a subset of `will_need_rereview`.** `terms/impact.py` counts every affected item in the
+  normal lane, expired and already-in-re-review included. The "of 9: n full review" line is computed client-side
+  from items (approved, becoming Needs re-review, lane normal).
+- **`already_in_rereview` counts all of them; only fast-track ones get new numbers.** The server's summary sentence
+  counts the fast-track ones; the tile shows the total, with "n get new numbers" computed from items.
+- **The impact preview takes no base.** It's always against the version in effect. That's right after a rebase (the
+  base is then the version in effect), but nothing can ask for a preview "against v12".
+- **Findings history has no total.** The tab shows the loaded count, with "+" when there are more pages. (The
+  items list does have one now: #32 added `ItemPageOut.total`. The Items tab still says "n items shown" and takes
+  its count from `PartnerDetailOut.item_count`; showing "n of total" is a small follow-up.)
+- **Agreement visibility isn't in the response.** `PartnerDetailOut.attachments` is empty both for "none on file"
+  and "you can't see them"; the page infers the second from the viewer's roles, duplicating the backend rule.
+- **`last_submitted_at` includes legacy imports' tracker dates** (`Max(items__submitted_at)`), so a partner with
+  only imported items shows the import's original date.
+- **Findings history filters by rule only**, not state, severity or item (out of scope per the review).
+
+### Deviations
+
+- **T7 locks tabs instead of confirming.** The other product tabs are disabled with the reason beside them, rather
+  than a confirm on switch: there's no dialog to dismiss, and the lead sees why before trying.
+- **Three tiles, not the review's 2×2 grid** (T4/T8): Needs re-review (with the full-review split), Expire, In
+  re-review now. "Already in re-review" became "In re-review now" so 1280 doesn't break "re-review".
+- **The findings tab count runs the unfiltered history query on page load** (it shares the tab's cache entry): one
+  extra request per detail view.
+- **P11's "Imported only" never applies.** Every item has a `submitted_at`, so a null last-submitted means no items,
+  and it shows "—".
+
+### Shared files touched
+
+- `ui/layout/nav.ts`: `to` on Offer terms and Partners (kept alongside Library, Metrics and Import in the rebase).
+- `ui/labels.ts`: `PARTNER_TYPE_LABELS`, `PARTNER_STATUS_LABELS`, `FINDING_STATE_LABELS`.
+- `ui/errorMessage.ts`: `isRetryable(error)` (5xx, or no status at all).
+- `theme.css`: one appended "Offer terms + Partners" section, after Library and Import's.
+
+### Decisions and follow-ups
+
+- **P1: reviewers can't reach a partner page.** The nav entry is lead-only, and the review screen's Details tab
+  shows the partner as plain text. These are two separate calls. (a) Whether Partners shows in reviewers' nav is a
+  product decision for Spencer; the page already works read-only for reviewers (no Edit, no Upload). (b) Linking
+  the partner name on the review Details tab is a small change for `features/review`'s owner. Neither was touched
+  here.
+- **`seen_versions` doesn't apply here.** These screens publish terms and preview impact; nothing here approves an
+  item. Fast-track approvals go through the review screen (the single endpoint, with the version shown) and the
+  queue's bulk bar (lead-only, `seen_versions` required since PR #33), so affected items reach approval through
+  callers that already send it.
+
+### Unverified
+
+- **The outbox → Celery fan-out after publish.** The real-backend check published v2 and confirmed the history and
+  diff, then ran `terms.fanout.fan_out_item` directly (items came back `reopened_fast_track` and `expired`). The
+  `TERMS_PUBLISHED` outbox row → dispatcher → `terms.fan_out_item` task path wasn't run, so "items update within a
+  few seconds" is the design, not something observed.
+- **The review fixes weren't rerun against the real backend.** Unit tests (MSW) and the stubbed screenshots cover
+  them; the rebase flow (T1) ran against a stubbed 409, not two real leads.
+
+### Verified against the real backend (before the review fixes)
+
+Private database, migrated and seeded, then dropped. Preview: "2 approved items quote v1; 1 will need re-review, 1
+will expire."; publish v2 and its history diff; the unchanged gate. Partners list, detail, items, findings history,
+upload, edit, create, and a duplicate-name 422 landing on Name.
+
+## Decisions (all three PRs)
+
+The orchestrator ruled on 1–7: 1–5 were accepted as built, and 6 and 7 are built in PR 3 as ruled.
+
+1. **Who reads metrics.** Built: reviewers, leads and admins; marketers get a 403. The nav shows Metrics to leads only (product-spec Roles). Changing who can read is a one-line `require_role` change.
+2. **Per-source figures.** When native and imported data both contribute, the tiles show each source's figure and no blended number. The blended median is still in the API.
+3. **Imported data's reach.** Imported history feeds time to first review, rounds and throughput. It doesn't feed time per round or time to fix live content, because the tracker has no per-round dates and imported items are never reopened.
+4. **Attribution by end time.** A measurement counts in the period where it ends.
+5. **Open fix-live clocks are a drill-down list, not a queue link.** This deviates from the plan: the queue can't show withdrawn items whose takedowns are pending, and ruling 6 counts those as open.
+6. **Reviewers and partner pages (P1). Ruled and built:** Offer terms and Partners appear in reviewers' nav (read-only), and the review Details tab links the partner name to its page.
+7. **Library Expires column (L6). Ruled and built:** "Expires" replaces "Planned run" on Approved to run. An approval with no expiry reads "No expiry".
+8. **Plan path.** The issue named `frontend-secondary.md`; the brief's `docs/plan/screens.md` was used.
+
+## Follow-ups for other owners
+
+- **reviews/:** `q` should match `legacy_ref`, and `ItemRowOut` should carry `legacy_ref` (L7). Precedent search should have paging.
+- **terms/:** `ImpactPreviewOut.normal_lane` isn't a subset of `will_need_rereview`.
+- **imports/ (G):** stuck commit jobs have no timeout and no retry.
+- **K (Outbox):** `AppShell.test.tsx` uses Outbox as its "unbuilt section" example. Change it when Outbox lands.
+- **queue:** move it onto `ui/FilterChip`. Its chip already regains its focus ring through J's `.app-chip-btn[data-focus-visible]` rule.
+- **Unverified live:** the outbox → Celery fan-out after a terms publish, and the Library, Import, Terms and Partners review fixes against a real backend. The import summary and the library's legacy view were checked live after the fixes, by J's owner, on a private DB.
