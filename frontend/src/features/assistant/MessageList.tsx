@@ -99,33 +99,38 @@ function Chip({ chip }: { chip: ToolChip }) {
       {icon !== undefined && (
         <Icon name={icon} size={14} className={chip.status === 'running' ? 'app-spin' : undefined} />
       )}
-      <LabelWithKeys label={chip.label} />
-      {chip.outcome === undefined && chip.status !== 'awaiting' && chip.status !== 'stopped' && (
-        <span className="sr-only">, {STATUS_TEXT[chip.status]}</span>
-      )}
-      {chip.outcome === 'sent' && chip.outboxId !== undefined && (
-        <>
-          <span aria-hidden="true">·</span>
-          <Link to="/outbox" search={{ email: chip.outboxId }} className="app-assistant-chip-link">
-            Open in Outbox
-          </Link>
-        </>
-      )}
-      {extraKeys.slice(0, 6).map((key) => (
-        <ItemKeyLink key={key} itemKey={key} />
-      ))}
-      {extraKeys.length > 6 && <span className="app-muted">+{extraKeys.length - 6}</span>}
+      <span className="app-assistant-tool-body">
+        <LabelWithKeys label={chip.label} />
+        {chip.outcome === undefined && chip.status !== 'awaiting' && chip.status !== 'stopped' && (
+          <span className="sr-only">, {STATUS_TEXT[chip.status]}</span>
+        )}
+        {chip.outcome === 'sent' && chip.outboxId !== undefined && (
+          <>
+            <span aria-hidden="true">·</span>
+            <Link to="/outbox" search={{ email: chip.outboxId }} className="app-assistant-chip-link">
+              Open in Outbox
+            </Link>
+          </>
+        )}
+        {extraKeys.slice(0, 6).map((key) => (
+          <ItemKeyLink key={key} itemKey={key} />
+        ))}
+        {extraKeys.length > 6 && <span className="app-muted">+{extraKeys.length - 6}</span>}
+      </span>
     </li>
   );
 }
 
 export function MessageList({
   messages,
+  outgoing,
   chipContext,
   isLoading,
   children,
 }: {
   messages: readonly BaseMessage[];
+  /** Your message on its way (shown until the server's copy arrives). */
+  outgoing?: string;
   chipContext: Omit<ChipContext, 'results'>;
   isLoading: boolean;
   /** After the last message: the approval card, the pending line. */
@@ -150,12 +155,16 @@ export function MessageList({
         }
         if (fields.type !== 'ai') return null;
         const chips = callsOf(message).map((call) => chipFor(call, context));
-        const streaming = isLoading && message === last;
+        const streaming = isLoading && message === last && outgoing === undefined;
         return (
           <div key={key} className="app-assistant-msg" data-role="assistant">
             <span className="sr-only">Assistant:</span>
-            {message.text !== '' && <AssistantMarkdown source={message.text} />}
-            {streaming && chips.length === 0 && <span className="app-assistant-caret" aria-hidden="true" />}
+            {message.text !== '' && (
+              <AssistantMarkdown source={message.text} streaming={streaming && chips.length === 0} />
+            )}
+            {streaming && chips.length === 0 && message.text === '' && (
+              <span className="app-assistant-caret" aria-hidden="true" />
+            )}
             {chips.length > 0 && (
               <ul className="app-assistant-tools" aria-label="Tool calls">
                 {chips.map((chip) => (
@@ -166,7 +175,13 @@ export function MessageList({
           </div>
         );
       })}
-      {isLoading && !lastIsAi && (
+      {outgoing !== undefined && (
+        <div className="app-assistant-msg" data-role="user" data-pending="true">
+          <span className="sr-only">You:</span>
+          <p className="app-assistant-user-text">{outgoing}</p>
+        </div>
+      )}
+      {isLoading && (!lastIsAi || outgoing !== undefined) && (
         <div className="app-assistant-msg app-assistant-thinking" data-role="assistant">
           <span className="app-skeleton" style={{ width: '60%' }} aria-hidden="true" />
           <span className="app-skeleton" style={{ width: '40%' }} aria-hidden="true" />

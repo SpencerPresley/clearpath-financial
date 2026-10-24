@@ -74,9 +74,10 @@ const COMPONENTS = {
   [ITEM_LINK_TAG]: ItemLink,
 } satisfies MarkdownComponents;
 
-export function AssistantMarkdown({ source }: { source: string }) {
+/** `streaming`: the reply is still arriving; a caret follows the last text (CSS, theme.css). */
+export function AssistantMarkdown({ source, streaming = false }: { source: string; streaming?: boolean }) {
   return (
-    <div className="app-assistant-markdown">
+    <div className="app-assistant-markdown" data-streaming={streaming ? 'true' : undefined}>
       <Markdown extensions={EXTENSIONS} components={COMPONENTS}>
         {source}
       </Markdown>

@@ -180,7 +180,7 @@ const REJECTED_MESSAGES = [
     tool_call_id: 'r-call',
     content: "The user declined to send this email. Don't send it again unless they ask.",
     status: 'error',
-    artifact: null,
+    artifact: { outcome: 'declined', to: ['sam.okafor@clearpath.demo'], item_keys: ['CP-1031'] },
   },
   {
     type: 'ai',
@@ -200,7 +200,13 @@ const REFUSED_MESSAGES = [
     content:
       'Not sent and not shown to the user. Not an internal address: marketing@lendfast.example. Only staff directory addresses receive email.',
     status: 'error',
-    artifact: null,
+    artifact: {
+      outcome: 'blocked',
+      refused: ['marketing@lendfast.example'],
+      reason: 'Not an internal address: marketing@lendfast.example',
+      to: ['marketing@lendfast.example'],
+      item_keys: ['CP-1044'],
+    },
   },
   {
     type: 'ai',
@@ -597,7 +603,7 @@ const shots: Shot[] = [
     scene: {},
     ready: async (page) => {
       await draftForApproval(page);
-      await cardOf(page).getByRole('button', { name: 'Reject' }).click();
+      await cardOf(page).getByRole('button', { name: "Don't send" }).click();
       await expect(cardOf(page).getByRole('textbox', { name: 'Reason (optional)' })).toBeFocused();
     },
   },
@@ -606,22 +612,25 @@ const shots: Shot[] = [
     scene: {},
     ready: async (page) => {
       await draftForApproval(page);
-      await cardOf(page).getByRole('button', { name: 'Approve' }).click();
+      await cardOf(page).getByRole('button', { name: 'Send email' }).click();
       await expect(panelOf(page).getByText('Sent. It is in the Outbox.')).toBeVisible();
+      await expect(panelOf(page).getByRole('link', { name: 'Open in Outbox' })).toBeVisible();
     },
   },
   {
     name: 'rejected',
     scene: { base: 'queue', open: T_REJECTED, ...ALL_THREADS },
     ready: async (page) => {
-      await expect(panelOf(page).getByText('Email not sent')).toBeVisible();
+      await expect(panelOf(page).getByText('You declined this email')).toBeVisible();
     },
   },
   {
     name: 'refused',
     scene: { base: 'queue', open: T_REFUSED, ...ALL_THREADS },
     ready: async (page) => {
-      await expect(panelOf(page).getByText('Email not sent')).toBeVisible();
+      await expect(
+        panelOf(page).getByText("Blocked: marketing@lendfast.example isn't an internal address"),
+      ).toBeVisible();
     },
   },
   {
@@ -824,7 +833,7 @@ for (const size of SIZES) {
     await page.keyboard.press('Enter');
     notes.afterEditPressed = await active();
     await page.keyboard.press('Escape');
-    notes.escapeInEditCancels = await cardOf(page).getByRole('button', { name: 'Approve' }).isVisible();
+    notes.escapeInEditCancels = await cardOf(page).getByRole('button', { name: 'Send email' }).isVisible();
     await page.screenshot({ path: `${OUT}/focus-edit-${String(size.width)}.png` });
 
     notes.panelAria = await panelOf(page).ariaSnapshot();

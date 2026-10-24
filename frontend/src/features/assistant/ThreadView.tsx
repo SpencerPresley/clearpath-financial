@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ApiError } from '../../api/mutator';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { ApprovalCard } from './ApprovalCard';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
@@ -17,13 +19,17 @@ import type { ApprovalResponse, AssistantConfigurable, AssistantState, ToolAppro
 
 const UNREACHABLE = "Couldn't reach the assistant. Try again.";
 
-/** One line for stream.error (spec §5.4); null when someone closer to the failure shows it. */
+/** One line for stream.error (spec §5.4): what happened and what to do; null when the approval form shows it. */
 export function streamErrorLine(error: unknown): string | null {
   if (error === undefined || error === null) return null;
   if (error instanceof ApiError) {
     if (error.status === 422) return null; // the approval form maps it onto its fields
     const body = error.body as { message?: unknown } | null;
-    return typeof body?.message === 'string' && body.message !== '' ? body.message : UNREACHABLE;
+    const message = typeof body?.message === 'string' && body.message !== '' ? body.message : UNREACHABLE;
+    // The run lock's 409 says what happened; add what to do unless the server already does.
+    return error.status === 409 && /already running/i.test(message) && !/send again/i.test(message)
+      ? `${message} Wait for it to finish, then send again.`
+      : message;
   }
   if (error instanceof TypeError) return UNREACHABLE;
   return error instanceof Error && error.message !== '' ? error.message : UNREACHABLE;
@@ -57,10 +63,16 @@ export function ThreadView({
     transport,
     threadId,
     onCompleted: onSettled,
+    // No SDK echo: a message the server refuses before the run starts (409, 404) must not sit in the log
+    // looking sent. The view shows its own pending bubble until the server's copy arrives (same id).
+    optimistic: false,
   });
   const [draft, setDraft] = useState<{ text: string } | undefined>(undefined);
   // A run you started in this view: an approval it ends on takes focus (a hydrated one doesn't).
   const [ranHere, setRanHere] = useState(false);
+  const [outgoing, setOutgoing] = useState<{ id: string; text: string } | null>(null);
+  /** Refused before the run started: the text is back in the box and Retry resends it. */
+  const [unsent, setUnsent] = useState<string | null>(null);
   const sentPending = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const lastText = stream.messages.at(-1)?.text.length ?? 0;
@@ -72,10 +84,23 @@ export function ThreadView({
   }, [stream.messages.length, lastText, stream.interrupt]);
 
   const send = (text: string) => {
+    const id = crypto.randomUUID();
     setRanHere(true);
+    setOutgoing({ id, text });
+    setUnsent(null);
     void stream.submit(
-      { messages: [new HumanMessage({ id: crypto.randomUUID(), content: text })] },
-      { config: { configurable: itemId === undefined ? {} : { item_id: itemId } } },
+      { messages: [new HumanMessage({ id, content: text })] },
+      {
+        config: { configurable: itemId === undefined ? {} : { item_id: itemId } },
+        onError: (error) => {
+          // Before the stream (ApiError from the POST, or no network): nothing was sent. Give the text back.
+          if (error instanceof ApiError || error instanceof TypeError) {
+            setOutgoing(null);
+            setUnsent(text);
+            setDraft({ text });
+          }
+        },
+      },
     );
   };
 
@@ -93,7 +118,7 @@ export function ThreadView({
 
   let lockedReason: string | undefined;
   if (stream.isThreadLoading) lockedReason = 'Loading the thread…';
-  else if (approval !== undefined) lockedReason = 'Approve, edit or reject the email first';
+  else if (approval !== undefined) lockedReason = 'Decide on the email draft first';
 
   const respond = async (response: ApprovalResponse) => {
     if (interruptId === undefined) return;
@@ -101,7 +126,12 @@ export function ThreadView({
     await stream.respond(response, { interruptId });
   };
 
-  const isEmpty = stream.messages.length === 0 && !stream.isLoading && !stream.isThreadLoading;
+  const pendingText =
+    outgoing !== null && !stream.messages.some((message) => message.id === outgoing.id)
+      ? outgoing.text
+      : undefined;
+  const isEmpty =
+    stream.messages.length === 0 && pendingText === undefined && !stream.isLoading && !stream.isThreadLoading;
 
   return (
     <>
@@ -113,6 +143,7 @@ export function ThreadView({
         ) : (
           <MessageList
             messages={stream.messages}
+            outgoing={pendingText}
             isLoading={stream.isLoading}
             chipContext={{
               live: new Map(stream.toolCalls.map((call) => [call.callId, call.status])),
@@ -138,9 +169,21 @@ export function ThreadView({
         )}
       </div>
       {errorLine !== null && (
-        <p className="app-assistant-error" role="alert">
-          {errorLine}
-        </p>
+        <div className="app-assistant-error" role="alert">
+          <Icon name="feedback.error" size={14} className="app-assistant-error-icon" />
+          <p>{errorLine}</p>
+          {unsent !== null && (
+            <Button
+              size="sm"
+              onPress={() => {
+                setDraft({ text: '' });
+                send(unsent);
+              }}
+            >
+              Retry
+            </Button>
+          )}
+        </div>
       )}
       <Composer
         onSend={send}

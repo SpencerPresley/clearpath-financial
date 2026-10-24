@@ -3579,12 +3579,19 @@
   .app-assistant-tools {
     @apply flex flex-col gap-1;
   }
+  /* Glyph beside a body that wraps on its own, so a long line never leaves the glyph alone above it. */
   .app-assistant-tool {
-    @apply inline-flex flex-wrap items-center gap-1.5 text-ui text-muted;
+    @apply flex items-start gap-1.5 text-ui text-muted;
+  }
+  .app-assistant-tool > .app-icon {
+    @apply mt-0.5 shrink-0;
+  }
+  .app-assistant-tool-body {
+    @apply flex min-w-0 flex-wrap items-baseline gap-x-1.5;
   }
   .app-assistant-tool[data-status='finished']:not([data-icon])::before {
     content: '';
-    @apply size-1.5 rounded-full bg-muted;
+    @apply mt-[0.5625rem] size-1.5 shrink-0 rounded-full bg-muted;
   }
   .app-assistant-tool[data-tone='error'] {
     @apply text-status-error-soft-content;
@@ -3606,7 +3613,26 @@
     @apply flex flex-col gap-1.5 py-1;
   }
   .app-assistant-error {
-    @apply mx-3 mb-2 rounded-sm border border-status-error-line bg-status-error-soft px-2 py-1 text-ui text-status-error-soft-content;
+    @apply mx-3 mb-2 flex items-start gap-1.5 rounded-sm border border-status-error-line bg-status-error-soft px-2 py-1 text-ui text-status-error-soft-content;
+  }
+  .app-assistant-error > p {
+    @apply min-w-0 flex-1;
+  }
+  .app-assistant-error-icon {
+    @apply mt-0.5 shrink-0;
+  }
+  .app-assistant-error > .app-btn {
+    @apply shrink-0;
+  }
+  .app-assistant-msg[data-pending] {
+    @apply opacity-70;
+  }
+  /* The streaming caret sits after the last text, not on a line of its own. */
+  .app-assistant-markdown[data-streaming] > :is(p, h1, h2, h3, h4, blockquote):last-child::after,
+  .app-assistant-markdown[data-streaming] > :is(ul, ol):last-child > li:last-child::after {
+    content: '';
+    @apply ml-0.5 inline-block h-4 w-1.5 bg-muted align-text-bottom;
+    animation: app-indeterminate-blink 1s steps(2, start) infinite;
   }
   .app-assistant-composer {
     @apply flex shrink-0 flex-col gap-1.5 border-t border-base-300 px-3 py-2;

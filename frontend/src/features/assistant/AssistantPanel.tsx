@@ -28,15 +28,19 @@ const UNTITLED = 'Untitled thread';
 
 /** Three short asks for an empty thread, by what the viewer does all day. */
 export function exampleAsks(roles: readonly Role[], itemKey: string | undefined): string[] {
-  const about = itemKey ?? 'CP-…';
+  // On a review screen the email ask names that item; elsewhere it asks for something complete on its own.
+  const email =
+    itemKey === undefined
+      ? "Email compliance this week's re-reviews"
+      : `Email compliance a summary of ${itemKey}`;
   const precedent = 'Find precedent for “no impact to your credit score”';
   if (roles.includes('reviewer') || roles.includes('lead')) {
-    return ["What's waiting on me?", precedent, `Email compliance a summary of ${about}`];
+    return ["What's waiting on me?", precedent, email];
   }
   if (roles.includes('marketer')) {
-    return ["What's holding up my submissions?", precedent, `Email compliance a summary of ${about}`];
+    return ["What's holding up my submissions?", precedent, email];
   }
-  return ['What does the queue look like today?', precedent, `Email compliance a summary of ${about}`];
+  return ['What does the queue look like today?', precedent, email];
 }
 
 function EmptyThread({ asks, onPick }: { asks: readonly string[]; onPick: (text: string) => void }) {

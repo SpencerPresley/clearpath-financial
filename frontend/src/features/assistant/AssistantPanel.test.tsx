@@ -211,7 +211,7 @@ describe('assistant conversation', () => {
     ).toEqual([
       "What's waiting on me?",
       'Find precedent for “no impact to your credit score”',
-      'Email compliance a summary of CP-…',
+      "Email compliance this week's re-reviews",
     ]);
     await user.click(within(asks).getByRole('button', { name: "What's waiting on me?" }));
     expect(screen.getByRole('textbox', { name: 'Message the assistant' })).toHaveValue(
@@ -313,20 +313,38 @@ describe('assistant conversation', () => {
     expect(within(region).queryByText('Too late.')).toBeNull();
   });
 
-  it('shows the API line when a reply is already running (409)', async () => {
+  it('on a 409, keeps your text, shows no unsent message, says what to do, and Retry sends it', async () => {
     const user = userEvent.setup();
-    setup({ threads: [threadFixture()], activeThread: 't-1' });
+    const { fake } = setup({ threads: [threadFixture()], activeThread: 't-1', runs: [echoRun('Done.')] });
+    let refused = false;
     server.use(
-      http.post('*/api/assistant/threads/:threadId/runs', () =>
-        HttpResponse.json({ code: 'conflict', message: 'A reply is already running.' }, { status: 409 }),
-      ),
+      http.post('*/api/assistant/threads/:threadId/runs', () => {
+        if (refused) return undefined; // the second try reaches the scripted run
+        refused = true;
+        return HttpResponse.json(
+          { code: 'conflict', message: 'A reply is already running in this thread.' },
+          { status: 409 },
+        );
+      }),
     );
     const region = await panel();
-    await user.type(
-      await within(region).findByRole('textbox', { name: 'Message the assistant' }),
-      'hi{Enter}',
+    const box = await within(region).findByRole('textbox', { name: 'Message the assistant' });
+    await user.type(box, 'Which of those are re-reviews?{Enter}');
+
+    const alert = await within(region).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'A reply is already running in this thread. Wait for it to finish, then send again.',
     );
-    expect(await within(region).findByRole('alert')).toHaveTextContent('A reply is already running.');
+    expect(box).toHaveValue('Which of those are re-reviews?');
+    expect(within(region).queryByRole('log')).toBeNull(); // nothing was sent, so no conversation yet
+
+    await user.click(within(alert).getByRole('button', { name: 'Retry' }));
+    expect(await within(region).findByText('Done.')).toBeInTheDocument();
+    expect(within(region).getAllByText('Which of those are re-reviews?')).toHaveLength(1);
+    expect(box).toHaveValue('');
+    expect(fake.posted.at(-1)?.body).toMatchObject({
+      message: { content: 'Which of those are re-reviews?' },
+    });
   });
 });
 
