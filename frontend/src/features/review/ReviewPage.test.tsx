@@ -3,11 +3,11 @@ import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/rea
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
 import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
-import type { DecisionIn, FindingOut } from '../../api/generated/model';
+import type { DecisionIn, FastTrackIn, FindingOut, ItemDetailOut } from '../../api/generated/model';
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
 import {
@@ -15,6 +15,7 @@ import {
   FINDINGS_OPEN,
   dismissedAll,
   FINDING_CREDIT,
+  FINDING_QUALIFIER,
   FINDING_RATE,
   REVIEWER,
   itemFixture,
@@ -26,6 +27,7 @@ import type { ReviewHandlerOptions } from '../../test/fixtures/reviewHandlers';
 import { server } from '../../test/server';
 import { ROLES } from '../../ui/domain';
 import type { Role } from '../../ui/domain';
+import { LLM_POLL_MS } from './useReviewData';
 
 interface Posted {
   path: string;
@@ -80,9 +82,13 @@ function renderReview(
       posted.push({ path: new URL(request.url).pathname, body: null });
       return HttpResponse.json({}, { status: 202 });
     }),
-    http.post('*/api/items/bulk/fast-track-approve', async ({ request }) => {
-      posted.push({ path: new URL(request.url).pathname, body: await request.json() });
-      return HttpResponse.json({ succeeded: [1042], skipped: [] });
+    http.post('*/api/items/:id/fast-track-approve', async ({ request }) => {
+      const body = (await request.json()) as FastTrackIn;
+      posted.push({ path: new URL(request.url).pathname, body });
+      return HttpResponse.json(
+        { ...DECISION_APPROVED, lane: 'fast_track', version_n: body.version_n, ai_review_carried_from_n: 1 },
+        { status: 201 },
+      );
     }),
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -118,6 +124,10 @@ function nthButton(name: string, index: number): HTMLElement {
 const approveButton = () => nthButton('Approve', 0);
 
 describe('ReviewPage', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('shows a skeleton, then the item with its flagged spans', async () => {
     renderReview();
     expect(await screen.findByRole('status', { name: 'Loading item' })).toBeInTheDocument();
@@ -226,6 +236,36 @@ describe('ReviewPage', () => {
     expect(approveButton()).toBeDisabled();
   });
 
+  it('polls while the AI check runs, then shows its findings and stops polling', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const running = itemFixture({ llm_check_status: 'running' });
+    const done = itemFixture({ llm_check_status: 'succeeded' });
+    const before = dismissedAll([FINDING_RATE, FINDING_CREDIT]);
+    let finished = false;
+    let itemGets = 0;
+    renderReview({ item: running, findings: before });
+    server.use(
+      http.get('*/api/items/:id', () => {
+        itemGets += 1;
+        return HttpResponse.json(finished ? done : running);
+      }),
+      http.get('*/api/items/:itemId/findings', () =>
+        HttpResponse.json(finished ? [...before, FINDING_QUALIFIER] : before),
+      ),
+    );
+    expect(await screen.findByText(/AI check running…/)).toBeInTheDocument();
+    expect(approveButton()).toBeDisabled();
+
+    finished = true;
+    await vi.advanceTimersByTimeAsync(LLM_POLL_MS);
+
+    expect(await screen.findByText('AI check finished · 1 suggestion')).toBeInTheDocument();
+    expect(await screen.findByRole('article', { name: /creditworthiness qualifier/ })).toBeInTheDocument();
+    const settled = itemGets;
+    await vi.advanceTimersByTimeAsync(LLM_POLL_MS * 2);
+    expect(itemGets).toBe(settled);
+  });
+
   it('requires an override reason to approve after the AI check failed, and offers Retry', async () => {
     const { posted } = renderReview({
       item: itemFixture({ llm_check_status: 'failed' }),
@@ -250,6 +290,39 @@ describe('ReviewPage', () => {
         llm_override_reason: 'Vendor outage; copy reviewed line by line.',
       });
     });
+  });
+
+  it('shows why the AI check failed, with Retry', async () => {
+    renderReview({
+      item: itemFixture({
+        llm_check_status: 'failed',
+        llm_check_failure_code: 'provider_unavailable',
+        llm_check_failure_reason:
+          "The AI service didn't answer after 4 tries. Couldn't reach the model provider.",
+      }),
+      findings: dismissedAll(FINDINGS_OPEN),
+    });
+    const status = (await screen.findByText(/AI check failed:/)).closest('.app-llm-status');
+    expect(status).toHaveTextContent(
+      "AI check failed: The AI service didn't answer after 4 tries. Couldn't reach the model provider.",
+    );
+    expect(within(status as HTMLElement).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('says plainly when AI review is not configured, and offers no Retry', async () => {
+    renderReview({
+      item: itemFixture({
+        llm_check_status: 'failed',
+        llm_check_failure_code: 'not_configured',
+        llm_check_failure_reason: "The AI check didn't run: no Anthropic API key is configured here.",
+      }),
+      findings: dismissedAll(FINDINGS_OPEN),
+    });
+    const status = (await screen.findByText(/AI review isn’t configured on this server\./)).closest(
+      '.app-llm-status',
+    );
+    expect(status).toHaveTextContent('Give an override reason when you approve.');
+    expect(within(status as HTMLElement).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('keeps plain Approve off while accepted findings need a change', async () => {
@@ -388,11 +461,81 @@ describe('ReviewPage', () => {
     await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');
     await userEvent.click(nthButton('Fast-track approve', -1));
     await waitFor(() => {
+      // The single endpoint, at the version on screen: never a version that arrived after the page loaded.
       expect(posted[0]).toEqual({
-        path: '/api/items/bulk/fast-track-approve',
-        body: { item_ids: [1042], reason: 'Only the APR floor changed.' },
+        path: '/api/items/1042/fast-track-approve',
+        body: { version_n: 2, reason: 'Only the APR floor changed.' },
       });
     });
+  });
+
+  it('reloads and says so when a newer version arrived before the fast-track click', async () => {
+    const shown = itemFixture({
+      status: 'needs_rereview',
+      reopen_reason: 'terms_changed',
+      llm_check_status: 'skipped',
+      latest_decision: { ...DECISION_APPROVED, version_n: 1 },
+      current_version: versionFixture(2, { origin: 'fast_track' }),
+    });
+    const newer: ItemDetailOut = {
+      ...shown,
+      current_version_n: 3,
+      current_version: versionFixture(2, { n: 3, id: 503, origin: 'fast_track' }),
+    };
+    let stale = false;
+    const { posted } = renderReview({ item: shown, findings: [] });
+    server.use(
+      http.get('*/api/items/:id', () => HttpResponse.json(stale ? newer : shown)),
+      http.post('*/api/items/:id/fast-track-approve', async ({ request }) => {
+        posted.push({ path: new URL(request.url).pathname, body: await request.json() });
+        stale = true;
+        return HttpResponse.json(
+          {
+            code: 'stale_version',
+            message: "v2 isn't the current version (v3). Reload the item.",
+            details: { version_n: 2, current_n: 3 },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Fast-track approve v2' }));
+    await userEvent.type(screen.getByLabelText(/^Reason/), 'Only the APR floor changed.');
+    await userEvent.click(nthButton('Fast-track approve', -1));
+    expect(
+      await screen.findByText(
+        'A newer version, v3, arrived while you had this open. Check it, then fast-track again.',
+      ),
+    ).toBeInTheDocument();
+    // The item was reloaded: the panel now offers v3, the version now on screen.
+    expect(await screen.findByRole('heading', { name: 'Fast-track approve v3' })).toBeInTheDocument();
+    expect(posted.map((p) => p.body)).toEqual([{ version_n: 2, reason: 'Only the APR floor changed.' }]);
+  });
+
+  it('labels a terms re-review whose numbers did not change, so fast-track reads as a confirmation', async () => {
+    renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'terms_changed',
+        llm_check_status: 'skipped',
+        live_placements_count: 1,
+        latest_decision: { ...DECISION_APPROVED, version_n: 1 },
+        current_version: versionFixture(2, {
+          origin: 'fast_track',
+          content_text: versionFixture(1).content_text,
+        }),
+        numbers_change: false,
+      }),
+      findings: [],
+    });
+    const label = await screen.findByText('Numbers unchanged.');
+    const note = label.closest('.app-note');
+    expect(note).toHaveTextContent('v2 matches approved v1; fast-track confirms it against the new terms.');
+    // Nothing to compare: the diff would be empty.
+    expect(screen.queryByRole('button', { name: /Compare with approved/ })).not.toBeInTheDocument();
+    expect(screen.getByText('AI review carried from v1').closest('.app-llm-status')).toHaveTextContent(
+      'numbers unchanged',
+    );
   });
 
   it('offers reaffirm and pull, not fast-track, when the approval expired', async () => {

@@ -21,7 +21,7 @@ export const STATUS_META: Record<ItemStatus, Meta> = {
   changes_requested: { label: 'Changes requested', tone: 'warning', icon: 'status.changes_requested' },
   approved: { label: 'Approved', tone: 'success', icon: 'status.approved' },
   rejected: { label: 'Rejected', tone: 'error', icon: 'status.rejected' },
-  needs_rereview: { label: 'Re-review', tone: 'alert', icon: 'status.needs_rereview' },
+  needs_rereview: { label: 'Needs re-review', tone: 'alert', icon: 'status.needs_rereview' },
   expired: { label: 'Expired', tone: 'neutral', icon: 'status.expired' },
   withdrawn: { label: 'Withdrawn', tone: 'neutral', icon: 'status.withdrawn' },
 };

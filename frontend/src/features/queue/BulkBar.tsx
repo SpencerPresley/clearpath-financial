@@ -1,8 +1,9 @@
 /*
  * Bulk actions on the selection (decisions.md "Ergonomics": bulk assign and bulk fast-track approval).
  * - Assign: leads and admins (decisions.md "Who can reassign"), via POST /items/bulk/assign.
- * - Fast-track approve: leads, only for selected items in needs re-review; needs a reason. The server skips
- *   any item with open findings (spec §4.2 ruling 4), and those stay selected so they can go the normal lane.
+ * - Fast-track approve: leads only (the server refuses anyone else), only for selected items in needs re-review,
+ *   each at the version its row showed (`seen_versions`); needs a reason. The server skips any item with open
+ *   findings (spec §4.2 ruling 4) or a newer version, and those stay selected so they can go the normal lane.
  * An action the viewer can't take isn't rendered (no dead buttons).
  */
 import { useQueryClient } from '@tanstack/react-query';
@@ -67,9 +68,14 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
   const [reason, setReason] = useState('');
 
   const selected = new Set(selectedIds);
-  const rereviewIds = rows
-    .filter((r) => selected.has(r.id) && r.status === 'needs_rereview')
-    .map((r) => r.id);
+  // Each re-review at the version its row showed: one a later terms change generated after the queue loaded is
+  // skipped as stale_version, never approved unseen.
+  const seenVersions = rows.flatMap((r) =>
+    selected.has(r.id) && r.status === 'needs_rereview' && r.current_version_n !== null
+      ? [{ item_id: r.id, version_n: r.current_version_n }]
+      : [],
+  );
+  const rereviewIds = seenVersions.map((v) => v.item_id);
 
   const settle = () => {
     void qc.invalidateQueries({ queryKey: getListItemsQueryKey().slice(0, 1) });
@@ -120,7 +126,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
 
   const doFastTrack = () => {
     fastTrack.mutate(
-      { data: { item_ids: rereviewIds, reason: reason.trim() } },
+      { data: { item_ids: rereviewIds, reason: reason.trim(), seen_versions: seenVersions } },
       {
         onSuccess: (result) => {
           setReasonOpen(false);

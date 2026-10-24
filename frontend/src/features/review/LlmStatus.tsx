@@ -48,15 +48,26 @@ export function LlmStatus({
           <span className="app-llm-progress" aria-hidden="true" />
         </div>
       );
-    case 'failed':
+    case 'failed': {
+      // No API key on this server: Retry would fail the same way, so it isn't offered.
+      const notConfigured = item.llm_check_failure_code === 'not_configured';
+      const reason = item.llm_check_failure_reason;
       return (
         <div className="app-llm-status" data-state="failed" role="alert">
           <Icon name="feedback.error" />
           <span>
-            AI check failed.
-            <span className="app-llm-status-note"> Retry, or give an override reason when you approve.</span>
+            {notConfigured
+              ? 'AI review isn’t configured on this server.'
+              : reason === null
+                ? 'AI check failed.'
+                : `AI check failed: ${reason}`}
+            <span className="app-llm-status-note">
+              {notConfigured
+                ? ' Give an override reason when you approve.'
+                : ' Retry, or give an override reason when you approve.'}
+            </span>
           </span>
-          {canRetry && (
+          {canRetry && !notConfigured && (
             <Button
               size="sm"
               className="ml-auto"
@@ -70,6 +81,7 @@ export function LlmStatus({
           )}
         </div>
       );
+    }
     case 'skipped': {
       const carried = item.latest_decision?.version_n;
       return (
@@ -79,7 +91,11 @@ export function LlmStatus({
             {carried === undefined
               ? 'AI check skipped for this version'
               : `AI review carried from v${String(carried)}`}
-            <span className="app-llm-status-note"> · only offer-terms numbers changed</span>
+            <span className="app-llm-status-note">
+              {item.numbers_change === false
+                ? ' · offer terms changed, numbers unchanged'
+                : ' · only offer-terms numbers changed'}
+            </span>
           </span>
         </div>
       );
