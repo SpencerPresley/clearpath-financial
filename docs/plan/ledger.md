@@ -11,7 +11,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | scaffold | orchestrator | main `430486c` | done | backend, frontend, compose, CI, CLAUDE.md |
 | infra-terraform | agent (worktree) | — | in progress | write + validate + plan only; apply deferred to deploy wave |
 | sample-tracker | agent (worktree) | — | in progress | messy xlsx + generator + intended-mess README |
-| spec | orchestrator | — | in progress | docs/spec.md, high-level spec over product-spec + decisions |
+| spec | orchestrator | main | builder check running | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
 

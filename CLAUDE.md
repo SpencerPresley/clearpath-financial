@@ -4,7 +4,7 @@ Internal tool for a (fictional) nonbank consumer lender's compliance team. Marke
 (ads, landing pages, emails, affiliate creatives); reviewers check it against regulations with automated
 code checks plus LLM pre-review and record decisions. It replaces an Excel tracker + email workflow.
 
-Read before changing behavior: `docs/product-spec.md` (workflow, data model, screens) and
+Start with `docs/spec.md` (intent, scope, UI and engineering standards, workstreams). Detail: `docs/product-spec.md` (workflow, data model, screens) and
 `docs/decisions.md` (why, and what's deliberately out of scope). Regulatory substance with citations:
 `docs/research/regulations.md`.
 
@@ -36,6 +36,11 @@ Makefile    every common command; `make help`
 - Compose publishes Postgres on 55432 and Redis on 56379 to avoid clashing with other local stacks.
 
 ## Workflow
+
+Orchestration state: `docs/plan/ledger.md` (read it first after a context reset).
+
+Errors: catch only where the code can decide what to do; domain errors are typed exceptions mapped to
+HTTP once in the API's exception handlers (spec §6.1).
 
 TDD: write the failing test first, at the lowest layer that can express it (pure function >
 service with DB > API). `make check` runs what CI runs. After any API schema change run `make schema`
