@@ -22,7 +22,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | L demo seed (#13) | agent (worktree) | PR #39 | final: tracker re-anchored to end 2026-08-14 (option c), rebase on #40 | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
-| Notifications inbox | agent (worktree `feat/notifications-ui`) | — | in progress | gap found: backend notifications had no UI; bell + popover inbox, polling |
+| Notifications inbox | agent (worktree) | PR #42 merged | done | bell + popover, typed detail per kind, 3 queries per page |
+| Comment links + quick-jump | agent (resumed) | — | in progress | mention deep link + highlight; topbar search made real (was a disabled "Search (soon)") |
+| Assistant flake fix | agent (resumed K) | PR #41 merged | done (test synchronized on committed state; product was correct) |
 | K assistant (#12) | agent (worktree) | PR #38 merged | done; live: 2 model calls, cache_read 4647 tokens on the 2nd call (prompt caching works) | live smoke passed (orchestrator); request-scoped runs, custom useStream adapter; injection test; duplicate-send bug found via real-server test and fixed |
 | J screens + metrics (#11) | agent (worktree) | #34, #35, #36 merged | done | per-source metric figures (no blended numbers); every number drills to its items |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
