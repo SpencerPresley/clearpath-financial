@@ -1,18 +1,41 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
 
+import { getGetMeQueryKey } from '../../api/generated/me/me';
+import { Button } from '../Button';
 import { Icon } from '../Icon';
+import { showToast } from '../toast';
+import { signOut } from './session';
 import { initialsOf, useViewer } from './Viewer';
 
 const ROLE_LABELS = { marketer: 'Marketer', reviewer: 'Reviewer', lead: 'Compliance lead', admin: 'Admin' };
 
-/**
- * Account panel. A popover dialog rather than a menu: until sign-in exists there is no account action to
- * offer, and a menu whose only item is a disabled "Sign out" is an inert control. When accounts land,
- * sign-out goes here (and this can become a MenuTrigger again).
- */
+/** Account panel: who is signed in, their roles, and sign out. */
 export function UserMenu() {
   const viewer = useViewer();
+  const qc = useQueryClient();
+  const [pending, setPending] = useState(false);
   const roles = viewer.roles.map((role) => ROLE_LABELS[role]).join(', ');
+
+  const doSignOut = () => {
+    setPending(true);
+    signOut().then(
+      () => {
+        // Drop everything cached for this user, then let SessionGate find no session and show sign-in.
+        qc.removeQueries({ predicate: (q) => q.queryKey[0] !== getGetMeQueryKey()[0] });
+        void qc.resetQueries({ queryKey: getGetMeQueryKey() });
+      },
+      () => {
+        setPending(false);
+        showToast({
+          tone: 'error',
+          title: 'Couldn’t sign out',
+          description: 'Check your connection and try again.',
+        });
+      },
+    );
+  };
 
   return (
     <DialogTrigger>
@@ -24,16 +47,17 @@ export function UserMenu() {
         <Icon name="action.expand" size={14} className="text-brand-muted" />
       </AriaButton>
       <Popover className="app-popover" placement="bottom end" offset={6}>
-        <Dialog className="app-menu-header outline-none" aria-label="Account">
+        <Dialog className="app-menu-header flex flex-col gap-0.5 outline-none" aria-label="Account">
           <Heading slot="title" className="font-medium">
             {viewer.name}
           </Heading>
-          <p className="text-meta text-muted">{roles}</p>
-          {viewer.isDemo === true && (
-            <p className="mt-2 max-w-60 text-meta text-muted">
-              No sign-in yet. This is a demo session with every role, so every section is visible.
-            </p>
-          )}
+          <p className="text-meta text-muted">{viewer.email}</p>
+          <p className="text-meta text-muted">{roles || 'No roles'}</p>
+          <div className="mt-2">
+            <Button size="sm" icon="action.sign_out" isDisabled={pending} onPress={doSignOut}>
+              Sign out
+            </Button>
+          </div>
         </Dialog>
       </Popover>
     </DialogTrigger>

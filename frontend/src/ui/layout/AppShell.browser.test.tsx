@@ -3,11 +3,12 @@ import '../../theme/theme.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 
 import { routeTree } from '../../routeTree.gen';
+import { stubApi } from '../../test/browserApi';
 
 async function renderApp(path = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -25,9 +26,11 @@ async function renderApp(path = '/') {
 
 beforeEach(async () => {
   await page.viewport(1440, 900);
+  stubApi(); // the root route resolves the viewer from /api/me
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   window.localStorage.clear();
 });
 

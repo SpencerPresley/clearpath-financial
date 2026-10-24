@@ -2000,6 +2000,31 @@
     @apply grid grid-cols-[4.5rem_1fr] items-center gap-3;
   }
 
+  /* ---- Shell wiring: sign-in (allauth headless) and the session loading frame. ----------------- */
+  .app-signin {
+    @apply grid h-screen grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
+  }
+  .app-signin-main {
+    @apply overflow-auto px-6 py-10;
+  }
+  .app-signin-form {
+    @apply mx-auto flex w-full max-w-sm flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-5;
+  }
+  .app-field-label {
+    @apply mb-1 block text-meta font-medium text-base-content;
+  }
+  .app-signin-demo {
+    @apply mt-2 flex flex-col gap-1 border-t border-base-300 pt-3;
+  }
+  .app-signin-demo-btn {
+    @apply flex w-full cursor-default items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-signin-demo-btn:hover {
+    @apply bg-hover;
+  }
+
   .app-table-footer {
     @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
   }

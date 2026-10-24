@@ -29,7 +29,7 @@ export function canEditRisk(viewer: Viewer): boolean {
 }
 
 export function canEditFields(viewer: Viewer, row: Pick<ItemRowOut, 'owner'>): boolean {
-  return canEditRisk(viewer) || (viewer.id !== null && row.owner?.id === viewer.id);
+  return canEditRisk(viewer) || row.owner?.id === viewer.id;
 }
 
 type Changes = Partial<Pick<ItemRowOut, 'tags' | 'risk_tier'>> & { notes?: string };

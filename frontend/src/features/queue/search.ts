@@ -145,13 +145,21 @@ export function sameFilters(a: QueueFilters, b: QueueFilters): boolean {
   return canonical(a) === canonical(b);
 }
 
-/** Parse raw URL search. A URL with no filters and no view opens My queue (spec §4.3). */
-export function parseQueueSearch(raw: Record<string, unknown>): QueueSearch {
-  const search = queueSearchSchema.parse(raw);
+function normalize(search: QueueSearch): QueueSearch {
   if (search.view === undefined && !hasFilters(search)) {
     return { ...search, ...viewSearch('mine'), layout: search.layout, item: search.item };
   }
   return search;
+}
+
+/**
+ * The route's search schema: the field guards plus the default view. A URL with no filters and no view opens
+ * My queue (spec §4.3). As a schema (not a function) the router types link input as the all-optional input.
+ */
+export const queueRouteSearchSchema = queueSearchSchema.transform(normalize);
+
+export function parseQueueSearch(raw: Record<string, unknown>): QueueSearch {
+  return queueRouteSearchSchema.parse(raw);
 }
 
 export function toListParams(

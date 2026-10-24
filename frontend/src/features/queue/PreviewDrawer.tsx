@@ -3,7 +3,7 @@
  * and the drawer follows. Summary, open findings by severity, the latest decision, notes and tags (editable
  * for the submitter or a reviewer), and the way into the full review.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Label, TextArea, TextField } from 'react-aria-components';
 
@@ -243,11 +243,27 @@ export interface PreviewDrawerProps {
   viewer: Viewer;
   onClose: () => void;
   onOpenReview: (id: number) => void;
+  /** Move focus into the drawer (opened with Enter): the panel at once, its heading once the item loads. */
+  autoFocus?: boolean;
 }
 
-export function PreviewDrawer({ itemId, viewer, onClose, onOpenReview }: PreviewDrawerProps) {
+export function PreviewDrawer({
+  itemId,
+  viewer,
+  onClose,
+  onOpenReview,
+  autoFocus = false,
+}: PreviewDrawerProps) {
   const item = useGetItem(itemId);
   const key = item.data?.key ?? `CP-${String(itemId)}`;
+  const panel = useRef<HTMLElement>(null);
+  const loaded = item.data !== undefined;
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    if (loaded) document.getElementById(PREVIEW_HEADING_ID)?.focus();
+    else panel.current?.focus();
+  }, [autoFocus, loaded]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return;
@@ -260,7 +276,13 @@ export function PreviewDrawer({ itemId, viewer, onClose, onOpenReview }: Preview
   };
 
   return (
-    <aside className="app-drawer" aria-label={`Preview ${key}`} onKeyDown={onKeyDown}>
+    <aside
+      ref={panel}
+      tabIndex={-1}
+      className="app-drawer"
+      aria-label={`Preview ${key}`}
+      onKeyDown={onKeyDown}
+    >
       <div className="app-drawer-head">
         <ItemKey value={key} />
         <IconButton icon="action.close" size="sm" aria-label="Close preview" onPress={onClose} />

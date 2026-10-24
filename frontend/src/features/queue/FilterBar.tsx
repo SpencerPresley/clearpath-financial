@@ -172,9 +172,11 @@ export interface FilterBarProps {
   onClear: () => void;
   /** Whether the filters differ from the active view; computed for built-in views when omitted. */
   isModified?: boolean;
+  /** The board's columns are statuses, so it has no Status filter. */
+  hideStatus?: boolean;
 }
 
-export function FilterBar({ search, onChange, onClear, isModified }: FilterBarProps) {
+export function FilterBar({ search, onChange, onClear, isModified, hideStatus = false }: FilterBarProps) {
   const users = useListUsers({ role: 'reviewer' });
   const partners = useListPartners();
   const view = activeView(search, []);
@@ -206,14 +208,16 @@ export function FilterBar({ search, onChange, onClear, isModified }: FilterBarPr
   return (
     <div className="app-filter-bar" role="group" aria-label="Filters">
       <QueueSearchField value={search.q} onChange={setQ} />
-      <FilterChip
-        label="Status"
-        options={Object.values(ItemStatus).map((s) => ({ id: s, label: STATUS_META[s].label }))}
-        selected={search.status ?? []}
-        onChange={(ids) => {
-          onChange({ status: ids.length > 0 ? (ids as ItemStatus[]) : undefined });
-        }}
-      />
+      {!hideStatus && (
+        <FilterChip
+          label="Status"
+          options={Object.values(ItemStatus).map((s) => ({ id: s, label: STATUS_META[s].label }))}
+          selected={search.status ?? []}
+          onChange={(ids) => {
+            onChange({ status: ids.length > 0 ? (ids as ItemStatus[]) : undefined });
+          }}
+        />
+      )}
       <FilterChip
         label="Risk"
         options={Object.values(RiskTier).map((t) => ({ id: t, label: RISK_SHORT[t] }))}
