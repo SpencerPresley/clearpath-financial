@@ -27,6 +27,7 @@ import {
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
 import { describeEvent } from './historyText';
+import { PlacementsSection } from './Placements';
 
 function PanelLoading({ label }: { label: string }) {
   return (
@@ -194,6 +195,8 @@ export function DetailsTab({ item }: { item: ItemDetailOut }) {
         {item.notes !== '' && <Row label="Notes">{item.notes}</Row>}
         {item.is_legacy && <Row label="Legacy ref">{item.legacy_ref ?? '—'}</Row>}
       </dl>
+      {/* Placements exist only once an approval has been recorded. */}
+      {item.approved_at !== null && <PlacementsSection itemId={item.id} ownerId={item.owner?.id ?? null} />}
       <section aria-labelledby="terms-title">
         <h3 id="terms-title" className="app-panel-heading">
           Offer terms quoted

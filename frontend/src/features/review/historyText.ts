@@ -88,6 +88,21 @@ export function describeEvent(entry: Entry, { versions, users }: HistoryLookups)
       return `Takedown requested: ${firstLine(entry.payload.reason)}`;
     case 'placement.takedown_confirmed':
       return 'Takedown confirmed';
+    case 'placement.drift_check_requested':
+      return entry.payload.trigger === 'manual'
+        ? 'Placement check requested'
+        : 'Daily placement check started';
+    case 'placement.drift_checked': {
+      if (entry.payload.status === 'failed') {
+        const why = entry.payload.error_code ?? '';
+        return why === '' ? 'Placement check failed' : `Placement check failed (${why.replaceAll('_', ' ')})`;
+      }
+      const compared = entry.payload.compared_version_id;
+      const against = compared === undefined || compared === null ? '' : ` against ${v(compared)}`;
+      if (entry.payload.result === 'unchanged') return `Placement checked${against}: copy unchanged`;
+      if (entry.payload.result === 'modified') return `Placement checked${against}: copy changed on the page`;
+      return `Placement checked${against}: approved copy missing from the page`;
+    }
     case 'attachment.added':
       return 'Evidence added';
     case 'terms.published':

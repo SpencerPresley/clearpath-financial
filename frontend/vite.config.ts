@@ -16,6 +16,8 @@ export default defineConfig({
     proxy: {
       '/api': { target: BACKEND_URL, changeOrigin: true },
       '/_allauth': { target: BACKEND_URL, changeOrigin: true },
+      // Drift monitor demo partner pages (Django views), as CloudFront routes them in production.
+      '/demo-partners': { target: BACKEND_URL, changeOrigin: true },
     },
   },
   test: {

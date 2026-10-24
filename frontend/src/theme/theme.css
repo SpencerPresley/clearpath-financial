@@ -491,6 +491,17 @@
     @apply flex flex-wrap items-center gap-3 self-start border-t border-base-300 pt-4;
   }
 
+  /* Fetch from a URL: its own field under the editor, so Enter fetches instead of submitting. */
+  .app-fetch-url {
+    @apply flex max-w-xl flex-col gap-1;
+  }
+  .app-fetch-url-field {
+    @apply flex flex-col gap-1;
+  }
+  .app-fetch-url-row {
+    @apply flex gap-2;
+  }
+
   /* Queued files: name, size, kind, remove. Rows on rules, not cards. */
   .app-file-list {
     @apply flex flex-col divide-y divide-base-300 rounded-md border border-base-300 bg-base-100;
@@ -1320,6 +1331,48 @@
   .app-evidence {
     @apply flex flex-col gap-0.5 border-b border-base-300 py-2 last:border-b-0;
   }
+  /* Placements and the drift monitor's last check (Details tab). Rows on rules, like evidence. */
+  .app-placement-list {
+    @apply flex flex-col;
+  }
+  .app-placement {
+    @apply flex flex-col gap-2 border-b border-base-300 py-3 first:pt-1 last:border-b-0;
+  }
+  .app-placement-head {
+    @apply flex flex-col gap-0.5;
+  }
+  .app-placement-head .app-link {
+    @apply inline-flex items-center gap-1 self-start text-ui;
+    overflow-wrap: anywhere;
+  }
+  .app-placement-location {
+    @apply text-ui font-medium text-base-content;
+  }
+  .app-placement-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-drift-check {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-drift-check-line {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-drift-note {
+    @apply text-ui text-base-content;
+  }
+  .app-drift-diff {
+    @apply flex flex-col gap-1 rounded-md border border-base-300 bg-base-100 p-2.5;
+  }
+  .app-drift-findings > summary {
+    @apply cursor-pointer text-ui text-base-content;
+  }
+  .app-drift-finding {
+    @apply flex items-start gap-2 py-1 text-ui;
+  }
+  .app-drift-new {
+    @apply font-medium text-base-content;
+  }
+
   .app-link {
     @apply font-medium text-primary underline decoration-primary/30 underline-offset-2;
   }
