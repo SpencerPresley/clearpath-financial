@@ -19,7 +19,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 ## Rulings
 
-- Ruling: Terraform is written and planned now, applied at the deploy wave — avoids paying for NAT/RDS/WAF while nothing is deployable — cost if wrong: a later apply surfaces account-level issues (quotas, OIDC provider exists) later than ideal.
+- Ruling: Terraform is written and planned now, applied at the deploy wave (Spencer approved running `terraform apply` once the app is deployable) — avoids paying for NAT/RDS/WAF while nothing is deployable — cost if wrong: a later apply surfaces account-level issues (quotas, OIDC provider exists) later than ideal.
 - Ruling: x86_64 EC2 (t3.medium) rather than Graviton — images build on standard GitHub-hosted runners without cross-compiling — cost if wrong: ~20% higher instance price for a short-lived demo.
 
 ## References for later workstreams
