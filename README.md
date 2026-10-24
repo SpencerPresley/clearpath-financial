@@ -6,7 +6,15 @@ and affiliate placement in an Excel tracker plus email threads. That process is 
 ([the brief](docs/description.md)). This tool replaces it. Each review item lives in the tool from submission to
 approval and beyond: its content and versions, its findings, its decision, where it runs, and its audit trail.
 
-**Live demo:** https://clearpath.spencerpresley.com (US only; demo logins are shared separately).
+**Live demo:** https://clearpath.spencerpresley.com (demo logins are shared separately).
+
+**Where to start:** sign in as the reviewer and open **CP-2**: its offer terms changed after approval, so the copy
+was regenerated with the new numbers for a one-click fast-track. Then open **CP-7**: a partner's live page changed
+after approval, and the drift monitor sent it back for re-review.
+
+> [!IMPORTANT]
+> The site is US-only: CloudFront's geo restriction refuses requests from outside the US
+> ([`infra/main/edge.tf`](infra/main/edge.tf#L171-L176)).
 
 > [!NOTE]
 > The technical design (stack, data model, checks pipeline, AWS deployment, security) is in
