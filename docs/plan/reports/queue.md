@@ -29,7 +29,7 @@ Naming: issue #9 says `frontend-queue.md`; the task brief says `queue.md`. Follo
 | Shell wiring (#20) | `ui/layout/SessionGate.tsx`, `SignIn.tsx`, `session.ts`, `Viewer.tsx`, `UserMenu.tsx`, `routes/__root.tsx` | The root route resolves the viewer from `GET /api/me` (`effective_roles` drive the nav and every role-gated control). 401 shows a minimal sign-in (allauth headless browser flow: GET session issues the CSRF cookie, POST login). The account panel shows email and roles and signs out. `DEMO_VIEWER` and "No sign-in yet" are gone. |
 | Generated enums (#20) | `ui/domain.ts` | Re-exports the generated `ItemStatus`, `RiskTier`, `Severity`, `FindingSource`, `Role` (no hand-mirrored literals); kept as a module so workstream I's imports don't break. |
 | Compact status badge (#20) | `ui/badges.tsx` `StatusMark` | Icon-only, `role="img"` + `aria-label` + `title`, no tab stop (the row is the tab stop). `RiskTierBadge` gained an additive `short` prop for the Risk column. |
-| Icons | `ui/icons.ts` | +17 keys: `view.table/board`, `action.columns/save_view/keyboard/reload/drag/sign_in/open`, `entity.user/tag`, `sort.ascending/descending/none`. `action.open` (ArrowRight) is same-tab navigation; `open_external` stays for new tabs. Identity test passes with no new allowlist entries. |
+| Icons | `ui/icons.ts` | +16 keys: `view.table/board`, `action.columns/save_view/reload/drag/sign_in/open`, `entity.user/tag`, `sort.ascending/descending/none`. `action.open` (ArrowRight) is same-tab navigation; `open_external` stays for new tabs. The keyboard-help button uses main's `action.shortcuts` (my `action.keyboard` was the same glyph and meaning, dropped in the rebase onto #28). Identity test passes with no new allowlist entries. |
 
 ## Interaction model
 
@@ -54,8 +54,9 @@ Naming: issue #9 says `frontend-queue.md`; the task brief says `queue.md`. Follo
 5. **Stats exclude legacy items; `GET /items` doesn't.** Queue statuses rarely hold legacy items, but a
    `is_legacy=false` default on the queue sort would make them agree by construction.
 6. **`POST /views` has no update.** Saving a modified saved view creates a new one.
-7. **Claim, assign (single and bulk), and bulk fast-track are stubs (501) today** (workstreams E and F). The UI calls the
-   generated hooks and shows the server's message on failure; the MSW mocks cover the success paths.
+7. **Bulk fast-track is still a 501 stub** (workstream F). Claim, assign, and bulk assign landed with #25 after
+   my real-backend check; the UI calls the generated hooks unchanged, but I haven't exercised them against the real
+   endpoints.
 8. **Dev CSRF origins are hardcoded** in `backend/config/settings/dev.py` (`localhost:5173` only), so a Vite dev
    server on any other port can't sign in. Not a bug in prod; worth reading from `DJANGO_CSRF_TRUSTED_ORIGINS`.
 
@@ -79,21 +80,19 @@ The themes and what changed:
 
 ## Verification
 
-Final run on the rebased branch (on origin/main `ff5a938`), from `frontend/`:
+Final run after rebasing onto origin/main `83c9410` (#25 review workflow, #27 review screen, #28 follow-ups), from
+`frontend/`:
 
 ```
 npm run lint            eslint .                                  (clean)
 npm run format:check    All matched files use Prettier code style!
 npm run typecheck       tsc -b                                    (clean)
-npm run test:run        Test Files 25 passed (25) · Tests 263 passed (263)
-npm run build           ✓ built in 337ms · routes 306.84 kB (gz 77.21) · index 542.28 kB (gz 168.95)
-npm run test:browser    Test Files 2 passed (2) · Tests 7 passed (7)
-E2E_PORT=4391 npm run test:e2e    9 passed · 32 skipped (screenshot spec, SCREENSHOTS=1 only)
-SCREENSHOTS=1 …         32 passed (UI review captures)
+npm run test:run        Test Files 43 passed (43) · Tests 393 passed (393)   (3 consecutive runs)
+npm run build           ✓ built · largest chunks routes 267.89 kB, index 250.47 kB (no >500 kB warning)
+npm run test:browser    Test Files 3 passed (3) · Tests 8 passed (8)
+E2E_PORT=4391 npm run test:e2e    12 passed · 45 skipped (screenshot specs, opt-in only)
+SCREENSHOTS=1 …         32 passed (UI review captures, before the rebase)
 ```
-
-The build still warns that `index` is over 500 kB (pre-existing; the queue route now splits into its own chunk,
-which took `index` from 671 kB to 542 kB).
 
 **Real backend check** (not a CI gate): this branch's Django server against a private `clearpath_wsh` database
 (migrated, demo users seeded), Vite on :5173, scripted with Playwright:
@@ -108,7 +107,7 @@ which took `index` from 671 kB to 542 kB).
 - Stats strip shows real counts; the drawer loads detail plus findings ("No open findings"); the board loads lanes.
 - No 4xx/5xx other than the expected `/api/me` 401 before sign-in.
 
-Not exercisable: claim/assign/bulk (501 stubs).
+Not exercised: claim/assign/bulk assign (501 stubs at the time; implemented by #25 since), bulk fast-track (still 501).
 
 ## Files touched outside the listed ownership
 
@@ -119,13 +118,19 @@ Not exercisable: claim/assign/bulk (501 stubs).
   `src/test/setup.ts` (jsdom `scrollIntoView` stub), new `src/test/renderApp.tsx`, `src/test/browserApi.ts`.
 - `frontend/e2e/shell.spec.ts` (now stubs `/api/me` and the queue), new `e2e/api.ts`, `e2e/queue.spec.ts`,
   `e2e/screenshots.spec.ts` (skipped unless `SCREENSHOTS=1`).
+- Rebase onto #25/#27/#28 (my `SessionGate` now fronts every route, and `Viewer` is the real `/api/me` shape):
+  `src/features/review/ReviewPage.test.tsx` serves `/api/me` with the test's roles instead of wrapping a
+  `ViewerProvider` with the old `{ name, roles, isDemo }` shape; `e2e/stubApi.ts` answers `/api/me` (all roles by
+  default, as `DEMO_VIEWER` had); `src/ui/layout/AppShell.test.tsx` opts into the generated item/user/partner mocks
+  for the index route. `src/test/server.ts` is back to main's core-only defaults: global random-data defaults made
+  ReviewPage's tests flaky.
 - `frontend/playwright.config.ts`: `E2E_PORT` override (default 4173 unchanged). Parallel worktrees were
   sharing port 4173 with `reuseExistingServer`, so one run could test another branch's build.
 
 ## Deferred and risks
 
-- **Review route link is a string.** `/items/$itemId` belongs to workstream I and isn't in this branch's route
-  tree, so `reviewPath()` + `router.history.push` stand in for a typed `<Link>`. Swap when I merges (one file).
+- **Review navigation**: `o` and the drawer's Open review use the typed `/items/$itemId` route (workstream I,
+  merged in #27). The drawer's anchor keeps a plain `href` from `reviewPath()` so modifier-clicks open a tab.
 - **Sign-in is minimal by design**: no password reset, no MFA step (a 401 from login says so), no signup.
 - **Board shows the first 200 items per query** and says so when truncated.
 - **Keyboard column resizing** isn't offered (pointer only); every column can also be hidden.

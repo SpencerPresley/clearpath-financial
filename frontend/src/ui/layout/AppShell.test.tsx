@@ -6,7 +6,10 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { getHealthMockHandler } from '../../api/generated/core/core.msw';
+import { getItemsMock } from '../../api/generated/items/items.msw';
 import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
+import { getPartnersMock } from '../../api/generated/partners/partners.msw';
+import { getUsersMock } from '../../api/generated/users/users.msw';
 import { routeTree } from '../../routeTree.gen';
 import { server } from '../../test/server';
 import type { Role } from '../domain';
@@ -15,8 +18,12 @@ import { NAV_COLLAPSED_KEY } from './AppShell';
 const ALL_ROLES: Role[] = ['marketer', 'reviewer', 'lead', 'admin'];
 
 function renderApp({ roles = ALL_ROLES, path = '/' }: { roles?: Role[]; path?: string } = {}) {
-  // The shell's viewer comes from GET /api/me (SessionGate in the root route).
+  // The shell's viewer comes from GET /api/me (SessionGate in the root route). The index route is the queue;
+  // its lists get the generated mocks (these tests assert on the shell, not on queue data).
   server.use(
+    ...getItemsMock(),
+    ...getUsersMock(),
+    ...getPartnersMock(),
     getGetMeMockHandler({
       id: 1,
       display_name: 'Test User',

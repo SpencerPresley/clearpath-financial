@@ -6,7 +6,7 @@
  * Every region fails on its own (spec §5.5 partial state): stats, saved views, and later pages show inline
  * errors while the rest keeps working.
  */
-import { useNavigate, useRouter, useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 import type { Key } from 'react-aria-components';
@@ -34,7 +34,6 @@ import { queueKeyAction } from './keyboard';
 import { PreviewDrawer } from './PreviewDrawer';
 import { QueueFooter } from './QueueFooter';
 import { QueueSkeleton, QueueTable, rowElementId } from './QueueTable';
-import { reviewPath } from './reviewPath';
 import { activeView, hasFilters, toListParams, viewSearch } from './search';
 import type { ActiveView, BuiltInViewId, QueueLayout, QueueSearch } from './search';
 import { ShortcutsDialog } from './ShortcutsDialog';
@@ -138,7 +137,6 @@ function EmptyQueue({
 export function QueuePage() {
   const search = useSearch({ from: '/' });
   const navigate = useNavigate({ from: '/' });
-  const router = useRouter();
   const viewer = useViewer();
   const cells = useQueueCells(viewer);
 
@@ -171,7 +169,7 @@ export function QueuePage() {
     update({ item: id }, true);
   };
   const openReview = (id: number) => {
-    router.history.push(reviewPath(id));
+    void navigate({ to: '/items/$itemId', params: { itemId: String(id) } });
   };
   const setColumnsAndSave = (next: ColumnVisibility) => {
     setColumns(next);
@@ -370,7 +368,7 @@ export function QueuePage() {
             }}
           />
           <IconButton
-            icon="action.keyboard"
+            icon="action.shortcuts"
             size="sm"
             aria-label="Keyboard shortcuts (?)"
             onPress={() => {

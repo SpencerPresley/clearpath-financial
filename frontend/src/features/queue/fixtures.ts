@@ -314,6 +314,7 @@ export function makeDecision(overrides: Partial<DecisionOut> = {}): DecisionOut 
     decided_at: '2026-10-18T15:30:00Z',
     expires_at: null,
     ruleset_date: '2026-10-01',
+    engine_version: '',
     evidence: [],
     terms_versions: [],
     ai_review_carried_from_n: null,
