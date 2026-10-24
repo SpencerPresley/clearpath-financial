@@ -21,7 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 merged `9f4d228` | done; logins + guided paths in docs/demo.md |
 | Walkthrough review 1 | fresh reviewer (worktree) | — | in progress | local full-stack walkthrough per role before deploy; findings only |
-| Deploy prep | agent (worktree `deploy/prod-readiness`) | — | in progress | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| Deploy prep | agent (worktree) | PR #43 | adding S3 gateway endpoint; found + closed open public signup | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree) | PR #42 merged | done | bell + popover, typed detail per kind, 3 queries per page |
@@ -40,6 +40,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 ## Rulings
 
+- Ruling: no self-signup — accounts are provisioned (allauth adapter closes signup; it was open by default and created role-less signed-in accounts).
+- Ruling: downloads stream through permission-checked endpoints, no presigned S3 URLs (bearer links bypass WAF/geo and the permission model).
+
 - Ruling: one notification per action — a reopen's sticky reassignment doesn't also send "back for your review" (the re-review notice carries the reason); resubmission's sticky assignment still notifies.
 
 - Ruling: the sample tracker is re-anchored once, statically, to end the day before native seed history; a reset weeks later shows a gap, never an overlap. Re-anchoring dynamically would change the oracle per reset; shifting only the dates puts holiday campaigns in September.
@@ -52,7 +55,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 - Ruling: hosted demo password comes from SSM (`DEMO_USER_PASSWORD`), never the repo default; Spencer shares it with evaluators — the repo default would let anyone with repo access reset the hosted demo.
 - Ruling: the sample tracker ends the day before the tool's go-live (start of native history), so metrics read as spreadsheet era → tool era; one shared go-live constant relative to the seed clock.
 - Ruling: landing route by role — reviewer/lead /queue, marketer /mine, admin /import.
-- Ruling: seed_demo runs after migrate on container start (no-op when data exists).
+- Ruling: seed_demo runs after migrate — on container start in dev compose; in prod inside deploy.sh after the one-off migrate (superseded by the prod ruling above).
 
 - Ruling: assistant runs are request-scoped (disconnect cancels); useStream consumes our SSE through a custom adapter, not the Agent Server protocol — server-held runs would need a replay buffer across uvicorn workers.
 - Ruling: all Django mail lands in the Outbox (assistant mail + system mail such as password reset, admin-visible); real delivery is a later EMAIL_BACKEND swap.
