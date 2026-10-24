@@ -4,11 +4,16 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { DecisionOutcome } from './decisionOutcome';
 import type { ItemStatus } from './itemStatus';
+import type { RowAction } from './rowAction';
 
 export interface ImportPreviewRowOut {
+  action: RowAction;
   legacy_ref: string | null;
-  ok: boolean;
+  outcome: DecisionOutcome | null;
+  partner: string | null;
+  problem_count: number;
   row_number: number;
   status: ItemStatus | null;
   submitted_on: string | null;

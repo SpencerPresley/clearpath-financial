@@ -7,6 +7,8 @@
 import type { ImportTargetField } from './importTargetField';
 
 export interface ImportColumnOut {
+  /** What the column is mapped to now. */
+  field: ImportTargetField;
   name: string;
   sample_values: string[];
   suggested_field: ImportTargetField | null;

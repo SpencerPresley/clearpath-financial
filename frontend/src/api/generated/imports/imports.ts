@@ -26,8 +26,8 @@ import type {
 import type {
   ErrorOut,
   ImportCommitIn,
-  ImportCommitOut,
   ImportJobOut,
+  ImportJobSummaryOut,
   ImportMappingIn,
   ImportPreviewOut,
   UploadImportBody
@@ -55,6 +55,107 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getListImportsUrl = () => {
+
+
+
+
+  return `/api/imports`
+}
+
+/**
+ * The 20 most recent imports. Admins only.
+ * @summary List Imports
+ */
+export const listImports = async ( options?: Parameters<typeof customFetch>[1]): Promise<ImportJobSummaryOut[]> => {
+
+  return customFetch<ImportJobSummaryOut[]>(getListImportsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListImportsQueryKey = () => {
+    return [
+    `/api/imports`
+    ] as const;
+    }
+
+
+export const getListImportsQueryOptions = <TData = Awaited<ReturnType<typeof listImports>>, TError = ErrorOut>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListImportsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listImports>>> = ({ signal }) => listImports({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListImportsQueryResult = NonNullable<Awaited<ReturnType<typeof listImports>>>
+export type ListImportsQueryError = ErrorOut
+
+
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = ErrorOut>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listImports>>,
+          TError,
+          Awaited<ReturnType<typeof listImports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listImports>>,
+          TError,
+          Awaited<ReturnType<typeof listImports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Imports
+ */
+
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListImportsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export const getUploadImportUrl = () => {
 
 
@@ -64,7 +165,7 @@ export const getUploadImportUrl = () => {
 }
 
 /**
- * Upload a tracker xlsx; detects columns and suggests a mapping. Admins only. [workstream G]
+ * Upload a tracker xlsx; reads it and guesses the column mapping. Admins only. 422 if it isn't an xlsx.
  * @summary Upload
  */
 export const uploadImport = async (uploadImportBody: UploadImportBody, options?: Parameters<typeof customFetch>[1]): Promise<ImportJobOut> => {
@@ -140,7 +241,7 @@ export const useUploadImport = <TError = ErrorOut,
 }
 
 /**
- * Start an import from the bundled sample tracker. [workstream G]
+ * Start an import from the bundled sample tracker ("Load sample tracker").
  * @summary Load Sample
  */
 export const loadSampleImport = async ( options?: Parameters<typeof customFetch>[1]): Promise<ImportJobOut> => {
@@ -214,7 +315,7 @@ export const useLoadSampleImport = <TError = ErrorOut,
 }
 
 /**
- * [workstream G]
+ * The job, its columns and current mapping. Poll this after `commitImport`.
  * @summary Get Import
  */
 export const getImport = async (jobId: number, options?: Parameters<typeof customFetch>[1]): Promise<ImportJobOut> => {
@@ -315,11 +416,11 @@ export const getCommitImportUrl = (jobId: number,) => {
 }
 
 /**
- * Create legacy items (is_legacy, legacy_ref kept). [workstream G]
+ * Create the legacy items in the background; poll `getImport`. Safe to repeat: nothing is imported twice.
  * @summary Commit
  */
 export const commitImport = async (jobId: number,
-    importCommitIn: ImportCommitIn, options?: Parameters<typeof customFetch>[1]): Promise<ImportCommitOut> => {
+    importCommitIn: ImportCommitIn, options?: Parameters<typeof customFetch>[1]): Promise<ImportJobOut> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -335,7 +436,7 @@ export const commitImport = async (jobId: number,
     }
     return headers;
   };
-return customFetch<ImportCommitOut>(getCommitImportUrl(jobId),
+return customFetch<ImportJobOut>(getCommitImportUrl(jobId),
   {
     ...options,
     method: 'POST',
@@ -404,7 +505,7 @@ export const useCommitImport = <TError = ErrorOut,
 }
 
 /**
- * Save the column and status-value mapping; returns the refreshed preview. [workstream G]
+ * Save the column, status-value, and value mappings; returns the refreshed preview.
  * @summary Set Mapping
  */
 export const setImportMapping = async (jobId: number,
@@ -493,7 +594,7 @@ export const useSetImportMapping = <TError = ErrorOut,
 }
 
 /**
- * Row problems are reported values, not errors (spec §6.1). [workstream G]
+ * Every row with what commit does with it, and every problem. Row problems are values, not errors.
  * @summary Preview
  */
 export const getImportPreview = async (jobId: number, options?: Parameters<typeof customFetch>[1]): Promise<ImportPreviewOut> => {

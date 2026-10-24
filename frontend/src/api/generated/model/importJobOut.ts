@@ -4,23 +4,31 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
-import type { ColumnMappingOut } from './columnMappingOut';
 import type { ImportColumnOut } from './importColumnOut';
 import type { ImportStatus } from './importStatus';
+import type { ImportSummaryOut } from './importSummaryOut';
 import type { PartyRefOut } from './partyRefOut';
-import type { StatusMappingOut } from './statusMappingOut';
+import type { StatusValueOut } from './statusValueOut';
+import type { ValueMappingOut } from './valueMappingOut';
 
 export interface ImportJobOut {
-  column_mapping: ColumnMappingOut[];
   columns: ImportColumnOut[];
+  commit_requested_at: string | null;
+  committed_at: string | null;
   created_at: string;
   created_by: PartyRefOut;
+  /** Why the last commit failed, if it did. */
+  error: string | null;
   filename: string;
   id: number;
+  /** Sheet rows below the header, data or not. */
   row_count: number;
   sheet_name: string;
   status: ImportStatus;
-  status_mapping: StatusMappingOut[];
-  /** Distinct values found in the mapped status column. */
-  status_values: string[];
+  /** Distinct values in the mapped status column. */
+  status_values: StatusValueOut[];
+  /** Set once committed. */
+  summary: ImportSummaryOut | null;
+  updated_at: string;
+  value_mappings: ValueMappingOut[];
 }

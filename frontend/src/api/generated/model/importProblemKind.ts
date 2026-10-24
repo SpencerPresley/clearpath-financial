@@ -9,11 +9,22 @@ export type ImportProblemKind = typeof ImportProblemKind[keyof typeof ImportProb
 
 
 export const ImportProblemKind = {
+  missing_mapping: 'missing_mapping',
   missing_value: 'missing_value',
   unparseable_date: 'unparseable_date',
+  coerced_date: 'coerced_date',
   unmapped_status: 'unmapped_status',
+  inferred_status: 'inferred_status',
   unknown_value: 'unknown_value',
-  duplicate_ref: 'duplicate_ref',
-  already_imported: 'already_imported',
   unknown_partner: 'unknown_partner',
+  fuzzy_partner: 'fuzzy_partner',
+  missing_expiry: 'missing_expiry',
+  unknown_trigger_terms: 'unknown_trigger_terms',
+  derived_approval_date: 'derived_approval_date',
+  unresolved_approver: 'unresolved_approver',
+  inconsistent_dates: 'inconsistent_dates',
+  duplicate_row: 'duplicate_row',
+  reused_ref: 'reused_ref',
+  already_imported: 'already_imported',
+  not_data_row: 'not_data_row',
 } as const;

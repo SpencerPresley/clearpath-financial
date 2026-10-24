@@ -6,18 +6,21 @@
  */
 import type { DecisionOut } from './decisionOut';
 import type { EvidenceOut } from './evidenceOut';
+import type { FindingOut } from './findingOut';
 import type { ItemRowOut } from './itemRowOut';
 import type { OfferTermsOut } from './offerTermsOut';
 import type { VersionOut } from './versionOut';
 
 /**
- * What an approval was recorded against: the approved version, the decision, the terms it quotes, and
- * the evidence it relied on, by hash.
+ * What an approval was recorded against: the approved version, the decision and the findings triaged on
+ * that version, the terms it quotes, and the evidence it relied on, by hash. The zip
+ * (`createEvidencePack`) holds the same record plus the files and the item history.
  */
 export interface EvidencePackOut {
   approved_version: VersionOut;
   decision: DecisionOut;
   evidence: EvidenceOut[];
+  findings: FindingOut[];
   generated_at: string;
   item: ItemRowOut;
   offer_terms: OfferTermsOut[];
