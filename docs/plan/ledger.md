@@ -14,7 +14,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | C rules engine (#4) | agent (worktree) | PR #21 merged | done | 42 code rules + 4 human items; 326 tests; ENGINE_VERSION in cache keys; ~3 ms per 5 KB ad |
 | D llm core (#5, phase 1) | agent (worktree) | PR #23 merged `f126747` | done | 7 LLM rules; live eval: recall 100%, precision 72%, 0/5 clean FPs, injection resisted, $0.00025/review (reports/llm-core-live-eval.md) |
 | E review workflow (#6, +#18) | agent (worktree) | PR #25 merged `d0fffbd` | done | 1201 backend tests; reviewer found 2 critical (carry-forward resurrecting reversed dismissals; approve with accepted findings), fixed |
-| E follow-up: evidence re-check | agent (resumed E) | — | in progress | attachment upload re-runs code checks on current version |
+| E follow-up: evidence re-check | agent (resumed E) | PR #26 merged | done | adds checks migration 0003 (system dismissal) |
 | D2 llm wiring (#5) | agent (worktree `wsD/llm-wiring`) | — | in progress | outbox handler → task → findings; failed/skipped/retry; stuck-running reconciliation. Unblocks Approve |
 | F offer terms (#7) | agent (worktree `wsF/offer-terms`) | — | in progress | publish, impact preview, per-item fan-out, fast-track (single + bulk) |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
