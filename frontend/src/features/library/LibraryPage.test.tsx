@@ -65,8 +65,12 @@ describe('Library: approved to run', () => {
 
     const legacy = within(table).getByRole('row', { name: /CP-412/ });
     expect(within(legacy).getByText('Legacy')).toBeInTheDocument();
-    expect(within(legacy).getByText('No pack · legacy')).toBeInTheDocument();
-    expect(within(legacy).queryByRole('button', { name: /evidence pack/i })).toBeNull();
+    expect(within(legacy).getByText('No pack')).toBeInTheDocument();
+    expect(
+      within(legacy).getByRole('button', { name: "Why there's no evidence pack for CP-412" }),
+    ).toBeInTheDocument();
+    expect(within(legacy).getByText(/no decision record to pack/)).toBeInTheDocument();
+    expect(within(legacy).queryByRole('button', { name: /^Evidence pack for/ })).toBeNull();
   });
 
   it('writes filters to the URL and sends them to the API', async () => {

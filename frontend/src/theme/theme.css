@@ -2358,6 +2358,24 @@
   .app-pack-error {
     @apply flex min-w-0 items-center gap-1 text-meta text-status-error-soft-content;
   }
+  .app-pack-reason {
+    @apply flex min-w-0 items-center gap-0.5;
+  }
+  .app-pack-why {
+    @apply inline-flex size-6 shrink-0 cursor-default items-center justify-center rounded-sm text-muted outline-none;
+    transition-property: background-color, color;
+    transition-duration: 120ms;
+  }
+  .app-pack-why[data-hovered] {
+    @apply bg-hover text-base-content;
+  }
+  .app-pack-why[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+  .app-pack-note.app-pack-wrap {
+    @apply whitespace-normal;
+  }
 
   /* ---- Export: the job's one-line state sits left of the button, so nothing below moves. ------------ */
   .app-export {
@@ -2517,6 +2535,12 @@
   }
   .app-import-error-text {
     @apply flex items-center gap-1.5 text-ui text-status-error-soft-content;
+  }
+  .app-import-result {
+    @apply block truncate text-muted;
+  }
+  .app-import-result[data-failed] {
+    @apply text-status-error-soft-content;
   }
 
   /* ---- Job header and the step list ------------------------------------------------------------- */

@@ -104,9 +104,8 @@ function RecentImports() {
             <td className="app-td app-figure">{formatDate(job.created_at)}</td>
             <td className="app-td" title={outcome(job)}>
               <span
-                className={
-                  job.error !== null && job.summary === null ? 'app-import-error-text' : 'text-muted'
-                }
+                className="app-import-result"
+                data-failed={job.error !== null && job.summary === null ? 'true' : undefined}
               >
                 {outcome(job)}
               </span>

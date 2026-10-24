@@ -19,17 +19,18 @@ import type { LibraryItemsQuery } from './useLibraryItems';
 
 /** Key, title, product, channel, partner, planned run, evidence pack. Title takes the rest. */
 const COLUMNS = [
-  { id: 'key', label: 'Item', width: '6.5rem' },
+  { id: 'key', label: 'Item', width: '5.5rem' },
   { id: 'title', label: 'Title', width: undefined },
-  { id: 'product', label: 'Product', width: '8rem' },
+  { id: 'product', label: 'Product', width: '7.5rem' },
   { id: 'channel', label: 'Channel', width: '7.5rem' },
-  { id: 'partner', label: 'Partner', width: '8rem' },
+  { id: 'partner', label: 'Partner', width: '7.5rem' },
   { id: 'run', label: 'Planned run', width: '10.5rem' },
-  { id: 'pack', label: 'Evidence pack', width: '9rem' },
+  { id: 'pack', label: 'Evidence pack', width: '8rem' },
 ] as const;
 
 const TITLE_MIN = 240;
-const MIN_WIDTH = TITLE_MIN + 49.5 * 16;
+/** Fits the 1280px layout (1014px for the table) without sideways scrolling. */
+const MIN_WIDTH = TITLE_MIN + 46.5 * 16;
 
 function shortDate(value: string, withYear: boolean): string {
   const date = new Date(`${value}T00:00:00`);
@@ -45,8 +46,11 @@ function shortDate(value: string, withYear: boolean): string {
 export function plannedRun(first: string | null, last: string | null): string {
   if (first === null && last === null) return '—';
   if (first !== null && last !== null) {
-    const sameYear = first.slice(0, 4) === last.slice(0, 4);
-    return `${shortDate(first, !sameYear)} – ${shortDate(last, true)}`;
+    if (first.slice(0, 4) === last.slice(0, 4))
+      return `${shortDate(first, false)} – ${shortDate(last, true)}`;
+    // Across a year end, short years keep it inside the column: "Nov 15 '26 – Jan 15 '27".
+    const year = (d: string) => `'${d.slice(2, 4)}`;
+    return `${shortDate(first, false)} ${year(first)} – ${shortDate(last, false)} ${year(last)}`;
   }
   if (first !== null) return `From ${formatDate(first)}`;
   return `Until ${formatDate(last ?? '')}`;
@@ -107,7 +111,7 @@ function Row({ row }: { row: ItemRowOut }) {
       </td>
       <td className="app-td app-figure">{plannedRun(row.planned_first_run, row.planned_last_run)}</td>
       <td className="app-td">
-        <EvidencePackAction itemId={row.id} itemKey={row.key} isLegacy={row.is_legacy} />
+        <EvidencePackAction itemId={row.id} itemKey={row.key} isLegacy={row.is_legacy} compact />
       </td>
     </tr>
   );

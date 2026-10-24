@@ -4,33 +4,66 @@
  * items have no decision record (ledger ruling), so they say so instead of offering a button that can only be
  * refused; any other refusal (409) shows the server's reason in place of the button.
  */
+import { Button as AriaButton } from 'react-aria-components';
+
 import { useCreateEvidencePack } from '../../api/generated/exports/exports';
 import { Button } from '../../ui/Button';
 import { DownloadLink } from '../../ui/DownloadLink';
+import { Icon } from '../../ui/Icon';
+import { Tooltip } from '../../ui/Tooltip';
 import { useExportJob } from './useExportJob';
 
 export const LEGACY_PACK_REASON =
   'Imported from the tracker: there is no decision record to pack. The approval is in the tracker history.';
 
+/**
+ * Why there's no pack. In a dense table cell (`compact`) a short label plus an info button whose tooltip holds
+ * the whole sentence; elsewhere the sentence itself. Screen readers get the sentence either way.
+ */
+function Reason({
+  short,
+  message,
+  itemKey,
+  compact,
+}: {
+  short: string;
+  message: string;
+  itemKey: string;
+  compact: boolean;
+}) {
+  if (!compact) return <span className="app-pack-note app-pack-wrap">{message}</span>;
+  return (
+    <span className="app-pack-reason">
+      <span className="app-pack-note" aria-hidden="true">
+        {short}
+      </span>
+      <Tooltip content={message} delay={200}>
+        <AriaButton className="app-pack-why" aria-label={`Why there's no evidence pack for ${itemKey}`}>
+          <Icon name="feedback.info" size={14} />
+        </AriaButton>
+      </Tooltip>
+      <span className="sr-only">{message}</span>
+    </span>
+  );
+}
+
 export function EvidencePackAction({
   itemId,
   itemKey,
   isLegacy,
+  compact = false,
 }: {
   itemId: number;
   itemKey: string;
   isLegacy: boolean;
+  /** A table cell: short labels, reasons in a tooltip. */
+  compact?: boolean;
 }) {
   const create = useCreateEvidencePack();
   const job = useExportJob(create);
 
   if (isLegacy) {
-    return (
-      <span className="app-pack-note" title={LEGACY_PACK_REASON}>
-        <span>No pack · legacy</span>
-        <span className="sr-only">{LEGACY_PACK_REASON}</span>
-      </span>
-    );
+    return <Reason short="No pack" message={LEGACY_PACK_REASON} itemKey={itemKey} compact={compact} />;
   }
 
   const start = () => {
@@ -49,7 +82,7 @@ export function EvidencePackAction({
           aria-label={`Evidence pack for ${itemKey}`}
           onPress={start}
         >
-          Evidence pack
+          {compact ? 'Build pack' : 'Evidence pack'}
         </Button>
       );
     case 'starting':
@@ -72,11 +105,7 @@ export function EvidencePackAction({
     case 'refused':
       // 409: nothing to pack (never approved, or legacy). The reason replaces the button: retrying can't help.
       if (state.status === 409) {
-        return (
-          <span className="app-pack-note" title={state.message}>
-            {state.message}
-          </span>
-        );
+        return <Reason short="No pack" message={state.message} itemKey={itemKey} compact={compact} />;
       }
       return <PackError message={state.message} itemKey={itemKey} onRetry={start} />;
     case 'failed':
