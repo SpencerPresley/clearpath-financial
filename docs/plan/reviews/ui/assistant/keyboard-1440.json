@@ -1,0 +1,34 @@
+{
+  "toggleAttrs": {
+    "ariaExpanded": "false",
+    "ariaKeyshortcuts": null
+  },
+  "afterShortcutOpen": "textarea \"\"",
+  "escapeClosesPanel": false,
+  "afterShortcutClose": "body",
+  "panelVisibleAfterShortcutClose": false,
+  "afterToggleOpen": "textarea \"\"",
+  "afterCloseButton": "button \"Assistant\"",
+  "shiftTabFromComposer": [
+    "button \"Email compliance a summary of CP-…\"",
+    "button \"Find precedent for “no impact to your cr\"",
+    "button \"What's waiting on me?\"",
+    "button \"Close assistant\"",
+    "button \"Threads\"",
+    "button \"Assignee for CP-1042: Dana Reyes. Change\""
+  ],
+  "afterDraftArrives": "body",
+  "tabAfterDraftArrives": "a \"CP-1\"",
+  "thenShiftTab": "button \"Close assistant\"",
+  "tabFromCardItemLink": [
+    "a \"CP-1\"",
+    "button \"Approve\"",
+    "button \"Edit\"",
+    "button \"Reject\"",
+    "body",
+    "a \"Skip to content\""
+  ],
+  "afterEditPressed": "body",
+  "escapeInEditCancels": false,
+  "panelAria": "- complementary \"Assistant\":\n  - heading \"Email compliance a summary of CP-1\" [level=2]\n  - button \"Threads\"\n  - button \"New thread\"\n  - button \"Close assistant\"\n  - log \"Conversation\":\n    - text: \"You:\"\n    - paragraph: Email compliance a summary of CP-1\n    - text: \"Assistant:\"\n    - paragraph: I'll draft it for your approval.\n    - list \"Tool calls\":\n      - listitem:\n        - text: Email waiting for your approval , waiting for approval\n        - link \"CP-1\":\n          - /url: /items/1\n    - region \"Email draft — needs your approval\":\n      - heading \"Email draft — needs your approval\" [level=3]\n      - paragraph: Nothing is sent until you approve.\n      - form \"Edit email\":\n        - text: To\n        - textbox \"To\": compliance@clearpath.demo\n        - text: Comma-separated or one per line Subject\n        - textbox \"Subject\": CP-1 findings summary\n        - text: Body\n        - textbox \"Body\": \"CP-1 has two blocking findings: the APR range and the credit-score claim.\"\n        - button \"Send edited\"\n        - button \"Cancel\"\n  - text: Message the assistant\n  - textbox \"Message the assistant\" [disabled]:\n    - /placeholder: Approve, edit or reject the email first\n  - text: Approve, edit or reject the email first\n  - button \"Send\" [disabled]"
+}
