@@ -4729,6 +4729,7 @@
                   "item.withdrawn": "#/components/schemas/ItemWithdrawnEventOut",
                   "llm_check.failed": "#/components/schemas/LlmCheckFailedEventOut",
                   "llm_check.requested": "#/components/schemas/LlmCheckRequestedEventOut",
+                  "llm_check.retry_scheduled": "#/components/schemas/LlmCheckRetryScheduledEventOut",
                   "llm_check.started": "#/components/schemas/LlmCheckStartedEventOut",
                   "llm_check.succeeded": "#/components/schemas/LlmCheckSucceededEventOut",
                   "partner.created": "#/components/schemas/PartnerCreatedEventOut",
@@ -4794,6 +4795,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LlmCheckStartedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/LlmCheckRetryScheduledEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/LlmCheckSucceededEventOut"
@@ -6238,6 +6242,113 @@
           "version_id"
         ],
         "title": "LlmCheckRequestedPayload",
+        "type": "object"
+      },
+      "LlmCheckRetryScheduledEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/LlmCheckRetryScheduledPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "llm_check.retry_scheduled",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "LlmCheckRetryScheduledEventOut",
+        "type": "object"
+      },
+      "LlmCheckRetryScheduledPayload": {
+        "additionalProperties": false,
+        "description": "An attempt ended without a result that retrying can fix; the next one starts after `countdown_s`.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "check_run_id": {
+            "title": "Check Run Id",
+            "type": "integer"
+          },
+          "countdown_s": {
+            "title": "Countdown S",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "check_run_id",
+          "attempt",
+          "error",
+          "countdown_s"
+        ],
+        "title": "LlmCheckRetryScheduledPayload",
         "type": "object"
       },
       "LlmCheckStartedEventOut": {

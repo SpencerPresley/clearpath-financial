@@ -170,6 +170,16 @@ class LlmCheckStartedPayload(EventPayload):
     attempt: int  # 1 for the first call; retries after a provider error or unreadable output count up
 
 
+class LlmCheckRetryScheduledPayload(EventPayload):
+    """An attempt ended without a result that retrying can fix; the next one starts after `countdown_s`."""
+
+    version_id: int
+    check_run_id: int
+    attempt: int  # the attempt that just ended
+    error: str
+    countdown_s: int
+
+
 class LlmCheckSucceededPayload(EventPayload):
     """What one AI pre-review cost and produced (spec §6.4: model, tokens, latency, dropped findings)."""
 
@@ -359,6 +369,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.CHECKS_COMPLETED: ChecksCompletedPayload,
     EventType.LLM_CHECK_REQUESTED: LlmCheckRequestedPayload,
     EventType.LLM_CHECK_STARTED: LlmCheckStartedPayload,
+    EventType.LLM_CHECK_RETRY_SCHEDULED: LlmCheckRetryScheduledPayload,
     EventType.LLM_CHECK_SUCCEEDED: LlmCheckSucceededPayload,
     EventType.LLM_CHECK_FAILED: LlmCheckFailedPayload,
     EventType.FINDING_ACCEPTED: FindingAcceptedPayload,

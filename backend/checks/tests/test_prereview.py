@@ -5,6 +5,7 @@ eagerly in tests, so `.delay()` and `self.retry()` execute synchronously (countd
 """
 
 import dataclasses
+import threading
 from collections.abc import Callable, Iterator
 from datetime import timedelta
 from typing import Any
@@ -12,7 +13,8 @@ from typing import Any
 import anthropic
 import httpx2
 import pytest
-from django.db import IntegrityError, transaction
+from celery.exceptions import SoftTimeLimitExceeded
+from django.db import IntegrityError, connection, connections, transaction
 from django.test import Client
 from langchain_core.language_models import BaseChatModel
 
@@ -308,6 +310,161 @@ def test_retryable_error_then_success(
     assert _events(item_id, EventType.LLM_CHECK_FAILED) == []
     run = CheckRun.objects.get(version_id=_version_id(item_id), source=FindingSource.LLM)
     assert (run.attempts, run.error) == (2, "")
+    [scheduled] = _events(item_id, EventType.LLM_CHECK_RETRY_SCHEDULED)
+    assert scheduled.payload == {
+        "version_id": run.version_id,  # pyrefly: ignore[missing-attribute]
+        "check_run_id": run.pk,
+        "attempt": 1,
+        "error": "The model provider returned 529.",
+        "countdown_s": 30,
+    }
+
+
+@pytest.mark.django_db
+def test_a_reenqueued_run_continues_its_retry_budget(
+    submitted: Callable[..., int],
+    models: Models,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    """Three attempts already failed and the retry message was lost: the reconciler's re-enqueue gets one more
+    call, not a fresh four."""
+    monkeypatch.setattr(prereview, "enqueue", lambda _version_id: None)
+    item_id = submitted()
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+    CheckRun.objects.filter(version_id=_version_id(item_id)).update(attempts=prereview.MAX_ATTEMPTS - 1)
+    models.append(_down())
+
+    assert tasks.run_llm_prereview.delay(_version_id(item_id)).get() == "failed"
+
+    failed = _event(item_id, EventType.LLM_CHECK_FAILED).payload
+    assert (failed["code"], failed["attempt"]) == (LlmFailureCode.PROVIDER_UNAVAILABLE, prereview.MAX_ATTEMPTS)
+
+
+@pytest.mark.django_db
+def test_a_lost_retry_message_ends_failed(
+    submitted: Callable[..., int],
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    """After a requeue the run is pending and the item running. If every message is lost, the reconciler keeps
+    re-enqueueing, then gives up at GIVE_UP_AFTER: the item ends failed, never running forever."""
+    monkeypatch.setattr(prereview, "enqueue", lambda _version_id: None)
+    item_id = submitted()
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+    claimed = prereview.claim(version_id=_version_id(item_id), clock=clock)
+    assert claimed is not None
+    prereview.requeue(
+        claim=claimed, error="The model provider returned 529.", countdown=30, invalid_output=False, clock=clock
+    )
+    assert _item(item_id).llm_check_status == CheckStatus.RUNNING
+    for _ in range(2):  # requeued at +10 and +20 min
+        clock.advance(STUCK_AFTER + timedelta(seconds=1))
+        assert prereview.reconcile(clock=clock).failed == ()
+
+    clock.advance(STUCK_AFTER)
+    result = prereview.reconcile(clock=clock)
+
+    assert result.failed == (claimed.run_id,)
+    assert _item(item_id).llm_check_status == CheckStatus.FAILED
+    failed = _event(item_id, EventType.LLM_CHECK_FAILED).payload
+    assert (failed["code"], failed["error"]) == (LlmFailureCode.STUCK, prereview.GAVE_UP_MESSAGE)
+
+
+@pytest.mark.django_db
+def test_pending_item_without_a_run_gets_one(
+    submitted: Callable[..., int],
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    """The handler never ran for this version (e.g. submitted before it was deployed)."""
+    enqueued: list[int] = []
+    monkeypatch.setattr(prereview, "enqueue", enqueued.append)
+    item_id = submitted()
+    young = prereview.reconcile(clock=clock)
+    clock.advance(STUCK_AFTER + timedelta(minutes=1))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        result = prereview.reconcile(clock=clock)
+    again = prereview.reconcile(clock=clock)
+
+    assert young.requested == ()
+    assert result.requested == (item_id,)
+    assert again.requested == ()
+    assert enqueued == [_version_id(item_id)]
+    run = CheckRun.objects.get(version_id=_version_id(item_id), source=FindingSource.LLM)
+    assert run.status == CheckStatus.PENDING
+    assert _event(item_id, EventType.LLM_CHECK_REQUESTED).payload["check_run_id"] == run.pk
+
+
+@pytest.mark.django_db
+def test_soft_time_limit_fails_with_timeout(
+    submitted: Callable[..., int],
+    models: Models,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    def slow(*args: Any, **kwargs: Any) -> LlmReviewResult:
+        raise SoftTimeLimitExceeded
+
+    monkeypatch.setattr(prereview, "review_copy", slow)
+    models.append(_good())
+    item_id = submitted()
+
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+
+    assert _item(item_id).llm_check_status == CheckStatus.FAILED
+    assert _event(item_id, EventType.LLM_CHECK_FAILED).payload["code"] == LlmFailureCode.TIMEOUT
+
+
+@pytest.mark.django_db
+def test_a_result_after_the_reconciler_failed_the_run_is_dropped(
+    submitted: Callable[..., int],
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    monkeypatch.setattr(prereview, "enqueue", lambda _version_id: None)
+    item_id = submitted()
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+    claimed = prereview.claim(version_id=_version_id(item_id), clock=clock)
+    assert claimed is not None
+    clock.advance(STUCK_AFTER + timedelta(minutes=1))
+    prereview.reconcile(clock=clock)
+
+    prereview.attempt(claim=claimed, model_factory=_good, clock=clock)
+
+    assert _llm_findings(_version_id(item_id)) == []
+    assert _events(item_id, EventType.LLM_CHECK_SUCCEEDED) == []
+    assert _item(item_id).llm_check_status == CheckStatus.FAILED
+    assert CheckRun.objects.get(pk=claimed.run_id).status == CheckStatus.FAILED
+
+
+@pytest.mark.django_db(transaction=True)
+def test_no_transaction_is_open_during_the_model_call(
+    submitted: Callable[..., int], models: Models, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real commits (no wrapping test transaction): the handler's on_commit fires and the task runs eagerly. An
+    open transaction during the call would hold back the outbox dispatcher's snapshot horizon."""
+    real = prereview.review_copy
+    in_transaction: list[bool] = []
+
+    def observed(*args: Any, **kwargs: Any) -> LlmReviewResult:
+        in_transaction.append(connection.in_atomic_block)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(prereview, "review_copy", observed)
+    models.append(_good())
+    item_id = submitted()
+    event = Event.objects.filter(item_id=item_id, type=EventType.ITEM_SUBMITTED).latest("id")
+
+    deliver(event_id=event.pk, handler_name=HANDLER)
+
+    assert in_transaction == [False]
+    assert _item(item_id).llm_check_status == CheckStatus.SUCCEEDED
 
 
 @pytest.mark.django_db
@@ -318,7 +475,7 @@ def test_retries_run_out_then_failed_and_approve_needs_an_override(
     clock: FixedClock,
     django_capture_on_commit_callbacks: OnCommit,
 ) -> None:
-    models.extend([_down() for _ in range(tasks.MAX_RETRIES + 1)])
+    models.extend([_down() for _ in range(prereview.MAX_ATTEMPTS)])
     item_id = submitted()
 
     _run_handler(item_id, django_capture_on_commit_callbacks)
@@ -326,7 +483,7 @@ def test_retries_run_out_then_failed_and_approve_needs_an_override(
     assert _item(item_id).llm_check_status == CheckStatus.FAILED
     failed = _event(item_id, EventType.LLM_CHECK_FAILED).payload
     assert failed["code"] == LlmFailureCode.PROVIDER_UNAVAILABLE
-    assert failed["attempt"] == tasks.MAX_RETRIES + 1
+    assert failed["attempt"] == prereview.MAX_ATTEMPTS
     assert "529" in failed["error"]
     run = CheckRun.objects.get(version_id=_version_id(item_id), source=FindingSource.LLM)
     assert (run.status, run.error, run.finished_at) == (CheckStatus.FAILED, failed["error"], clock.now())
@@ -487,6 +644,59 @@ def test_second_delivery_is_a_noop(
     assert len(_llm_findings(_version_id(item_id))) == 1
     assert len(_events(item_id, EventType.LLM_CHECK_SUCCEEDED)) == 1
     assert CheckRun.objects.filter(version_id=_version_id(item_id), source=FindingSource.LLM).count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_claims_take_the_run_once(
+    submitted: Callable[..., int], clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A duplicate delivery while the original is starting (acks_late redelivery, reconciler re-enqueue): two
+    workers on separate connections race to claim; exactly one wins."""
+    monkeypatch.setattr(prereview, "enqueue", lambda _version_id: None)
+    item_id = submitted()
+    event = Event.objects.filter(item_id=item_id, type=EventType.ITEM_SUBMITTED).latest("id")
+    deliver(event_id=event.pk, handler_name=HANDLER)
+    version_id = _version_id(item_id)
+    barrier = threading.Barrier(2)
+    claims: list[prereview.Claim | None] = []
+
+    def worker() -> None:
+        try:
+            barrier.wait()
+            claims.append(prereview.claim(version_id=version_id, clock=clock))
+        finally:
+            connections.close_all()
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert sorted(c is not None for c in claims) == [False, True]
+    assert len(_events(item_id, EventType.LLM_CHECK_STARTED)) == 1
+
+
+@pytest.mark.django_db
+def test_a_version_replaced_before_delivery_gets_no_check(
+    submitted: Callable[..., int],
+    marketer: User,
+    reviewer: User,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    enqueued: list[int] = []
+    monkeypatch.setattr(prereview, "enqueue", enqueued.append)
+    item_id = submitted()
+    v1 = _version_id(item_id)
+    _changes_requested(item_id, reviewer, clock)
+    resubmit_item(actor=marketer, item_id=item_id, content_text="Personal loans from ClearPath.", clock=clock)
+
+    _run_handler(item_id, django_capture_on_commit_callbacks)  # v1's ITEM_SUBMITTED, delivered late
+
+    assert not CheckRun.objects.filter(version_id=v1, source=FindingSource.LLM).exists()
+    assert enqueued == []
 
 
 @pytest.mark.django_db

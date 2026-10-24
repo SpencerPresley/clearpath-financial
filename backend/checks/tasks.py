@@ -3,7 +3,8 @@ on the run and the item (`failed` with a plain reason), never a silent gap.
 
 `run_llm_prereview` is keyed by version id and idempotent: it acts only if it can claim the version's pending run,
 so a duplicate delivery, a redelivery after a worker death, or a reconciler re-enqueue racing the original does
-nothing. Retries go through `self.retry` (not `autoretry_for`), so running out of them still records `failed`.
+nothing. Retries go through `self.retry` (not `autoretry_for`), so running out of them still records `failed`;
+the retry budget is counted on the run, not in the message.
 """
 
 import logging
@@ -19,7 +20,6 @@ from core.domain import LlmFailureCode
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES: Final = 3  # 4 attempts in all; the Anthropic SDK retries each call 3 more times itself
 # One attempt is one call: at worst 4 x 60 s SDK attempts plus backoff (~255 s). Soft limit fails it visibly.
 SOFT_TIME_LIMIT: Final = 280
 TIME_LIMIT: Final = 300
@@ -32,51 +32,46 @@ clock: Clock = SYSTEM_CLOCK
 @shared_task(
     bind=True,
     name="checks.run_llm_prereview",
-    max_retries=MAX_RETRIES,
+    # The budget is on the run (prereview.MAX_ATTEMPTS); this only keeps Celery from refusing a retry first.
+    max_retries=prereview.MAX_ATTEMPTS - 1,
     soft_time_limit=SOFT_TIME_LIMIT,
     time_limit=TIME_LIMIT,
 )
-def run_llm_prereview(self: Task, version_id: int, invalid_outputs: int = 0) -> str:
+def run_llm_prereview(self: Task, version_id: int) -> str:
     started = time.monotonic()
     claim = prereview.claim(version_id=version_id, clock=clock)
     if claim is None:
         logger.info("ai check noop version_id=%d (nothing pending)", version_id)
         return "noop"
     logger.info("ai check start version_id=%d run_id=%d attempt=%d", version_id, claim.run_id, claim.attempt)
+    outcome = "failed"
+    countdown = 0
     try:
-        outcome = prereview.attempt(
-            claim=claim,
-            can_retry=self.request.retries < MAX_RETRIES,
-            invalid_outputs=invalid_outputs,
-            model_factory=model_factory,
-            clock=clock,
-        )
+        result = prereview.attempt(claim=claim, model_factory=model_factory, clock=clock)
+        outcome, countdown = result.kind, result.countdown
     except SoftTimeLimitExceeded:
         prereview.fail(claim=claim, code=LlmFailureCode.TIMEOUT, error=prereview.TIMEOUT_MESSAGE, clock=clock)
-        return "failed"
     except Exception:
         logger.exception("ai check error version_id=%d run_id=%d", version_id, claim.run_id)
         prereview.fail(claim=claim, code=LlmFailureCode.ERROR, error=prereview.ERROR_MESSAGE, clock=clock)
-        return "failed"
     logger.info(
         "ai check %s version_id=%d run_id=%d attempt=%d duration_ms=%d",
-        outcome.kind,
+        outcome,
         version_id,
         claim.run_id,
         claim.attempt,
         (time.monotonic() - started) * 1000,
     )
-    if outcome.kind == "retry":
-        raise self.retry(
-            args=(),
-            kwargs={"version_id": version_id, "invalid_outputs": outcome.invalid_outputs},
-            countdown=outcome.countdown,
-        )
-    return outcome.kind
+    if outcome == "retry":
+        raise self.retry(args=(version_id,), kwargs={}, countdown=countdown)
+    return outcome
 
 
 @shared_task(name="checks.reconcile_llm_checks")
 def reconcile_llm_checks() -> int:
-    """Beat, every 2 minutes: stuck runs fail, lost ones are enqueued again. Returns runs touched."""
+    """Beat, every 2 minutes: stuck runs fail, lost ones are enqueued again. Returns runs and items touched."""
+    started = time.monotonic()
     result = prereview.reconcile(clock=clock)
-    return len(result.failed) + len(result.requeued)
+    touched = len(result.failed) + len(result.requeued) + len(result.requested)
+    logger.info("ai check reconcile done touched=%d duration_ms=%d", touched, (time.monotonic() - started) * 1000)
+    return touched

@@ -117,7 +117,7 @@ class LlmFailureCode(StrEnum):
     PROVIDER_UNAVAILABLE = "provider_unavailable"  # unreachable, rate-limited or 5xx after every retry
     PROVIDER_REFUSED = "provider_refused"  # a 4xx that retrying can't fix
     INVALID_OUTPUT = "invalid_output"  # no usable report, twice
-    STUCK = "stuck"  # still running long after any attempt can take: the worker died
+    STUCK = "stuck"  # a worker died mid-call, or the check outlived every retry it could have had
     TIMEOUT = "timeout"
     ERROR = "error"
 
@@ -261,6 +261,7 @@ class EventType(StrEnum):
     CHECKS_COMPLETED = "checks.completed"
     LLM_CHECK_REQUESTED = "llm_check.requested"
     LLM_CHECK_STARTED = "llm_check.started"
+    LLM_CHECK_RETRY_SCHEDULED = "llm_check.retry_scheduled"
     LLM_CHECK_SUCCEEDED = "llm_check.succeeded"
     LLM_CHECK_FAILED = "llm_check.failed"
     FINDING_ACCEPTED = "finding.accepted"

@@ -172,6 +172,8 @@ export * from './llmCheckFailedEventOut';
 export * from './llmCheckFailedPayload';
 export * from './llmCheckRequestedEventOut';
 export * from './llmCheckRequestedPayload';
+export * from './llmCheckRetryScheduledEventOut';
+export * from './llmCheckRetryScheduledPayload';
 export * from './llmCheckStartedEventOut';
 export * from './llmCheckStartedPayload';
 export * from './llmCheckSucceededEventOut';

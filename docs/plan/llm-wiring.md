@@ -179,3 +179,12 @@ running runs with `started_at < now - STUCK_AFTER` → `fail(code="stuck")`; pen
   `run_attempt` with `settings_model`, assert succeeded and CheckRun tokens > 0.
 - [ ] `make schema`; ruff, pyrefly, migrations check, full pytest; report `docs/plan/reports/llm-wiring.md`;
   fresh review → `docs/plan/reviews/llm-wiring.md`; PR.
+
+## Changes after review (see `docs/plan/reviews/llm-wiring.md`)
+
+- The retry budget moved onto the run: `CheckRun.invalid_outputs`, `can_retry = claim.attempt < MAX_ATTEMPTS`. The task
+  signature is `run_llm_prereview(self, version_id)`.
+- `CheckRun.requested_at` was added, and `GIVE_UP_AFTER = 30 min` fails any unfinished run.
+- `LLM_CHECK_RETRY_SCHEDULED` is recorded on requeue.
+- The reconciler requests checks for pending items with no run.
+- The handler skips a version already replaced at delivery.

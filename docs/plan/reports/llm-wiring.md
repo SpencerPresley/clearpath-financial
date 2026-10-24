@@ -14,11 +14,11 @@ Approve stops refusing with `ai_check_pending`.
 |---|---|---|
 | Outbox handler `checks.llm_prereview` | `checks/handlers.py` | On ITEM_SUBMITTED, ITEM_RESUBMITTED, ITEM_NEW_ROUND_STARTED: a pending LLM `CheckRun`, LLM_CHECK_REQUESTED, and the task enqueued once the receipt commits |
 | Lifecycle service | `checks/prereview.py` | `request_check`, `claim`, `attempt`, `requeue`, `fail`, `complete`, `reconcile`, `retry_check` |
-| Celery task | `checks/tasks.py` `checks.run_llm_prereview(version_id)` | Claim, one model call, outcome; `bind=True` + `self.retry`, max 3 retries, backoff 30/60/120 s, soft limit 280 s, hard 300 s |
-| Reconciliation | `checks.reconcile_llm_checks`, beat every 120 s | `running` > 10 min → `failed` (code `stuck`); `pending` > 10 min → enqueued again |
+| Celery task | `checks/tasks.py` `checks.run_llm_prereview(version_id)` | Claim, one model call, outcome. `bind=True` + `self.retry`, backoff 30/60/120 s, soft limit 280 s, hard 300 s. The budget (4 calls, one retry after unreadable output) is counted on the run |
+| Reconciliation | `checks.reconcile_llm_checks`, beat every 120 s | Requested > 30 min ago and unfinished → `failed`. `running` > 10 min → `failed`. Both use code `stuck`. `pending` > 10 min → enqueued again. A reviewable item `pending` with no AI run → requested |
 | Retry | `POST /items/{id}/llm-check/retry` → 202 `ItemRowOut` | Reviewer or lead, only from `failed`, only while submitted / in_review / needs_rereview |
 | Settings | `config/settings/base.py` | `ANTHROPIC_API_KEY` (str or None), `ANTHROPIC_MODEL`; test settings force the key to None |
-| Schema | `checks/migrations/0004_llm_runs.py` | `CheckRun.attempts`; CHECK `finding_llm_is_warning` |
+| Schema | `checks/migrations/0004_llm_runs.py` | `CheckRun.attempts`, `invalid_outputs`, `requested_at`; CHECK `finding_llm_is_warning` |
 
 ### State machine
 
@@ -27,7 +27,7 @@ request_check (handler / retry)   run pending    item pending*   LLM_CHECK_REQUE
 claim (task)                      run running    item running*   LLM_CHECK_STARTED (attempt n)
 review_copy                       no transaction open
   complete                        run succeeded  item succeeded* LLM_CHECK_SUCCEEDED; recount open findings*
-  requeue (retryable, retries left) run pending  item stays running; task retries with backoff
+  requeue (retryable, budget left) run pending   item stays running   LLM_CHECK_RETRY_SCHEDULED (error, countdown)
   fail                            run failed     item failed*    LLM_CHECK_FAILED (code, plain reason)
 * only if the run's version is still item.current_version, checked under the item row lock
 ```
@@ -56,6 +56,16 @@ review_copy                       no transaction open
   computed for. The item's status and count are left alone, and the event says `current: false`.
 - **A late result after the reconciler already failed the run** is dropped and logged, so each run has one terminal
   transition.
+- **No item stays `pending` or `running` forever.** Each hole has its own fix:
+
+| Hole | Fix |
+|---|---|
+| Worker death | `stuck` after 10 min |
+| Lost message | enqueued again; the budget continues on the run |
+| Lost retry chain, or a run that never ends | `stuck` 30 min after the request |
+| Handler never ran (items submitted before this deploy) | the reconciler requests a check |
+
+  The handler skips a version that was already replaced when the event was delivered.
 - **Carry-forward:** a dismissed AI finding with the same rule and quote as on an earlier version is created
   dismissed and marked carried (`persist_findings`). Temperature is fixed at 1, so quotes vary run to run and this
   matches less often than it does for code findings.
@@ -70,17 +80,19 @@ review_copy                       no transaction open
 - Ruling: AI findings are always `warning` (orchestrator ruling, enforced here) — `complete` coerces severity and the `finding_llm_is_warning` CHECK constraint backs it — cost if wrong: drop a constraint.
 - Ruling: unreadable output retries once (phase 1 item 2), as a Celery retry, so each task execution is one model call under the 300 s hard limit — cost if wrong: one counter.
 - Ruling: retry only while the item is submitted, in_review or needs_rereview — findings on an approved version can't be triaged — cost if wrong: one condition.
+- Ruling: the AI check gives up 30 min after the request (GIVE_UP_AFTER; the longest legitimate chain is ~23.5 min) — bounds every retry chain and lost message so the gate can't deadlock — cost if wrong: a constant.
+- Ruling: a version already replaced when its event is delivered gets no AI check — its result could never reach the gate — cost if wrong: one condition in the handler.
 - Ruling: a result that arrives after the reconciler failed its run is discarded — one terminal transition per run, and the reviewer may already have approved with an override — cost if wrong: the findings of one slow call.
-- Ruling: no result cache yet (spec §7, phase 1 item 4). The CheckRun stores `content_sha256` and `ruleset_key = LLM_RULESET_VERSION/PROMPT_VERSION/ENGINE_VERSION/model`, so reuse on identical text is a follow-up. It isn't free: the input also includes product, channel, partner type and current terms — cost: one extra ~$0.00025 call when a new round copies the text unchanged.
+- Ruling: no result cache yet (spec §7, phase 1 item 4). The CheckRun stores `content_sha256` and `ruleset_key = LLM_RULESET_VERSION/PROMPT_VERSION/ENGINE_VERSION/model`, so reuse is a follow-up. When it's built, the key must hash the full rule context (product, channel, markets, partner type, attachment kinds, current terms), not just the text — cost: one extra ~$0.00025 call when a new round copies the text unchanged.
 - `to_finding` is moot. `checks/llm/screen.py` builds AI drafts with `source=LLM`, so `checks/engine/rule.py` is untouched.
 
 ## Shared-file touches
 
 All are additive:
 
-- `core/domain.py`: `EventType.LLM_CHECK_STARTED` and `LlmFailureCode`.
+- `core/domain.py`: `EventType.LLM_CHECK_STARTED`, `EventType.LLM_CHECK_RETRY_SCHEDULED` and `LlmFailureCode`.
 - `audit/payloads.py`:
-  - `LlmCheckStartedPayload` is new.
+  - `LlmCheckStartedPayload` and `LlmCheckRetryScheduledPayload` are new.
   - Defaulted fields were added to the Requested, Succeeded and Failed payloads, so old events still parse.
 - `config/settings/base.py` and `test.py`.
 - `config/tests/test_contract.py`: the retry stub is removed.
@@ -94,9 +106,9 @@ Run from `backend/` with the brief's env and test DB suffix `wsD2`:
 
 ```
 $ uv run pytest -q
-1234 passed, 2 deselected
+1242 passed, 2 deselected
 $ uv run --group lint ruff check . && uv run --group lint ruff format --check .
-All checks passed! / 255 files already formatted
+All checks passed! / 256 files already formatted
 $ uv run --group typecheck pyrefly check
 0 errors
 $ manage.py makemigrations --check --dry-run
@@ -109,7 +121,7 @@ tsc ok; 145 passed; eslint ok; prettier ok
 
 ### Tests
 
-The tests are in `checks/tests/test_prereview.py`, 26 of them. Each uses the `GenericFakeChatModel` fakes from
+The tests are in `checks/tests/test_prereview.py`, 34 of them. Each uses the `GenericFakeChatModel` fakes from
 phase 1 through the `checks.tasks.model_factory` seam, and Celery runs eagerly, so `self.retry` re-runs
 synchronously. They cover:
 
@@ -137,6 +149,15 @@ synchronously. They cover:
   - Stuck after 11 min → failed. A 5-minute-old run is untouched.
   - A stuck run on a replaced version fails the run but leaves the item alone.
   - A stale pending run is enqueued again exactly once.
+- **Fixes from the review:**
+  - A re-enqueued run continues its budget.
+  - A lost retry message ends `failed`.
+  - A pending item with no run gets one.
+  - The soft time limit ends in `timeout`.
+  - A late result is dropped.
+  - Concurrent claims (two threads) take the run once.
+  - No transaction is open during the model call (transactional DB).
+  - A version replaced before delivery gets no check.
 - **Retry service and endpoint:** 202, 409 `llm_check_not_failed`, 403 for a marketer, 409 `invalid_transition`
   once decided.
 
@@ -148,6 +169,10 @@ synchronously. They cover:
 | Drop the current-version guard | the stale-version and stale-stuck tests |
 | Let `claim` take non-pending runs | the idempotency test |
 | Drop the invalid-output retry | the two invalid-output tests |
+| Ignore the run's budget | the budget test |
+| Drop the 30-minute give-up | the lost-retry-message test |
+| Drop the request for orphaned pending items | the orphan test |
+| Wrap the call in `atomic()` | the no-transaction test |
 
 **Not run: the live smoke test.** It's `checks/tests/test_prereview_live.py`, behind the `live` marker. It submits
 an item, delivers the handler, runs the task against the real API, and asserts `succeeded`, tokens > 0 and
@@ -164,5 +189,6 @@ latency > 0. Test settings blank the key, so it reads it from `env`. Run it from
   - Code-point offsets still need UTF-16 conversion.
 - **Ops:** beat must run `checks.reconcile_llm_checks`. It's in `CELERY_BEAT_SCHEDULE`. Without it, a worker
   death leaves the item `running` until someone notices.
+- **Orchestrator (deploy wave):** should prod refuse to boot without `ANTHROPIC_API_KEY`? The reviewer suggests it, and so did the llm-core report. Today a missing key turns every check into `failed`/`not_configured` plus an override. That's loud, but it doesn't stop a deploy.
 - **Dev:** with no key, every new item's AI check fails within seconds of dispatch. Approve then works with an
   override reason.

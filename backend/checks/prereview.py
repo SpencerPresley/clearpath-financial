@@ -8,9 +8,13 @@ and nothing the model returns reaches a status other than the check's own.
     claim (task)                             running   LLM_CHECK_STARTED (attempt n)
     attempt: review_copy, no transaction open
       -> complete                            succeeded LLM_CHECK_SUCCEEDED (usage, latency, model, drops)
-      -> requeue (retryable, retries left)   pending   (item stays running; the task retries with backoff)
+      -> requeue (retryable, budget left)    pending   LLM_CHECK_RETRY_SCHEDULED (item stays running)
       -> fail                                failed    LLM_CHECK_FAILED (code, plain reason)
-    reconcile (beat)   running > STUCK_AFTER -> failed (stuck); pending > STUCK_AFTER -> enqueued again
+    reconcile (beat)   requested > GIVE_UP_AFTER, or running > STUCK_AFTER -> failed (stuck);
+                       pending > STUCK_AFTER -> enqueued again; a pending item with no run -> requested
+
+The retry budget (MAX_ATTEMPTS model calls, one retry after unreadable output) is counted on the run, so a
+re-enqueued run continues its budget rather than starting a new one.
 
 The item's `llm_check_status` mirrors the run only while the run's version is the item's current version,
 checked under the item row lock. A run whose version was replaced meanwhile still stores its findings on that
@@ -24,17 +28,19 @@ import logging
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Final, Literal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 from langchain_core.language_models import BaseChatModel
 
 from accounts.models import User
 from audit.payloads import (
     LlmCheckFailedPayload,
     LlmCheckRequestedPayload,
+    LlmCheckRetryScheduledPayload,
     LlmCheckStartedPayload,
     LlmCheckSucceededPayload,
 )
@@ -53,7 +59,16 @@ from checks.llm import (
 from checks.models import CheckRun
 from checks.services import TRIAGEABLE, persist_findings, recount_open_findings, rule_context
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import CheckStatus, EntityType, EventType, FindingSource, ItemStatus, LlmFailureCode, Severity
+from core.domain import (
+    CheckStatus,
+    EntityType,
+    EventType,
+    FindingSource,
+    ItemStatus,
+    LlmFailureCode,
+    Severity,
+    VersionOrigin,
+)
 from core.errors import InvalidTransition
 from core.permissions import REVIEW_ROLES, require_role
 from reviews.assignment import locked_item
@@ -64,12 +79,19 @@ logger = logging.getLogger(__name__)
 # Longer than any attempt can run (the task's hard time limit is 300 s) and than the longest retry backoff
 # (120 s), so a run older than this in `running` lost its worker, and one in `pending` lost its message.
 STUCK_AFTER: Final = timedelta(minutes=10)
+# Model calls per run: the first plus three retries. The Anthropic SDK retries each call 3 more times itself.
+MAX_ATTEMPTS: Final = 4
+# The longest a run can legitimately take from request to result: 4 attempts at the 300 s hard limit plus
+# 30 + 60 + 120 s of backoff is about 23.5 min. Past this, whatever is happening, the check has failed.
+GIVE_UP_AFTER: Final = timedelta(minutes=30)
 
 type ModelFactory = Callable[[], BaseChatModel | None]
 
 _NOT_CONFIGURED: Final = "The AI check didn't run: no Anthropic API key is configured here."
 _INVALID_OUTPUT: Final = "The AI's answer couldn't be read, twice."
+_UNREADABLE_ONCE: Final = "The AI's answer couldn't be read."
 STUCK_MESSAGE: Final = "The AI check stopped without finishing (its worker restarted)."
+GAVE_UP_MESSAGE: Final = "The AI check didn't finish within 30 minutes."
 TIMEOUT_MESSAGE: Final = "The AI check took too long and was stopped."
 ERROR_MESSAGE: Final = "The AI check hit an unexpected error."
 
@@ -126,6 +148,7 @@ def request_check(
         status=CheckStatus.PENDING,
         content_sha256=version.content_sha256,
         ruleset_key=ruleset_key(settings.ANTHROPIC_MODEL),
+        requested_at=now,
         started_at=now,
     )
     _mirror(item, version.pk, CheckStatus.PENDING)
@@ -144,14 +167,15 @@ def request_check(
 
 
 def retry_check(*, actor: User, item_id: int, clock: Clock = SYSTEM_CLOCK) -> None:
-    """A reviewer runs a failed AI check again on the current version. Only while the item is under review: new
-    findings on an approved version couldn't be triaged."""
+    """A reviewer runs a failed AI check again on the current version. Only while the item is under review: once
+    it's decided, a new result can't change the gate. (A check already in flight when a reviewer requests changes
+    still lands its findings, and the marketer sees them; starting a new one then would only spend money.)"""
     require_role(actor, *REVIEW_ROLES)
     with transaction.atomic():
         item = locked_item(item_id)
         status = ItemStatus(item.status)
         if status not in TRIAGEABLE or item.current_version is None:
-            raise InvalidTransition(action="retry_ai_check", from_status=status)
+            raise InvalidTransition(action="retry_llm_check", from_status=status)
         check_status = CheckStatus(item.llm_check_status)
         if check_status is not CheckStatus.FAILED:
             raise LlmCheckNotFailed(status=check_status)
@@ -167,6 +191,7 @@ class Claim:
     version_id: int
     item_id: int
     attempt: int
+    invalid_outputs: int  # unreadable answers before this attempt
 
 
 def _latest_run(version_id: int) -> CheckRun | None:
@@ -203,7 +228,13 @@ def claim(*, version_id: int, clock: Clock) -> Claim | None:
             actor=None,
             at=now,
         )
-    return Claim(run_id=run.pk, version_id=version_id, item_id=item.pk, attempt=run.attempts)
+    return Claim(
+        run_id=run.pk,
+        version_id=version_id,
+        item_id=item.pk,
+        attempt=run.attempts,
+        invalid_outputs=run.invalid_outputs,
+    )
 
 
 def _locked_running(claim: Claim) -> tuple[ReviewItem, CheckRun] | None:
@@ -216,15 +247,33 @@ def _locked_running(claim: Claim) -> tuple[ReviewItem, CheckRun] | None:
     return item, run
 
 
-def requeue(*, claim: Claim, error: str, clock: Clock) -> None:
-    """Back to pending for the task's retry. The item stays `running`: the check is still in progress."""
+def requeue(*, claim: Claim, error: str, countdown: int, invalid_output: bool, clock: Clock) -> None:
+    """Back to pending for the task's retry, recorded as LLM_CHECK_RETRY_SCHEDULED with the error. The item stays
+    `running`: the check is still in progress."""
+    now = clock.now()
     with transaction.atomic():
         locked = _locked_running(claim)
         if locked is None:
             return
-        _, run = locked
-        run.status, run.error, run.started_at = CheckStatus.PENDING, error, clock.now()
-        run.save(update_fields=["status", "error", "started_at"])
+        item, run = locked
+        run.status, run.error, run.started_at = CheckStatus.PENDING, error, now
+        run.invalid_outputs += int(invalid_output)
+        run.save(update_fields=["status", "error", "started_at", "invalid_outputs"])
+        record_event(
+            type=EventType.LLM_CHECK_RETRY_SCHEDULED,
+            entity=EntityType.VERSION,
+            entity_id=claim.version_id,
+            item_id=item.pk,
+            payload=LlmCheckRetryScheduledPayload(
+                version_id=claim.version_id,
+                check_run_id=run.pk,
+                attempt=claim.attempt,
+                error=error,
+                countdown_s=countdown,
+            ),
+            actor=None,
+            at=now,
+        )
 
 
 def _fail_run(*, item: ReviewItem, run: CheckRun, code: LlmFailureCode, error: str, clock: Clock) -> None:
@@ -347,7 +396,6 @@ def complete(*, claim: Claim, result: LlmReviewResult, clock: Clock) -> None:
 class AttemptOutcome:
     kind: Literal["succeeded", "failed", "retry"]
     countdown: int = 0
-    invalid_outputs: int = 0
 
 
 def backoff(attempt: int) -> int:
@@ -355,11 +403,10 @@ def backoff(attempt: int) -> int:
     return 30 * 2 ** (attempt - 1)
 
 
-def attempt(
-    *, claim: Claim, can_retry: bool, invalid_outputs: int, model_factory: ModelFactory, clock: Clock
-) -> AttemptOutcome:
+def attempt(*, claim: Claim, model_factory: ModelFactory, clock: Clock) -> AttemptOutcome:
     """One model call for a claimed run, and what it led to. Provider errors and unreadable output are outcomes
     here; anything else propagates to the task, which fails the run."""
+    can_retry = claim.attempt < MAX_ATTEMPTS
     model = model_factory()
     if model is None:
         fail(claim=claim, code=LlmFailureCode.NOT_CONFIGURED, error=_NOT_CONFIGURED, clock=clock)
@@ -370,8 +417,9 @@ def attempt(
         result = review_copy(ctx, code_findings=run_engine(ctx).findings, model=model)
     except LlmUnavailable as error:
         if error.retryable and can_retry:
-            requeue(claim=claim, error=str(error), clock=clock)
-            return AttemptOutcome("retry", countdown=backoff(claim.attempt), invalid_outputs=invalid_outputs)
+            countdown = backoff(claim.attempt)
+            requeue(claim=claim, error=str(error), countdown=countdown, invalid_output=False, clock=clock)
+            return AttemptOutcome("retry", countdown=countdown)
         if error.retryable:
             code, reason = (
                 LlmFailureCode.PROVIDER_UNAVAILABLE,
@@ -383,9 +431,9 @@ def attempt(
         return AttemptOutcome("failed")
     if not result.output_valid:
         # Zero findings from unreadable output must not look clean (spec §6.1): retry once, then fail.
-        if invalid_outputs == 0 and can_retry:
-            requeue(claim=claim, error=_INVALID_OUTPUT, clock=clock)
-            return AttemptOutcome("retry", countdown=0, invalid_outputs=1)
+        if claim.invalid_outputs == 0 and can_retry:
+            requeue(claim=claim, error=_UNREADABLE_ONCE, countdown=0, invalid_output=True, clock=clock)
+            return AttemptOutcome("retry")
         fail(claim=claim, code=LlmFailureCode.INVALID_OUTPUT, error=_INVALID_OUTPUT, clock=clock)
         return AttemptOutcome("failed")
     complete(claim=claim, result=result, clock=clock)
@@ -399,29 +447,93 @@ def attempt(
 class ReconcileResult:
     failed: tuple[int, ...]  # run ids marked failed (stuck)
     requeued: tuple[int, ...]  # run ids enqueued again
+    requested: tuple[int, ...] = ()  # item ids that were pending with no run at all
+
+
+def _fail_stale(
+    run_id: int, version_id: int, *, still_stale: Callable[[CheckRun], bool], error: str, clock: Clock
+) -> bool:
+    with transaction.atomic():
+        item = locked_item(_item_id(version_id))
+        run = CheckRun.objects.select_for_update().get(pk=run_id)
+        if run.status not in (CheckStatus.PENDING, CheckStatus.RUNNING) or not still_stale(run):
+            return False
+        _fail_run(item=item, run=run, code=LlmFailureCode.STUCK, error=error, clock=clock)
+        return True
+
+
+def _request_missing(*, cutoff: datetime, clock: Clock) -> list[int]:
+    """Reviewable items still `pending` whose current (submission) version never got an AI run: the outbox
+    handler never ran for it, e.g. items submitted before this handler was deployed."""
+    has_run = CheckRun.objects.filter(source=FindingSource.LLM, version_id=OuterRef("current_version_id"))
+    orphans = (
+        ReviewItem.objects.filter(
+            llm_check_status=CheckStatus.PENDING.value,
+            status__in=[s.value for s in TRIAGEABLE],
+            current_version__origin=VersionOrigin.SUBMISSION.value,
+            current_version__created_at__lt=cutoff,
+        )
+        .exclude(Exists(has_run))
+        .values_list("pk", flat=True)
+    )
+    requested: list[int] = []
+    for item_id in orphans:
+        with transaction.atomic():
+            item = locked_item(item_id)
+            version = item.current_version
+            if (
+                version is None
+                or item.llm_check_status != CheckStatus.PENDING
+                or CheckRun.objects.filter(source=FindingSource.LLM, version=version).exists()
+            ):
+                continue
+            request_check(item=item, version=version, actor=None, clock=clock)
+            requested.append(item_id)
+    return requested
 
 
 def reconcile(*, clock: Clock = SYSTEM_CLOCK) -> ReconcileResult:
-    """So the AI gate never deadlocks: a run still `running` after STUCK_AFTER lost its worker and fails (code
-    stuck); a run still `pending` after STUCK_AFTER lost its message and is enqueued again (claiming is
-    exclusive, so a late original is harmless)."""
-    cutoff = clock.now() - STUCK_AFTER
-    stale = CheckRun.objects.filter(source=FindingSource.LLM, started_at__lt=cutoff)
+    """So the AI gate never deadlocks. In order:
+
+    1. A run requested more than GIVE_UP_AFTER ago and still unfinished fails (code stuck), whatever state it is
+       in: this bounds every retry chain and every lost message.
+    2. A run still `running` after STUCK_AFTER lost its worker and fails (code stuck).
+    3. A run still `pending` after STUCK_AFTER lost its message and is enqueued again (claiming is exclusive, so
+       a late original is harmless; the retry budget is on the run, so this buys no extra calls).
+    4. A reviewable item `pending` with no AI run for its current version gets one requested.
+    """
+    now = clock.now()
+    cutoff, give_up = now - STUCK_AFTER, now - GIVE_UP_AFTER
+    unfinished = CheckRun.objects.filter(
+        source=FindingSource.LLM, status__in=[CheckStatus.PENDING.value, CheckStatus.RUNNING.value]
+    )
     failed: list[int] = []
-    for run_id, version_id in stale.filter(status=CheckStatus.RUNNING).values_list("pk", "version_id"):
-        with transaction.atomic():
-            item = locked_item(_item_id(version_id))
-            run = CheckRun.objects.select_for_update().get(pk=run_id)
-            if run.status == CheckStatus.RUNNING and run.started_at < cutoff:
-                _fail_run(item=item, run=run, code=LlmFailureCode.STUCK, error=STUCK_MESSAGE, clock=clock)
-                failed.append(run_id)
-    requeued: list[int] = []
-    for run_id, version_id in stale.filter(status=CheckStatus.PENDING).values_list("pk", "version_id"):
-        if CheckRun.objects.filter(pk=run_id, status=CheckStatus.PENDING, started_at__lt=cutoff).update(
-            started_at=clock.now()
+    for run_id, version_id in unfinished.filter(requested_at__lt=give_up).values_list("pk", "version_id"):
+        if _fail_stale(
+            run_id,
+            version_id,
+            still_stale=lambda r: r.requested_at is not None and r.requested_at < give_up,
+            error=GAVE_UP_MESSAGE,
+            clock=clock,
         ):
+            failed.append(run_id)
+    running = unfinished.filter(status=CheckStatus.RUNNING.value, started_at__lt=cutoff)
+    for run_id, version_id in running.values_list("pk", "version_id"):
+        if _fail_stale(
+            run_id,
+            version_id,
+            still_stale=lambda r: r.status == CheckStatus.RUNNING and r.started_at < cutoff,
+            error=STUCK_MESSAGE,
+            clock=clock,
+        ):
+            failed.append(run_id)
+    requeued: list[int] = []
+    pending = unfinished.filter(status=CheckStatus.PENDING.value, started_at__lt=cutoff)
+    for run_id, version_id in pending.values_list("pk", "version_id"):
+        if CheckRun.objects.filter(pk=run_id, status=CheckStatus.PENDING, started_at__lt=cutoff).update(started_at=now):
             enqueue(version_id)
             requeued.append(run_id)
-    if failed or requeued:
-        logger.warning("ai check reconcile failed=%s requeued=%s", failed, requeued)
-    return ReconcileResult(failed=tuple(failed), requeued=tuple(requeued))
+    requested = _request_missing(cutoff=cutoff, clock=clock)
+    if failed or requeued or requested:
+        logger.warning("ai check reconcile failed=%s requeued=%s requested=%s", failed, requeued, requested)
+    return ReconcileResult(failed=tuple(failed), requeued=tuple(requeued), requested=tuple(requested))

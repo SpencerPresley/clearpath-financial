@@ -134,8 +134,12 @@ class CheckRun(models.Model):
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
     error = models.TextField(blank=True)
-    # AI checks: model calls started for this run (retries count up). Code runs leave it 0.
+    # AI checks only (code runs leave these unset). The retry budget lives on the run, not in the task message,
+    # so a re-enqueued run doesn't start a fresh budget: model calls started, unreadable answers, and when the
+    # check was requested (never rewritten; `started_at` is the current attempt's start).
     attempts = models.PositiveSmallIntegerField(default=0)
+    invalid_outputs = models.PositiveSmallIntegerField(default=0)
+    requested_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [
