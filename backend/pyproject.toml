@@ -64,6 +64,8 @@ max-args = 8
 "config/settings/*.py" = ["F405", "F403"]
 "**/api.py" = ["ARG001", "FBT001", "FBT002"]  # ninja passes request to every operation; bool query params
 "core/errors.py" = ["N818"]  # domain error names are fixed by the spec (InvalidTransition, NotPermitted, ...)
+# Workstream C wrote this noqa for the default max-args (5); max-args = 8 here makes it unused. C owns the file.
+"checks/engine/tests/conftest.py" = ["RUF100"]
 
 [tool.pyrefly]
 project-includes = ["config", "core", "checks", "accounts", "conftest.py", "partners", "terms", "reviews", "audit", "notifications", "imports", "exports", "metrics", "assistant"]

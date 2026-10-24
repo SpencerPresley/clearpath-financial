@@ -8,7 +8,7 @@ from pytest_django import Settings
 
 from accounts.models import User
 from audit.models import Event
-from checks.contracts import CodeCheckResult, FindingDraft
+from checks.engine import CheckResult, FindingDraft
 from checks.services import PersistedChecks
 from conftest import UserFactory
 from core.clock import FixedClock
@@ -159,15 +159,20 @@ def test_submit_takes_open_findings_count_from_the_checks_seam(
     # must not recount the raw drafts.
     drafts = tuple(
         FindingDraft(
-            rule_id=f"R{n}", citation="Reg Z", source=FindingSource.CODE, severity=Severity.BLOCKING, message="x"
+            rule_id=f"R{n}",
+            source=FindingSource.CODE,
+            severity=Severity.BLOCKING,
+            message="x",
+            citation="Reg Z",
+            suggested_fix=None,
+            span=None,
+            quote=None,
         )
         for n in range(3)
     )
 
     def two_open(**kwargs: object) -> PersistedChecks:
-        return PersistedChecks(
-            result=CodeCheckResult(findings=drafts, terms_refs=(), ruleset_key="test"), open_findings_count=2
-        )
+        return PersistedChecks(result=CheckResult(findings=drafts, terms_refs=()), open_findings_count=2)
 
     monkeypatch.setattr("reviews.services.run_code_checks", two_open)
 

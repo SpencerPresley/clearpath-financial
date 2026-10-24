@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Self
 
-from checks.contracts import CodeCheckResult
+from checks.engine import CheckResult
 from core.clock import SYSTEM_CLOCK, Clock
 from reviews.models import Version
 
@@ -16,22 +16,24 @@ class PersistedChecks:
     lower than `len(result.findings)`. The caller writes it to `ReviewItem.open_findings_count`.
     """
 
-    result: CodeCheckResult
+    result: CheckResult
     open_findings_count: int
 
     @classmethod
     def empty(cls) -> Self:
-        return cls(result=CodeCheckResult.empty(), open_findings_count=0)
+        return cls(result=CheckResult(findings=(), terms_refs=()), open_findings_count=0)
 
 
 def run_code_checks(*, version: Version, clock: Clock = SYSTEM_CLOCK) -> PersistedChecks:
     """Run the code rules on `version` synchronously and persist findings and terms refs.
 
-    Seam (workstreams C and E): build a `checks.contracts.CheckInput` for the version, run the rules engine
-    (`checks.engine`), write Findings/TermsRefs/CheckRun, carry forward identical dismissals (ruling 4), and
-    record CHECKS_COMPLETED. Return the open count; the calling action (submit, resubmit) writes it to the
-    item in the same transaction, so one action has one writer of `open_findings_count`. Until the engine
-    lands this persists nothing and reports an empty result, so submission works end to end.
+    Seam (the C/E integration): build a `checks.engine.RuleContext` for the version (its item's product,
+    channel, markets, partner type, attachment kinds, the current OfferTerms values, today), call
+    `checks.engine.run_code_checks`, write Findings (`suggested_fix or ""`), TermsRefs (`TermsField(draft.field)`)
+    and a CheckRun keyed by `checks.engine.ENGINE_VERSION`, carry forward identical dismissals (ruling 4), and
+    record CHECKS_COMPLETED. Return the open count; the calling action (submit, resubmit) writes it to the item in
+    the same transaction, so one action has one writer of `open_findings_count`. Until that lands this persists
+    nothing and reports an empty result, so submission works end to end.
     """
     del version, clock
     return PersistedChecks.empty()
