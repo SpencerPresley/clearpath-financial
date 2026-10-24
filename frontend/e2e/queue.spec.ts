@@ -50,7 +50,7 @@ test('board toggle shows the five columns and claims by drag', async ({ page }) 
     'In review',
     'Changes requested',
     'Needs re-review',
-    'Approved (14 days)',
+    'Approved · last 14 days',
   ]) {
     await expect(page.getByRole('grid', { name })).toBeVisible();
   }

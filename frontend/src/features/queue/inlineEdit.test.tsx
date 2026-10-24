@@ -5,18 +5,20 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import type { ItemRowOut, ItemUpdateIn } from '../../api/generated/model';
+import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { server } from '../../test/server';
 import { renderWithQuery } from '../../test/render';
 import { ToastHost } from '../../ui/toast';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { DEFAULT_COLUMN_VISIBILITY } from './columns';
-import { makeRow } from './fixtures';
+import { makeRow, USERS } from './fixtures';
 import { QueueTable } from './QueueTable';
 import { parseQueueSearch } from './search';
 import { useQueueCells } from './useItemPatch';
 import { useQueueItems } from './useQueueItems';
 
 const REVIEWER: Viewer = { id: 2, name: 'Dana Whitfield', email: 'dana@x', roles: ['reviewer'] };
+const LEAD: Viewer = { id: 4, name: 'Priya Raman', email: 'priya@x', roles: ['lead'] };
 const MARKETER: Viewer = { id: 7, name: 'Jordan Ellis', email: 'jordan@x', roles: ['marketer'] };
 
 const ROW = makeRow({ id: 1042, risk_tier: 'medium', tags: ['q4-launch'], owner: { id: 7, name: 'Jordan' } });
@@ -157,5 +159,48 @@ describe('inline edits', () => {
     await userEvent.type(await screen.findByRole('textbox', { name: 'Add tag' }), `${'x'.repeat(51)}{Enter}`);
     expect(await screen.findByText('Tags are 50 characters or fewer.')).toBeInTheDocument();
     expect(calls).toBe(0);
+  });
+
+  it('lets a reviewer claim an unassigned submitted item from the table', async () => {
+    serveRow(makeRow({ id: 1044, status: 'submitted', assignee: null }));
+    let claimed: string | undefined;
+    server.use(
+      http.post('*/api/items/:id/claim', ({ params }) => {
+        claimed = String(params.id);
+        return HttpResponse.json(makeRow({ id: 1044, status: 'in_review' }));
+      }),
+    );
+    renderWithQuery(<Harness viewer={REVIEWER} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Claim CP-1044' }));
+    await waitFor(() => {
+      expect(claimed).toBe('1044');
+    });
+    expect(await screen.findByText('Claimed CP-1044')).toBeInTheDocument();
+  });
+
+  it("offers a reviewer neither claim nor reassign on someone else's item", async () => {
+    serveRow(makeRow({ id: 1044, status: 'in_review', assignee: { id: 3, name: 'Sam Okafor' } }));
+    renderWithQuery(<Harness viewer={REVIEWER} />);
+    expect(await screen.findByText('Sam Okafor')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Claim CP-1044|Assignee for CP-1044/ })).toBeNull();
+  });
+
+  it('lets a lead reassign from the assignee cell', async () => {
+    serveRow(makeRow({ id: 1044, assignee: { id: 2, name: 'Dana Whitfield' } }));
+    let body: unknown;
+    server.use(
+      getListUsersMockHandler(USERS),
+      http.post('*/api/items/:id/assign', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(makeRow({ id: 1044, assignee: { id: 3, name: 'Sam Okafor' } }));
+      }),
+    );
+    renderWithQuery(<Harness viewer={LEAD} />);
+    await userEvent.click(await screen.findByRole('button', { name: /^Assignee for CP-1044/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Sam Okafor' }));
+    await waitFor(() => {
+      expect(body).toEqual({ assignee_id: 3 });
+    });
+    expect(await screen.findByText('Assigned CP-1044 to Sam Okafor')).toBeInTheDocument();
   });
 });

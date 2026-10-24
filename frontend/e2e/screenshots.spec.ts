@@ -44,7 +44,7 @@ const shots: Shot[] = [
   },
   {
     name: 'empty-my-queue',
-    stub: { rows: [] },
+    stub: { rows: [], stats: { mine: 0 } },
     ready: async (page) => {
       await expect(page.getByText('4 unassigned items')).toBeVisible();
     },
@@ -91,7 +91,7 @@ const shots: Shot[] = [
     stub: { me: ME.lead },
     ready: async (page) => {
       await expect(
-        page.getByRole('grid', { name: 'Approved (14 days)' }).getByRole('row').first(),
+        page.getByRole('grid', { name: 'Approved · last 14 days' }).getByRole('row').first(),
       ).toBeVisible();
     },
   },
@@ -103,6 +103,15 @@ const shots: Shot[] = [
       await page.getByRole('button', { name: /^Status/ }).click();
       await page.getByRole('menuitemcheckbox', { name: 'Changes requested' }).click();
       await expect(page.getByRole('menu')).toBeVisible();
+    },
+  },
+  {
+    name: 'more-filters',
+    ready: async (page) => {
+      await expect(page.getByRole('table', { name: 'Queue' })).toBeVisible();
+      await page.getByRole('button', { name: 'More filters' }).click();
+      await page.getByRole('menuitem', { name: 'Product' }).hover();
+      await expect(page.getByRole('menu', { name: 'Product' })).toBeVisible();
     },
   },
   {
@@ -170,7 +179,7 @@ for (const size of SIZES) {
       await stubApi(page, shot.stub);
       await page.goto(shot.path ?? '/');
       await shot.ready?.(page);
-      await page.waitForTimeout(250); // let transitions settle
+      await page.waitForTimeout(400); // let transitions (120ms) and the scrim fade settle
       await page.screenshot({ path: `${OUT}/${shot.name}-${String(size.width)}.png` });
     });
   }

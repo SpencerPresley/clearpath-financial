@@ -147,6 +147,17 @@ describe('QueueTable', () => {
     expect(screen.getByRole('checkbox', { name: 'Select CP-1044' })).toBeChecked();
   });
 
+  it('selects from anywhere in the checkbox cell, not just the box', async () => {
+    const onOpen = vi.fn();
+    const onSelection = vi.fn();
+    render(<Harness onOpen={onOpen} onSelection={onSelection} />);
+    const hit = screen.getByRole('checkbox', { name: 'Select CP-1044' }).closest('label');
+    if (hit === null) throw new Error('checkbox should sit in a cell-sized label');
+    await userEvent.click(hit);
+    expect(onSelection).toHaveBeenLastCalledWith({ '1044': true });
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('selects every loaded row from the header checkbox', async () => {
     const onSelection = vi.fn();
     render(<Harness onSelection={onSelection} />);

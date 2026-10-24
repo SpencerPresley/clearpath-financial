@@ -19,7 +19,6 @@ import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { useViewer } from '../../ui/layout/Viewer';
-import { SkeletonTable } from '../../ui/Skeleton';
 import { Board } from './Board';
 import { BulkBar } from './BulkBar';
 import {
@@ -29,13 +28,12 @@ import {
   visibleColumnIds,
   writeColumns,
 } from './ColumnChooser';
-import { queueColumns } from './columns';
 import type { ColumnVisibility, RowSelection } from './columns';
 import { FilterBar, SortMenu } from './FilterBar';
 import { queueKeyAction } from './keyboard';
 import { PreviewDrawer } from './PreviewDrawer';
 import { QueueFooter } from './QueueFooter';
-import { QueueTable, rowElementId } from './QueueTable';
+import { QueueSkeleton, QueueTable, rowElementId } from './QueueTable';
 import { reviewPath } from './reviewPath';
 import { activeView, hasFilters, toListParams, viewSearch } from './search';
 import type { ActiveView, BuiltInViewId, QueueLayout, QueueSearch } from './search';
@@ -43,15 +41,12 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import { StatsStrip } from './StatsStrip';
 import { useQueueCells } from './useItemPatch';
 import { useQueueItems } from './useQueueItems';
-import { ViewBar } from './ViewBar';
+import { SavedViewsError, ViewBar } from './ViewBar';
 
 const NO_VIEWS: SavedViewOut[] = [];
 
-function skeletonWidths(visibility: ColumnVisibility): string[] {
-  return queueColumns
-    .filter((c) => c.id !== undefined && visibility[c.id] !== false)
-    .map((c) => (c.id === 'title' ? '1fr' : `${String(c.size ?? 120)}px`));
-}
+/** The drawer shows these, so they step aside while it's open and the triage columns keep their width. */
+const DRAWER_HIDDEN: ColumnVisibility = { partner: false, assignee: false, round: false, risk_tier: false };
 
 function EmptyQueue({
   view,
@@ -261,6 +256,10 @@ export function QueuePage() {
 
   const visibleIds = useMemo(() => visibleColumnIds(columns), [columns]);
   const showBulk = search.layout === 'table' && selectedIds.length > 0;
+  const tableColumns = useMemo(
+    () => (search.item === undefined ? columns : { ...columns, ...DRAWER_HIDDEN }),
+    [columns, search.item],
+  );
 
   let region;
   if (search.layout === 'board') {
@@ -268,12 +267,12 @@ export function QueuePage() {
   } else if (query.isPending) {
     region = (
       <div className="app-queue-region">
-        <SkeletonTable rows={10} columns={skeletonWidths(columns)} label="Loading the queue" />
+        <QueueSkeleton columnVisibility={tableColumns} />
       </div>
     );
   } else if (query.isError && rows.length === 0) {
     region = (
-      <div className="app-queue-region" role="alert">
+      <div className="app-queue-region app-queue-error" role="alert">
         <EmptyState
           icon="feedback.error"
           title="Couldn't load the queue"
@@ -323,10 +322,13 @@ export function QueuePage() {
             const next = typeof updater === 'function' ? updater(rowSelection) : updater;
             setSelectionState({ key: listKey, rows: next });
           }}
-          columnVisibility={columns}
+          columnVisibility={tableColumns}
           cells={cells}
         />
         <QueueFooter query={query} count={rows.length} />
+        {showBulk && (
+          <BulkBar viewer={viewer} selectedIds={selectedIds} rows={rows} onSelectionChange={setSelectedIds} />
+        )}
       </div>
     );
   }
@@ -377,19 +379,16 @@ export function QueuePage() {
           />
         </div>
       </div>
-      {showBulk ? (
-        <BulkBar viewer={viewer} selectedIds={selectedIds} rows={rows} onSelectionChange={setSelectedIds} />
-      ) : (
-        <FilterBar
-          search={search}
-          hideStatus={search.layout === 'board'}
-          isModified={view.kind === 'custom' ? hasFilters(search) : view.modified}
-          onChange={(patch) => {
-            update(patch);
-          }}
-          onClear={clearToView}
-        />
-      )}
+      <FilterBar
+        search={search}
+        hideStatus={search.layout === 'board'}
+        isModified={view.kind === 'custom' ? hasFilters(search) : view.modified}
+        onChange={(patch) => {
+          update(patch);
+        }}
+        onClear={clearToView}
+        trailing={<SavedViewsError />}
+      />
       <div className="app-queue-body">
         {region}
         {search.item !== undefined && (

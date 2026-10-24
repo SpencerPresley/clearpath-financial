@@ -14,7 +14,7 @@ import { renderWithQuery } from '../../test/render';
 import { AFFILIATE_VIEW, STATS } from './fixtures';
 import { savedViewToSearch, viewSearch } from './search';
 import { StatsStrip } from './StatsStrip';
-import { ViewBar } from './ViewBar';
+import { SavedViewsError, ViewBar } from './ViewBar';
 
 describe('ViewBar', () => {
   it('marks the active built-in view and switches views', async () => {
@@ -83,7 +83,12 @@ describe('ViewBar', () => {
     server.use(
       http.get('*/api/views', () => HttpResponse.json({ code: 'x', message: 'boom' }, { status: 500 })),
     );
-    renderWithQuery(<ViewBar search={viewSearch('mine')} columns={[]} onSelect={vi.fn()} />);
+    renderWithQuery(
+      <>
+        <ViewBar search={viewSearch('mine')} columns={[]} onSelect={vi.fn()} />
+        <SavedViewsError />
+      </>,
+    );
     expect(await screen.findByText("Couldn't load saved views.")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Unassigned' })).toBeEnabled();
@@ -95,11 +100,11 @@ describe('StatsStrip', () => {
     server.use(getGetQueueStatsMockHandler(STATS));
     const onPick = vi.fn();
     renderWithQuery(<StatsStrip onPick={onPick} />);
-    const mine = await screen.findByRole('button', { name: '8 Mine' });
+    const mine = await screen.findByRole('button', { name: '8 My queue' });
     expect(screen.getByText('23')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '4 Unassigned' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '6 Waiting >3 days' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2 Re-review' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2 Needs re-review' })).toBeInTheDocument();
     await userEvent.click(mine);
     expect(onPick).toHaveBeenCalledWith('mine');
   });

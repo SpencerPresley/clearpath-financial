@@ -16,6 +16,7 @@ import {
   ArrowBendUpLeftIcon,
   ArrowClockwiseIcon,
   ArrowDownIcon,
+  ArrowRightIcon,
   ArrowsCounterClockwiseIcon,
   ArrowsDownUpIcon,
   ArrowSquareOutIcon,
@@ -147,6 +148,8 @@ export const icons = {
   'action.more': bold(DotsThreeIcon),
   'action.expand': regular(CaretDownIcon),
   'action.open_external': regular(ArrowSquareOutIcon),
+  /** Go to another screen in this app (same tab); open_external is for new tabs and other sites. */
+  'action.open': regular(ArrowRightIcon),
   'action.toggle_nav': regular(SidebarSimpleIcon),
   'action.sign_out': regular(SignOutIcon),
   // Pull live content: take it out of public view (the unpublish idiom). Not a download arrow

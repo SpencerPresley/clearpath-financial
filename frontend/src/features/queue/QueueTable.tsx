@@ -8,11 +8,18 @@ import type { OnChangeFn } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 
 import type { ItemRowOut, ItemSort } from '../../api/generated/model';
-import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
 import { QueueCellContext, READ_ONLY_CELLS } from './cellContext';
 import type { QueueCellContextValue } from './cellContext';
-import { ariaSortFor, COLUMN_LABELS, nextSort, queueColumns, queueFeatures, SORT_CYCLES } from './columns';
+import {
+  ariaSortFor,
+  COLUMN_LABELS,
+  nextSort,
+  queueColumns,
+  queueFeatures,
+  SORT_CYCLES,
+  TITLE_MIN_WIDTH,
+} from './columns';
 import type { ColumnId, ColumnSizing, ColumnVisibility, RowSelection } from './columns';
 
 export const SIZES_KEY = 'clearpath.queue.columnSizes';
@@ -36,6 +43,69 @@ function writeSizes(sizes: ColumnSizing) {
   } catch {
     // storage blocked: widths last for this page view
   }
+}
+
+/** Widths the table will use: the user's resized widths over the column defaults. Title flexes. */
+function columnWidths(visibility: ColumnVisibility): { id: ColumnId; width: number | undefined }[] {
+  const sizes = readSizes();
+  return queueColumns
+    .map((c) => c.id as ColumnId)
+    .filter((id) => visibility[id] !== false)
+    .map((id) => {
+      const size = queueColumns.find((c) => c.id === id)?.size ?? 120;
+      return { id, width: id === 'title' ? undefined : (sizes[id] ?? size) };
+    });
+}
+
+/**
+ * Loading placeholder built as the real table (same colgroup, header, row height), so nothing moves when rows
+ * arrive (§5.3). Bar widths vary per row so it reads as text.
+ */
+export function QueueSkeleton({
+  columnVisibility,
+  rows = 10,
+}: {
+  columnVisibility: ColumnVisibility;
+  rows?: number;
+}) {
+  const cols = columnWidths(columnVisibility);
+  const minWidth = cols.reduce((sum, c) => sum + (c.width ?? TITLE_MIN_WIDTH), 0);
+  return (
+    <div role="status" aria-label="Loading the queue" aria-busy="true">
+      <table className="app-table" aria-hidden="true" style={{ minWidth }}>
+        <colgroup>
+          {cols.map((c) => (
+            <col key={c.id} style={c.width === undefined ? undefined : { width: c.width }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            {cols.map((c) => (
+              <th key={c.id} className="app-th" data-column={c.id}>
+                {c.id === 'select' ? null : <span className="app-th-label">{COLUMN_LABELS[c.id]}</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }, (_, row) => (
+            <tr key={row} className="app-tr">
+              {cols.map((c, column) => (
+                <td key={c.id} className="app-td" data-column={c.id}>
+                  {c.id === 'select' ? null : (
+                    <span
+                      className="app-skeleton"
+                      style={{ width: `${String(45 + ((row * 17 + column * 29) % 45))}%` }}
+                    />
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function rowElementId(id: number): string {
@@ -147,7 +217,8 @@ export function QueueTable({
                               : 'sort.none'
                         }
                         size={12}
-                        className={cx('app-th-sort-icon', ariaSort === undefined && 'opacity-0')}
+                        className="app-th-sort-icon"
+                        data-idle={ariaSort === undefined ? 'true' : undefined}
                       />
                     </button>
                   ) : (

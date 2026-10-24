@@ -14,10 +14,10 @@ const FIGURES: readonly {
   view: BuiltInViewId;
   alert?: boolean;
 }[] = [
-  { key: 'mine', label: 'Mine', view: 'mine' },
+  { key: 'mine', label: 'My queue', view: 'mine' },
   { key: 'unassigned', label: 'Unassigned', view: 'unassigned' },
   { key: 'waiting_over_3_days', label: 'Waiting >3 days', view: 'waiting' },
-  { key: 'needs_rereview', label: 'Re-review', view: 'rereview', alert: true },
+  { key: 'needs_rereview', label: 'Needs re-review', view: 'rereview', alert: true },
 ];
 
 export function StatsStrip({
@@ -54,7 +54,7 @@ export function StatsStrip({
     <div className="app-stats" aria-label="Queue counts" role="group" aria-busy={data === undefined}>
       <div className="app-stat">
         {data === undefined ? (
-          <span className="app-skeleton h-5 w-8" />
+          <span className="app-skeleton h-6 w-8" />
         ) : (
           <span className="app-stat-figure">{data.open}</span>
         )}{' '}
@@ -75,7 +75,7 @@ export function StatsStrip({
           }}
         >
           {data === undefined ? (
-            <span className="app-skeleton h-5 w-8" />
+            <span className="app-skeleton h-6 w-8" />
           ) : (
             <span className="app-stat-figure">{data[figure.key]}</span>
           )}{' '}

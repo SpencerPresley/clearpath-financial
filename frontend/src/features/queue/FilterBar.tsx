@@ -1,9 +1,11 @@
 /*
- * Filter bar (not spreadsheet column menus): a search box plus one chip per common ItemFilter field. A chip
+ * Filter bar (not spreadsheet column menus): a search box, chips for Status, Risk, Assignee, and Partner, and
+ * More filters for the rest (each joins the bar as a chip once it has a value). A chip
  * names its choice ("Status: In review, Submitted") so the active filters read as a sentence, and each has its
  * own clear button. Everything writes to the URL through onChange.
  */
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Key, Selection } from 'react-aria-components';
 import {
   Button as AriaButton,
@@ -13,6 +15,7 @@ import {
   MenuTrigger,
   Popover,
   SearchField,
+  SubmenuTrigger,
 } from 'react-aria-components';
 
 import { useListPartners } from '../../api/generated/partners/partners';
@@ -63,19 +66,44 @@ function keysOf(selection: Selection): string[] {
   return selection === 'all' ? [] : [...selection].map(String);
 }
 
-export function FilterChip({
-  label,
-  options,
-  selected,
-  mode = 'multiple',
-  onChange,
-}: {
+interface ChipProps {
   label: string;
   options: readonly ChipOption[];
   selected: readonly string[];
   mode?: 'multiple' | 'single';
   onChange: (ids: string[]) => void;
-}) {
+}
+
+function ChipMenu({ label, options, selected, mode = 'multiple', onChange }: ChipProps) {
+  return (
+    <Menu
+      className="app-menu"
+      aria-label={label}
+      selectionMode={mode}
+      selectedKeys={new Set<Key>(selected)}
+      onSelectionChange={(keys) => {
+        onChange(keysOf(keys));
+      }}
+      items={options}
+    >
+      {(option) => (
+        <MenuItem id={option.id} textValue={option.label} className="app-menu-item app-menu-check">
+          {({ isSelected }) => (
+            <>
+              <span className="app-menu-check-mark" aria-hidden="true">
+                {isSelected && <Icon name="action.approve" size={12} />}
+              </span>
+              {option.label}
+            </>
+          )}
+        </MenuItem>
+      )}
+    </Menu>
+  );
+}
+
+export function FilterChip(props: ChipProps) {
+  const { label, options, selected, onChange } = props;
   const active = selected.length > 0;
   return (
     <span className="app-chip" data-active={active ? 'true' : undefined}>
@@ -85,29 +113,7 @@ export function FilterChip({
           <Icon name="action.expand" size={12} />
         </AriaButton>
         <Popover className="app-popover max-h-80 overflow-auto" placement="bottom start" offset={4}>
-          <Menu
-            className="app-menu"
-            aria-label={label}
-            selectionMode={mode}
-            selectedKeys={new Set<Key>(selected)}
-            onSelectionChange={(keys) => {
-              onChange(keysOf(keys));
-            }}
-            items={options}
-          >
-            {(option) => (
-              <MenuItem id={option.id} textValue={option.label} className="app-menu-item app-menu-check">
-                {({ isSelected }) => (
-                  <>
-                    <span className="app-menu-check-mark" aria-hidden="true">
-                      {isSelected && <Icon name="action.approve" size={12} />}
-                    </span>
-                    {option.label}
-                  </>
-                )}
-              </MenuItem>
-            )}
-          </Menu>
+          <ChipMenu {...props} />
         </Popover>
       </MenuTrigger>
       {active && (
@@ -174,9 +180,18 @@ export interface FilterBarProps {
   isModified?: boolean;
   /** The board's columns are statuses, so it has no Status filter. */
   hideStatus?: boolean;
+  /** View actions (Modified, Save view) and the saved-views error, after the chips. */
+  trailing?: ReactNode;
 }
 
-export function FilterBar({ search, onChange, onClear, isModified, hideStatus = false }: FilterBarProps) {
+export function FilterBar({
+  search,
+  onChange,
+  onClear,
+  isModified,
+  hideStatus = false,
+  trailing,
+}: FilterBarProps) {
   const users = useListUsers({ role: 'reviewer' });
   const partners = useListPartners();
   const view = activeView(search, []);
@@ -205,6 +220,55 @@ export function FilterBar({ search, onChange, onClear, isModified, hideStatus = 
     onChangeRef.current({ q });
   });
 
+  // Less-used filters live under More filters until they have a value, so the bar stays one line (§5.3).
+  const secondary: ChipProps[] = [
+    {
+      label: 'Product',
+      options: Object.values(Product).map((p) => ({ id: p, label: PRODUCT_LABEL[p] })),
+      selected: search.product ?? [],
+      onChange: (ids) => {
+        onChange({ product: ids.length > 0 ? (ids as Product[]) : undefined });
+      },
+    },
+    {
+      label: 'Channel',
+      options: Object.values(Channel).map((c) => ({ id: c, label: CHANNEL_LABEL[c] })),
+      selected: search.channel ?? [],
+      onChange: (ids) => {
+        onChange({ channel: ids.length > 0 ? (ids as Channel[]) : undefined });
+      },
+    },
+    {
+      label: 'Findings',
+      mode: 'single',
+      options: [
+        { id: 'open', label: 'Has open findings' },
+        { id: 'clear', label: 'No open findings' },
+      ],
+      selected: findings,
+      onChange: (ids) => {
+        onChange({ has_open_findings: ids[0] === undefined ? undefined : ids[0] === 'open' });
+      },
+    },
+    {
+      label: 'Waiting',
+      mode: 'single',
+      options: WAITING_DAYS.map((d) => ({ id: String(d), label: waitingLabel(d) })),
+      selected: search.waiting === undefined ? [] : [String(search.waiting)],
+      onChange: (ids) => {
+        onChange({ waiting: ids[0] === undefined ? undefined : Number(ids[0]) });
+      },
+    },
+    {
+      label: 'Re-review reason',
+      options: Object.values(ReopenReason).map((r) => ({ id: r, label: REOPEN_REASON_LABEL[r] })),
+      selected: search.reopen_reason ?? [],
+      onChange: (ids) => {
+        onChange({ reopen_reason: ids.length > 0 ? (ids as ReopenReason[]) : undefined });
+      },
+    },
+  ];
+
   return (
     <div className="app-filter-bar" role="group" aria-label="Filters">
       <QueueSearchField value={search.q} onChange={setQ} />
@@ -224,22 +288,6 @@ export function FilterBar({ search, onChange, onClear, isModified, hideStatus = 
         selected={search.risk_tier ?? []}
         onChange={(ids) => {
           onChange({ risk_tier: ids.length > 0 ? (ids as RiskTier[]) : undefined });
-        }}
-      />
-      <FilterChip
-        label="Product"
-        options={Object.values(Product).map((p) => ({ id: p, label: PRODUCT_LABEL[p] }))}
-        selected={search.product ?? []}
-        onChange={(ids) => {
-          onChange({ product: ids.length > 0 ? (ids as Product[]) : undefined });
-        }}
-      />
-      <FilterChip
-        label="Channel"
-        options={Object.values(Channel).map((c) => ({ id: c, label: CHANNEL_LABEL[c] }))}
-        selected={search.channel ?? []}
-        onChange={(ids) => {
-          onChange({ channel: ids.length > 0 ? (ids as Channel[]) : undefined });
         }}
       />
       <FilterChip
@@ -264,41 +312,48 @@ export function FilterBar({ search, onChange, onClear, isModified, hideStatus = 
           onChange({ partner_id: ids.length > 0 ? ids.map(Number) : undefined });
         }}
       />
-      <FilterChip
-        label="Findings"
-        mode="single"
-        options={[
-          { id: 'open', label: 'Has open findings' },
-          { id: 'clear', label: 'No open findings' },
-        ]}
-        selected={findings}
-        onChange={(ids) => {
-          onChange({ has_open_findings: ids[0] === undefined ? undefined : ids[0] === 'open' });
-        }}
-      />
-      <FilterChip
-        label="Waiting"
-        mode="single"
-        options={WAITING_DAYS.map((d) => ({ id: String(d), label: waitingLabel(d) }))}
-        selected={search.waiting === undefined ? [] : [String(search.waiting)]}
-        onChange={(ids) => {
-          onChange({ waiting: ids[0] === undefined ? undefined : Number(ids[0]) });
-        }}
-      />
-      <FilterChip
-        label="Re-review reason"
-        options={Object.values(ReopenReason).map((r) => ({ id: r, label: REOPEN_REASON_LABEL[r] }))}
-        selected={search.reopen_reason ?? []}
-        onChange={(ids) => {
-          onChange({ reopen_reason: ids.length > 0 ? (ids as ReopenReason[]) : undefined });
-        }}
-      />
+      {secondary
+        .filter((chip) => chip.selected.length > 0)
+        .map((chip) => (
+          <FilterChip key={chip.label} {...chip} />
+        ))}
+      <MoreFilters chips={secondary.filter((chip) => chip.selected.length === 0)} />
       {modified && (
         <Button size="sm" variant="ghost" onPress={onClear}>
           Clear filters
         </Button>
       )}
+      {trailing}
     </div>
+  );
+}
+
+/** Filters without a value, each a submenu with the same choices its chip has. */
+function MoreFilters({ chips }: { chips: readonly ChipProps[] }) {
+  if (chips.length === 0) return null;
+  return (
+    <MenuTrigger>
+      <AriaButton className="app-chip-btn app-chip-plain app-filter-more">
+        <Icon name="action.filter" size={14} />
+        <span>More filters</span>
+        <Icon name="action.expand" size={12} />
+      </AriaButton>
+      <Popover className="app-popover" placement="bottom start" offset={4}>
+        <Menu className="app-menu" aria-label="More filters">
+          {chips.map((chip) => (
+            <SubmenuTrigger key={chip.label}>
+              <MenuItem id={chip.label} textValue={chip.label} className="app-menu-item justify-between">
+                <span>{chip.label}</span>
+                <Icon name="action.expand" size={12} className="-rotate-90 text-muted" />
+              </MenuItem>
+              <Popover className="app-popover max-h-80 overflow-auto" offset={-4}>
+                <ChipMenu {...chip} />
+              </Popover>
+            </SubmenuTrigger>
+          ))}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 
@@ -306,9 +361,9 @@ export function SortMenu({ sort, onChange }: { sort: ItemSort; onChange: (sort: 
   const options = Object.keys(SORT_LABEL) as ItemSort[];
   return (
     <MenuTrigger>
-      <AriaButton className={cx('app-chip-btn app-chip-plain')}>
+      <AriaButton className={cx('app-chip-btn app-chip-plain')} aria-label={`Sort: ${SORT_LABEL[sort]}`}>
         <Icon name="action.sort" size={14} />
-        <span>Sort: {SORT_LABEL[sort]}</span>
+        <span>{SORT_LABEL[sort]}</span>
         <Icon name="action.expand" size={12} />
       </AriaButton>
       <Popover className="app-popover" placement="bottom end" offset={4}>

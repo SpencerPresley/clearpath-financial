@@ -375,12 +375,23 @@ function detail(r: Row) {
   };
 }
 
+const RISK_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+/** The server's queue order (backend/reviews/selectors.py): re-reviews first, then risk, then oldest. */
+function queueOrder(rows: Row[]): Row[] {
+  const rank = (r: Row) => (r.reopen_reason === null ? 10 : 0) + (RISK_RANK[String(r.risk_tier)] ?? 2);
+  return [...rows].sort(
+    (a, b) => rank(a) - rank(b) || String(a.submitted_at).localeCompare(String(b.submitted_at)),
+  );
+}
+
 export interface StubOptions {
   me?: object | 'signed-out';
   rows?: Row[];
   /** 'hang' never answers (loading state); a number answers with that status. */
   items?: 'hang' | number;
-  stats?: 'hang' | number;
+  /** Counts to serve instead of STATS; 'hang' never answers; a number answers with that status. */
+  stats?: 'hang' | number | Partial<typeof STATS>;
   views?: object[] | number;
 }
 
@@ -406,12 +417,18 @@ export async function stubApi(page: Page, opts: StubOptions = {}) {
       if (opts.stats === 'hang') return; // never answers
       if (typeof opts.stats === 'number')
         return fulfill(route, { code: 'x', message: 'Counts are unavailable.' }, opts.stats);
-      return fulfill(route, STATS);
+      return fulfill(route, { ...STATS, ...(typeof opts.stats === 'object' ? opts.stats : {}) });
     }
     if (path === '/api/items') {
       const statuses = url.searchParams.getAll('status');
       if (statuses.includes('approved')) return fulfill(route, { rows: approvedRows(), next_cursor: null });
-      if (statuses.length === 4) return fulfill(route, { rows: boardRows(), next_cursor: null });
+      if (statuses.length === 4) {
+        const board = boardRows();
+        return fulfill(route, {
+          rows: url.searchParams.get('sort') === 'queue' ? queueOrder(board) : board,
+          next_cursor: null,
+        });
+      }
       if (opts.items === 'hang') return;
       if (typeof opts.items === 'number') {
         return fulfill(

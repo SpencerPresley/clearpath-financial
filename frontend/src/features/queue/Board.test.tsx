@@ -55,7 +55,7 @@ describe('Board', () => {
     expect((await column('In review')).getByText('Reviewing one')).toBeInTheDocument();
     expect((await column('Changes requested')).getByText('Back with marketer')).toBeInTheDocument();
     expect((await column('Needs re-review')).getByText('Terms moved')).toBeInTheDocument();
-    expect((await column('Approved (14 days)')).getByText('Cleared last week')).toBeInTheDocument();
+    expect((await column('Approved · last 14 days')).getByText('Cleared last week')).toBeInTheDocument();
   });
 
   it('asks for every board status and only the last 14 days of approvals', async () => {

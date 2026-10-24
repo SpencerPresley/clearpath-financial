@@ -28,9 +28,21 @@ export function RiskCell({ row }: { row: ItemRowOut }) {
         <Popover className="app-popover min-w-40" placement="bottom start" offset={4}>
           <ListBox className="app-menu">
             {RISK_TIERS.map((tier) => (
-              <ListBoxItem key={tier} id={tier} textValue={RISK_META[tier].label} className="app-menu-item">
-                <Icon name={RISK_META[tier].icon} size={14} />
-                {RISK_META[tier].label}
+              <ListBoxItem
+                key={tier}
+                id={tier}
+                textValue={RISK_META[tier].label}
+                className="app-menu-item app-menu-check"
+              >
+                {({ isSelected }) => (
+                  <>
+                    <span className="app-menu-check-mark" aria-hidden="true">
+                      {isSelected && <Icon name="action.approve" size={12} />}
+                    </span>
+                    <Icon name={RISK_META[tier].icon} size={14} />
+                    {RISK_META[tier].label}
+                  </>
+                )}
               </ListBoxItem>
             ))}
           </ListBox>

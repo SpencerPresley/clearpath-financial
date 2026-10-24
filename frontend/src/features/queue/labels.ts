@@ -1,5 +1,5 @@
 /* Display copy for queue enums (spec §5.4: short, domain-native, one term per concept). */
-import type { Channel, DecisionOutcome, Product, ReopenReason } from '../../api/generated/model';
+import type { Channel, DecisionOutcome, Market, Product, ReopenReason } from '../../api/generated/model';
 
 export const PRODUCT_LABEL: Record<Product, string> = {
   personal_loan: 'Personal loan',
@@ -35,3 +35,8 @@ export const OUTCOME_LABEL: Record<DecisionOutcome, string> = {
 export function roundLabel(round: number): string {
   return `R${String(round)}`;
 }
+
+export const MARKET_LABEL: Record<Market, string> = {
+  national: 'National',
+  CA: 'CA',
+};

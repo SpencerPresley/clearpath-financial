@@ -20,9 +20,11 @@ import { StatusBadge } from '../../ui/badges';
 import { ItemKey } from '../../ui/ItemKey';
 import { formatAge } from '../../ui/RelativeAge';
 import { useQueueCell } from './cellContext';
+import { AssigneeCell } from './AssigneeCell';
 import { FindingsCount } from './FindingsCount';
 import { CHANNEL_LABEL, PRODUCT_LABEL, REOPEN_REASON_LABEL, roundLabel } from './labels';
 import { RiskCell } from './RiskCell';
+import { stopRowClick } from './stopRowClick';
 import { TagsCell } from './TagsCell';
 
 export const queueFeatures = tableFeatures({
@@ -130,31 +132,36 @@ export const queueColumns = helper.columns([
     enableResizing: false,
     enableHiding: false,
     header: ({ table }) => (
-      <input
-        type="checkbox"
-        className="app-check"
-        aria-label="Select all loaded items"
-        checked={table.getIsAllRowsSelected()}
-        ref={(el) => {
-          if (el) el.indeterminate = table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
-        }}
-        onChange={table.getToggleAllRowsSelectedHandler()}
-      />
+      <label className="app-check-hit">
+        <input
+          type="checkbox"
+          className="app-check"
+          aria-label="Select all loaded items"
+          checked={table.getIsAllRowsSelected()}
+          ref={(el) => {
+            if (el) el.indeterminate = table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+          }}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+        />
+      </label>
     ),
     cell: ({ row }) => (
-      <input
-        type="checkbox"
-        className="app-check"
-        aria-label={`Select ${row.original.key}`}
-        checked={row.getIsSelected()}
-        onClick={(event) => {
-          event.stopPropagation();
-          row.getToggleSelectedHandler()(event);
-        }}
-        onChange={() => {
-          /* handled on click, which carries Shift for range selection */
-        }}
-      />
+      // The label fills the cell so the whole 36px square selects (a near miss would open the preview).
+      <label className="app-check-hit" onClick={stopRowClick}>
+        <input
+          type="checkbox"
+          className="app-check"
+          aria-label={`Select ${row.original.key}`}
+          checked={row.getIsSelected()}
+          onClick={(event) => {
+            event.stopPropagation();
+            row.getToggleSelectedHandler()(event);
+          }}
+          onChange={() => {
+            /* handled on click, which carries Shift for range selection */
+          }}
+        />
+      </label>
     ),
   }),
   helper.accessor('key', {
@@ -179,7 +186,7 @@ export const queueColumns = helper.columns([
   helper.accessor('status', {
     id: 'status',
     header: COLUMN_LABELS.status,
-    size: 172,
+    size: 168,
     minSize: 44,
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
   }),
@@ -214,9 +221,9 @@ export const queueColumns = helper.columns([
   helper.accessor('assignee', {
     id: 'assignee',
     header: COLUMN_LABELS.assignee,
-    size: 128,
+    size: 140,
     minSize: 80,
-    cell: ({ row }) => row.original.assignee?.name ?? <Muted>Unassigned</Muted>,
+    cell: ({ row }) => <AssigneeCell row={row.original} />,
   }),
   helper.accessor('open_findings_count', {
     id: 'open_findings',

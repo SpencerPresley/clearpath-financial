@@ -1494,9 +1494,10 @@
 
 /* ---- Queue (workstream H part 2: table, filters, board, preview drawer) ----------------------------- */
 @theme static {
-  /* Selected rows (bulk selection): a pale navy tint. Brand, not status: selection is the user's own state. */
-  --color-selected: oklch(95.5% 0.018 262);
-  --color-selected-hover: oklch(93.5% 0.024 262);
+  /* Selected rows and active chips: near-neutral (chroma <= 0.006, like nav-active) so selection never reads as
+     the info-blue "In review" tint (§5.2). The navy carriers are the checkbox, the chip border, and the row bar. */
+  --color-selected: oklch(95% 0.005 258);
+  --color-selected-hover: oklch(93% 0.006 258);
 }
 
 @layer components {
@@ -1564,6 +1565,10 @@
   .app-th-sort:focus-visible .app-th-sort-icon {
     opacity: 1;
   }
+  /* Sortable headers show a dim glyph at rest so it's clear which 2 of the headers sort. */
+  .app-th-sort-icon[data-idle] {
+    opacity: 0.4;
+  }
   .app-th-sort-icon {
     transition-property: opacity;
     transition-duration: 120ms;
@@ -1630,7 +1635,11 @@
   }
   .app-td[data-column='select'],
   .app-th[data-column='select'] {
-    @apply pr-0 pl-3;
+    @apply p-0;
+  }
+  /* The whole select cell is the checkbox's hit area (36x36), not the 14px box (WCAG 2.5.8). */
+  .app-check-hit {
+    @apply flex h-[calc(var(--spacing-row)-1px)] w-full cursor-default items-center pl-3;
   }
   .app-cell-title {
     @apply block truncate text-base-content;
@@ -1720,8 +1729,12 @@
   .app-queue-title {
     @apply text-lg leading-7 font-semibold text-base-content;
   }
+  /* min-h holds the two-line height when counts fail, so the rows below don't move (§5.3). */
   .app-stats {
-    @apply flex items-stretch gap-px text-ui;
+    @apply flex min-h-12 items-stretch gap-px text-ui;
+  }
+  .app-stats > .app-inline-error {
+    @apply self-center;
   }
   .app-stat {
     @apply flex flex-col items-start justify-center rounded-md px-2.5 py-0.5 text-left;
@@ -1750,11 +1763,13 @@
     @apply text-meta whitespace-nowrap text-muted;
   }
 
+  /* One line at every width: tabs scroll sideways before the toolbar wraps under them (§5.3). */
   .app-view-bar {
-    @apply flex min-h-8 flex-wrap items-center gap-2;
+    @apply flex min-h-8 min-w-0 flex-nowrap items-center gap-2;
   }
   .app-view-tabs {
-    @apply flex flex-wrap items-center gap-0.5;
+    @apply flex min-w-0 shrink items-center gap-0.5 overflow-x-auto p-px;
+    scrollbar-width: none;
   }
   .app-view-tab {
     @apply inline-flex h-7 cursor-default items-center rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap text-muted;
@@ -1774,20 +1789,26 @@
     @apply inline-flex items-center;
   }
   .app-view-modified {
-    @apply text-meta text-muted italic;
+    @apply shrink-0 text-meta whitespace-nowrap text-muted italic;
+  }
+  .app-view-group {
+    @apply flex min-w-0 shrink items-center gap-2;
+  }
+  .app-view-actions {
+    @apply flex shrink-0 items-center gap-1;
   }
   .app-inline-error {
     @apply inline-flex items-center gap-1.5 text-meta text-status-error-soft-content;
   }
 
   .app-toolbar-end {
-    @apply ml-auto flex items-center gap-1;
+    @apply ml-auto flex shrink-0 items-center gap-1;
   }
   .app-segmented {
     @apply inline-flex rounded-md border border-base-300 bg-base-100 p-0.5;
   }
   .app-segmented-item {
-    @apply inline-flex h-6 cursor-default items-center gap-1.5 rounded-sm px-2 text-ui text-muted;
+    @apply inline-flex h-6 cursor-default items-center gap-1.5 rounded-xs px-2 text-ui text-muted;
     transition-property: background-color, color;
     transition-duration: 120ms;
   }
@@ -1802,7 +1823,7 @@
     @apply flex flex-wrap items-center gap-1.5;
   }
   .app-queue-search {
-    @apply flex h-7 w-56 items-center gap-1.5 rounded-md border border-base-300 bg-base-100 px-2;
+    @apply flex h-7 w-48 items-center gap-1.5 rounded-md border border-base-300 bg-base-100 px-2;
   }
   .app-queue-search[data-focus-within] {
     @apply border-focus;
@@ -1814,7 +1835,7 @@
     display: none;
   }
   .app-chip {
-    @apply inline-flex h-7 max-w-72 items-center rounded-md border border-base-300 bg-base-100 text-ui text-base-content;
+    @apply inline-flex h-7 max-w-56 items-center rounded-md border border-base-300 bg-base-100 text-ui text-base-content;
   }
   .app-chip[data-active] {
     @apply border-primary/30 bg-selected;
@@ -1832,7 +1853,7 @@
     @apply h-7 gap-1.5 text-muted;
   }
   .app-chip-clear.app-btn {
-    @apply mr-0.5 size-5 w-5 rounded-sm;
+    @apply mr-0.5 size-6 w-6 rounded-sm;
   }
   .app-menu-check {
     @apply pl-1.5;
@@ -1905,7 +1926,7 @@
     @apply flex min-h-0 flex-1 flex-col gap-2;
   }
   .app-board {
-    @apply grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(13rem,1fr))] gap-2 overflow-x-auto;
+    @apply grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(12rem,1fr))] gap-2 overflow-x-auto;
   }
   .app-board-col {
     @apply flex min-h-0 flex-col rounded-lg border border-base-300 bg-base-100;
@@ -1954,7 +1975,7 @@
     @apply flex items-center gap-1;
   }
   .app-card-drag {
-    @apply -ml-1 inline-flex size-5 cursor-grab items-center justify-center rounded-sm text-muted outline-none;
+    @apply -ml-1.5 inline-flex size-6 cursor-grab items-center justify-center rounded-sm text-muted outline-none;
   }
   .app-card-drag[data-focus-visible] {
     outline: 2px solid var(--color-focus);
@@ -1969,9 +1990,10 @@
     @apply mt-1 self-start;
   }
 
-  /* ---- Bulk bar: replaces the filter row while rows are selected. ------------------------------ */
+  /* ---- Bulk bar: floats at the bottom of the list while rows are selected, so neither the rows nor the
+     active filters move (§5.3). It overlays content, so it takes the overlay shadow. ---------------- */
   .app-bulk-bar {
-    @apply flex h-9 items-center gap-2 rounded-md border border-primary/30 bg-selected px-2;
+    @apply sticky bottom-2 z-20 mx-2 mb-2 flex h-10 w-fit items-center gap-2 rounded-md border border-primary/30 bg-base-100 px-2 shadow-overlay;
   }
   .app-bulk-count {
     @apply pr-1 pl-1 font-medium text-primary;
@@ -2004,6 +2026,10 @@
   .app-signin {
     @apply grid h-screen grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
   }
+  /* The shell's topbar spans two columns; here there is one, so it must not create a second. */
+  .app-signin > .app-topbar {
+    @apply col-span-full;
+  }
   .app-signin-main {
     @apply flex items-start justify-center overflow-auto px-6 py-10;
   }
@@ -2016,12 +2042,23 @@
   .app-signin-demo {
     @apply mt-2 flex flex-col gap-1 border-t border-base-300 pt-3;
   }
+  .app-signin-demo-list {
+    @apply -mx-1.5 flex flex-col;
+  }
   .app-signin-demo-btn {
     @apply flex w-full cursor-default items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left;
     transition-property: background-color;
     transition-duration: 120ms;
   }
   .app-signin-demo-btn:hover {
+    @apply bg-hover;
+  }
+
+  /* Error and empty share a layout; the error's glyph takes the error color so they read apart (§5.5). */
+  .app-queue-error .app-empty-icon {
+    @apply text-status-error-soft-content;
+  }
+  .app-filter-more[data-pressed] {
     @apply bg-hover;
   }
 

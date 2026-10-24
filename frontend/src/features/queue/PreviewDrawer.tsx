@@ -20,7 +20,14 @@ import { Kbd } from '../../ui/Kbd';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
-import { CHANNEL_LABEL, OUTCOME_LABEL, PRODUCT_LABEL, REOPEN_REASON_LABEL, roundLabel } from './labels';
+import {
+  CHANNEL_LABEL,
+  MARKET_LABEL,
+  OUTCOME_LABEL,
+  PRODUCT_LABEL,
+  REOPEN_REASON_LABEL,
+  roundLabel,
+} from './labels';
 import { reviewPath } from './reviewPath';
 import { TagEditor } from './TagEditor';
 import { canEditFields, canEditRisk, useItemPatch } from './useItemPatch';
@@ -161,7 +168,7 @@ function DrawerBody({
           className="app-btn app-drawer-open"
           data-variant="primary"
         >
-          <Icon name="action.open_external" size={16} />
+          <Icon name="action.open" size={16} />
           Open review
           <Kbd keys={['o']} />
         </a>
@@ -189,7 +196,9 @@ function DrawerBody({
             </span>
           </Fact>
           <Fact label="Planned run">{runDates(item)}</Fact>
-          <Fact label="Markets">{item.markets.length > 0 ? item.markets.join(', ') : '—'}</Fact>
+          <Fact label="Markets">
+            {item.markets.length > 0 ? item.markets.map((m) => MARKET_LABEL[m]).join(', ') : '—'}
+          </Fact>
           {item.risk_tier_overridden && canEditRisk(viewer) && (
             <Fact label="Risk">Overridden by a reviewer</Fact>
           )}

@@ -17,6 +17,7 @@ import {
 } from '../../api/generated/items/items';
 import type { ItemDetailOut, ItemPageOut, ItemRowOut, ItemUpdateIn } from '../../api/generated/model';
 import { errorMessage } from '../../ui/errorMessage';
+import { canAssign, canClaim, useAssign, useClaim } from './useAssignment';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { showToast } from '../../ui/toast';
 import type { QueueCellContextValue } from './cellContext';
@@ -121,6 +122,8 @@ export function useItemPatch() {
 /** What the table's editable cells need for this viewer. */
 export function useQueueCells(viewer: Viewer): Omit<QueueCellContextValue, 'now' | 'activeId'> {
   const { mutate } = useItemPatch();
+  const { claim } = useClaim();
+  const { assign } = useAssign();
   return useMemo(
     () => ({
       canEditRisk: () => canEditRisk(viewer),
@@ -128,7 +131,11 @@ export function useQueueCells(viewer: Viewer): Omit<QueueCellContextValue, 'now'
       save: (row: ItemRowOut, patch: ItemUpdateIn) => {
         mutate({ itemId: row.id, data: patch });
       },
+      canClaim: (row: ItemRowOut) => canClaim(viewer, row),
+      canAssign: (row: ItemRowOut) => canAssign(viewer, row),
+      claim,
+      assign,
     }),
-    [viewer, mutate],
+    [viewer, mutate, claim, assign],
   );
 }

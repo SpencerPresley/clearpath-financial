@@ -88,7 +88,8 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           </Button>
           <div className="app-signin-demo">
             <p className="text-meta font-medium text-muted">Demo accounts</p>
-            <ul className="flex flex-col gap-0.5">
+            <p className="text-meta text-muted">Pick one to fill in the email.</p>
+            <ul className="app-signin-demo-list gap-0.5">
               {DEMO_ACCOUNTS.map((account) => (
                 <li key={account.email}>
                   <button

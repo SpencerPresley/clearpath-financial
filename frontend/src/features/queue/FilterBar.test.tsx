@@ -120,4 +120,16 @@ describe('FilterBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(spy).toHaveBeenLastCalledWith(viewSearch('mine'));
   });
+
+  it('keeps less-used filters under More filters until they have a value', async () => {
+    const spy = vi.fn();
+    renderWithQuery(<Harness initial={viewSearch('mine')} spy={spy} />);
+    expect(screen.queryByRole('button', { name: /^Product/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Product' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Credit card' }));
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ product: ['credit_card'] }));
+    await userEvent.keyboard('{Escape}{Escape}');
+    expect(await screen.findByRole('button', { name: 'Product: Credit card' })).toBeInTheDocument();
+  });
 });

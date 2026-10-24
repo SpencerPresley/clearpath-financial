@@ -67,7 +67,7 @@ describe('QueuePage', () => {
     expect(await screen.findByRole('heading', { name: "Couldn't load the queue" })).toBeInTheDocument();
     expect(screen.getByText('The queue is temporarily unavailable.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '8 Mine' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '8 My queue' })).toBeInTheDocument();
   });
 
   it('drives the list from the keyboard: j/k, x, Enter, Escape, o', async () => {
@@ -126,5 +126,28 @@ describe('QueuePage', () => {
     expect(await screen.findByRole('grid', { name: 'Submitted' })).toBeInTheDocument();
     expect(router.state.location.search).toMatchObject({ layout: 'board', mine: true });
     expect(screen.queryByRole('button', { name: 'Status' })).toBeNull();
+  });
+
+  it('keeps the filters in place while rows are selected', async () => {
+    serveItems(queueRows());
+    renderApp('/');
+    await screen.findByText('RateRadar lead-gen form copy');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select CP-1044' }));
+    expect(await screen.findByRole('toolbar', { name: 'Bulk actions' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Filters' })).toBeInTheDocument();
+  });
+
+  it('steps Risk, Partner, Assignee, and Round aside while the preview is open', async () => {
+    const rows = queueRows();
+    serveItems(rows);
+    const [first] = rows;
+    if (first === undefined) throw new Error('fixture needs a row');
+    server.use(getGetItemMockHandler(makeDetail(first)));
+    renderApp(`/?item=${String(first.id)}`);
+    await screen.findByRole('complementary', { name: `Preview ${first.key}` });
+    expect(await screen.findByRole('columnheader', { name: 'Findings' })).toBeInTheDocument();
+    for (const name of ['Risk', 'Partner', 'Assignee', 'Round']) {
+      expect(screen.queryByRole('columnheader', { name })).toBeNull();
+    }
   });
 });

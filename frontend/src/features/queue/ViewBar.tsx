@@ -26,6 +26,7 @@ import {
 import type { SavedViewOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { errorMessage } from '../../ui/errorMessage';
+import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { showToast } from '../../ui/toast';
 import {
@@ -120,7 +121,7 @@ export function ViewBar({ search, columns, onSelect }: ViewBarProps) {
   };
 
   return (
-    <div className="app-view-bar">
+    <div className="app-view-group">
       <div className="app-view-tabs" role="group" aria-label="Views">
         {BUILT_IN_VIEWS.map((view) => (
           <ToggleButton
@@ -178,45 +179,54 @@ export function ViewBar({ search, columns, onSelect }: ViewBarProps) {
             </span>
           );
         })}
-        {views.isError && (
-          <span className="app-inline-error">
-            <span>Couldn't load saved views.</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() => {
-                void views.refetch();
-              }}
-            >
-              Retry
+      </div>
+      <div className="app-view-actions">
+        {active.kind !== 'custom' && active.modified && <span className="app-view-modified">Modified</span>}
+        {canSave && (
+          <DialogTrigger>
+            <Button size="sm" variant="ghost" icon="action.save_view">
+              Save view
             </Button>
-          </span>
+            <Popover className="app-popover p-3" placement="bottom start" offset={4}>
+              <Dialog aria-label="Save view" className="outline-none">
+                {({ close }) => (
+                  <SaveViewForm
+                    search={search}
+                    columns={columns}
+                    close={close}
+                    onSaved={(view) => {
+                      void qc.invalidateQueries({ queryKey: getListSavedViewsQueryKey() });
+                      showToast({ title: `Saved view “${view.name}”` });
+                      openSaved(view);
+                    }}
+                  />
+                )}
+              </Dialog>
+            </Popover>
+          </DialogTrigger>
         )}
       </div>
-      {active.kind !== 'custom' && active.modified && <span className="app-view-modified">Modified</span>}
-      {canSave && (
-        <DialogTrigger>
-          <Button size="sm" variant="ghost" icon="action.save_view">
-            Save view
-          </Button>
-          <Popover className="app-popover p-3" placement="bottom start" offset={4}>
-            <Dialog aria-label="Save view" className="outline-none">
-              {({ close }) => (
-                <SaveViewForm
-                  search={search}
-                  columns={columns}
-                  close={close}
-                  onSaved={(view) => {
-                    void qc.invalidateQueries({ queryKey: getListSavedViewsQueryKey() });
-                    showToast({ title: `Saved view “${view.name}”` });
-                    openSaved(view);
-                  }}
-                />
-              )}
-            </Dialog>
-          </Popover>
-        </DialogTrigger>
-      )}
     </div>
+  );
+}
+
+/** Shown in the filter row (not after the tabs) so a failure never pushes the toolbar onto a second line. */
+export function SavedViewsError() {
+  const views = useListSavedViews();
+  if (!views.isError) return null;
+  return (
+    <span className="app-inline-error" role="status">
+      <Icon name="feedback.error" size={14} />
+      <span>Couldn't load saved views.</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        onPress={() => {
+          void views.refetch();
+        }}
+      >
+        Retry
+      </Button>
+    </span>
   );
 }
