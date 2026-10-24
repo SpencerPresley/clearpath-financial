@@ -128,14 +128,6 @@ STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/bulk/fast-track-approve", {"item_ids": [1], "reason": "Numbers only"}),
     ("post", "/api/terms/impact-preview", None),
     ("post", "/api/terms", None),
-    ("post", "/api/exports", {"filters": {}}),
-    ("get", "/api/exports/1", None),
-    ("get", "/api/items/{item}/evidence-pack", None),
-    ("post", "/api/imports/sample", None),
-    ("get", "/api/imports/1", None),
-    ("put", "/api/imports/1/mapping", {"columns": [{"source": "Request ID", "target": "legacy_ref"}]}),
-    ("get", "/api/imports/1/preview", None),
-    ("post", "/api/imports/1/commit", {}),
     ("get", "/api/metrics/summary", None),
     ("get", "/api/metrics/series?metric=rounds_per_item", None),
     ("post", "/api/assistant/threads", None),
@@ -195,18 +187,6 @@ def test_stub_still_validates_input_first(marketer: User) -> None:
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
-
-
-@pytest.mark.django_db
-def test_upload_import_stub_accepts_a_file(admin_user: User) -> None:
-    from django.core.files.uploadedfile import SimpleUploadedFile
-
-    client = Client()
-    client.force_login(admin_user)
-
-    response = client.post("/api/imports", {"file": SimpleUploadedFile("tracker.xlsx", b"PK...")})
-
-    assert response.status_code == 501
 
 
 @pytest.mark.django_db
