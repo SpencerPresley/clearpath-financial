@@ -54,8 +54,12 @@ class Finding(models.Model):
                 condition=~Q(state=FindingState.DISMISSED.value) | Q(GreaterThan(Length(Trim("reason")), 0)),
                 name="finding_dismissal_has_reason",
             ),
+            # A resolution has a time and a person, except a dismissal by the system (evidence attached that
+            # answers the finding, `checks.services.recheck_for_evidence`), which has no person.
             models.CheckConstraint(
-                condition=Q(state=FindingState.OPEN.value) | Q(resolved_by__isnull=False, resolved_at__isnull=False),
+                condition=Q(state=FindingState.OPEN.value)
+                | Q(resolved_by__isnull=False, resolved_at__isnull=False)
+                | Q(state=FindingState.DISMISSED.value, resolved_at__isnull=False),
                 name="finding_resolution_recorded",
             ),
             models.CheckConstraint(

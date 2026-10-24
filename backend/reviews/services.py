@@ -22,7 +22,7 @@ from audit.payloads import (
     ItemSubmittedPayload,
 )
 from audit.services import record_event
-from checks.services import run_code_checks
+from checks.services import recheck_for_evidence, run_code_checks
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import (
     PARTNER_CHANNELS,
@@ -41,7 +41,7 @@ from core.domain import (
 from core.errors import InvalidInput, NotFound, NotPermitted
 from core.permissions import REVIEW_ROLES, has_role, require_role
 from partners.models import Partner
-from reviews.assignment import auto_assign
+from reviews.assignment import auto_assign, locked_item
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, ReviewItem, SavedView, Version
 from reviews.risk import derive_risk_tier
@@ -322,7 +322,8 @@ def _sha256(file: UploadedFile) -> str:
 def add_attachment(
     *, actor: User, owner: AttachmentOwner, kind: AttachmentKind, file: UploadedFile, clock: Clock = SYSTEM_CLOCK
 ) -> AttachmentRef:
-    """Store an evidence file with its hash. Immutable: replacing a file adds a new attachment."""
+    """Store an evidence file with its hash. Immutable: replacing a file adds a new attachment. On an item under
+    review, the code checks re-run on the current version in the same transaction (`recheck_for_evidence`)."""
     item_id: int | None = None
     owner_fields: dict[str, ReviewItem | Version | Partner]
     if owner.kind == "partner":
@@ -349,6 +350,10 @@ def add_attachment(
     sha256 = _sha256(file)
     now = clock.now()
     with transaction.atomic():
+        if item_id is not None:
+            # Lock before the insert: the insert's FK takes FOR KEY SHARE on the item, and upgrading that to
+            # the re-check's FOR UPDATE would deadlock two concurrent uploads.
+            locked_item(item_id)
         attachment = Attachment.objects.create(
             kind=kind,
             file=file,
@@ -371,6 +376,8 @@ def add_attachment(
             actor=actor,
             at=now,
         )
+        if item_id is not None:
+            recheck_for_evidence(item_id=item_id, kind=kind, clock=clock)
     return AttachmentRef(id=attachment.pk, sha256=sha256)
 
 
