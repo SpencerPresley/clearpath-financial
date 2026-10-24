@@ -74,9 +74,9 @@ function Count({
     >
       <span className="app-terms-count-figure" aria-hidden="true">
         {value}
+        {mark !== undefined && <StatusMark status={mark} />}
       </span>
       <span className="app-terms-count-label" aria-hidden="true">
-        {mark !== undefined && <StatusMark status={mark} />}
         {label}
       </span>
       {detail !== undefined && (
@@ -90,26 +90,47 @@ function Count({
 
 /** Placeholder in the loaded panel's shape: summary line, the counts row, one more line. */
 function ImpactSkeleton() {
+  // Each bar sits in the loaded element's own type, so every line keeps its height and nothing moves when the
+  // preview lands: summary, the counts row, two lines, then partners.
   return (
     <div role="status" aria-label="Checking the impact" className="app-terms-impact-body">
-      <SkeletonText width="85%" />
+      <p className="app-terms-summary app-tp-skel-line">
+        <SkeletonText width="85%" />
+      </p>
       <div className="app-terms-counts">
         {Array.from({ length: 3 }, (_, i) => (
           <div key={i} className="app-terms-count">
-            <span className="app-terms-count-figure">
+            <span className="app-terms-count-figure app-tp-skel-line">
               <SkeletonText width="1.5rem" />
             </span>
-            <span className="app-terms-count-label">
+            <span className="app-terms-count-label app-tp-skel-line">
               <SkeletonText width="6rem" />
             </span>
-            <span className="app-terms-count-detail">
+            <span className="app-terms-count-detail app-tp-skel-line">
               <SkeletonText width="4rem" />
             </span>
           </div>
         ))}
       </div>
-      <SkeletonText width="40%" />
-      <SkeletonText width="60%" />
+      <p className="app-terms-impact-line app-tp-skel-line">
+        <SkeletonText width="45%" />
+      </p>
+      <p className="app-terms-impact-line app-tp-skel-line">
+        <SkeletonText width="25%" />
+      </p>
+      <div>
+        <p className="app-panel-heading app-tp-skel-line">
+          <SkeletonText width="4rem" />
+        </p>
+        <ul className="app-terms-partners">
+          {[0, 1].map((i) => (
+            <li key={i}>
+              <SkeletonText width={i === 0 ? '6rem' : '5rem'} />
+              <SkeletonText width="3rem" />
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -171,8 +192,12 @@ export function ImpactPanel({
             <Count value={preview.will_expire} label="Expire" mark="expired" detail="not live" />
             <Count
               value={preview.already_in_rereview}
-              label="Already in re-review"
-              detail={`${String(refreshedCount(preview))} get new numbers`}
+              label="In re-review now"
+              detail={
+                preview.already_in_rereview === 0
+                  ? 'none'
+                  : `${String(refreshedCount(preview))} get new numbers`
+              }
             />
           </div>
           {preview.changed_fields.length > 0 && (
@@ -183,17 +208,18 @@ export function ImpactPanel({
           )}
           {preview.items.length > 0 && (
             <p className="app-terms-impact-line">
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={() => {
+              {/* A button, not a #hash link: the router would take the hash into the URL. */}
+              <button
+                type="button"
+                className="app-link app-terms-jump"
+                onClick={() => {
                   const section = document.getElementById(AFFECTED_ITEMS_ID);
                   section?.scrollIntoView({ block: 'start' });
                   section?.focus();
                 }}
               >
                 {`${plural(preview.items.length, 'affected item')} ↓`}
-              </Button>
+              </button>
             </p>
           )}
           {preview.partners.length > 0 && (

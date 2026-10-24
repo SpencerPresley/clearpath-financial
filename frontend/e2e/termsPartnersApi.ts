@@ -41,6 +41,8 @@ export interface TermsPartnersStub {
   partner?: Stub<PartnerDetailOut>;
   items?: Stub<ItemRowOut[]>;
   findings?: Stub<PartnerFindingOut[]>;
+  /** Another lead published this first: the first publish is a 409 and the current terms become it. */
+  publishConflict?: OfferTermsOut;
 }
 
 export interface Posted {
@@ -58,7 +60,9 @@ function failure(route: Route, status: number, what: string) {
     route,
     status === 404
       ? { code: 'not_found', message: `${what} doesn't exist.` }
-      : { code: 'server_error', message: `${what} are unavailable right now. Try again in a minute.` },
+      : status === 403
+        ? { code: 'not_permitted', message: `${what} are for reviewers and leads.` }
+        : { code: 'server_error', message: `${what} are unavailable right now. Try again in a minute.` },
     status,
   );
 }
@@ -73,6 +77,8 @@ async function serve<T>(route: Route, stub: Stub<T> | undefined, what: string, f
 export async function stubTermsPartners(page: Page, opts: TermsPartnersStub = {}): Promise<Posted[]> {
   const posted: Posted[] = [];
   let current = opts.current;
+  let conflict = opts.publishConflict;
+  let preview = opts.preview;
   await page.route(/\/(api|_allauth)\//, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -95,9 +101,28 @@ export async function stubTermsPartners(page: Page, opts: TermsPartnersStub = {}
     if (path === '/api/terms/current') return serve(route, current, 'Offer terms', CURRENT_TERMS);
     if (path === '/api/terms/impact-preview') {
       if (opts.previewDelayMs !== undefined) await new Promise((r) => setTimeout(r, opts.previewDelayMs));
-      return serve(route, opts.preview, 'Impact previews', IMPACT_PL);
+      return serve(route, preview, 'Impact previews', IMPACT_PL);
     }
     if (path === '/api/terms' && method === 'POST') {
+      if (conflict !== undefined) {
+        current = [conflict, ...CURRENT_TERMS.slice(1)];
+        const version = conflict.version;
+        preview ??= {
+          ...IMPACT_PL,
+          summary: IMPACT_PL.summary.replace('v12', `v${String(version)}`),
+          current_version: version,
+          next_version: version + 1,
+        };
+        conflict = undefined;
+        return fulfill(
+          route,
+          {
+            code: 'conflict',
+            message: `The offer terms changed since you opened this (v${String(version)} is in effect now). Review the impact again.`,
+          },
+          409,
+        );
+      }
       current = [PL_V13, ...CURRENT_TERMS.slice(1)];
       return fulfill(route, PL_V13, 201);
     }
@@ -127,6 +152,13 @@ export async function stubTermsPartners(page: Page, opts: TermsPartnersStub = {}
           return serve(route, opts.findings, 'Findings', []);
         }
         return fulfill(route, { rows: opts.findings, next_cursor: null });
+      }
+      const rule = url.searchParams.get('rule_id');
+      if (rule !== null) {
+        const rows = [...PARTNER_FINDINGS_PAGE_1, ...PARTNER_FINDINGS_PAGE_2].filter(
+          (f) => f.rule_id === rule,
+        );
+        return fulfill(route, { rows, next_cursor: null });
       }
       return url.searchParams.get('cursor') === 'page-2'
         ? fulfill(route, { rows: PARTNER_FINDINGS_PAGE_2, next_cursor: null })

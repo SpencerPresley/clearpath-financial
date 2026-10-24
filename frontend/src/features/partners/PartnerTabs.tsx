@@ -183,7 +183,7 @@ export function FindingsHistory({ partner, rule }: { partner: PartnerDetailOut; 
           params={{ partnerId: String(partner.id) }}
           search={{ tab: 'findings' }}
           replace
-          className="app-tp-link"
+          className="app-link"
         >
           Show all findings
         </Link>
@@ -312,7 +312,8 @@ export function RepeatIssues({ partner }: { partner: PartnerDetailOut }): ReactN
         <tbody>
           {partner.repeat_issues.map((issue) => (
             <tr key={issue.rule_id}>
-              <td className="app-tp-cell-title" title={issue.rule_title ?? issue.rule_id}>
+              {/* Title over id, wrapping: the title is the point, so it isn't cut off. */}
+              <td className="app-tp-rule-cell">
                 <Link
                   to="/partners/$partnerId"
                   params={{ partnerId: String(partner.id) }}
@@ -321,9 +322,7 @@ export function RepeatIssues({ partner }: { partner: PartnerDetailOut }): ReactN
                 >
                   {issue.rule_title ?? issue.rule_id}
                 </Link>
-                {issue.rule_title !== null && (
-                  <span className="app-muted font-mono app-tp-rule-id"> {issue.rule_id}</span>
-                )}
+                {issue.rule_title !== null && <span className="app-tp-rule-id">{issue.rule_id}</span>}
               </td>
               <td className="app-tp-cell-title" title={issue.citation}>
                 {issue.citation}

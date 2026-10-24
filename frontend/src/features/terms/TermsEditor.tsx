@@ -373,6 +373,12 @@ function EditorFrame({
   const [note, setNote] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // A rebase answers the 409 that prompted it: its notice replaces the error line.
+  const [seenRebase, setSeenRebase] = useState(rebase);
+  if (rebase !== seenRebase) {
+    setSeenRebase(rebase);
+    setFormError(null);
+  }
 
   const dirty = fieldsDirty || note.trim() !== '';
   useEffect(() => {
@@ -537,7 +543,7 @@ function EditorFrame({
             </>
           )}
           {changes.length > 0 && (
-            <dl className="app-details">
+            <dl className="app-details app-terms-confirm-counts">
               {changes.map((change) => (
                 <div key={change.field} className="app-detail-row">
                   <dt>{change.label}</dt>

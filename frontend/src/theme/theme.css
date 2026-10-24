@@ -2837,8 +2837,14 @@
   .app-tp-key {
     @apply inline-flex items-center gap-1.5 whitespace-nowrap;
   }
+  .app-tp-rule-cell {
+    @apply py-1.5;
+  }
+  .app-tp-rule-cell > a {
+    text-wrap: pretty;
+  }
   .app-tp-rule-id {
-    @apply text-meta;
+    @apply block truncate font-mono text-meta text-muted;
   }
   /* A narrowed findings history: what it's narrowed to, and the way back. */
   .app-tp-filter {
@@ -2890,6 +2896,12 @@
   }
   .app-terms-tab-lock {
     @apply pb-2 text-meta text-muted;
+  }
+  .app-terms-tabs .app-tab[data-disabled] {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .app-terms-jump {
+    @apply cursor-pointer self-start;
   }
   /* RAC marks the whole Tabs container focus-visible while anything inside has keyboard focus; the tab and
      the field show it instead. */
@@ -3057,12 +3069,12 @@
     @apply flex flex-col gap-0.5 bg-base-100 px-3 py-2;
   }
   .app-terms-count-figure {
-    @apply text-lg leading-6 font-semibold text-base-content tabular-nums;
+    @apply inline-flex items-center gap-1.5 text-lg leading-6 font-semibold text-base-content tabular-nums;
   }
   .app-terms-count-label {
-    @apply inline-flex items-center gap-1.5 text-meta text-muted;
+    @apply text-meta whitespace-nowrap text-muted;
   }
-  .app-terms-count-label .app-status-mark {
+  .app-terms-count-figure .app-status-mark {
     @apply size-4;
   }
   .app-terms-count-detail {

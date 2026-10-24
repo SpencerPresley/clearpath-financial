@@ -6,7 +6,7 @@
 import { expect as baseExpect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { PARTNER_DETAIL, REVIEWER_ME } from '../src/test/fixtures/termsPartners';
+import { PARTNER_DETAIL, PL_V12, REVIEWER_ME } from '../src/test/fixtures/termsPartners';
 import { stubTermsPartners } from './termsPartnersApi.ts';
 import type { TermsPartnersStub } from './termsPartnersApi.ts';
 
@@ -146,6 +146,65 @@ const shots: Shot[] = [
     },
   },
   {
+    name: 'terms-edit-min-over-max',
+    path: '/terms',
+    ready: async (page) => {
+      await editTerms(page, '40');
+      await expect(page.getByText('APR min must be at most APR max.')).toBeVisible();
+      await expect(page.getByText('Fix the highlighted fields to preview the impact.')).toBeVisible();
+    },
+  },
+  {
+    name: 'terms-edit-retyping',
+    path: '/terms',
+    ready: async (page) => {
+      await editTerms(page, '12.99');
+      await expect(page.getByRole('button', { name: /Publish v13/ })).toBeEnabled();
+      await page.getByRole('textbox', { name: 'APR min' }).fill('');
+      await expect(page.getByRole('region', { name: /Impact of publishing/ })).toHaveAttribute(
+        'aria-busy',
+        'true',
+      );
+    },
+  },
+  {
+    name: 'terms-edit-rebased',
+    path: '/terms',
+    stub: {
+      publishConflict: {
+        ...PL_V12,
+        id: 113,
+        version: 13,
+        created_by_name: 'Sam Okafor',
+        values: { ...PL_V12.values, apr_max: '29.99' } as typeof PL_V12.values,
+      },
+    },
+    ready: async (page) => {
+      await editTerms(page, '12.99');
+      const publish = page.getByRole('button', { name: /Publish v13/ });
+      await expect(publish).toBeEnabled();
+      await publish.click();
+      await page
+        .getByRole('alertdialog', { name: 'Publish personal loan terms v13?' })
+        .getByRole('button', { name: 'Publish v13' })
+        .click();
+      await expect(page.getByText(/v13 was published since you opened this/)).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'APR max' })).toHaveValue('29.99');
+      await expect(page.getByRole('button', { name: 'Publish v14…' })).toBeEnabled();
+    },
+  },
+  {
+    name: 'terms-edit-locked-tabs',
+    path: '/terms',
+    ready: async (page) => {
+      await editTerms(page, '12.99');
+      await expect(
+        page.getByText('Publish or cancel your personal loan edits to switch products.'),
+      ).toBeVisible();
+      await expect(page.getByRole('table', { name: 'Affected items' })).toBeAttached();
+    },
+  },
+  {
     name: 'terms-edit-preview-error',
     path: '/terms',
     stub: { preview: 503 },
@@ -233,6 +292,33 @@ const shots: Shot[] = [
     path: '/partners/31?tab=findings',
     ready: async (page) => {
       await expect(page.getByRole('list', { name: 'Findings history, newest first' })).toBeVisible();
+    },
+  },
+  {
+    name: 'partners-detail-findings-rule',
+    path: '/partners/31?tab=findings&rule=endorsement.material_connection',
+    ready: async (page) => {
+      await expect(page.getByText('Show all findings')).toBeVisible();
+      await expect(page.getByRole('list', { name: 'Findings history, newest first' })).toBeVisible();
+    },
+  },
+  {
+    name: 'partners-detail-findings-forbidden',
+    path: '/partners/31?tab=findings',
+    stub: { findings: 403 },
+    ready: async (page) => {
+      await expect(page.getByText(/Findings are for reviewers and leads/)).toBeVisible();
+    },
+  },
+  {
+    name: 'partners-detail-marketer',
+    path: '/partners/31',
+    stub: {
+      me: { ...REVIEWER_ME, roles: ['marketer'], effective_roles: ['marketer'] },
+      partner: { ...PARTNER_DETAIL, attachments: [] },
+    },
+    ready: async (page) => {
+      await expect(page.getByText('Agreements are visible to reviewers and leads.')).toBeVisible();
     },
   },
   {
