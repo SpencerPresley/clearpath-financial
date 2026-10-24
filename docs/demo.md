@@ -60,7 +60,7 @@ she can also:
 
 ### Marketer (Priya)
 
-You land on **My submissions**.
+Sign-in opens the shared queue view; open **My submissions** in the nav.
 
 - **Waiting on you**: **CP-22** came back with changes requested. Samuel's note asks for the card issuer line,
   so **Resubmit** with it added. **CP-10** and **CP-11** expired, one after the rate change and one past its
@@ -69,6 +69,8 @@ You land on **My submissions**.
 - **New submission**: paste copy for any product and channel and watch the code checks and AI pre-review land.
 
 ### Admin (Avery)
+
+Sign-in opens the shared queue view (Avery reviews nothing, so it's empty).
 
 - **Import** shows the Excel tracker import that brought in the 178 legacy rows (matched to partners where the
   tracker named one). They're in the **Library** with `legacy=only`.

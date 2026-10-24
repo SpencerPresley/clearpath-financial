@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Final
 
 from django.db import connection, transaction
+from django.db.models import Q
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
@@ -25,12 +26,13 @@ from demo.reset import SeedResult
 
 logger = logging.getLogger(__name__)
 
-# A queued or running reset older than this lost its worker or its message: the task's hard limit is 300 s
-# (CELERY_TASK_TIME_LIMIT), so a live one can't still be going. Reading or requesting marks it failed, so the UI's
-# poll ends and a new request starts a fresh job. The reset is one transaction, so a dead one changed nothing.
+# A reset queued this long lost its message (or the workers are swamped), and one running this long lost its
+# worker: the task's hard limit is 300 s (CELERY_TASK_TIME_LIMIT). Reading or requesting marks it failed, so the
+# UI's poll ends and a new request starts a fresh job. Nothing changed: the reset is one transaction, and an
+# abandoned job delivered late finds itself failed and doesn't run (start_reset).
 STALE_AFTER: Final = timedelta(minutes=15)
 STALE_MESSAGE: Final = (
-    "The reset didn't finish within 15 minutes, so it was abandoned and nothing changed. "
+    "The reset didn't start or didn't finish within 15 minutes, so it was abandoned and nothing changed. "
     "Check that a worker is running, then try again."
 )
 REQUEST_LOCK_KEY: Final = 0x4445_4D52  # "DEMR"
@@ -80,7 +82,12 @@ enqueue: Callable[[int], None] = _enqueue_task
 
 
 def _abandon_stale(now: datetime) -> None:
-    DemoReset.objects.filter(status__in=IN_FLIGHT, requested_at__lt=now - STALE_AFTER).update(
+    """A running job is judged by when it started, not when it was asked for: one that waited in the queue and
+    then started is mid-run, not dead."""
+    cutoff = now - STALE_AFTER
+    queued_too_long = Q(status=ResetStatus.QUEUED.value, requested_at__lt=cutoff)
+    running_too_long = Q(status=ResetStatus.RUNNING.value, started_at__lt=cutoff)
+    DemoReset.objects.filter(queued_too_long | running_too_long).update(
         status=ResetStatus.FAILED.value, finished_at=now, error=STALE_MESSAGE
     )
 

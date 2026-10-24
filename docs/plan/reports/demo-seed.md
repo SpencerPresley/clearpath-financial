@@ -48,21 +48,23 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 ## Verification
 
 - Backend, after rebasing on `64c7fb6`:
-  - `pytest`: 1458 passed;
+  - `pytest`: 1459 passed;
   - `ruff check`, `ruff format --check` and `pyrefly check` (0 errors) are clean;
   - `makemigrations --check` reports no changes;
-  - the exported schema matches the committed one.
-- Frontend:
-  - `npm run test:run`: 420 passed;
-  - `typecheck`, `lint` and `format:check` are clean.
-- Demo tests (`backend/demo/tests/`, 36 in all):
+  - the exported schema matches the committed one;
+  - `make semgrep` reports 0 findings.
+- Frontend, after the rebase:
+  - `npm run test:run`: 460 passed;
+  - `typecheck`, `lint`, `format:check` and `build` are clean.
+- Demo tests (`backend/demo/tests/`, 37 in all):
   - the catalog is pure: rule coverage, AI quotes are substrings, steps are in order;
   - the seed runs on one committed DB per module and checks: status counts, an event per item, every rule
     persisted, triage states, AI run statuses, legacy counts, terms versions, every handler's receipts present
     and nothing enqueued to the real worker;
   - a failing reset changes nothing, and reset restores the same `{title: (pk, status)}` snapshot;
   - API: two `seed_demo` runs on an empty DB, an admin reset after which the admin is still signed in, the
-    in-flight job is returned to a second request, non-admins get 403, failed and stale jobs are reported.
+    in-flight job is returned to a second request, non-admins get 403, failed and stale jobs are reported,
+    and a job that started late is judged by its start.
 - Full stack, run against a fresh database `clearpath_wsl`:
   - setup: migrate, `seed_demo`, then `seed_demo` again (no-op); runserver on 8017, Vite on 5183, and a Celery
     worker on a private Redis DB;
@@ -83,6 +85,9 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
   `queued` forever. Now stale in-flight rows are marked failed on read and on request (`STALE_MESSAGE`), with
   tests. The reset is one transaction, and the task's hard limit is 300 s, so a job past 15 minutes is dead and
   changed nothing.
+- **Running reset jobs were misjudged as stale.** A job that waited in the queue and then started was judged
+  by `requested_at`, and could be marked failed mid-run. Running jobs are now judged by `started_at`. A queued job
+  that's abandoned and delivered late finds itself failed and doesn't run.
 - **The dialog trapped the admin while the job ran.** It now closes freely. Polling continues, and the result
   arrives as a toast.
 
@@ -114,6 +119,11 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
 - **Only Django-model tables are wiped.** `domain_tables()` comes from `apps.get_models()`. If K's LangGraph
   checkpointer keeps its own non-model tables, a reset leaves old assistant threads behind; those would need
   adding to the TRUNCATE list.
+- **Finding for J: marketer and admin land on a page that isn't in their nav.** The index route sends every
+  role to the Queue (`/?view=mine&status=…`). Queue isn't in the marketer's or admin's nav, so their first
+  screen is an empty queue they can't get back to (`marketer.png`, `admin.png`). The marketer should land on
+  **My submissions**. `docs/demo.md` describes what happens today; I didn't change the route because it isn't
+  L's file.
 - **The reset holds an advisory lock and truncates every domain table for ~10 s.** Requests in that window wait
   on the lock. Fine for a demo, and the reason it's admin-only.
 

@@ -14,7 +14,7 @@ from accounts.models import User
 from core.clock import FixedClock
 from demo import tasks
 from demo.content.people import PERSONAS
-from demo.services import STALE_AFTER, STALE_MESSAGE, ResetStatus, get_reset, request_reset
+from demo.services import STALE_AFTER, STALE_MESSAGE, ResetStatus, get_reset, request_reset, start_reset
 from demo.users import demo_password, upsert_personas
 from reviews.models import ReviewItem
 
@@ -130,3 +130,22 @@ def test_a_reset_within_the_window_is_still_in_flight(
     seen = get_reset(viewer=admin, reset_id=job.id, clock=FixedClock(asked + STALE_AFTER - timedelta(seconds=1)))
 
     assert seen.status == ResetStatus.QUEUED
+
+
+def test_a_reset_that_waited_in_the_queue_then_started_is_judged_by_its_start(
+    personas: dict[str, User], django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    """Queued 14 minutes behind other work, then picked up: at minute 16 it's mid-run, not dead."""
+    admin = personas["admin"]
+    asked = datetime(2026, 10, 24, 22, 0, tzinfo=UTC)
+    with django_capture_on_commit_callbacks(execute=False):
+        job = request_reset(actor=admin, clock=FixedClock(asked))
+    start_reset(reset_id=job.id, clock=FixedClock(asked + timedelta(minutes=14)))
+
+    seen = get_reset(viewer=admin, reset_id=job.id, clock=FixedClock(asked + timedelta(minutes=16)))
+    gone = get_reset(
+        viewer=admin, reset_id=job.id, clock=FixedClock(asked + timedelta(minutes=14, seconds=1) + STALE_AFTER)
+    )
+
+    assert seen.status == ResetStatus.RUNNING
+    assert gone.status == ResetStatus.FAILED
