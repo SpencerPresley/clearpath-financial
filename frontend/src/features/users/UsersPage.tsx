@@ -238,7 +238,8 @@ export function UsersPage() {
           </h1>
           <p className="app-users-detail">
             {active === undefined ? ' ' : `${plural(active, 'active account')}. `}
-            Out-of-office reviewers aren&apos;t auto-assigned new work.
+            Out-of-office reviewers aren&apos;t auto-assigned new work. Deactivating a reviewer reassigns
+            their open items.
           </p>
         </div>
         {!adding && (

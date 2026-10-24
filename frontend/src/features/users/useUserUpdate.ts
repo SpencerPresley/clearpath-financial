@@ -1,12 +1,14 @@
 /*
  * One PATCH /admin/users/{id} per change. On success the row is replaced in the cached list (no refetch flash) and
- * every other user list (assignee pickers, @mentions) and the workload are refreshed. A refusal (409: the last
+ * every other user list (assignee pickers, @mentions), the workload and the queue are refreshed (deactivating a
+ * reviewer reassigns their open items). A refusal (409: the last
  * admin, deactivating yourself) is kept as the page's one error line; the row keeps the server's state.
  */
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useUpdateUser } from '../../api/generated/admin/admin';
+import { getGetQueueStatsQueryKey, getListItemsQueryKey } from '../../api/generated/items/items';
 import type { UserOut, UserUpdateIn } from '../../api/generated/model';
 import { getGetReviewerWorkloadQueryKey, getListUsersQueryKey } from '../../api/generated/users/users';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
@@ -31,6 +33,8 @@ export function useUserUpdate() {
             JSON.stringify(q.queryKey) !== JSON.stringify(getListUsersQueryKey(USERS_PARAMS)),
         });
         void qc.invalidateQueries({ queryKey: getGetReviewerWorkloadQueryKey() });
+        void qc.invalidateQueries({ queryKey: getListItemsQueryKey().slice(0, 1) });
+        void qc.invalidateQueries({ queryKey: getGetQueueStatsQueryKey() });
       },
       onError: (err, { userId }) => {
         setError({ userId, message: apiErrorMessage(err) });

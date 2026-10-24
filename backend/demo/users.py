@@ -9,7 +9,9 @@ from collections.abc import Iterable
 from typing import Final
 
 from django.conf import settings
+from django.contrib.auth import SESSION_KEY
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
@@ -43,6 +45,27 @@ def check_password_strength(password: str) -> None:
         validate_password(password)
     except ValidationError as exc:
         raise InvalidInput.for_field("password", f"DEMO_USER_PASSWORD is too weak: {' '.join(exc.messages)}") from exc
+
+
+def remove_added_people(personas: Iterable[Persona], *, keep: User | None) -> int:
+    """Delete accounts that aren't personas, and end their sessions. A reset truncates the events, so an account
+    added after the seed would otherwise exist with no USER_CREATED or any other trail.
+
+    Kept: `keep` (whoever pressed Reset, so they stay signed in even if they were added after the seed), and
+    operator accounts (`is_staff`: django-admin users made with createsuperuser, which belong to the deployment,
+    not the demo). Returns how many were removed. Run after the domain tables are emptied: nothing else
+    references these users by then (DemoReset.requested_by is SET_NULL)."""
+    removed = User.objects.exclude(email__in=[p.email for p in personas]).exclude(is_staff=True)
+    if keep is not None:
+        removed = removed.exclude(pk=keep.pk)
+    ids = {str(pk) for pk in removed.values_list("pk", flat=True)}
+    if not ids:
+        return 0
+    # Sessions store the user id inside the encoded data; the demo has a handful, so decode them.
+    ended = [s.pk for s in Session.objects.all() if s.get_decoded().get(SESSION_KEY) in ids]
+    Session.objects.filter(pk__in=ended).delete()
+    removed.delete()
+    return len(ids)
 
 
 def upsert_personas(personas: Iterable[Persona], *, password: str) -> dict[str, User]:

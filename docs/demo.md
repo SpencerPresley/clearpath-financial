@@ -95,8 +95,10 @@ You land on **Import**.
   date from last round", "Skipped: duplicate"). **Load sample tracker** walks the same steps on a new copy; since
   the rows are already in, its preview says so in one line and links back to that import.
 - **Users**: everyone's roles, availability and account. Toggle a role, mark Leah back in office, add someone.
-  There's always an admin: you can't deactivate yourself or drop the last admin role. Reviewers set their own
-  availability from the account menu. **Metrics** is in an admin's nav too.
+  There's always an admin: you can't deactivate yourself or drop the last admin role. Deactivating a reviewer
+  hands their open items to whoever has the lowest load (or the unassigned pool). Reviewers set their own
+  availability from the account menu. **Metrics** is in an admin's nav too. **Reset demo** puts the team back as
+  seeded: people you added are removed and signed out, and everyone's roles and availability are restored.
 - **Reset demo**: account menu (top right), **Reset demo…**, confirm. It runs as a background job, takes about
   ten seconds, and everyone stays signed in. The dialog can be closed while it runs; a notice appears when it's
   done.

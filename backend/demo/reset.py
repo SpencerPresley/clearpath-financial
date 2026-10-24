@@ -4,8 +4,10 @@
   password, a story the services refuse) leaves the previous demo exactly as it was, and two resets run one after
   the other. TRUNCATE is allowed by the insert-only triggers on purpose (`core.db.forbid_mutation`); RESTART
   IDENTITY makes item keys (CP-1, CP-2, ...) the same after every reset.
-- **People survive.** Users and sessions aren't truncated: the admin who pressed Reset stays signed in, and the
-  personas are upserted (password, roles, availability) instead of recreated.
+- **The seeded people come back.** Users and sessions aren't truncated: the admin who pressed Reset stays signed
+  in, and the personas are upserted (password, roles, active, availability) instead of recreated. Accounts added
+  after the seed are deleted with their sessions (their events are gone, and no account exists without its
+  trail), except the one who pressed Reset and operator (`is_staff`) accounts (`demo.users.remove_added_people`).
 - **Nothing leaks to the worker.** While the seed's transaction is open, the beat dispatcher can't see its events
   (they're uncommitted) and the runner delivers them in-process, writing their receipts. The handlers that would
   enqueue Celery work on commit (the AI check, the terms fan-out, the import commit, the drift check) are pointed
@@ -33,7 +35,7 @@ from core.domain import EntityType, EventType
 from demo.content import CATALOG
 from demo.runner import run_catalog
 from demo.story import Catalog
-from demo.users import check_password_strength, demo_password, upsert_personas
+from demo.users import check_password_strength, demo_password, remove_added_people, upsert_personas
 from drift import services as drift_services
 from drift.demo import reset_demo_pages
 from imports import services as import_services
@@ -148,6 +150,7 @@ def reset_demo(
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", [RESET_LOCK_KEY])
         _truncate()
+        remove_added_people(catalog.personas, keep=requested_by)
         users = upsert_personas(catalog.personas, password=password)
         run = run_catalog(catalog=catalog, now=at, users=users)
         # The demo partner pages' state is in the cache, not the database. Set inside the transaction so a cache

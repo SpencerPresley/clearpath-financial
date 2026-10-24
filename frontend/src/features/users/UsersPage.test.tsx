@@ -115,7 +115,9 @@ describe('Users', () => {
     expect(within(me).getByRole('button', { name: 'Deactivate Morgan Admin' })).toBeDisabled();
     expect(within(me).getByText('You')).toBeInTheDocument();
     await userEvent.click(within(me).getByRole('button', { name: 'Admin' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    // Not findByRole('alert') alone: the topbar's API-health badge is an alert too when the mock says it's down.
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toContain(
       "Couldn't change Morgan Admin: Morgan Admin is the only admin. Make someone else an admin first.",
     );
     expect(within(await row(/Morgan Admin/)).getByRole('button', { name: 'Admin' })).toHaveAttribute(

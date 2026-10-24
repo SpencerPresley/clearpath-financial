@@ -12,8 +12,11 @@ from accounts.models import User
 from audit.models import Event
 from conftest import TEST_PASSWORD, UserFactory
 from core.clock import FixedClock
-from core.domain import EventType, Role
+from core.domain import EventType, ItemStatus, RiskTier, Role
 from core.errors import Conflict, InvalidInput, NotFound, NotPermitted
+from reviews.assignment import auto_assign, locked_item
+from reviews.models import QUEUE_STATUSES, ReviewItem
+from reviews.tests.factories import make_item
 
 pytestmark = pytest.mark.django_db
 
@@ -231,6 +234,146 @@ def test_two_admins_demoting_each_other_at_once_leave_one_admin(user_factory: Us
 
     assert sorted(results.values()) == ["conflict", "ok"]
     assert User.objects.filter(roles__contains=[Role.ADMIN.value], is_active=True).count() == 1
+
+
+# --- deactivating a reviewer releases their queue -------------------------------------------------------------
+
+
+def _assigned(item_ids: list[int]) -> list[dict[str, object]]:
+    events = Event.objects.filter(type=EventType.ITEM_ASSIGNED.value, item_id__in=item_ids).order_by("id")
+    return [{**e.payload, "item": e.item_id, "actor": e.actor, "at": e.at} for e in events]  # pyrefly: ignore[missing-attribute]
+
+
+def test_deactivating_a_reviewer_reassigns_their_open_items_by_lowest_load(
+    admin_user: User, user_factory: UserFactory, marketer: User, clock: FixedClock
+) -> None:
+    sam = user_factory(roles=[Role.REVIEWER], display_name="Sam Okafor")
+    dana = user_factory(roles=[Role.REVIEWER], display_name="Dana Kim")
+    nikhil = user_factory(roles=[Role.REVIEWER], display_name="Nikhil Rao")
+    make_item(marketer, assignee=nikhil, risk_tier=RiskTier.HIGH, status=ItemStatus.IN_REVIEW)  # Nikhil: load 3
+    open_items = [
+        make_item(marketer, assignee=sam, risk_tier=RiskTier.HIGH, status=ItemStatus.SUBMITTED).pk,
+        make_item(marketer, assignee=sam, risk_tier=RiskTier.LOW, status=ItemStatus.IN_REVIEW).pk,
+        make_item(
+            marketer,
+            assignee=sam,
+            risk_tier=RiskTier.LOW,
+            status=ItemStatus.NEEDS_REREVIEW,
+            reopen_reason="approval_expired",
+        ).pk,
+    ]
+    # With the marketer or closed: no reviewer work waiting, so they stay put (a resubmission goes through
+    # sticky, which skips an inactive reviewer).
+    kept = [
+        make_item(marketer, assignee=sam, status=ItemStatus.CHANGES_REQUESTED).pk,
+        make_item(marketer, assignee=sam, status=ItemStatus.APPROVED).pk,
+    ]
+
+    services.update_user(actor=admin_user, user_id=sam.pk, changes=services.UserChanges(is_active=False), clock=clock)
+
+    events = _assigned(open_items)
+    # One at a time, each seeing the loads the previous one left: Dana 0 → 3 → 4, Nikhil 3.
+    assert [(e["item"], e["assignee_id"], e["mode"], e["reason"]) for e in events] == [
+        (open_items[0], dana.pk, "lowest_load", "Sam Okafor was deactivated. Dana Kim: load 0 vs Nikhil Rao 3"),
+        (open_items[1], nikhil.pk, "lowest_load", "Sam Okafor was deactivated. Nikhil Rao: load 3 vs Dana Kim 3"),
+        (open_items[2], dana.pk, "lowest_load", "Sam Okafor was deactivated. Dana Kim: load 3 vs Nikhil Rao 4"),
+    ]
+    assert {(e["previous_assignee_id"], e["actor"], e["at"]) for e in events} == {(sam.pk, admin_user, clock.now())}
+    assert set(ReviewItem.objects.filter(pk__in=kept).values_list("assignee_id", flat=True)) == {sam.pk}
+    assert not ReviewItem.objects.filter(assignee=sam, status__in=QUEUE_STATUSES).exists()
+
+
+def test_with_no_one_available_the_released_items_go_to_the_pool(
+    admin_user: User, user_factory: UserFactory, marketer: User
+) -> None:
+    sam = user_factory(roles=[Role.REVIEWER], display_name="Sam Okafor")
+    user_factory(roles=[Role.REVIEWER], display_name="Leah Brandt", is_available=False)
+    item = make_item(marketer, assignee=sam, status=ItemStatus.SUBMITTED)
+
+    services.update_user(actor=admin_user, user_id=sam.pk, changes=services.UserChanges(is_active=False))
+
+    (event,) = _assigned([item.pk])
+    assert (event["assignee_id"], event["mode"], event["reason"]) == (
+        None,
+        "pool",  # the ITEM_ASSIGNED handler tells the leads
+        "Sam Okafor was deactivated. No reviewer is available",
+    )
+    item.refresh_from_db()
+    assert (item.assignee_id, item.assigned_at) == (None, None)  # pyrefly: ignore[missing-attribute]
+
+
+def test_a_refused_deactivation_moves_nothing(admin_user: User, marketer: User) -> None:
+    admin_user.roles = [Role.ADMIN.value, Role.REVIEWER.value]
+    admin_user.save(update_fields=["roles"])
+    item = make_item(marketer, assignee=admin_user, status=ItemStatus.SUBMITTED)
+
+    with pytest.raises(Conflict):
+        services.update_user(actor=admin_user, user_id=admin_user.pk, changes=services.UserChanges(is_active=False))
+
+    item.refresh_from_db()
+    assert item.assignee_id == admin_user.pk  # pyrefly: ignore[missing-attribute]
+    assert not Event.objects.filter(type=EventType.ITEM_ASSIGNED.value).exists()
+
+
+def test_other_changes_and_reactivation_move_nothing(
+    admin_user: User, user_factory: UserFactory, marketer: User
+) -> None:
+    sam = user_factory(roles=[Role.REVIEWER])
+    user_factory(roles=[Role.REVIEWER])
+    make_item(marketer, assignee=sam, status=ItemStatus.SUBMITTED)
+
+    services.update_user(
+        actor=admin_user, user_id=sam.pk, changes=services.UserChanges(roles=(Role.REVIEWER, Role.LEAD))
+    )
+    services.update_user(actor=admin_user, user_id=sam.pk, changes=services.UserChanges(is_available=False))
+
+    assert not Event.objects.filter(type=EventType.ITEM_ASSIGNED.value).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_an_item_assigned_to_them_while_they_are_deactivated_is_released_too(
+    user_factory: UserFactory, marketer: User
+) -> None:
+    """A submission's auto-assignment picks Sam and holds the assignment lock while the admin deactivates him. The
+    deactivation waits for it, then finds the new item and releases it with the rest: Sam ends with nothing."""
+    admin = user_factory(roles=[Role.ADMIN])
+    sam = user_factory(roles=[Role.REVIEWER], display_name="Sam Okafor")
+    make_item(marketer, assignee=sam, status=ItemStatus.SUBMITTED)
+    fresh = make_item(marketer, status=ItemStatus.SUBMITTED)
+    holding = threading.Event()
+    errors: list[BaseException] = []
+
+    def assign_fresh() -> None:
+        try:
+            with transaction.atomic():
+                auto_assign(item=locked_item(fresh.pk), actor=None)  # Sam is the only reviewer: he gets it
+                holding.set()
+                threading.Event().wait(0.3)
+        except BaseException as exc:  # noqa: BLE001  # reported by the assertion below
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    def deactivate() -> None:
+        try:
+            user_factory(roles=[Role.REVIEWER], display_name="Dana Kim")
+            services.update_user(actor=admin, user_id=sam.pk, changes=services.UserChanges(is_active=False))
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    t1 = threading.Thread(target=assign_fresh)
+    t1.start()
+    holding.wait(5)
+    t2 = threading.Thread(target=deactivate)
+    t2.start()
+    t1.join(10)
+    t2.join(10)
+
+    assert errors == []
+    assert not ReviewItem.objects.filter(assignee=sam, status__in=QUEUE_STATUSES).exists()
+    assert ReviewItem.objects.filter(status__in=QUEUE_STATUSES, assignee__display_name="Dana Kim").count() == 2
 
 
 # --- API -------------------------------------------------------------------------------------------------------

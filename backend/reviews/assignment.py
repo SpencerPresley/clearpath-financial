@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
 from django.db.models import Case, Count, IntegerField, QuerySet, Sum, Value, When
 
 from accounts.models import User
@@ -25,7 +25,7 @@ from audit.payloads import ItemAssignedPayload
 from audit.services import record_event
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import AssignmentMode, EntityType, EventType, ItemStatus, RiskTier, Role
-from core.errors import DomainError, InvalidInput, InvalidTransition, NotFound, NotPermitted
+from core.errors import Conflict, DomainError, InvalidInput, InvalidTransition, NotFound, NotPermitted
 from core.permissions import REVIEW_ROLES, has_role, require_role
 from reviews.models import QUEUE_STATUSES, Decision, ReviewItem
 from reviews.transitions import start_review
@@ -150,6 +150,7 @@ def auto_assign(
     clock: Clock = SYSTEM_CLOCK,
     sticky: bool = False,
     reopen_event_id: int | None = None,
+    because: str = "",
 ) -> Assignment:
     """Assign `item` (locked or freshly created by the caller) by the three rules, recording ITEM_ASSIGNED with
     the reason. `sticky` for resubmissions, new rounds, and re-reviews; a re-review also passes its ITEM_REOPENED
@@ -157,11 +158,12 @@ def auto_assign(
 
     The sticky reviewer must still be active, available, a reviewer (a lead who reviewed counts), and not the
     item's owner; otherwise the item falls through to lowest load. The lowest-load pool uses stored roles, so a
-    lead isn't auto-assigned new work unless also granted `reviewer` (Foundation, core.permissions).
+    lead isn't auto-assigned new work unless also granted `reviewer` (Foundation, core.permissions). `because`
+    leads the recorded reason ("Sam Okafor was deactivated. ").
     """
     _acquire_lock()
     now = clock.now()
-    unavailable = ""
+    unavailable = because
     if sticky:
         previous = _previous_reviewer(item)
         if previous is not None:
@@ -176,7 +178,7 @@ def auto_assign(
                     at=now,
                     reopen_event_id=reopen_event_id,
                 )
-            unavailable = f"{_name(previous)} is unavailable. "
+            unavailable = f"{because}{_name(previous)} is unavailable. "
     pool = list(auto_assign_pool().exclude(pk=item.owner_id))  # pyrefly: ignore[missing-attribute]
     if not pool:
         return _set_assignee(
@@ -204,6 +206,34 @@ def auto_assign(
         at=now,
         reopen_event_id=reopen_event_id,
     )
+
+
+def lock_open_items_of(user_id: int) -> list[ReviewItem]:
+    """Lock a reviewer's open (queue) items and then the assignment lock, for `release_items` in the same
+    transaction, keeping the lock order: item rows first, then the advisory lock.
+
+    An assignment holding the advisory lock may still hand them an item. Once the lock is granted that one has
+    committed, so it's read again and locked NOWAIT: waiting here, after the advisory lock, could deadlock with a
+    transaction that holds the row and waits for the lock. If such a transaction holds it, the caller gets a
+    Conflict to retry instead.
+    """
+    open_items = ReviewItem.objects.filter(assignee_id=user_id, status__in=QUEUE_STATUSES).order_by("pk")
+    items = list(open_items.select_for_update())
+    _acquire_lock()
+    late = open_items.exclude(pk__in=[i.pk for i in items]).select_for_update(nowait=True)
+    try:
+        items += list(late)
+    except OperationalError as exc:  # the row is locked by someone mid-change: retrying is the caller's decision
+        raise Conflict("One of their items is being changed right now. Try again.") from exc
+    return sorted(items, key=lambda i: i.pk)
+
+
+def release_items(items: Iterable[ReviewItem], *, actor: User, because: str, clock: Clock = SYSTEM_CLOCK) -> None:
+    """Auto-assign each item (locked by `lock_open_items_of`) again, one ITEM_ASSIGNED each with `because` leading
+    the reason. Not sticky: the reviewer they're leaving is the one sticky would pick. Lowest load sees the loads
+    the previous item left; with nobody available, the pool, and the leads hear about it."""
+    for item in items:
+        auto_assign(item=item, actor=actor, clock=clock, because=because)
 
 
 # --- claim, manual, hand-off, bulk -----------------------------------------------------------------------------

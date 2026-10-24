@@ -17,6 +17,7 @@ from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import EntityType, EventType, Role
 from core.errors import Conflict, InvalidInput, NotFound
 from core.permissions import require_role
+from reviews.assignment import lock_open_items_of, release_items
 
 _ROLE_ORDER = list(Role)
 
@@ -119,10 +120,15 @@ def update_user(*, actor: User, user_id: int, changes: UserChanges, clock: Clock
 
     There is always an active admin: an admin can't deactivate their own account, and the last active admin keeps
     the admin role. The active admins' rows are locked before they're counted, so two admins demoting each other
-    at once can't both pass the check (the second waits, then counts one)."""
+    at once can't both pass the check (the second waits, then counts one).
+
+    Deactivating someone releases their open items through auto-assignment in the same transaction. Their item
+    rows and the assignment lock are taken before any user row (reviews.assignment's order: item, advisory lock,
+    then the users an assignment touches), so an assignment in flight can't deadlock with this."""
     require_role(actor, Role.ADMIN)
     now = clock.now()
     with transaction.atomic():
+        queue = lock_open_items_of(user_id) if changes.is_active is False else []
         admins = set(
             User.objects.select_for_update()
             .filter(is_active=True, roles__contains=[Role.ADMIN.value])
@@ -174,3 +180,5 @@ def update_user(*, actor: User, user_id: int, changes: UserChanges, clock: Clock
             fields.append("is_available")
         if fields:
             user.save(update_fields=fields)
+        if "is_active" in fields and not active:
+            release_items(queue, actor=actor, because=f"{_name(user)} was deactivated. ", clock=clock)

@@ -7,15 +7,21 @@ from io import StringIO
 from typing import Any
 
 import pytest
+from django.contrib.sessions.models import Session
 from django.core.management import call_command
+from django.db import connection
 from django.test import Client
 from pytest_django import Settings
 
 from accounts.models import User
+from accounts.services import NewUser, UserChanges, create_user, update_user
 from core.clock import FixedClock
+from core.domain import Role
 from demo import tasks
 from demo.content.people import PERSONAS
+from demo.reset import reset_demo
 from demo.services import STALE_AFTER, STALE_MESSAGE, ResetStatus, get_reset, request_reset, start_reset
+from demo.tests.conftest import NOW
 from demo.users import demo_password, upsert_personas
 from reviews.models import ReviewItem
 
@@ -169,3 +175,73 @@ def test_a_reset_that_waited_in_the_queue_then_started_is_judged_by_its_start(
 
     assert seen.status == ResetStatus.RUNNING
     assert gone.status == ResetStatus.FAILED
+
+
+# --- Reset demo restores the seeded people ----------------------------------------------------------------------
+
+STRONG = "plum-lantern-orbit-42"
+
+
+def _people() -> dict[str, tuple[list[str], bool, bool]]:
+    return {u.email: (u.roles, u.is_active, u.is_available) for u in User.objects.order_by("email")}
+
+
+def _add(admin: User, email: str, roles: tuple[Role, ...]) -> User:
+    new = NewUser(email=email, display_name=email.split("@", maxsplit=1)[0], roles=roles, password=STRONG)
+    return User.objects.get(pk=create_user(actor=admin, new=new))
+
+
+def _as_if_committed() -> None:
+    """A real reset starts its own transaction. Here the test's one transaction still holds the deferred FK checks
+    of the events written above, and TRUNCATE refuses to run past pending trigger events: fire them now."""
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+
+
+def test_a_reset_restores_the_seeded_people_and_ends_added_users_sessions(personas: dict[str, User]) -> None:
+    """Accounts added after the seed would lose their audit trail on reset (events are truncated), so they go too,
+    and their sessions end. Seeded people get their seeded roles, active flag and availability back."""
+    admin = personas["admin"]
+    reset_demo(requested_by=admin, now=NOW)
+    seeded = _people()
+    jo = _add(admin, "jo@clearpath.demo", (Role.REVIEWER,))
+    jo_client = _signed_in(jo.email)
+    update_user(
+        actor=admin, user_id=personas["sam"].pk, changes=UserChanges(roles=(Role.MARKETER,), is_available=False)
+    )
+    update_user(actor=admin, user_id=personas["nikhil"].pk, changes=UserChanges(is_active=False))
+    update_user(actor=admin, user_id=personas["leah"].pk, changes=UserChanges(is_available=True))
+    admin_client = _signed_in(admin.email)
+    jo_session = jo_client.session.session_key
+    _as_if_committed()
+
+    reset_demo(requested_by=admin, now=NOW)
+
+    assert _people() == seeded
+    assert seeded["leah@clearpath.demo"] == (["reviewer"], True, False)  # out of office, as the story has it
+    assert not User.objects.filter(email=jo.email).exists()
+    assert not Session.objects.filter(session_key=jo_session).exists()
+    assert jo_client.get("/api/me").status_code == 401
+    assert admin_client.get("/api/me").status_code == 200
+
+
+def test_an_added_admin_who_runs_the_reset_keeps_their_account(personas: dict[str, User]) -> None:
+    ops = _add(personas["admin"], "ops@clearpath.demo", (Role.ADMIN,))
+    temp = _add(personas["admin"], "temp@clearpath.demo", (Role.MARKETER,))
+    client = _signed_in(ops.email)
+    _as_if_committed()
+
+    reset_demo(requested_by=ops, now=NOW)
+
+    assert User.objects.filter(pk=ops.pk, is_active=True).exists()
+    assert not User.objects.filter(pk=temp.pk).exists()
+    assert client.get("/api/me").status_code == 200
+
+
+def test_a_reset_keeps_operator_accounts(personas: dict[str, User]) -> None:
+    """A django-admin superuser (manage.py createsuperuser) belongs to the deployment, not the demo."""
+    operator = User.objects.create_superuser(email="ops-root@clearpath.test", password=STRONG)
+
+    reset_demo(requested_by=personas["admin"], now=NOW)
+
+    assert User.objects.filter(pk=operator.pk).exists()
