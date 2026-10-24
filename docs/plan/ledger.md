@@ -19,7 +19,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | F offer terms (#7) | agent (worktree) | PR #31 merged | done | worked example end to end; per-item transactions (deadlock control test); optimistic publish (based_on_terms_id); seen_versions on bulk |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
-| L demo seed (#13) | agent (worktree) | PR #39 | final: tracker re-anchored to end 2026-08-14 (option c), rebase on #40 | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| L demo seed (#13) | agent (worktree) | PR #39 | last rebase (onto #41/#42); GO_LIVE 2026-08-17, tracker ends 2026-08-14, overlap test |
+| Deploy prep | agent (worktree `deploy/prod-readiness`) | — | in progress | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree) | PR #42 merged | done | bell + popover, typed detail per kind, 3 queries per page |
