@@ -19,7 +19,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | F offer terms (#7) | agent (worktree) | PR #31 merged | done | worked example end to end; per-item transactions (deadlock control test); optimistic publish (based_on_terms_id); seen_versions on bulk |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
-| L demo seed (#13) | agent (worktree) | PR #39 | follow-ups (hosted password, seed on start, tracker go-live split, role landing) | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| L demo seed (#13) | agent (worktree) | PR #39 | final: tracker re-anchored to end 2026-08-14 (option c), rebase on #40 | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
 | M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree `feat/notifications-ui`) | — | in progress | gap found: backend notifications had no UI; bell + popover inbox, polling |
@@ -35,6 +35,9 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: the sample tracker is re-anchored once, statically, to end the day before native seed history; a reset weeks later shows a gap, never an overlap. Re-anchoring dynamically would change the oracle per reset; shifting only the dates puts holiday campaigns in September.
+- Ruling: prod seeds in deploy.sh after the one-off migrate, not on container start — a failed seed stops the deploy while the old containers still serve.
 
 - Ruling: system mail (allauth) is stored metadata-only in the Outbox — storing bodies would let an admin read live password-reset links (account takeover).
 - Ruling: drift — unchanged approved copy + new blocking findings on the page → in-app notify assignee + leads and flag the placement (no reopen); 3 consecutive fetch failures on a live placement → missing → reopen; Reaffirm on drift_detected only when the latest check is unchanged; honest bot User-Agent.
@@ -135,7 +138,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 - Backend gaps from I (bundle into next backend follow-up): ItemRowOut lacks latest decision reason and approval_expires_at (/mine does N fetches; Approved shows no expiry); SubmitItemIn takes no attachments (evidence uploads after create; E's re-check PR #26 now resolves attachment findings on upload); single-item fast-track endpoint (F); shell Viewer from /api/me (H2).
 
-- Deploy wave checklist: terraform apply for the /demo-partners/* CloudFront route (infra/main/edge.tf); CONN_MAX_AGE under ASGI (verify Django docs; likely CONN_MAX_AGE=0 + psycopg pool); set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
+- Deploy wave checklist: apply edge.tf (/demo-partners/*) and the DEMO_USER_PASSWORD SSM param BEFORE the first seeding deploy (otherwise CloudFront serves index.html there and the 07:00 sweep marks seeded placements missing); terraform apply for the /demo-partners/* CloudFront route (infra/main/edge.tf); CONN_MAX_AGE under ASGI (verify Django docs; likely CONN_MAX_AGE=0 + psycopg pool); set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
 
 - G follow-ups for J/later: stale running jobs if the worker dies (no redelivery), old export files never deleted, Request-ID reuse across files is skipped as duplicate.
 
