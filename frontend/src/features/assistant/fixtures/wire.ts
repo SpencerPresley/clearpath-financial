@@ -4,7 +4,7 @@
  * drafts an email and ends interrupted on its approval; RUN2 is the approve resume. STATE1/STATE2 are
  * GET /state after each run. Wire events carry no seq/event_id: the transport assigns them. The send_email
  * tool message's artifact (`outcome`, `outbox_id`, `to`, `item_keys`) was added after recording, matching the
- * backend's current shape (backend/assistant/schemas.py).
+ * backend's current shape (backend/assistant/tools.py).
  */
 import type { AssistantThreadStateOut } from '../../../api/generated/model';
 

@@ -153,7 +153,7 @@ function strings(value: unknown): string[] {
 }
 
 /**
- * The email outcome from send_email's artifact (backend/assistant/schemas.py), written by the app, not the
+ * The email outcome from send_email's artifact (backend/assistant/tools.py), written by the app, not the
  * model: after an injection the model's own words are the thing we can't trust.
  */
 function emailOutcome(
