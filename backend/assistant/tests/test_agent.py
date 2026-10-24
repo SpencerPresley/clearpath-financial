@@ -24,6 +24,7 @@ from reviews.models import Decision, ReviewItem
 class Run:
     messages: list[BaseMessage]
     interrupts: list[Any]
+    tool_events: list[dict[str, Any]]
 
 
 def _call(name: str, call_id: str, **args: Any) -> AIMessage:
@@ -36,10 +37,9 @@ def run_agent(viewer: User, clock: FixedClock, *script: AIMessage | str) -> Run:
 
     async def go() -> Run:
         stream = await agent.astream_events({"messages": [{"role": "user", "content": "go"}]}, config, version="v3")
-        async for _ in stream:
-            pass
+        tool_events = [e["params"]["data"] async for e in stream if e["method"] == "tools"]
         state = await agent.aget_state(config)
-        return Run(messages=state.values["messages"], interrupts=list(await stream.interrupts()))
+        return Run(state.values["messages"], list(await stream.interrupts()), tool_events)
 
     return async_to_sync(go)()
 
@@ -62,6 +62,8 @@ def test_outside_recipient_is_refused_without_asking_for_approval(owner: User, c
     assert refusal.status == "error"
     assert "Not an internal address: partner@evil.example" in str(refusal.content)
     assert "\n" not in str(refusal.content)
+    # The tool never ran, so the stream has no `tools` events for it: the UI sees the refusal in `values`.
+    assert run.tool_events == []
     assert not OutboxEmail.objects.exists()
 
 
