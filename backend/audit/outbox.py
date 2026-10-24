@@ -120,6 +120,7 @@ class Delivery(StrEnum):
 class DispatchResult:
     events: int
     deliveries: int
+    busy: bool = False  # another dispatcher held the cursor; this pass did nothing
 
 
 def enqueue_handler(event_id: int, handler_name: str) -> None:
@@ -144,10 +145,13 @@ def dispatch_pending(
     *, registry: HandlerRegistry = REGISTRY, enqueue: Enqueue = enqueue_handler, batch_size: int = 500
 ) -> DispatchResult:
     """Enqueue every matching handler for events past the cursor, then advance it. Safe to run
-    concurrently (the cursor row is locked) and to crash midway (deliveries are idempotent)."""
+    concurrently and to crash midway (deliveries are idempotent). If another dispatcher holds the cursor,
+    return at once rather than queue behind it: beat fires every 2 s, and the holder will reach these events."""
     with transaction.atomic():
         OutboxCursor.objects.get_or_create(name=CURSOR_NAME)
-        cursor = OutboxCursor.objects.select_for_update().get(name=CURSOR_NAME)
+        cursor = OutboxCursor.objects.select_for_update(skip_locked=True).filter(name=CURSOR_NAME).first()
+        if cursor is None:
+            return DispatchResult(events=0, deliveries=0, busy=True)
         with connection.cursor() as db:
             db.execute(_PENDING_SQL, [cursor.last_txid, cursor.last_event_id, batch_size])
             rows: list[tuple[int, int, str]] = db.fetchall()

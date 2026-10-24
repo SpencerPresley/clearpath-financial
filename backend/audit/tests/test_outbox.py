@@ -8,7 +8,15 @@ from django.db import connection, transaction
 
 from accounts.models import User
 from audit.models import Event, OutboxCursor, ProcessedEvent
-from audit.outbox import Delivery, EventRecord, HandlerRegistry, deliver, dispatch_pending, redeliver_stale
+from audit.outbox import (
+    CURSOR_NAME,
+    Delivery,
+    EventRecord,
+    HandlerRegistry,
+    deliver,
+    dispatch_pending,
+    redeliver_stale,
+)
 from audit.payloads import ItemAssignedPayload, UserAvailabilityChangedPayload
 from audit.services import record_event
 from core.clock import FixedClock
@@ -164,6 +172,36 @@ def test_redeliver_stale_requeues_missing_receipts(reviewer: User, clock: FixedC
 
     assert count == 1
     assert enqueue.calls == [(event.pk, "test.flip_availability")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dispatch_returns_at_once_while_another_dispatcher_holds_the_cursor(reviewer: User, clock: FixedClock) -> None:
+    """Beat fires every 2 s; a dispatcher stuck on slow enqueues must not stack the next ones behind its lock."""
+    registry, _ = _registry()
+    OutboxCursor.objects.get_or_create(name=CURSOR_NAME)
+    _availability_event(reviewer, clock)
+    locked = threading.Event()
+    release = threading.Event()
+
+    def busy_dispatcher() -> None:
+        try:
+            with transaction.atomic():
+                OutboxCursor.objects.select_for_update().get(name=CURSOR_NAME)
+                locked.set()
+                release.wait(timeout=3)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=busy_dispatcher)
+    thread.start()
+    assert locked.wait(timeout=10)
+    try:
+        result = dispatch_pending(registry=registry, enqueue=Recorder())
+    finally:
+        release.set()
+        thread.join(timeout=10)
+
+    assert (result.events, result.busy) == (0, True)
 
 
 @pytest.mark.django_db(transaction=True)
