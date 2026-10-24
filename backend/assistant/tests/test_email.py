@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from accounts.models import User
@@ -84,7 +86,7 @@ def test_send_writes_one_outbox_email_and_one_event(owner: User, dana: User, clo
         item_id=item.pk,
     )
 
-    email_id = send_approved_email(requester=owner, approver=owner, draft=draft, thread_id="t-1", clock=clock)
+    email_id = send_approved_email(requester=owner, approver=owner, draft=draft, thread_id="t-1", clock=clock).outbox_id
 
     email = OutboxEmail.objects.get()
     assert email.pk == email_id
@@ -128,3 +130,22 @@ def test_send_without_item(user_factory: UserFactory, dana: User, clock: FixedCl
     send_approved_email(requester=lead, approver=lead, draft=draft, thread_id="t", clock=clock)
 
     assert OutboxEmail.objects.get().item is None
+
+
+@pytest.mark.django_db
+def test_recipient_check_queries_only_the_candidates(
+    dana: User,
+    user_factory: UserFactory,
+    django_assert_num_queries: Any,
+) -> None:
+    for i in range(20):
+        user_factory(email=f"staff{i}@clearpath.demo")
+
+    with django_assert_num_queries(1) as ctx:
+        assert check_recipients(["dana@clearpath.demo", "legal@clearpath.demo"]) == (
+            "dana@clearpath.demo",
+            "legal@clearpath.demo",
+        )
+
+    assert "staff1" not in ctx.captured_queries[0]["sql"]
+    assert "dana@clearpath.demo" in ctx.captured_queries[0]["sql"]

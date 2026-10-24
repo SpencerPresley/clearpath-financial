@@ -27,6 +27,7 @@ from assistant.schemas import AssistantThreadStateOut
 GRAPH_NAME: Final = "assistant"
 KEEPALIVE: Final = b": keepalive\n\n"
 TOOL_ERROR_MESSAGE: Final = "The tool failed."
+_PROVIDER_KEYS: Final = frozenset({"metadata", "additional_kwargs", "response_metadata", "usage_metadata"})
 _MESSAGE_KEYS: Final = ("type", "id", "content", "name", "tool_calls", "tool_call_id", "status", "artifact")
 
 type LifecycleEvent = Literal["running", "completed", "interrupted", "failed"]
@@ -94,6 +95,9 @@ def to_wire(event: ProtocolEvent, seen_interrupts: set[str]) -> list[WireEvent]:
     timestamp = params["timestamp"]
     if method == "messages":
         chunk, metadata = params["data"]
+        if isinstance(chunk, Mapping) and chunk.get("event") == "message-finish":
+            # v3 puts the provider's response_metadata (model id, usage, stop reason) here; it stays server-side.
+            chunk = {k: v for k, v in chunk.items() if k not in _PROVIDER_KEYS}
         wire = _event("messages", namespace, chunk, timestamp=timestamp)
         wire["params"]["node"] = metadata.get("langgraph_node") if isinstance(metadata, Mapping) else None
         return [wire]

@@ -14,11 +14,17 @@ from django.db import connection
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.conninfo import make_conninfo
 
+# Keys Django's PostgreSQL backend consumes itself; everything else in OPTIONS is passed to libpq.
+_DJANGO_ONLY_OPTIONS = frozenset({"pool", "server_side_binding", "isolation_level", "assume_role", "cursor_factory"})
+
 
 def postgres_conninfo(settings_dict: Mapping[str, Any] | None = None) -> str:
     """libpq conninfo for Django's default database (the test database under pytest)."""
     s = settings_dict if settings_dict is not None else connection.settings_dict
+    # Django's OPTIONS mixes libpq keywords (sslmode, sslrootcert, connect_timeout, options, ...) with its own.
+    options = {k: str(v) for k, v in (s.get("OPTIONS") or {}).items() if k not in _DJANGO_ONLY_OPTIONS}
     params = {
+        **options,
         "dbname": s["NAME"],
         "user": s.get("USER") or None,
         "password": s.get("PASSWORD") or None,

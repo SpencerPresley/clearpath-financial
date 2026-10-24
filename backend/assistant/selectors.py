@@ -9,9 +9,10 @@ from assistant.models import AssistantThread
 from core.errors import NotFound
 from reviews.models import ReviewItem
 
-# A run normally ends well inside this (12 model calls, each capped at ~4 min with retries is the far tail);
-# a lock older than this belongs to a process that died, and the next run takes it over.
-STALE_RUN: Final = timedelta(minutes=10)
+# The run lock is a lease: a running stream renews it every RENEW_RUN, and one not renewed for STALE_RUN
+# belongs to a request that died or never started its response; the next run takes it over.
+STALE_RUN: Final = timedelta(seconds=60)
+RENEW_RUN: Final = timedelta(seconds=15)
 _ITEM_KEY: Final = re.compile(r"^\s*(?:CP-?)?(\d{1,12})\s*$", re.IGNORECASE)
 
 

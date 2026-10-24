@@ -79,6 +79,11 @@ fine. No emoji, no closing offers of more help.
 </answers>"""
 
 
+def quoted(text: str) -> str:
+    """Free text as one JSON string with `<` and `>` escaped: it can't end a line or close a tag here."""
+    return json.dumps(text).replace("<", "\\u003c").replace(">", "\\u003e")
+
+
 def staff_directory() -> list[tuple[str, str, str]]:
     """(name, email, roles) for everyone `send_email` accepts: active users at the internal domain, then the
     team aliases. The same set as `assistant.email.allowed_recipients`."""
@@ -99,13 +104,14 @@ def request_context(viewer: User, *, item: ItemRow | None, clock: Clock) -> str:
     lines = [
         "<request_context>",
         f"Today: {today.isoformat()} ({today:%A})",
-        f"User: {viewer.display_name or viewer.email} <{viewer.email}>; roles: {roles}",
+        # Names are admin-entered free text: JSON-quoted, like the item title, so they stay one data value.
+        f"User: {quoted(viewer.display_name or viewer.email)} <{viewer.email}>; roles: {roles}",
     ]
     if item is not None:
         # The title is submitter-written: JSON-quoted so it stays one data value, not prose in this block.
-        lines.append(f"Open item: the user has {item.key} open in the review screen (title: {json.dumps(item.title)})")
+        lines.append(f"Open item: the user has {item.key} open in the review screen (title: {quoted(item.title)})")
     lines.append("<staff_directory>")
-    lines.extend(f"- {name} <{email}>: {roles}" for name, email, roles in staff_directory())
+    lines.extend(f"- {quoted(name)} <{email}>: {roles}" for name, email, roles in staff_directory())
     lines.extend(["</staff_directory>", "</request_context>"])
     return "\n".join(lines)
 

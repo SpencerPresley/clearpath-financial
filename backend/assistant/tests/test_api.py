@@ -451,13 +451,13 @@ def test_disconnect_while_the_approved_send_runs_never_sends_twice(
 
     panel = Panel(world.reviewer)
     interrupt_id = _pause(panel, world, monkeypatch)
-    claimed_at = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
+    token = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
     send = tools.send_approved_email
 
-    def send_then_stall(**kwargs: Any) -> int:
-        outbox_id = send(**kwargs)
+    def send_then_stall(**kwargs: Any) -> Any:
+        sent = send(**kwargs)
         time.sleep(0.5)  # still inside the tool when the client goes away
-        return outbox_id
+        return sent
 
     monkeypatch.setattr(tools, "send_approved_email", send_then_stall)
 
@@ -466,7 +466,7 @@ def test_disconnect_while_the_approved_send_runs_never_sends_twice(
             thread_id=panel.thread_id,
             viewer=world.reviewer,
             command=runs.Resume(interrupt_id=interrupt_id, decision={"type": "approve"}),
-            claimed_at=claimed_at,
+            token=token,
             model_factory=lambda: scripted("Sent it to Dana."),
         )
         async for frame in stream:
@@ -523,3 +523,121 @@ def test_blocked_send_outcome_on_the_wire_and_in_state(world: World, monkeypatch
     }
     values = [f.data for f in stream.frames if f.method == "values"][-1]["messages"]
     assert [m["artifact"] for m in values if m["type"] == "tool"] == [tool["artifact"]]
+
+
+def _cut_send_short(panel: Panel, world: World, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Pause on the draft to dana@, approve, and disconnect while the send runs: the email is in the Outbox
+    but the approval is pending again. Returns the interrupt id."""
+    from assistant import tools
+
+    interrupt_id = _pause(panel, world, monkeypatch)
+    token = runs.services.claim_run(thread_id=panel.thread_id, owner=world.reviewer)
+    send = tools.send_approved_email
+
+    def send_then_stall(**kwargs: Any) -> Any:
+        sent = send(**kwargs)
+        time.sleep(0.5)
+        return sent
+
+    monkeypatch.setattr(tools, "send_approved_email", send_then_stall)
+
+    async def approve_then_disconnect() -> None:
+        stream = runs.stream_run(
+            thread_id=panel.thread_id,
+            viewer=world.reviewer,
+            command=runs.Resume(interrupt_id=interrupt_id, decision={"type": "approve"}),
+            token=token,
+            model_factory=lambda: scripted("Sent."),
+        )
+        async for frame in stream:
+            if frame.startswith(b"event: tools") and b'"tool-started"' in frame:
+                break
+        await stream.aclose()
+
+    async_to_sync(approve_then_disconnect)()
+    monkeypatch.setattr(tools, "send_approved_email", send)
+    assert OutboxEmail.objects.count() == 1
+    assert [i["id"] for t in panel.state()["tasks"] for i in t["interrupts"]] == [interrupt_id]  # the card is back
+    return interrupt_id
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        {"type": "reject", "message": "Not now"},
+        {
+            "type": "edit",
+            "edited_action": {
+                "name": "send_email",
+                "args": {"to": ["compliance@clearpath.demo"], "subject": "Other", "body": "Other body."},
+            },
+        },
+        {"type": "approve"},
+    ],
+    ids=["reject", "edit", "approve"],
+)
+def test_any_answer_after_a_cut_short_send_reports_the_stored_email(
+    world: World, monkeypatch: pytest.MonkeyPatch, answer: dict[str, Any]
+) -> None:
+    panel = Panel(world.reviewer)
+    interrupt_id = _cut_send_short(panel, world, monkeypatch)
+    use_models(monkeypatch, scripted("Already sent to Dana."))
+
+    stream = read(panel.respond(interrupt_id, answer))
+
+    assert stream.lifecycle() == ["running", "completed"]
+    email = OutboxEmail.objects.get()
+    assert email.to == ["dana@clearpath.demo"]
+    assert Event.objects.filter(type=EventType.EMAIL_SENT).count() == 1
+    (tool,) = [m for m in panel.state()["values"]["messages"] if m.get("tool_call_id") == "c3"]
+    assert tool["artifact"] == {
+        "outcome": "sent",
+        "outbox_id": email.pk,
+        "to": ["dana@clearpath.demo"],
+        "item_keys": [world.item.key],
+    }
+    assert json.loads(tool["content"])["to"] == ["dana@clearpath.demo"]
+    assert panel.state()["tasks"] == []
+    assert panel.thread().awaiting_approval is False
+
+
+def test_history_skips_csrf_but_runs_dont(world: World) -> None:
+    panel = Panel(world.reviewer)
+    strict = Client(enforce_csrf_checks=True)
+    strict.force_login(world.reviewer)
+
+    history = strict.post(f"{panel.base}/history", {"limit": 20}, content_type="application/json")
+    run = strict.post(f"{panel.base}/runs", {"message": {"id": "u1", "content": "hi"}}, content_type="application/json")
+
+    assert history.status_code == 200
+    assert run.status_code == 403
+    assert (
+        Client(enforce_csrf_checks=True).post(f"{panel.base}/history", {}, content_type="application/json").status_code
+        == 401
+    )
+
+
+def test_declined_outcome_doesnt_depend_on_the_librarys_reject_wording(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from langchain.agents.middleware import human_in_the_loop
+    from langchain_core.messages import ToolMessage as LCToolMessage
+
+    def reworded(tool_call: Any, decision: Any) -> LCToolMessage:
+        return LCToolMessage(
+            content=f"Rejected by reviewer. Note: {decision.get('message', '')}",
+            name=tool_call["name"],
+            tool_call_id=tool_call["id"],
+            status="error",
+        )
+
+    panel = Panel(world.reviewer)
+    interrupt_id = _pause(panel, world, monkeypatch)
+    monkeypatch.setattr(human_in_the_loop, "_answer_message", reworded)
+    use_models(monkeypatch, scripted("Okay."))
+
+    read(panel.respond(interrupt_id, {"type": "reject", "message": "Wrong person"}))
+
+    (tool,) = [m for m in panel.state()["values"]["messages"] if m.get("tool_call_id") == "c3"]
+    assert tool["artifact"]["outcome"] == "declined"
+    assert "Their reason: Wrong person" in tool["content"]

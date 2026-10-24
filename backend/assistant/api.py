@@ -2,18 +2,19 @@
 a 404), body validation, the pending-approval check and the run lock all happen before the response starts,
 so those failures are ordinary JSON errors. The body is an async iterator Django serves natively under ASGI."""
 
-from collections.abc import AsyncIterator, Callable
-from datetime import datetime
-from typing import Any, Final
+from collections.abc import Callable
+from typing import Final
 from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from django.http import HttpRequest, StreamingHttpResponse
 from ninja import Router, Status
+from ninja.security import SessionAuth
 
 from accounts.api import current_user
 from accounts.models import User
 from assistant import runs, selectors, services
+from assistant.agent import reject_message
 from assistant.email import check_recipients
 from assistant.schemas import (
     ApprovalResponseIn,
@@ -47,22 +48,27 @@ PENDING_APPROVAL: Final = "An email is waiting for your approval in this thread.
 NOT_PENDING: Final = "That approval is no longer pending."
 
 
-def _sse(body: AsyncIterator[bytes]) -> StreamingHttpResponse:
+def _sse(body: runs.RunBody) -> StreamingHttpResponse:
     response = StreamingHttpResponse(body, content_type="text/event-stream")
     response["Cache-Control"] = "no-cache, no-transform"
     response["X-Accel-Buffering"] = "no"
     return response
 
 
-def _locked(viewer: User, thread_id: UUID, check: Callable[[], None]) -> datetime:
-    """Take the run lock, then run `check` under it; a failed check gives the lock back."""
-    claimed_at = services.claim_run(thread_id=thread_id, owner=viewer)
+def _locked(viewer: User, thread_id: UUID, check: Callable[[], None]) -> UUID:
+    """Take the run lease, then run `check` under it; a failed check gives the lease back."""
+    token = services.claim_run(thread_id=thread_id, owner=viewer)
     try:
         check()
     except BaseException:
-        services.release_run(thread_id=thread_id, claimed_at=claimed_at)
+        services.release_run(thread_id=thread_id, token=token)
         raise
-    return claimed_at
+    return token
+
+
+def _stream(viewer: User, thread_id: UUID, command: runs.RunCommand, token: UUID) -> StreamingHttpResponse:
+    frames = runs.stream_run(thread_id=thread_id, viewer=viewer, command=command, token=token)
+    return _sse(runs.RunBody(frames, thread_id=thread_id, token=token))
 
 
 def _pending(viewer: User, thread_id: UUID) -> set[str]:
@@ -109,6 +115,9 @@ def get_thread_state(request: HttpRequest, thread_id: UUID) -> AssistantThreadSt
     "/assistant/threads/{uuid:thread_id}/history",
     response={200: list[AssistantThreadStateOut], **ERRORS},
     operation_id="getAssistantThreadHistory",
+    # The SDK's own client posts this without our CSRF header. It reads nothing and changes nothing, so the
+    # session is checked but CSRF isn't.
+    auth=SessionAuth(csrf=False),
 )
 def get_thread_history(
     request: HttpRequest, thread_id: UUID, body: AssistantHistoryIn
@@ -136,12 +145,12 @@ def start_run(request: HttpRequest, thread_id: UUID, body: AssistantRunIn) -> St
         if _pending(viewer, thread_id):
             raise Conflict(PENDING_APPROVAL)
 
-    claimed_at = _locked(viewer, thread_id, no_pending_approval)
+    token = _locked(viewer, thread_id, no_pending_approval)
     command = runs.StartRun(message_id=body.message.id, content=body.message.content, item=item)
-    return _sse(runs.stream_run(thread_id=thread_id, viewer=viewer, command=command, claimed_at=claimed_at))
+    return _stream(viewer, thread_id, command, token)
 
 
-def hitl_decision(body: ApproveIn | EditIn | RejectIn) -> dict[str, Any]:
+def hitl_decision(body: ApproveIn | EditIn | RejectIn) -> runs.Decision:
     """The HumanInTheLoopMiddleware decision for a validated answer. An edit is checked here first (the
     allowlist middleware only saw the model's draft): outside recipients are a 422 on `to`."""
     if isinstance(body, ApproveIn):
@@ -153,7 +162,7 @@ def hitl_decision(body: ApproveIn | EditIn | RejectIn) -> dict[str, Any]:
             raise InvalidInput.for_field("item_key", f"No item {args.item_key}.")
         edited = {"to": list(to), "subject": args.subject, "body": args.body, "item_key": args.item_key}
         return {"type": "edit", "edited_action": {"name": "send_email", "args": edited}}
-    return {"type": "reject", "message": body.message.strip() or runs.REJECT_DEFAULT}
+    return {"type": "reject", "message": reject_message(body.message)}
 
 
 @router.post(
@@ -177,6 +186,5 @@ def respond_to_interrupt(
         if interrupt_id not in _pending(viewer, thread_id):
             raise Conflict(NOT_PENDING)
 
-    claimed_at = _locked(viewer, thread_id, still_pending)
-    command = runs.Resume(interrupt_id=interrupt_id, decision=decision)
-    return _sse(runs.stream_run(thread_id=thread_id, viewer=viewer, command=command, claimed_at=claimed_at))
+    token = _locked(viewer, thread_id, still_pending)
+    return _stream(viewer, thread_id, runs.Resume(interrupt_id=interrupt_id, decision=decision), token)

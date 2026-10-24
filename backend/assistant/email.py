@@ -14,6 +14,7 @@ from typing import Final
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db import transaction
+from django.db.models.functions import Lower
 from django.template.loader import render_to_string
 
 from accounts.models import User
@@ -27,6 +28,15 @@ from notifications.models import OutboxEmail
 from reviews.models import ReviewItem
 
 TO_FIELD: Final = "to"
+
+
+@dataclass(frozen=True)
+class SentEmail:
+    """What the Outbox recorded: the truth about a send, whatever arguments a later replay carries."""
+
+    outbox_id: int
+    to: tuple[str, ...]
+    item_id: int | None
 
 
 @dataclass(frozen=True)
@@ -58,9 +68,21 @@ def _bare_address(raw: str) -> str | None:
     return address.lower()
 
 
+def _allowed_among(addresses: set[str]) -> set[str]:
+    """Which of these (bare, lower-cased) addresses may receive email: one query for just these candidates."""
+    internal = {a for a in addresses if at_internal_domain(a)}
+    aliases = {a.lower() for a in settings.ASSISTANT_TEAM_ADDRESSES} & internal
+    users = (
+        User.objects.annotate(lower_email=Lower("email"))
+        .filter(is_active=True, lower_email__in=internal - aliases)
+        .values_list("lower_email", flat=True)
+    )
+    return aliases | set(users)
+
+
 def _sort_recipients(to: Sequence[str]) -> tuple[tuple[str, ...], list[str]]:
     """(accepted: lower-cased, deduped, in order; refused: the inputs as written, stripped)."""
-    allowed = allowed_recipients()
+    allowed = _allowed_among({a for a in (_bare_address(raw) for raw in to) if a is not None})
     accepted: dict[str, None] = {}
     refused: list[str] = []
     for raw in to:
@@ -103,18 +125,15 @@ def send_approved_email(  # who, what, and where it came from
     thread_id: str,
     tool_call_id: str = "",
     clock: Clock = SYSTEM_CLOCK,
-) -> int:
-    """Send an approved draft through `EMAIL_BACKEND` (the Outbox) and record `EMAIL_SENT`. Returns the
-    OutboxEmail id.
+) -> SentEmail:
+    """Send an approved draft through `EMAIL_BACKEND` (the Outbox) and record `EMAIL_SENT`.
 
     Idempotent per (thread, tool call): if a resumed run executes the same approved `send_email` again (the
-    step that ran it was cut short before its checkpoint landed), the existing email's id comes back and
-    nothing is sent or recorded twice. The unique constraint backs this up under concurrency."""
+    step that ran it was cut short before its checkpoint landed), the stored email comes back (its id and
+    recipients, not this call's) and nothing is sent or recorded twice. The unique constraint backs this up."""
     with transaction.atomic():
-        if tool_call_id:
-            sent = OutboxEmail.objects.filter(thread_id=thread_id, tool_call_id=tool_call_id).first()
-            if sent is not None:
-                return sent.pk
+        if tool_call_id and (sent := sent_email(thread_id=thread_id, tool_call_id=tool_call_id)) is not None:
+            return sent
         to = check_recipients(draft.to)
         item = _item(draft.item_id)
         now = clock.now()
@@ -156,4 +175,12 @@ def send_approved_email(  # who, what, and where it came from
             at=now,
             item_id=item.pk if item else None,
         )
-    return outbox_id
+    return SentEmail(outbox_id=outbox_id, to=to, item_id=item.pk if item else None)
+
+
+def sent_email(*, thread_id: str, tool_call_id: str) -> SentEmail | None:
+    """The email an approved `send_email` call already produced, if any."""
+    row = OutboxEmail.objects.filter(thread_id=thread_id, tool_call_id=tool_call_id).first()
+    if row is None:
+        return None
+    return SentEmail(outbox_id=row.pk, to=tuple(row.to), item_id=row.item_id)  # pyrefly: ignore[missing-attribute]

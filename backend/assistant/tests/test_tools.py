@@ -266,3 +266,15 @@ def test_send_email_artifact_says_blocked_when_the_send_time_check_refuses(world
         "to": ["dana@clearpath.demo", "x@evil.example"],
         "item_keys": [],
     }
+
+
+@pytest.mark.django_db
+def test_a_replayed_send_reports_the_stored_recipients_not_its_own(world: World, clock: FixedClock) -> None:
+    send = _tools(world.reviewer, clock)["send_email"]
+    call(send, to=["dana@clearpath.demo"], subject="s", body="b")
+
+    replay, _ = call(send, to=["compliance@clearpath.demo"], subject="Other", body="Other")  # same call id
+
+    email = OutboxEmail.objects.get()
+    assert email.to == ["dana@clearpath.demo"]
+    assert replay == {"sent": True, "outbox_id": email.pk, "to": ["dana@clearpath.demo"]}

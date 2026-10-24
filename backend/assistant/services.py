@@ -2,7 +2,7 @@
 Event; the emails a thread sends do (`EMAIL_SENT`, in `assistant.email`)."""
 
 import re
-from datetime import datetime
+import uuid
 from typing import Final
 from uuid import UUID
 
@@ -25,16 +25,23 @@ def create_thread(*, owner: User, clock: Clock = SYSTEM_CLOCK) -> AssistantThrea
     return AssistantThread.objects.create(owner=owner, created_at=now, updated_at=now)
 
 
-def claim_run(*, thread_id: UUID, owner: User, clock: Clock = SYSTEM_CLOCK) -> datetime:
-    """Take the thread's run lock in one conditional UPDATE, so two tabs can't both run an agent on one
-    checkpoint. Returns the claim time, which `release_run` must present."""
+def claim_run(*, thread_id: UUID, owner: User, clock: Clock = SYSTEM_CLOCK) -> UUID:
+    """Take the thread's run lease in one conditional UPDATE, so two tabs can't both run an agent on one
+    checkpoint. Returns the claim's token: renewing and releasing need it. A lease nobody renews lapses after
+    STALE_RUN, so a claim whose response never started (the client left first) frees itself."""
     require_role(owner, *Role)
     now = clock.now()
+    token = uuid.uuid4()
     free = Q(running_since__isnull=True) | Q(running_since__lt=now - STALE_RUN)
-    if not AssistantThread.objects.filter(free, pk=thread_id, owner=owner).update(running_since=now):
+    if not AssistantThread.objects.filter(free, pk=thread_id, owner=owner).update(running_since=now, run_token=token):
         owned_thread(owner=owner, thread_id=thread_id)  # someone else's or missing: 404, not 409
         raise Conflict("A reply is already running in this thread.")
-    return now
+    return token
+
+
+def renew_run(*, thread_id: UUID, token: UUID, clock: Clock = SYSTEM_CLOCK) -> bool:
+    """Extend the lease this run holds. False if it isn't ours any more (it lapsed and was taken over)."""
+    return bool(AssistantThread.objects.filter(pk=thread_id, run_token=token).update(running_since=clock.now()))
 
 
 def thread_title(message: str) -> str:
@@ -45,17 +52,16 @@ def thread_title(message: str) -> str:
 def release_run(
     *,
     thread_id: UUID,
-    claimed_at: datetime,
+    token: UUID,
     awaiting_approval: bool | None = None,
     first_message: str | None = None,
     clock: Clock = SYSTEM_CLOCK,
 ) -> None:
-    """Drop the lock this run holds (a lock taken over after going stale isn't ours to drop) and record what
-    the list view shows. `awaiting_approval=None` leaves the flag as it was (the run ended before we knew)."""
-    mine = AssistantThread.objects.filter(pk=thread_id, running_since=claimed_at)
-    changes: dict[str, object] = {"running_since": None, "updated_at": clock.now()}
+    """Drop the lease this run holds (one taken over after lapsing isn't ours to drop) and record what the
+    list view shows. `awaiting_approval=None` leaves the flag as it was (the run ended before we knew)."""
+    changes: dict[str, object] = {"running_since": None, "run_token": None, "updated_at": clock.now()}
     if awaiting_approval is not None:
         changes["awaiting_approval"] = awaiting_approval
-    mine.update(**changes)
+    AssistantThread.objects.filter(pk=thread_id, run_token=token).update(**changes)
     if first_message:
         AssistantThread.objects.filter(pk=thread_id, title="").update(title=thread_title(first_message))

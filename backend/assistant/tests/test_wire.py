@@ -141,3 +141,15 @@ def test_state_of_an_empty_thread() -> None:
         "metadata": None,
         "created_at": None,
     }
+
+
+def test_message_finish_drops_provider_metadata() -> None:
+    finish = {
+        "event": "message-finish",
+        "reason": "stop",
+        "metadata": {"model_name": "claude-haiku-5-5", "usage": {"input_tokens": 9}, "stop_reason": "end_turn"},
+    }
+
+    (wire,) = to_wire(_event("messages", [finish, {"langgraph_node": "model"}]), set())
+
+    assert wire["params"]["data"] == {"event": "message-finish", "reason": "stop"}

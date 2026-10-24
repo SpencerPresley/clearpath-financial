@@ -61,6 +61,7 @@ class ToolCallingFakeModel(GenericFakeChatModel):
                 content="",
                 id=message.id,
                 tool_call_chunks=tool_call_chunks,  # pyrefly: ignore[bad-argument-type]
+                usage_metadata=getattr(message, "usage_metadata", None),  # scripted token counts, if any
                 chunk_position="last",
             )
         )

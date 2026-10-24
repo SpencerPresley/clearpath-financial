@@ -22,7 +22,14 @@ from langchain_core.tools import BaseTool, InjectedToolCallId, StructuredTool
 from pydantic import BaseModel, Field
 
 from accounts.models import User
-from assistant.email import EmailDraft, check_recipients, refused_recipients, send_approved_email
+from assistant.email import (
+    EmailDraft,
+    SentEmail,
+    check_recipients,
+    refused_recipients,
+    send_approved_email,
+    sent_email,
+)
 from assistant.schemas import SubjectLine
 from assistant.selectors import parse_item_key
 from checks.selectors import list_findings
@@ -535,9 +542,17 @@ def _build_export(viewer: User, args: BuildExportArgs, clock: Clock) -> ToolOutp
     return _result(ExportStarted(export_id=export_id, poll_url=f"/api/exports/{export_id}"))
 
 
+def sent_result(sent: SentEmail) -> ToolOutput:
+    """The send_email result for an email the Outbox has: always the stored row's id and recipients."""
+    content = dumps(EmailSent(sent=True, outbox_id=sent.outbox_id, to=list(sent.to)))
+    return content, email_sent_artifact(outbox_id=sent.outbox_id, to=sent.to, item_id=sent.item_id)
+
+
 def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str) -> ToolOutput:
     """Runs only after the user approved (or edited) the draft. Third recipient check: `send_approved_email`
-    checks again inside its transaction."""
+    checks again inside its transaction. A replay of a call that already sent reports the stored email."""
+    if (already := sent_email(thread_id=thread_id, tool_call_id=args.tool_call_id)) is not None:
+        return sent_result(already)
     drafted = args.model_dump(exclude={"tool_call_id"})
 
     def blocked(reason: str, refused: Sequence[str] = ()) -> ToolOutput:
@@ -555,7 +570,7 @@ def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str
             return blocked(f"Not sent. {args.item_key!r} isn't an item key.")
     draft = EmailDraft(to=to, subject=args.subject, body=args.body, item_id=item_id)
     try:
-        outbox_id = send_approved_email(
+        sent = send_approved_email(
             requester=viewer,
             approver=viewer,
             draft=draft,
@@ -565,8 +580,7 @@ def _send_email(viewer: User, args: _SendEmailCall, clock: Clock, thread_id: str
         )
     except DomainError as e:
         return blocked(f"Not sent. {e.message}", refused_recipients(args.to))
-    content = dumps(EmailSent(sent=True, outbox_id=outbox_id, to=list(to)))
-    return content, email_sent_artifact(outbox_id=outbox_id, to=to, item_id=item_id)
+    return sent_result(sent)
 
 
 # --- what happened to a send_email call (its ToolMessage artifact; set in code, never by the model) -------------

@@ -44,3 +44,21 @@ def test_checkpointer_round_trips_a_thread() -> None:
         return [m.id for m in state.values["messages"]]
 
     assert async_to_sync(run)() == ["m1"]
+
+
+def test_conninfo_carries_libpq_options_but_not_djangos() -> None:
+    settings_dict = {
+        "NAME": "clearpath",
+        "USER": "u",
+        "PASSWORD": "p",
+        "HOST": "db",
+        "PORT": 5432,
+        "OPTIONS": {"sslmode": "require", "connect_timeout": 5, "pool": True, "server_side_binding": False},
+    }
+
+    conninfo = postgres_conninfo(settings_dict)
+
+    assert "sslmode=require" in conninfo
+    assert "connect_timeout=5" in conninfo
+    assert "pool" not in conninfo
+    assert "server_side_binding" not in conninfo

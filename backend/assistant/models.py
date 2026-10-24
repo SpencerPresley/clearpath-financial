@@ -15,6 +15,8 @@ class AssistantThread(models.Model):
     updated_at = models.DateTimeField()
     # Set while a request is running the agent on this thread; a second run is refused until it clears or goes stale.
     running_since = models.DateTimeField(null=True, blank=True)
+    # Who holds that lock: the claim's token. Renewals move running_since (a lease), so release is keyed on this.
+    run_token = models.UUIDField(null=True, blank=True)
     # True when the last run ended paused on an email approval.
     awaiting_approval = models.BooleanField(default=False)
 

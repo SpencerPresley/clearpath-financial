@@ -159,3 +159,64 @@ def test_invalid_draft_artifact_refuses_no_address(owner: User, dana: User, cloc
     assert refusal.artifact["refused"] == []
     assert refusal.artifact["reason"] == refusal.content
     assert refusal.artifact["to"] == ["dana@clearpath.demo"]
+
+
+@pytest.mark.django_db
+def test_the_model_call_limit_ends_with_product_copy(owner: User, clock: FixedClock) -> None:
+    from assistant.agent import CALL_LIMIT_REPLY, MODEL_CALL_LIMIT
+
+    loop = [_call("get_queue_stats", f"c{i}") for i in range(MODEL_CALL_LIMIT + 5)]
+
+    run = run_agent(owner, clock, *loop)
+
+    assert len(_tool_messages(run)) == MODEL_CALL_LIMIT
+    assert run.messages[-1].type == "ai"
+    assert run.messages[-1].content == CALL_LIMIT_REPLY
+    assert "limits exceeded" not in str([m.content for m in run.messages])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("answer", ["reject", "edit"])
+def test_a_call_the_outbox_already_has_returns_the_stored_email(
+    owner: User, dana: User, clock: FixedClock, answer: str
+) -> None:
+    """Whatever the re-shown card is answered with, the middleware reports what was sent (stored row's `to`),
+    without asking HITL (the handler) at all."""
+    from langchain.agents.middleware.types import ToolCallRequest
+
+    from assistant.agent import RecipientAllowlistMiddleware, reject_message
+    from assistant.email import EmailDraft, send_approved_email
+
+    sent = send_approved_email(
+        requester=owner,
+        approver=owner,
+        draft=EmailDraft(to=("dana@clearpath.demo",), subject="s", body="b", item_id=None),
+        thread_id="t-9",
+        tool_call_id="c3",
+        clock=clock,
+    )
+    edited_to = ["compliance@clearpath.demo"] if answer == "edit" else ["dana@clearpath.demo"]
+    call = {
+        "name": "send_email",
+        "args": {"to": edited_to, "subject": "s", "body": "b"},
+        "id": "c3",
+        "type": "tool_call",
+    }
+
+    async def hitl(_request: ToolCallRequest) -> ToolMessage:
+        if answer == "reject":
+            return ToolMessage(content=reject_message(), tool_call_id="c3", name="send_email", status="error")
+        raise AssertionError("an already-sent call must not reach the approval gate")
+
+    request = ToolCallRequest(tool_call=call, tool=None, state={}, runtime=None)  # pyrefly: ignore[bad-argument-type]
+    result = async_to_sync(RecipientAllowlistMiddleware(thread_id="t-9").awrap_tool_call)(request, hitl)
+
+    assert isinstance(result, ToolMessage)
+    assert result.artifact == {
+        "outcome": "sent",
+        "outbox_id": sent.outbox_id,
+        "to": ["dana@clearpath.demo"],
+        "item_keys": [],
+    }
+    assert result.status == "success"
+    assert OutboxEmail.objects.count() == 1
