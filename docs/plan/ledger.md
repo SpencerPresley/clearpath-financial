@@ -11,7 +11,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | scaffold | orchestrator | main `430486c` | done | backend, frontend, compose, CI, CLAUDE.md |
 | shared domain vocabulary | orchestrator | main `44e7264` | done | backend/core/domain.py enums + offer-terms schemas; per-worktree test DB suffix |
 | 0 foundation (#1) | agent (worktree `ws0/foundation`) | — | in progress | models, migrations, patterns, API contract |
-| C rules engine (#4) | agent (worktree) | PR #21 | final change in progress | 41 code rules + 4 human items; 316 tests; ~3 ms per 5 KB ad |
+| C rules engine (#4) | agent (worktree) | PR #21 merged | done | 42 code rules + 4 human items; 326 tests; ENGINE_VERSION in cache keys; ~3 ms per 5 KB ad |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
 | infra-terraform (#2) | agent (worktree) | PR #16 merged `b7c2ea3` | done (not applied) | 74 resources; sub verified from a real token; app follow-ups in #18 |
 | sample-tracker (#3) | agent (worktree) | PR #17 merged `b01999b` | done | 180 rows; samples/README.md is the import oracle; importer notes in reports/sample-tracker.md |
