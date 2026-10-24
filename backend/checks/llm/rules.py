@@ -45,7 +45,7 @@ class LlmRule:
     partner_only: bool = False  # applies only to partner content (mirrors endorsement.material_connection)
 
 
-def _spec(  # noqa: PLR0913 - keywords mirror RuleSpec's facets
+def _spec(
     rule_id: str,
     *,
     title: str,

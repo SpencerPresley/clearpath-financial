@@ -27,7 +27,7 @@ def _payload(model: ChatAnthropic) -> dict:
     bound = model.bind_tools([report_tool()], tool_choice=REPORT_TOOL_NAME)
     assert isinstance(bound, RunnableBinding)
     messages = [system_message(), item_message(ctx, applicable_rules(ctx), ())]
-    return model._get_request_payload(messages, **bound.kwargs)  # noqa: SLF001
+    return model._get_request_payload(messages, **bound.kwargs)
 
 
 def test_defaults():
