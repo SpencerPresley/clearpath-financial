@@ -11,13 +11,17 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | scaffold | orchestrator | main `430486c` | done | backend, frontend, compose, CI, CLAUDE.md |
 | shared domain vocabulary | orchestrator | main `44e7264` | done | backend/core/domain.py enums + offer-terms schemas; per-worktree test DB suffix |
 | 0 foundation (#1) | agent (worktree `ws0/foundation`) | — | in progress | models, migrations, patterns, API contract |
-| C rules engine (#4) | agent (worktree `wsC/rules-engine`) | — | in progress | pure engine in backend/checks/engine |
+| C rules engine (#4) | agent (worktree) | PR #21 | final change in progress | 41 code rules + 4 human items; 316 tests; ~3 ms per 5 KB ad |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
 | infra-terraform (#2) | agent (worktree) | PR #16 merged `b7c2ea3` | done (not applied) | 74 resources; sub verified from a real token; app follow-ups in #18 |
 | sample-tracker (#3) | agent (worktree) | PR #17 merged `b01999b` | done | 180 rows; samples/README.md is the import oracle; importer notes in reports/sample-tracker.md |
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: prescreen notices are checked twice — a blocking code check that the notice text is present, plus a human checklist item for layout — presence is text-checkable, layout isn't — cost if wrong: one extra triage click on prescreen items.
+- Ruling: "pre-approved" invitations on mortgage_prequal items are a warning — ClearPath offers prequalification, a materially different product — cost if wrong: occasional warning to dismiss.
+- Ruling: check-result caches key on ENGINE_VERSION as well as RULESET_VERSION — a regex fix must invalidate cached findings even when the law hasn't changed — cost if wrong: none.
 
 - Ruling: no warm brand accent; navy is the only brand color — spec §5.2 already uses every warm hue for a status, and the UI reviewer read a gold mark as "warning" — cost if wrong: a slightly plainer brand; easy to add a non-status accent later.
 
