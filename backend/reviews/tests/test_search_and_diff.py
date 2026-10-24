@@ -1,0 +1,96 @@
+import pytest
+
+from accounts.models import User
+from core.clock import FixedClock
+from core.domain import DecisionLane, DecisionOutcome, ItemStatus, Product
+from reviews.diff import DiffOp, DiffSegment, diff_texts
+from reviews.filters import ItemFilter
+from reviews.models import Decision
+from reviews.search import find_phrase, search_text
+from reviews.tests.factories import AT, make_item, make_version
+
+
+def test_diff_texts_is_word_level() -> None:
+    segments = diff_texts("Rates from 7.49% APR.", "Rates from 6.99% APR for you.")
+
+    assert segments == (
+        DiffSegment(DiffOp.EQUAL, "Rates from "),
+        DiffSegment(DiffOp.DELETE, "7.49"),
+        DiffSegment(DiffOp.INSERT, "6.99"),
+        DiffSegment(DiffOp.EQUAL, "% APR"),
+        DiffSegment(DiffOp.INSERT, " for you"),
+        DiffSegment(DiffOp.EQUAL, "."),
+    )
+
+
+def test_diff_of_identical_texts_is_one_equal_segment() -> None:
+    assert diff_texts("same", "same") == (DiffSegment(DiffOp.EQUAL, "same"),)
+
+
+def test_diff_reassembles_both_sides() -> None:
+    old, new = "No annual fee. Intro 0% APR for 15 months.", "No annual fee! Intro 0% APR for 18 months, then 21.99%."
+    segments = diff_texts(old, new)
+
+    assert "".join(s.text for s in segments if s.op is not DiffOp.INSERT) == old
+    assert "".join(s.text for s in segments if s.op is not DiffOp.DELETE) == new
+
+
+@pytest.mark.django_db
+def test_find_phrase_matches_case_insensitively_and_returns_latest_decision(
+    marketer: User, reviewer: User, clock: FixedClock
+) -> None:
+    approved = make_item(marketer, title="Soft pull page", status=ItemStatus.APPROVED)
+    version = make_version(approved, "Checking your rate WON'T AFFECT YOUR CREDIT SCORE.")
+    Decision.objects.create(
+        item=approved,
+        version=version,
+        outcome=DecisionOutcome.APPROVED,
+        lane=DecisionLane.STANDARD,
+        approver=reviewer,
+        reason="Limited to the soft-pull step.",
+        ruleset_date=AT.date(),
+        expires_at=AT,
+        decided_at=AT,
+    )
+    other = make_item(marketer, title="Unrelated")
+    make_version(other, "Low rates for everyone.")
+
+    hits = find_phrase(viewer=reviewer, phrase="won't affect your credit score", filters=ItemFilter(), clock=clock)
+
+    assert [h.item_id for h in hits] == [approved.pk]
+    hit = hits[0]
+    assert (hit.version_n, hit.latest_outcome, hit.key) == (1, DecisionOutcome.APPROVED, f"CP-{approved.pk}")
+    assert [p.text for p in hit.snippet if p.highlighted] == ["WON'T AFFECT YOUR CREDIT SCORE"]
+    assert "".join(p.text for p in hit.snippet) == "Checking your rate WON'T AFFECT YOUR CREDIT SCORE."
+
+
+@pytest.mark.django_db
+def test_search_text_uses_websearch_syntax_and_ranks(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    strong = make_item(marketer, title="Strong")
+    make_version(strong, "No credit check. Credit check free. Checking credit is soft.")
+    weak = make_item(marketer, title="Weak")
+    make_version(weak, "A credit card with a long check-out flow.")
+    excluded = make_item(marketer, title="Excluded")
+    make_version(excluded, "No credit check, guaranteed approval.")
+
+    hits = search_text(viewer=reviewer, query='"credit check" -guaranteed', filters=ItemFilter(), clock=clock)
+
+    assert [h.item_id for h in hits] == [strong.pk]
+    highlighted = [p.text.lower() for p in hits[0].snippet if p.highlighted]
+    assert "credit" in highlighted
+    assert "<" not in "".join(p.text for p in hits[0].snippet)
+
+
+@pytest.mark.django_db
+def test_search_respects_item_filter_and_dedupes_by_item(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    card = make_item(marketer, product=Product.CREDIT_CARD)
+    make_version(card, "No annual fee.", n=1)
+    make_version(card, "No annual fee, ever.", n=2)
+    loan = make_item(marketer, product=Product.PERSONAL_LOAN)
+    make_version(loan, "No annual fee on loans.")
+
+    hits = search_text(
+        viewer=reviewer, query="annual fee", filters=ItemFilter(product=[Product.CREDIT_CARD]), clock=clock
+    )
+
+    assert [(h.item_id, h.version_n) for h in hits] == [(card.pk, 2)]

@@ -55,6 +55,10 @@ ignore = [
   "EM", "TRY003",              # messages at the raise site are fine
 ]
 
+[tool.ruff.lint.pylint]
+# Services and selectors take keyword-only arguments (actor, data, clock, ...); five is too few for them.
+max-args = 8
+
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "PLR2004", "ANN", "ARG", "PLC0415", "SLF001", "FBT001"]
 "config/settings/*.py" = ["F405", "F403"]
