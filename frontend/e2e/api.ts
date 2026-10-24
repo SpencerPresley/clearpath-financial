@@ -437,7 +437,10 @@ export async function stubApi(page: Page, opts: StubOptions = {}) {
           opts.items,
         );
       }
-      return fulfill(route, { rows, next_cursor: null });
+      return fulfill(route, {
+        rows: url.searchParams.get('sort') === 'queue' ? queueOrder(rows) : rows,
+        next_cursor: null,
+      });
     }
     if (path === '/api/views') {
       if (typeof opts.views === 'number') return fulfill(route, { code: 'x', message: 'down' }, opts.views);

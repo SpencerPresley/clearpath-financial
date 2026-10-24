@@ -129,3 +129,7 @@ Not exercisable: claim/assign/bulk (501 stubs).
 - **Sign-in is minimal by design**: no password reset, no MFA step (a 401 from login says so), no signup.
 - **Board shows the first 200 items per query** and says so when truncated.
 - **Keyboard column resizing** isn't offered (pointer only); every column can also be hidden.
+- **Drawer-open column hiding has two edges.** (a) The Columns chooser shows the user's choice, not what's rendered:
+  with the preview open, Partner can be checked in the chooser yet not shown. (b) Hiding Risk removes the inline risk
+  editor while the preview is open, and the drawer's risk badge is read-only; close the preview (Esc) to edit it.
+  Both follow from showing the drawer's facts once instead of twice at 1280.

@@ -107,6 +107,7 @@ const shots: Shot[] = [
   },
   {
     name: 'more-filters',
+    path: ACTIVE,
     ready: async (page) => {
       await expect(page.getByRole('table', { name: 'Queue' })).toBeVisible();
       await page.getByRole('button', { name: 'More filters' }).click();
