@@ -196,6 +196,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# --- LLM pre-review (checks.prereview) ---
+# No key (dev, CI): every AI check ends `failed` with code not_configured, so Approve asks for an override reason.
+ANTHROPIC_API_KEY: str | None = (
+    env.anthropic_api_key.get_secret_value() if env.anthropic_api_key is not None else None
+) or None
+ANTHROPIC_MODEL = env.anthropic_model
+
 # --- Celery ---
 CELERY_BROKER_URL = env.redis_url
 CELERY_RESULT_BACKEND = None
@@ -209,6 +216,8 @@ CELERY_BEAT_SCHEDULE = {
     # Approval expiry and 30-day warnings (product-spec "Automation": daily sweep). 06:00 UTC = before the
     # US working day, so items land in the morning queue.
     "expiry-sweep": {"task": "reviews.expiry_sweep", "schedule": crontab(hour=6, minute=0)},
+    # AI checks stuck `running` after a worker died flip to failed; pending ones whose message was lost re-enqueue.
+    "reconcile-llm-checks": {"task": "checks.reconcile_llm_checks", "schedule": 120.0},
 }
 
 LOGGING = {

@@ -4,10 +4,27 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { LlmCheckSucceededPayloadAdjustmentsByKind } from './llmCheckSucceededPayloadAdjustmentsByKind';
+import type { LlmCheckSucceededPayloadDroppedByReason } from './llmCheckSucceededPayloadDroppedByReason';
 
+/**
+ * What one AI pre-review cost and produced (spec §6.4: model, tokens, latency, dropped findings).
+ */
 export interface LlmCheckSucceededPayload {
+  adjustments_by_kind?: LlmCheckSucceededPayloadAdjustmentsByKind;
+  attempt?: number;
+  cache_creation_tokens?: number;
+  cache_read_tokens?: number;
   check_run_id: number;
+  current?: boolean;
+  dropped_by_reason?: LlmCheckSucceededPayloadDroppedByReason;
   dropped_findings_count: number;
   findings_count: number;
+  input_tokens?: number;
+  latency_ms?: number;
+  model?: string;
+  output_tokens?: number;
+  prompt_version?: string;
+  ruleset_key?: string;
   version_id: number;
 }

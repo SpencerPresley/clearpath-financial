@@ -6,5 +6,7 @@
  */
 
 export interface LlmCheckRequestedPayload {
+  check_run_id?: number | null;
+  retry?: boolean;
   version_id: number;
 }

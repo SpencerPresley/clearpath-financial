@@ -10,7 +10,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Length, Trim
 from django.db.models.lookups import GreaterThan
 
-from core.domain import CheckStatus, FindingState
+from core.domain import CheckStatus, FindingSource, FindingState, Severity
 
 
 def _span_valid() -> Q:
@@ -65,6 +65,11 @@ class Finding(models.Model):
             models.CheckConstraint(
                 condition=Q(carried_from__isnull=True) | Q(state=FindingState.DISMISSED.value),
                 name="finding_carried_is_dismissed",
+            ),
+            # Orchestrator ruling: the AI never blocks on its own judgment; blocking stays with code and humans.
+            models.CheckConstraint(
+                condition=~Q(source=FindingSource.LLM.value) | Q(severity=Severity.WARNING.value),
+                name="finding_llm_is_warning",
             ),
             models.UniqueConstraint(
                 fields=["version", "source", "rule_id", "span_start", "span_end"],
@@ -129,6 +134,12 @@ class CheckRun(models.Model):
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
     error = models.TextField(blank=True)
+    # AI checks only (code runs leave these unset). The retry budget lives on the run, not in the task message,
+    # so a re-enqueued run doesn't start a fresh budget: model calls started, unreadable answers, and when the
+    # check was requested (never rewritten; `started_at` is the current attempt's start).
+    attempts = models.PositiveSmallIntegerField(default=0)
+    invalid_outputs = models.PositiveSmallIntegerField(default=0)
+    requested_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [

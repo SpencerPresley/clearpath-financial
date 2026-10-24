@@ -4,9 +4,13 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { LlmFailureCode } from './llmFailureCode';
 
 export interface LlmCheckFailedPayload {
+  attempt?: number;
   check_run_id: number;
+  code?: LlmFailureCode;
+  current?: boolean;
   error: string;
   version_id: number;
 }

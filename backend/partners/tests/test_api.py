@@ -72,7 +72,7 @@ def test_partner_detail_counts_and_repeat_issues(marketer: User, reviewer: User)
             rule_id="ftc.material_connection",
             citation="16 CFR 255.5",
             source=FindingSource.LLM,
-            severity=Severity.BLOCKING,
+            severity=Severity.WARNING,  # AI findings are always warnings (checks.finding_llm_is_warning)
             message="No #ad disclosure",
             created_at=AT,
         )

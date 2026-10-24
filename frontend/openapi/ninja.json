@@ -4729,6 +4729,8 @@
                   "item.withdrawn": "#/components/schemas/ItemWithdrawnEventOut",
                   "llm_check.failed": "#/components/schemas/LlmCheckFailedEventOut",
                   "llm_check.requested": "#/components/schemas/LlmCheckRequestedEventOut",
+                  "llm_check.retry_scheduled": "#/components/schemas/LlmCheckRetryScheduledEventOut",
+                  "llm_check.started": "#/components/schemas/LlmCheckStartedEventOut",
                   "llm_check.succeeded": "#/components/schemas/LlmCheckSucceededEventOut",
                   "partner.created": "#/components/schemas/PartnerCreatedEventOut",
                   "partner.updated": "#/components/schemas/PartnerUpdatedEventOut",
@@ -4790,6 +4792,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/LlmCheckRequestedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/LlmCheckStartedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/LlmCheckRetryScheduledEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/LlmCheckSucceededEventOut"
@@ -6095,9 +6103,27 @@
       "LlmCheckFailedPayload": {
         "additionalProperties": false,
         "properties": {
+          "attempt": {
+            "default": 1,
+            "title": "Attempt",
+            "type": "integer"
+          },
           "check_run_id": {
             "title": "Check Run Id",
             "type": "integer"
+          },
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LlmFailureCode"
+              }
+            ],
+            "default": "error"
+          },
+          "current": {
+            "default": true,
+            "title": "Current",
+            "type": "boolean"
           },
           "error": {
             "title": "Error",
@@ -6191,6 +6217,22 @@
       "LlmCheckRequestedPayload": {
         "additionalProperties": false,
         "properties": {
+          "check_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Run Id"
+          },
+          "retry": {
+            "default": false,
+            "title": "Retry",
+            "type": "boolean"
+          },
           "version_id": {
             "title": "Version Id",
             "type": "integer"
@@ -6200,6 +6242,209 @@
           "version_id"
         ],
         "title": "LlmCheckRequestedPayload",
+        "type": "object"
+      },
+      "LlmCheckRetryScheduledEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/LlmCheckRetryScheduledPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "llm_check.retry_scheduled",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "LlmCheckRetryScheduledEventOut",
+        "type": "object"
+      },
+      "LlmCheckRetryScheduledPayload": {
+        "additionalProperties": false,
+        "description": "An attempt ended without a result that retrying can fix; the next one starts after `countdown_s`.",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "check_run_id": {
+            "title": "Check Run Id",
+            "type": "integer"
+          },
+          "countdown_s": {
+            "title": "Countdown S",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "check_run_id",
+          "attempt",
+          "error",
+          "countdown_s"
+        ],
+        "title": "LlmCheckRetryScheduledPayload",
+        "type": "object"
+      },
+      "LlmCheckStartedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/LlmCheckStartedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "llm_check.started",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "LlmCheckStartedEventOut",
+        "type": "object"
+      },
+      "LlmCheckStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "check_run_id": {
+            "title": "Check Run Id",
+            "type": "integer"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "check_run_id",
+          "attempt"
+        ],
+        "title": "LlmCheckStartedPayload",
         "type": "object"
       },
       "LlmCheckSucceededEventOut": {
@@ -6276,10 +6521,45 @@
       },
       "LlmCheckSucceededPayload": {
         "additionalProperties": false,
+        "description": "What one AI pre-review cost and produced (spec §6.4: model, tokens, latency, dropped findings).",
         "properties": {
+          "adjustments_by_kind": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Adjustments By Kind",
+            "type": "object"
+          },
+          "attempt": {
+            "default": 1,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "cache_creation_tokens": {
+            "default": 0,
+            "title": "Cache Creation Tokens",
+            "type": "integer"
+          },
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
           "check_run_id": {
             "title": "Check Run Id",
             "type": "integer"
+          },
+          "current": {
+            "default": true,
+            "title": "Current",
+            "type": "boolean"
+          },
+          "dropped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Dropped By Reason",
+            "type": "object"
           },
           "dropped_findings_count": {
             "title": "Dropped Findings Count",
@@ -6288,6 +6568,36 @@
           "findings_count": {
             "title": "Findings Count",
             "type": "integer"
+          },
+          "input_tokens": {
+            "default": 0,
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "latency_ms": {
+            "default": 0,
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "output_tokens": {
+            "default": 0,
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "default": "",
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "ruleset_key": {
+            "default": "",
+            "title": "Ruleset Key",
+            "type": "string"
           },
           "version_id": {
             "title": "Version Id",
@@ -6302,6 +6612,20 @@
         ],
         "title": "LlmCheckSucceededPayload",
         "type": "object"
+      },
+      "LlmFailureCode": {
+        "description": "Why an AI pre-review ended `failed` (LLM_CHECK_FAILED). Approve then needs an override reason.",
+        "enum": [
+          "not_configured",
+          "provider_unavailable",
+          "provider_refused",
+          "invalid_output",
+          "stuck",
+          "timeout",
+          "error"
+        ],
+        "title": "LlmFailureCode",
+        "type": "string"
       },
       "MarkAllReadOut": {
         "properties": {
@@ -14906,7 +15230,7 @@
     },
     "/api/items/{item_id}/llm-check/retry": {
       "post": {
-        "description": "Re-run a failed AI check on the current version. [workstream D]",
+        "description": "Run a failed AI check again on the current version (reviewer or lead, while the item is under review).\nIt starts as `pending`; poll the item for the result.",
         "operationId": "retryLlmCheck",
         "parameters": [
           {
@@ -14989,16 +15313,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
