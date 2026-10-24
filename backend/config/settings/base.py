@@ -252,3 +252,4 @@ ASSISTANT_TEAM_ADDRESSES = ("compliance@clearpath.demo", "marketing@clearpath.de
 # The demo's mail lands in the Outbox table; real delivery would be a backend swap (decisions.md).
 EMAIL_BACKEND = "notifications.email_backend.OutboxEmailBackend"
 DEFAULT_FROM_EMAIL = "ClearPath Assistant <assistant@clearpath.demo>"
+FRONTEND_BASE_URL = env.frontend_base_url  # item links in emails
