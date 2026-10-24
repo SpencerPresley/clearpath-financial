@@ -179,6 +179,7 @@ class NotificationKind(StrEnum):
     DECISION = "decision"
     REREVIEW = "rereview"
     MENTION = "mention"
+    EXPIRY_WARNING = "expiry_warning"
 
 
 class TermsField(StrEnum):
@@ -240,6 +241,7 @@ class EventType(StrEnum):
     ITEM_RISK_TIER_OVERRIDDEN = "item.risk_tier_overridden"
     ITEM_REOPENED = "item.reopened"
     ITEM_EXPIRED = "item.expired"
+    APPROVAL_EXPIRING = "item.approval_expiring"  # the daily sweep's 30-day warning, one per approval
     ITEM_WITHDRAWN = "item.withdrawn"
     ITEM_NEW_ROUND_STARTED = "item.new_round_started"
     ITEM_IMPORTED = "item.imported"

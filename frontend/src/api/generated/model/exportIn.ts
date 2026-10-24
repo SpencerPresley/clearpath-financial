@@ -5,11 +5,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ItemFilter } from './itemFilter';
+import type { ItemSort } from './itemSort';
 
 /**
- * Export any filtered view: an xlsx index, plus an evidence pack per approved item if asked.
+ * Export any filtered view as xlsx, in the view's sort order.
  */
 export interface ExportIn {
-  filters: ItemFilter;
+  filters?: ItemFilter;
+  /** Return a zip: the xlsx plus an evidence pack for every item in the view with an approval (at most 200). */
   include_evidence_packs?: boolean;
+  sort?: ItemSort;
 }

@@ -14,6 +14,8 @@ export interface DecisionOut {
   ai_review_carried_from_n: number | null;
   approver: PartyRefOut;
   decided_at: string;
+  /** The code-check engine version the findings came from; '' if unknown. */
+  engine_version: string;
   evidence: EvidenceOut[];
   expires_at: string | null;
   id: number;

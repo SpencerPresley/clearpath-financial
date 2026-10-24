@@ -4,14 +4,18 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { ImportCountsOut } from './importCountsOut';
 import type { ImportPreviewRowOut } from './importPreviewRowOut';
 import type { ImportProblemOut } from './importProblemOut';
+import type { ImportStatus } from './importStatus';
+import type { UnmappedValueOut } from './unmappedValueOut';
 
 export interface ImportPreviewOut {
+  counts: ImportCountsOut;
   job_id: number;
   problems: ImportProblemOut[];
-  rows_ready: number;
-  rows_total: number;
-  rows_with_problems: number;
-  sample_rows: ImportPreviewRowOut[];
+  rows: ImportPreviewRowOut[];
+  status: ImportStatus;
+  /** Values the admin must map before those rows import. */
+  unmapped: UnmappedValueOut[];
 }

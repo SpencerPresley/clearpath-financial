@@ -6,6 +6,7 @@
  */
 
 export interface ItemResubmittedPayload {
+  note?: string;
   previous_version_id: number;
   round: number;
   version_id: number;

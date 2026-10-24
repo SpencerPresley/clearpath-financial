@@ -95,6 +95,99 @@
         "title": "ApprovalDecision",
         "type": "string"
       },
+      "ApprovalExpiringEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApprovalExpiringPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "item.approval_expiring",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "ApprovalExpiringEventOut",
+        "type": "object"
+      },
+      "ApprovalExpiringPayload": {
+        "additionalProperties": false,
+        "description": "The daily sweep's warning, 30 days ahead; one per approving decision.",
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision_id",
+          "expires_at"
+        ],
+        "title": "ApprovalExpiringPayload",
+        "type": "object"
+      },
       "ApprovalRequiredEventOut": {
         "properties": {
           "approval": {
@@ -799,6 +892,7 @@
       "ColumnMappingIn": {
         "properties": {
           "source": {
+            "description": "A header from the sheet.",
             "title": "Source",
             "type": "string"
           },
@@ -811,23 +905,6 @@
           "target"
         ],
         "title": "ColumnMappingIn",
-        "type": "object"
-      },
-      "ColumnMappingOut": {
-        "properties": {
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "target": {
-            "$ref": "#/components/schemas/ImportTargetField"
-          }
-        },
-        "required": [
-          "source",
-          "target"
-        ],
-        "title": "ColumnMappingOut",
         "type": "object"
       },
       "CommentAddedEventOut": {
@@ -1152,13 +1229,14 @@
             "anyOf": [
               {
                 "maxLength": 100000,
+                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Approve with edits: the reviewer's v+1, which is what's approved.",
+            "description": "Approve with edits: the reviewer's v+1, which is what's approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field (and with llm_override_reason again if the AI check failed).",
             "title": "Edited Content Text"
           },
           "evidence_attachment_ids": {
@@ -1236,6 +1314,11 @@
             "title": "Decided At",
             "type": "string"
           },
+          "engine_version": {
+            "description": "The code-check engine version the findings came from; '' if unknown.",
+            "title": "Engine Version",
+            "type": "string"
+          },
           "evidence": {
             "items": {
               "$ref": "#/components/schemas/EvidenceOut"
@@ -1305,6 +1388,7 @@
           "approver",
           "reason",
           "ruleset_date",
+          "engine_version",
           "expires_at",
           "llm_override_reason",
           "ai_review_carried_from_n",
@@ -1400,9 +1484,25 @@
       "DecisionRecordedPayload": {
         "additionalProperties": false,
         "properties": {
+          "ai_review_carried_from_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Review Carried From Version Id"
+          },
           "decision_id": {
             "title": "Decision Id",
             "type": "integer"
+          },
+          "engine_version": {
+            "default": "",
+            "title": "Engine Version",
+            "type": "string"
           },
           "evidence_attachment_ids": {
             "default": [],
@@ -1427,12 +1527,29 @@
           "lane": {
             "$ref": "#/components/schemas/DecisionLane"
           },
+          "llm_override_reason": {
+            "default": "",
+            "title": "Llm Override Reason",
+            "type": "string"
+          },
           "outcome": {
             "$ref": "#/components/schemas/DecisionOutcome"
           },
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "ruleset_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleset Date"
           },
           "terms_version_ids": {
             "default": [],
@@ -1917,7 +2034,7 @@
         "type": "object"
       },
       "EvidencePackOut": {
-        "description": "What an approval was recorded against: the approved version, the decision, the terms it quotes, and\nthe evidence it relied on, by hash.",
+        "description": "What an approval was recorded against: the approved version, the decision and the findings triaged on\nthat version, the terms it quotes, and the evidence it relied on, by hash. The zip\n(`createEvidencePack`) holds the same record plus the files and the item history.",
         "properties": {
           "approved_version": {
             "$ref": "#/components/schemas/VersionOut"
@@ -1930,6 +2047,13 @@
               "$ref": "#/components/schemas/EvidenceOut"
             },
             "title": "Evidence",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "title": "Findings",
             "type": "array"
           },
           "generated_at": {
@@ -1952,6 +2076,7 @@
           "item",
           "approved_version",
           "decision",
+          "findings",
           "offer_terms",
           "evidence",
           "generated_at"
@@ -2051,22 +2176,40 @@
         "type": "object"
       },
       "ExportIn": {
-        "description": "Export any filtered view: an xlsx index, plus an evidence pack per approved item if asked.",
+        "description": "Export any filtered view as xlsx, in the view's sort order.",
         "properties": {
           "filters": {
-            "$ref": "#/components/schemas/ItemFilter"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItemFilter"
+              }
+            ]
           },
           "include_evidence_packs": {
             "default": false,
+            "description": "Return a zip: the xlsx plus an evidence pack for every item in the view with an approval (at most 200).",
             "title": "Include Evidence Packs",
             "type": "boolean"
+          },
+          "sort": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItemSort"
+              }
+            ],
+            "default": "newest"
           }
         },
-        "required": [
-          "filters"
-        ],
         "title": "ExportIn",
         "type": "object"
+      },
+      "ExportKind": {
+        "enum": [
+          "items_xlsx",
+          "evidence_pack"
+        ],
+        "title": "ExportKind",
+        "type": "string"
       },
       "ExportOut": {
         "properties": {
@@ -2084,7 +2227,7 @@
                 "type": "null"
               }
             ],
-            "description": "Set once status is ready.",
+            "description": "Set once status is ready. Only the requester can download.",
             "title": "Download Url"
           },
           "error": {
@@ -2097,6 +2240,29 @@
               }
             ],
             "title": "Error"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
           },
           "id": {
             "title": "Id",
@@ -2111,7 +2277,23 @@
                 "type": "null"
               }
             ],
+            "description": "Rows in the file; set once ready.",
             "title": "Item Count"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The item, for an evidence pack.",
+            "title": "Item Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ExportKind"
           },
           "status": {
             "$ref": "#/components/schemas/ExportStatus"
@@ -2119,11 +2301,15 @@
         },
         "required": [
           "id",
+          "kind",
           "status",
+          "item_id",
           "item_count",
+          "filename",
           "download_url",
           "error",
-          "created_at"
+          "created_at",
+          "finished_at"
         ],
         "title": "ExportOut",
         "type": "object"
@@ -2923,6 +3109,10 @@
       },
       "ImportColumnOut": {
         "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImportTargetField",
+            "description": "What the column is mapped to now."
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2948,7 +3138,8 @@
         "required": [
           "name",
           "sample_values",
-          "suggested_field"
+          "suggested_field",
+          "field"
         ],
         "title": "ImportColumnOut",
         "type": "object"
@@ -2957,34 +3148,12 @@
         "properties": {
           "skip_rows_with_problems": {
             "default": true,
+            "description": "Skip rows with error-severity problems; false refuses to commit while any exist.",
             "title": "Skip Rows With Problems",
             "type": "boolean"
           }
         },
         "title": "ImportCommitIn",
-        "type": "object"
-      },
-      "ImportCommitOut": {
-        "properties": {
-          "created": {
-            "title": "Created",
-            "type": "integer"
-          },
-          "job_id": {
-            "title": "Job Id",
-            "type": "integer"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "job_id",
-          "created",
-          "skipped"
-        ],
-        "title": "ImportCommitOut",
         "type": "object"
       },
       "ImportCommittedEventOut": {
@@ -3083,21 +3252,78 @@
         "title": "ImportCommittedPayload",
         "type": "object"
       },
+      "ImportCountsOut": {
+        "properties": {
+          "already_imported": {
+            "title": "Already Imported",
+            "type": "integer"
+          },
+          "blocked": {
+            "description": "Rows with an error-severity problem.",
+            "title": "Blocked",
+            "type": "integer"
+          },
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "not_data": {
+            "title": "Not Data",
+            "type": "integer"
+          },
+          "ready": {
+            "description": "Rows commit creates an item for (or created, once committed).",
+            "title": "Ready",
+            "type": "integer"
+          },
+          "rows_total": {
+            "title": "Rows Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows_total",
+          "ready",
+          "duplicates",
+          "already_imported",
+          "not_data",
+          "blocked"
+        ],
+        "title": "ImportCountsOut",
+        "type": "object"
+      },
       "ImportJobOut": {
         "properties": {
-          "column_mapping": {
-            "items": {
-              "$ref": "#/components/schemas/ColumnMappingOut"
-            },
-            "title": "Column Mapping",
-            "type": "array"
-          },
           "columns": {
             "items": {
               "$ref": "#/components/schemas/ImportColumnOut"
             },
             "title": "Columns",
             "type": "array"
+          },
+          "commit_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Requested At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
           },
           "created_at": {
             "format": "date-time",
@@ -3106,6 +3332,18 @@
           },
           "created_by": {
             "$ref": "#/components/schemas/PartyRefOut"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the last commit failed, if it did.",
+            "title": "Error"
           },
           "filename": {
             "title": "Filename",
@@ -3116,6 +3354,7 @@
             "type": "integer"
           },
           "row_count": {
+            "description": "Sheet rows below the header, data or not.",
             "title": "Row Count",
             "type": "integer"
           },
@@ -3126,19 +3365,35 @@
           "status": {
             "$ref": "#/components/schemas/ImportStatus"
           },
-          "status_mapping": {
-            "items": {
-              "$ref": "#/components/schemas/StatusMappingOut"
-            },
-            "title": "Status Mapping",
-            "type": "array"
-          },
           "status_values": {
-            "description": "Distinct values found in the mapped status column.",
+            "description": "Distinct values in the mapped status column.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/StatusValueOut"
             },
             "title": "Status Values",
+            "type": "array"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set once committed."
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "value_mappings": {
+            "items": {
+              "$ref": "#/components/schemas/ValueMappingOut"
+            },
+            "title": "Value Mappings",
             "type": "array"
           }
         },
@@ -3148,42 +3403,167 @@
           "filename",
           "sheet_name",
           "row_count",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "commit_requested_at",
+          "committed_at",
+          "summary",
+          "error",
           "columns",
           "status_values",
-          "column_mapping",
-          "status_mapping",
-          "created_by",
-          "created_at"
+          "value_mappings"
         ],
         "title": "ImportJobOut",
         "type": "object"
       },
+      "ImportJobSummaryOut": {
+        "properties": {
+          "commit_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Requested At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/PartyRefOut"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the last commit failed, if it did.",
+            "title": "Error"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "row_count": {
+            "description": "Sheet rows below the header, data or not.",
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "sheet_name": {
+            "title": "Sheet Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set once committed."
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "filename",
+          "sheet_name",
+          "row_count",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "commit_requested_at",
+          "committed_at",
+          "summary",
+          "error"
+        ],
+        "title": "ImportJobSummaryOut",
+        "type": "object"
+      },
       "ImportMappingIn": {
+        "description": "`columns` are merged into the current mapping (headers left out keep theirs). `status_values` and\n`value_mappings` replace the saved lists when sent; leave them out (or null) to keep what's saved.",
         "properties": {
           "columns": {
             "items": {
               "$ref": "#/components/schemas/ColumnMappingIn"
             },
-            "minItems": 1,
             "title": "Columns",
             "type": "array"
           },
           "status_values": {
-            "items": {
-              "$ref": "#/components/schemas/StatusMappingIn"
-            },
-            "title": "Status Values",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StatusMappingIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Values"
+          },
+          "value_mappings": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValueMappingIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Mappings"
           }
         },
-        "required": [
-          "columns"
-        ],
         "title": "ImportMappingIn",
         "type": "object"
       },
       "ImportPreviewOut": {
         "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ImportCountsOut"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "integer"
@@ -3195,39 +3575,41 @@
             "title": "Problems",
             "type": "array"
           },
-          "rows_ready": {
-            "title": "Rows Ready",
-            "type": "integer"
-          },
-          "rows_total": {
-            "title": "Rows Total",
-            "type": "integer"
-          },
-          "rows_with_problems": {
-            "title": "Rows With Problems",
-            "type": "integer"
-          },
-          "sample_rows": {
+          "rows": {
             "items": {
               "$ref": "#/components/schemas/ImportPreviewRowOut"
             },
-            "title": "Sample Rows",
+            "title": "Rows",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus"
+          },
+          "unmapped": {
+            "description": "Values the admin must map before those rows import.",
+            "items": {
+              "$ref": "#/components/schemas/UnmappedValueOut"
+            },
+            "title": "Unmapped",
             "type": "array"
           }
         },
         "required": [
           "job_id",
-          "rows_total",
-          "rows_ready",
-          "rows_with_problems",
+          "status",
+          "counts",
           "problems",
-          "sample_rows"
+          "unmapped",
+          "rows"
         ],
         "title": "ImportPreviewOut",
         "type": "object"
       },
       "ImportPreviewRowOut": {
         "properties": {
+          "action": {
+            "$ref": "#/components/schemas/RowAction"
+          },
           "legacy_ref": {
             "anyOf": [
               {
@@ -3239,9 +3621,30 @@
             ],
             "title": "Legacy Ref"
           },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner"
+          },
+          "problem_count": {
+            "title": "Problem Count",
+            "type": "integer"
           },
           "row_number": {
             "title": "Row Number",
@@ -3260,7 +3663,7 @@
           "submitted_on": {
             "anyOf": [
               {
-                "format": "date-time",
+                "format": "date",
                 "type": "string"
               },
               {
@@ -3283,24 +3686,38 @@
         },
         "required": [
           "row_number",
+          "action",
           "legacy_ref",
           "title",
           "status",
+          "outcome",
           "submitted_on",
-          "ok"
+          "partner",
+          "problem_count"
         ],
         "title": "ImportPreviewRowOut",
         "type": "object"
       },
       "ImportProblemKind": {
         "enum": [
+          "missing_mapping",
           "missing_value",
           "unparseable_date",
+          "coerced_date",
           "unmapped_status",
+          "inferred_status",
           "unknown_value",
-          "duplicate_ref",
+          "unknown_partner",
+          "fuzzy_partner",
+          "missing_expiry",
+          "unknown_trigger_terms",
+          "derived_approval_date",
+          "unresolved_approver",
+          "inconsistent_dates",
+          "duplicate_row",
+          "reused_ref",
           "already_imported",
-          "unknown_partner"
+          "not_data_row"
         ],
         "title": "ImportProblemKind",
         "type": "string"
@@ -3326,9 +3743,20 @@
             "type": "string"
           },
           "row_number": {
-            "description": "1-based row number in the sheet, as the admin sees it in Excel.",
-            "title": "Row Number",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Excel's row number; null for a problem with the whole sheet.",
+            "title": "Row Number"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/ProblemSeverity",
+            "description": "error: the row is skipped (or blocks commit); warning: imported, worth a look; info: a value read from a non-standard form."
           },
           "value": {
             "anyOf": [
@@ -3346,6 +3774,7 @@
           "row_number",
           "column",
           "kind",
+          "severity",
           "value",
           "message"
         ],
@@ -3363,30 +3792,65 @@
         "title": "ImportStatus",
         "type": "string"
       },
+      "ImportSummaryOut": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "partners_created": {
+            "title": "Partners Created",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "skipped",
+          "partners_created"
+        ],
+        "title": "ImportSummaryOut",
+        "type": "object"
+      },
       "ImportTargetField": {
         "description": "What a tracker column maps onto.",
         "enum": [
           "legacy_ref",
-          "title",
+          "submitted_on",
+          "submitter",
           "product",
           "channel",
+          "title",
           "partner",
-          "submitter",
-          "reviewer",
-          "submitted_on",
-          "decided_on",
-          "status",
-          "expires_on",
-          "first_run",
-          "last_run",
           "risk_tier",
-          "markets",
+          "trigger_terms",
+          "reviewer",
+          "version_number",
+          "rounds",
+          "status",
           "comments",
+          "approval",
+          "expires_on",
+          "placement",
           "notes",
-          "asset_link",
           "ignore"
         ],
         "title": "ImportTargetField",
+        "type": "string"
+      },
+      "ImportValueField": {
+        "description": "Columns whose raw values map onto app values; unknown ones are listed for the admin to map.",
+        "enum": [
+          "product",
+          "channel",
+          "risk_tier",
+          "partner",
+          "trigger_terms"
+        ],
+        "title": "ImportValueField",
         "type": "string"
       },
       "ItemAssignedEventOut": {
@@ -4251,6 +4715,7 @@
                   "finding.dismissed": "#/components/schemas/FindingDismissedEventOut",
                   "finding.reopened": "#/components/schemas/FindingReopenedEventOut",
                   "import.committed": "#/components/schemas/ImportCommittedEventOut",
+                  "item.approval_expiring": "#/components/schemas/ApprovalExpiringEventOut",
                   "item.assigned": "#/components/schemas/ItemAssignedEventOut",
                   "item.expired": "#/components/schemas/ItemExpiredEventOut",
                   "item.fields_updated": "#/components/schemas/ItemFieldsUpdatedEventOut",
@@ -4304,6 +4769,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ItemExpiredEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/ApprovalExpiringEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/ItemWithdrawnEventOut"
@@ -4822,6 +5290,11 @@
       "ItemResubmittedPayload": {
         "additionalProperties": false,
         "properties": {
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
           "previous_version_id": {
             "title": "Previous Version Id",
             "type": "integer"
@@ -5538,6 +6011,15 @@
         "title": "LegacyTimeline",
         "type": "object"
       },
+      "LibraryScope": {
+        "description": "The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn't lapse; run-permission does).",
+        "enum": [
+          "approved_to_run",
+          "ever_approved"
+        ],
+        "title": "LibraryScope",
+        "type": "string"
+      },
       "LlmCheckFailedEventOut": {
         "properties": {
           "actor": {
@@ -6130,7 +6612,8 @@
           "assignment",
           "decision",
           "rereview",
-          "mention"
+          "mention",
+          "expiry_warning"
         ],
         "title": "NotificationKind",
         "type": "string"
@@ -7441,6 +7924,16 @@
         "title": "PlacementUpdatedPayload",
         "type": "object"
       },
+      "ProblemSeverity": {
+        "description": "error: the row can't be imported as is. warning: imported, but someone should look. info: a value was\nread from a non-standard form (a date typed as text).",
+        "enum": [
+          "error",
+          "warning",
+          "info"
+        ],
+        "title": "ProblemSeverity",
+        "type": "string"
+      },
       "Product": {
         "enum": [
           "personal_loan",
@@ -7516,6 +8009,19 @@
       },
       "ReaffirmIn": {
         "properties": {
+          "llm_override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when the version's AI check failed.",
+            "title": "Llm Override Reason"
+          },
           "reason": {
             "maxLength": 10000,
             "minLength": 1,
@@ -7613,6 +8119,18 @@
           "admin"
         ],
         "title": "Role",
+        "type": "string"
+      },
+      "RowAction": {
+        "description": "What commit does with a row.",
+        "enum": [
+          "create",
+          "skip_duplicate",
+          "skip_already_imported",
+          "skip_not_data",
+          "blocked"
+        ],
+        "title": "RowAction",
         "type": "string"
       },
       "SavedViewIn": {
@@ -7896,9 +8414,12 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Defaults to the decision the status implies."
           },
           "source_value": {
+            "maxLength": 200,
+            "minLength": 1,
             "title": "Source Value",
             "type": "string"
           },
@@ -7913,7 +8434,7 @@
         "title": "StatusMappingIn",
         "type": "object"
       },
-      "StatusMappingOut": {
+      "StatusValueOut": {
         "properties": {
           "outcome": {
             "anyOf": [
@@ -7923,22 +8444,52 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "default",
+                  "mapped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "description": "The decision implied, if any."
+            "description": "default: the built-in table; mapped: the admin's mapping; null: not mapped yet.",
+            "title": "Source"
           },
           "source_value": {
             "title": "Source Value",
             "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/ItemStatus"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until mapped: the row can't be imported."
           }
         },
         "required": [
           "source_value",
-          "status"
+          "rows",
+          "status",
+          "outcome",
+          "source"
         ],
-        "title": "StatusMappingOut",
+        "title": "StatusValueOut",
         "type": "object"
       },
       "SubmitItemIn": {
@@ -8501,6 +9052,28 @@
         "title": "ToolResultEventOut",
         "type": "object"
       },
+      "UnmappedValueOut": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImportTargetField"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "value",
+          "rows"
+        ],
+        "title": "UnmappedValueOut",
+        "type": "object"
+      },
       "UserActiveChangedEventOut": {
         "properties": {
           "actor": {
@@ -9017,6 +9590,55 @@
           }
         },
         "title": "UserUpdateIn",
+        "type": "object"
+      },
+      "ValueMappingIn": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImportValueField"
+          },
+          "source_value": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Value",
+            "type": "string"
+          },
+          "value": {
+            "description": "product/channel/risk_tier: the app value; partner: a partner name; trigger_terms: yes or no.",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "source_value",
+          "value"
+        ],
+        "title": "ValueMappingIn",
+        "type": "object"
+      },
+      "ValueMappingOut": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImportValueField"
+          },
+          "source_value": {
+            "title": "Source Value",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "source_value",
+          "value"
+        ],
+        "title": "ValueMappingOut",
         "type": "object"
       },
       "VersionCreatedEventOut": {
@@ -10221,7 +10843,7 @@
     },
     "/api/checks/preview": {
       "post": {
-        "description": "Run the code rules on unsaved text; nothing is stored. [workstream C]",
+        "description": "Run the code rules on unsaved text, as the marketer types; nothing is stored.",
         "operationId": "previewChecks",
         "parameters": [],
         "requestBody": {
@@ -10304,16 +10926,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10329,7 +10941,7 @@
     },
     "/api/exports": {
       "post": {
-        "description": "Build an xlsx of the filtered items in the background; poll `getExport`. [workstream G]",
+        "description": "Build an xlsx of the filtered view in the background; poll `getExport`. Reviewers, leads, admins.",
         "operationId": "createExport",
         "parameters": [],
         "requestBody": {
@@ -10412,16 +11024,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10437,7 +11039,7 @@
     },
     "/api/exports/{export_id}": {
       "get": {
-        "description": "[workstream G]",
+        "description": "Status of an export you requested; `download_url` once ready.",
         "operationId": "getExport",
         "parameters": [
           {
@@ -10520,16 +11122,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10543,9 +11135,114 @@
         ]
       }
     },
+    "/api/exports/{export_id}/download": {
+      "get": {
+        "description": "The file. Only its requester (or an admin) can download it; 409 until it's ready.",
+        "operationId": "downloadExport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The xlsx or zip."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Download Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/api/findings/{finding_id}/accept": {
       "post": {
-        "description": "Accepted findings become required changes in the request-changes message. [workstream E]",
+        "description": "The problem is real: it becomes a required change. Assignee or lead; current version only.",
         "operationId": "acceptFinding",
         "parameters": [
           {
@@ -10638,16 +11335,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10663,7 +11350,7 @@
     },
     "/api/findings/{finding_id}/dismiss": {
       "post": {
-        "description": "[workstream E]",
+        "description": "Not a problem here, with the reason. Assignee or lead; current version only.",
         "operationId": "dismissFinding",
         "parameters": [
           {
@@ -10756,16 +11443,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10781,7 +11458,6 @@
     },
     "/api/findings/{finding_id}/reopen": {
       "post": {
-        "description": "[workstream E]",
         "operationId": "reopenFinding",
         "parameters": [
           {
@@ -10864,16 +11540,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -10910,8 +11576,98 @@
       }
     },
     "/api/imports": {
+      "get": {
+        "description": "The 20 most recent imports. Admins only.",
+        "operationId": "listImports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportJobSummaryOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "List Imports",
+        "tags": [
+          "imports"
+        ]
+      },
       "post": {
-        "description": "Upload a tracker xlsx; detects columns and suggests a mapping. Admins only. [workstream G]",
+        "description": "Upload a tracker xlsx; reads it and guesses the column mapping. Admins only. 422 if it isn't an xlsx.",
         "operationId": "uploadImport",
         "parameters": [],
         "requestBody": {
@@ -11005,16 +11761,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11030,7 +11776,7 @@
     },
     "/api/imports/sample": {
       "post": {
-        "description": "Start an import from the bundled sample tracker. [workstream G]",
+        "description": "Start an import from the bundled sample tracker (\"Load sample tracker\").",
         "operationId": "loadSampleImport",
         "parameters": [],
         "responses": {
@@ -11103,16 +11849,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11128,7 +11864,7 @@
     },
     "/api/imports/{job_id}": {
       "get": {
-        "description": "[workstream G]",
+        "description": "The job, its columns and current mapping. Poll this after `commitImport`.",
         "operationId": "getImport",
         "parameters": [
           {
@@ -11211,16 +11947,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11236,7 +11962,7 @@
     },
     "/api/imports/{job_id}/commit": {
       "post": {
-        "description": "Create legacy items (is_legacy, legacy_ref kept). [workstream G]",
+        "description": "Create the legacy items in the background; poll `getImport`. Safe to repeat: nothing is imported twice.",
         "operationId": "commitImport",
         "parameters": [
           {
@@ -11260,15 +11986,15 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportCommitOut"
+                  "$ref": "#/components/schemas/ImportJobOut"
                 }
               }
             },
-            "description": "OK"
+            "description": "Accepted"
           },
           "400": {
             "content": {
@@ -11329,16 +12055,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11354,7 +12070,7 @@
     },
     "/api/imports/{job_id}/mapping": {
       "put": {
-        "description": "Save the column and status-value mapping; returns the refreshed preview. [workstream G]",
+        "description": "Save the column, status-value, and value mappings; returns the refreshed preview.",
         "operationId": "setImportMapping",
         "parameters": [
           {
@@ -11447,16 +12163,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -11472,7 +12178,7 @@
     },
     "/api/imports/{job_id}/preview": {
       "get": {
-        "description": "Row problems are reported values, not errors (spec §6.1). [workstream G]",
+        "description": "Every row with what commit does with it, and every problem. Row problems are values, not errors.",
         "operationId": "getImportPreview",
         "parameters": [
           {
@@ -11555,16 +12261,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12213,7 +12909,7 @@
     },
     "/api/items/bulk/assign": {
       "post": {
-        "description": "[workstream E]",
+        "description": "Leads and admins. Each item is assigned on its own; problems come back per item in `skipped`.",
         "operationId": "bulkAssignItems",
         "parameters": [],
         "requestBody": {
@@ -12296,16 +12992,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12827,7 +13513,7 @@
     },
     "/api/items/{item_id}/assign": {
       "post": {
-        "description": "Manual assignment by a lead, or a reviewer handing off their own item. [workstream E]",
+        "description": "Manual assignment by a lead, or a reviewer handing off their own item. Null returns it to the pool.",
         "operationId": "assignItem",
         "parameters": [
           {
@@ -12920,16 +13606,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13177,7 +13853,7 @@
     },
     "/api/items/{item_id}/claim": {
       "post": {
-        "description": "A reviewer takes an item: submitted -> in_review, assigned to them. [workstream E]",
+        "description": "A reviewer takes an item (from the pool, or their own) and starts reviewing it: submitted or\nneeds_rereview -> in_review. Leads may claim anyone's.",
         "operationId": "claimItem",
         "parameters": [
           {
@@ -13260,16 +13936,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13606,7 +14272,7 @@
         ]
       },
       "post": {
-        "description": "Approve, approve with edits, request changes, or reject. Approve needs every finding triaged\n(409 open_findings_block_decision) and the AI check finished (409 ai_check_pending). [workstream E]",
+        "description": "Approve, approve with edits, request changes, or reject the current version. Every decision needs a\nreason. Approvals also need every finding triaged (409 open_findings_block_decision; plain Approve also\n409 accepted_findings_block_approval), the AI check finished (409 ai_check_pending; failed needs\nllm_override_reason), and current offer terms (409 stale_offer_terms). Approve with edits may answer 409\nfindings_need_triage with v+1's new findings (v+1 is kept). A newer version is 409 stale_version.",
         "operationId": "recordDecision",
         "parameters": [
           {
@@ -13699,16 +14365,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13841,7 +14497,7 @@
     },
     "/api/items/{item_id}/evidence-pack": {
       "get": {
-        "description": "The latest approval's record. 409 if the item was never approved. [workstream G]",
+        "description": "The latest approval's record. 409 if the item was never approved (or is a legacy import).",
         "operationId": "getEvidencePack",
         "parameters": [
           {
@@ -13924,16 +14580,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -13941,7 +14587,103 @@
             "SessionAuth": []
           }
         ],
-        "summary": "Evidence Pack",
+        "summary": "Get Evidence Pack",
+        "tags": [
+          "exports"
+        ]
+      },
+      "post": {
+        "description": "Build the evidence pack zip (files, hashes, history) in the background; poll `getExport`.",
+        "operationId": "createEvidencePack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Create Evidence Pack",
         "tags": [
           "exports"
         ]
@@ -14272,7 +15014,7 @@
     },
     "/api/items/{item_id}/new-round": {
       "post": {
-        "description": "withdrawn or expired -> draft v+1 -> submitted. [workstream E]",
+        "description": "withdrawn or expired -> submitted with v+1 (a copy of the current version unless text is given).",
         "operationId": "startNewRound",
         "parameters": [
           {
@@ -14365,16 +15107,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14489,7 +15221,7 @@
         ]
       },
       "post": {
-        "description": "The marketer records where approved content runs. [workstream E]",
+        "description": "The submitter (or a lead) records where the approved version runs. Approved items only.",
         "operationId": "recordPlacement",
         "parameters": [
           {
@@ -14582,16 +15314,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14607,7 +15329,7 @@
     },
     "/api/items/{item_id}/pull": {
       "post": {
-        "description": "Request takedown of live content; the item goes to withdrawn (ruling 6). [workstream E]",
+        "description": "Request takedown of live content; the item goes to withdrawn (ruling 6).",
         "operationId": "pullItem",
         "parameters": [
           {
@@ -14700,16 +15422,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14725,7 +15437,7 @@
     },
     "/api/items/{item_id}/reaffirm": {
       "post": {
-        "description": "needs_rereview -> approved on the same version. [workstream E]",
+        "description": "needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new\nfindings come back as 409 findings_need_triage.",
         "operationId": "reaffirmApproval",
         "parameters": [
           {
@@ -14818,16 +15530,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -14942,7 +15644,7 @@
         ]
       },
       "post": {
-        "description": "Submit v+1 after changes were requested; bumps the round. [workstream E]",
+        "description": "Submit v+1 after changes were requested: bumps the round, back to the previous reviewer. Submitter only.",
         "operationId": "resubmitItem",
         "parameters": [
           {
@@ -15035,16 +15737,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -15166,7 +15858,7 @@
     },
     "/api/library": {
       "get": {
-        "description": "The approved archive, including legacy items. `status` is ignored: always approved.",
+        "description": "The approved archive, legacy included. `approved_to_run` (default): currently approved. `ever_approved`:\nevery item that ever received an approval, whatever its status now (precedent doesn't lapse).",
         "operationId": "listLibrary",
         "parameters": [
           {
@@ -15567,6 +16259,25 @@
               ],
               "description": "Has a placement running on or before this date.",
               "title": "Run To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "description": "The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value\ndoesn't lapse; run-permission does).",
+                  "enum": [
+                    "approved_to_run",
+                    "ever_approved"
+                  ],
+                  "title": "LibraryScope",
+                  "type": "string"
+                }
+              ],
+              "default": "approved_to_run"
             }
           },
           {
@@ -17959,7 +18670,7 @@
     },
     "/api/placements/{placement_id}": {
       "patch": {
-        "description": "[workstream E]",
+        "description": "End or extend a run (`last_run`; send null for open-ended) or flip `monitored`. Omitted fields stay.",
         "operationId": "updatePlacement",
         "parameters": [
           {
@@ -18052,16 +18763,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -18077,7 +18778,7 @@
     },
     "/api/placements/{placement_id}/confirm-takedown": {
       "post": {
-        "description": "Stops the \"time to fix live content\" clock (ruling 6). [workstream E]",
+        "description": "The requested takedown happened. Stops the \"time to fix live content\" clock (ruling 6).",
         "operationId": "confirmTakedown",
         "parameters": [
           {
@@ -18160,16 +18861,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [

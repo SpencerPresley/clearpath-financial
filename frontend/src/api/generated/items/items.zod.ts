@@ -184,6 +184,7 @@ export const SubmitItemResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
@@ -249,7 +250,7 @@ export const SubmitItemResponse = zod.object({
 })
 
 /**
- * [workstream E]
+ * Leads and admins. Each item is assigned on its own; problems come back per item in `skipped`.
  * @summary Bulk Assign
  */
 export const bulkAssignItemsBodyItemIdsMax = 500;
@@ -365,6 +366,7 @@ export const GetItemResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
@@ -487,7 +489,7 @@ export const UpdateItemResponse = zod.object({
 })
 
 /**
- * Manual assignment by a lead, or a reviewer handing off their own item. [workstream E]
+ * Manual assignment by a lead, or a reviewer handing off their own item. Null returns it to the pool.
  * @summary Assign Item
  */
 export const AssignItemParams = zod.object({
@@ -590,7 +592,8 @@ export const UploadItemAttachmentResponse = zod.object({
 })
 
 /**
- * A reviewer takes an item: submitted -> in_review, assigned to them. [workstream E]
+ * A reviewer takes an item (from the pool, or their own) and starts reviewing it: submitted or
+ * needs_rereview -> in_review. Leads may claim anyone's.
  * @summary Claim Item
  */
 export const ClaimItemParams = zod.object({
@@ -738,15 +741,17 @@ export const GetItemHistoryParams = zod.object({
   "item_id": zod.int()
 })
 
-
-export const getItemHistoryResponseEntriesItemOneonePayloadTimelineDefault = { "decided_at": null, "first_reviewed_at": null, "outcome": null, "rounds": null, "submitted_at": null };
-export const getItemHistoryResponseEntriesItemOnesevenPayloadNoteDefault = ``;
-export const getItemHistoryResponseEntriesItemOneeightPayloadCarriedDefault = false;
-export const getItemHistoryResponseEntriesItemTwozeroPayloadMentionUserIdsDefault = [];
-export const getItemHistoryResponseEntriesItemTwoonePayloadEvidenceAttachmentIdsDefault = [];
-export const getItemHistoryResponseEntriesItemTwoonePayloadTermsVersionIdsDefault = [];
-export const getItemHistoryResponseEntriesItemTwosevenPayloadAffectedItemIdsDefault = [];
-export const getItemHistoryResponseEntriesItemThreesevenPayloadSeededItemsDefault = 0;
+export const getItemHistoryResponseEntriesItemTwoPayloadNoteDefault = ``;
+export const getItemHistoryResponseEntriesItemOnetwoPayloadTimelineDefault = { "decided_at": null, "first_reviewed_at": null, "outcome": null, "rounds": null, "submitted_at": null };
+export const getItemHistoryResponseEntriesItemOneeightPayloadNoteDefault = ``;
+export const getItemHistoryResponseEntriesItemOneninePayloadCarriedDefault = false;
+export const getItemHistoryResponseEntriesItemTwoonePayloadMentionUserIdsDefault = [];
+export const getItemHistoryResponseEntriesItemTwotwoPayloadEngineVersionDefault = ``;
+export const getItemHistoryResponseEntriesItemTwotwoPayloadEvidenceAttachmentIdsDefault = [];
+export const getItemHistoryResponseEntriesItemTwotwoPayloadLlmOverrideReasonDefault = ``;
+export const getItemHistoryResponseEntriesItemTwotwoPayloadTermsVersionIdsDefault = [];
+export const getItemHistoryResponseEntriesItemTwoeightPayloadAffectedItemIdsDefault = [];
+export const getItemHistoryResponseEntriesItemThreeeightPayloadSeededItemsDefault = 0;
 
 export const GetItemHistoryResponse = zod.object({
   "entries": zod.array(zod.union([zod.object({
@@ -779,6 +784,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "note": zod.string().default(getItemHistoryResponseEntriesItemTwoPayloadNoteDefault),
   "previous_version_id": zod.int(),
   "round": zod.int(),
   "version_id": zod.int(),
@@ -899,6 +905,22 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "decision_id": zod.int(),
+  "expires_at": zod.iso.datetime({"offset":true})
+}).describe('The daily sweep\'s warning, 30 days ahead; one per approving decision.'),
+  "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "type": zod.literal("item.approval_expiring").meta({ title: 'Type' })
+}),zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Null for system actions (sweeps, fan-out).'),
+  "at": zod.iso.datetime({"offset":true}),
+  "entity": zod.enum(['item', 'version', 'finding', 'comment', 'decision', 'placement', 'attachment', 'offer_terms', 'partner', 'user', 'import', 'export', 'email', 'system']).describe('What an Event is about.'),
+  "entity_id": zod.int(),
+  "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "id": zod.int(),
+  "payload": zod.object({
   "placement_ids": zod.array(zod.int()),
   "reason": zod.string()
 }),
@@ -941,7 +963,7 @@ export const GetItemHistoryResponse = zod.object({
   "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional(),
   "rounds": zod.union([zod.int().min(1),zod.null()]).optional(),
   "submitted_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional()
-}).describe('The tracker\'s own dates for an imported row. The event\'s `occurred_at` is the import time, so metrics\n(time to first review, rounds per item) read these instead. Every field is optional: the tracker is messy,\nand a missing date is recorded as missing rather than guessed.').default(getItemHistoryResponseEntriesItemOneonePayloadTimelineDefault)
+}).describe('The tracker\'s own dates for an imported row. The event\'s `occurred_at` is the import time, so metrics\n(time to first review, rounds per item) read these instead. Every field is optional: the tracker is messy,\nand a missing date is recorded as missing rather than guessed.').default(getItemHistoryResponseEntriesItemOnetwoPayloadTimelineDefault)
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("item.imported").meta({ title: 'Type' })
@@ -1044,7 +1066,7 @@ export const GetItemHistoryResponse = zod.object({
   "id": zod.int(),
   "payload": zod.object({
   "finding_id": zod.int(),
-  "note": zod.string().default(getItemHistoryResponseEntriesItemOnesevenPayloadNoteDefault),
+  "note": zod.string().default(getItemHistoryResponseEntriesItemOneeightPayloadNoteDefault),
   "rule_id": zod.string(),
   "version_id": zod.int()
 }),
@@ -1061,7 +1083,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "carried": zod.boolean().default(getItemHistoryResponseEntriesItemOneeightPayloadCarriedDefault),
+  "carried": zod.boolean().default(getItemHistoryResponseEntriesItemOneninePayloadCarriedDefault),
   "finding_id": zod.int(),
   "reason": zod.string(),
   "rule_id": zod.string(),
@@ -1098,7 +1120,7 @@ export const GetItemHistoryResponse = zod.object({
   "id": zod.int(),
   "payload": zod.object({
   "comment_id": zod.int(),
-  "mention_user_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwozeroPayloadMentionUserIdsDefault),
+  "mention_user_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwoonePayloadMentionUserIdsDefault),
   "version_id": zod.int()
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
@@ -1114,13 +1136,17 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "ai_review_carried_from_version_id": zod.union([zod.int(),zod.null()]).optional(),
   "decision_id": zod.int(),
-  "evidence_attachment_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwoonePayloadEvidenceAttachmentIdsDefault),
+  "engine_version": zod.string().default(getItemHistoryResponseEntriesItemTwotwoPayloadEngineVersionDefault),
+  "evidence_attachment_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwotwoPayloadEvidenceAttachmentIdsDefault),
   "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "lane": zod.enum(['standard', 'fast_track', 'reaffirm']).describe('How a decision was reached; metrics and the evidence pack distinguish them.'),
+  "llm_override_reason": zod.string().default(getItemHistoryResponseEntriesItemTwotwoPayloadLlmOverrideReasonDefault),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string(),
-  "terms_version_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwoonePayloadTermsVersionIdsDefault),
+  "ruleset_date": zod.union([zod.iso.date(),zod.null()]).optional(),
+  "terms_version_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwotwoPayloadTermsVersionIdsDefault),
   "version_id": zod.int()
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
@@ -1225,7 +1251,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwosevenPayloadAffectedItemIdsDefault),
+  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemTwoeightPayloadAffectedItemIdsDefault),
   "offer_terms_id": zod.int(),
   "previous_offer_terms_id": zod.union([zod.int(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
@@ -1398,7 +1424,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemThreesevenPayloadSeededItemsDefault)
+  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemThreeeightPayloadSeededItemsDefault)
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("demo.reset").meta({ title: 'Type' })
@@ -1406,7 +1432,7 @@ export const GetItemHistoryResponse = zod.object({
 })
 
 /**
- * withdrawn or expired -> draft v+1 -> submitted. [workstream E]
+ * withdrawn or expired -> submitted with v+1 (a copy of the current version unless text is given).
  * @summary Start New Round
  */
 export const StartNewRoundParams = zod.object({
@@ -1477,7 +1503,7 @@ export const ListPlacementsResponseItem = zod.object({
 export const ListPlacementsResponse = zod.array(ListPlacementsResponseItem)
 
 /**
- * The marketer records where approved content runs. [workstream E]
+ * The submitter (or a lead) records where the approved version runs. Approved items only.
  * @summary Record Placement
  */
 export const RecordPlacementParams = zod.object({
@@ -1539,7 +1565,7 @@ export const ListVersionsResponseItem = zod.object({
 export const ListVersionsResponse = zod.array(ListVersionsResponseItem)
 
 /**
- * Submit v+1 after changes were requested; bumps the round. [workstream E]
+ * Submit v+1 after changes were requested: bumps the round, back to the previous reviewer. Submitter only.
  * @summary Resubmit Item
  */
 export const ResubmitItemParams = zod.object({
@@ -1623,7 +1649,7 @@ export const GetVersionResponse = zod.object({
 })
 
 /**
- * [workstream E]
+ * End or extend a run (`last_run`; send null for open-ended) or flip `monitored`. Omitted fields stay.
  * @summary Update Placement
  */
 export const UpdatePlacementParams = zod.object({
@@ -1655,7 +1681,7 @@ export const UpdatePlacementResponse = zod.object({
 })
 
 /**
- * Stops the "time to fix live content" clock (ruling 6). [workstream E]
+ * The requested takedown happened. Stops the "time to fix live content" clock (ruling 6).
  * @summary Confirm Takedown
  */
 export const ConfirmTakedownParams = zod.object({

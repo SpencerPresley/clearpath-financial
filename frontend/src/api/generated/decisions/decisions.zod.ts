@@ -45,6 +45,7 @@ export const ListDecisionsResponseItem = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
@@ -68,8 +69,11 @@ export const ListDecisionsResponseItem = zod.object({
 export const ListDecisionsResponse = zod.array(ListDecisionsResponseItem)
 
 /**
- * Approve, approve with edits, request changes, or reject. Approve needs every finding triaged
- * (409 open_findings_block_decision) and the AI check finished (409 ai_check_pending). [workstream E]
+ * Approve, approve with edits, request changes, or reject the current version. Every decision needs a
+ * reason. Approvals also need every finding triaged (409 open_findings_block_decision; plain Approve also
+ * 409 accepted_findings_block_approval), the AI check finished (409 ai_check_pending; failed needs
+ * llm_override_reason), and current offer terms (409 stale_offer_terms). Approve with edits may answer 409
+ * findings_need_triage with v+1's new findings (v+1 is kept). A newer version is 409 stale_version.
  * @summary Record Decision
  */
 export const RecordDecisionParams = zod.object({
@@ -87,7 +91,7 @@ export const recordDecisionBodyReasonMax = 10000;
 
 
 export const RecordDecisionBody = zod.object({
-  "edited_content_text": zod.union([zod.string().max(recordDecisionBodyEditedContentTextOneMax),zod.null()]).optional().describe('Approve with edits: the reviewer\'s v+1, which is what\'s approved.'),
+  "edited_content_text": zod.union([zod.string().min(1).max(recordDecisionBodyEditedContentTextOneMax),zod.null()]).optional().describe('Approve with edits: the reviewer\'s v+1, which is what\'s approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field (and with llm_override_reason again if the AI check failed).'),
   "evidence_attachment_ids": zod.array(zod.int()).max(recordDecisionBodyEvidenceAttachmentIdsMax).optional(),
   "llm_override_reason": zod.union([zod.string().max(recordDecisionBodyLlmOverrideReasonOneMax),zod.null()]).optional().describe('Required to approve when the AI check failed.'),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
@@ -102,6 +106,7 @@ export const RecordDecisionResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
@@ -124,7 +129,7 @@ export const RecordDecisionResponse = zod.object({
 })
 
 /**
- * Request takedown of live content; the item goes to withdrawn (ruling 6). [workstream E]
+ * Request takedown of live content; the item goes to withdrawn (ruling 6).
  * @summary Pull Item
  */
 export const PullItemParams = zod.object({
@@ -176,18 +181,22 @@ export const PullItemResponse = zod.object({
 })
 
 /**
- * needs_rereview -> approved on the same version. [workstream E]
+ * needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new
+ * findings come back as 409 findings_need_triage.
  * @summary Reaffirm
  */
 export const ReaffirmApprovalParams = zod.object({
   "item_id": zod.int()
 })
 
+export const reaffirmApprovalBodyLlmOverrideReasonOneMax = 2000;
+
 export const reaffirmApprovalBodyReasonMax = 10000;
 
 
 
 export const ReaffirmApprovalBody = zod.object({
+  "llm_override_reason": zod.union([zod.string().max(reaffirmApprovalBodyLlmOverrideReasonOneMax),zod.null()]).optional().describe('Required when the version\'s AI check failed.'),
   "reason": zod.string().min(1).max(reaffirmApprovalBodyReasonMax)
 })
 
@@ -198,6 +207,7 @@ export const ReaffirmApprovalResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),

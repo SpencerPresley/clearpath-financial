@@ -27,7 +27,7 @@ export const ListNotificationsResponse = zod.object({
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
   "item_key": zod.union([zod.string(),zod.null()]),
-  "kind": zod.enum(['assignment', 'decision', 'rereview', 'mention']),
+  "kind": zod.enum(['assignment', 'decision', 'rereview', 'mention', 'expiry_warning']),
   "message": zod.string(),
   "read_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()])
 })),

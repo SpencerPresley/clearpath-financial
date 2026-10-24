@@ -54,6 +54,7 @@ class ItemResubmittedPayload(EventPayload):
     version_n: int
     round: int
     previous_version_id: int
+    note: str = ""  # the marketer's "what changed", for the reviewer
 
 
 class ItemAssignedPayload(EventPayload):
@@ -90,6 +91,13 @@ class ItemExpiredPayload(EventPayload):
     reason: ReopenReason
     offer_terms_id: int | None = None
     generated_version_id: int | None = None
+
+
+class ApprovalExpiringPayload(EventPayload):
+    """The daily sweep's warning, 30 days ahead; one per approving decision."""
+
+    decision_id: int
+    expires_at: datetime
 
 
 class ItemWithdrawnPayload(EventPayload):
@@ -205,6 +213,10 @@ class DecisionRecordedPayload(EventPayload):
     expires_at: datetime | None
     terms_version_ids: tuple[int, ...] = ()
     evidence_attachment_ids: tuple[int, ...] = ()
+    ruleset_date: date | None = None
+    engine_version: str = ""
+    ai_review_carried_from_version_id: int | None = None
+    llm_override_reason: str = ""
 
 
 class PlacementRecordedPayload(EventPayload):
@@ -312,6 +324,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.ITEM_RISK_TIER_OVERRIDDEN: ItemRiskTierOverriddenPayload,
     EventType.ITEM_REOPENED: ItemReopenedPayload,
     EventType.ITEM_EXPIRED: ItemExpiredPayload,
+    EventType.APPROVAL_EXPIRING: ApprovalExpiringPayload,
     EventType.ITEM_WITHDRAWN: ItemWithdrawnPayload,
     EventType.ITEM_NEW_ROUND_STARTED: ItemNewRoundStartedPayload,
     EventType.ITEM_IMPORTED: ItemImportedPayload,

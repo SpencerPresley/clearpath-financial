@@ -264,6 +264,9 @@ class Decision(models.Model):
     approver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     reason = models.TextField()
     ruleset_date = models.DateField()
+    # The rules engine's behavior version (checks.engine.ENGINE_VERSION) the findings were produced with; "" for
+    # decisions recorded before it was captured.
+    engine_version = models.CharField(max_length=40, blank=True, default="")
     expires_at = models.DateTimeField(null=True, blank=True)
     # Approving with a failed AI check needs a recorded reason (spec §4.2 ruling 3).
     llm_override_reason = models.TextField(blank=True)

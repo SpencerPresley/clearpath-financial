@@ -4,8 +4,9 @@
   trigram word similarity.
 - `search_text`: `websearch_to_tsquery` over the generated tsvector, ranked by `ts_rank_cd`.
 
-Each returns at most one hit per item (its latest matching version). Snippets are structured parts, not
-HTML: version text is untrusted affiliate copy, and `ts_headline` doesn't escape it.
+Both search only versions that ever received an approval (precedent), one hit per item (its latest matching
+such version). Snippets are structured parts, not HTML: version text is untrusted affiliate copy, and
+`ts_headline` doesn't escape it.
 """
 
 from dataclasses import dataclass
@@ -14,13 +15,13 @@ from enum import StrEnum
 from typing import Final
 
 from django.contrib.postgres.search import SearchHeadline, SearchQuery, SearchRank, TrigramWordSimilarity
-from django.db.models import F, OuterRef, QuerySet, Subquery
+from django.db.models import Exists, F, OuterRef, QuerySet, Subquery
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import Channel, DecisionOutcome, ItemStatus, Product
 from reviews.filters import ItemFilter
-from reviews.models import Decision, ReviewItem, Version
+from reviews.models import APPROVED_OUTCOMES, Decision, ReviewItem, Version
 from reviews.selectors import filter_items
 
 
@@ -57,7 +58,10 @@ class SearchHit:
 
 
 def _latest_matching_versions(items: QuerySet[ReviewItem], matching: QuerySet[Version]) -> QuerySet[Version]:
-    latest = matching.filter(item__in=items).order_by("item_id", "-n").distinct("item_id").values("pk")
+    # Precedent is approved wording (ledger ruling): only versions that ever received an approving decision,
+    # whatever the item's status is now (shown as a badge). Copy still under review isn't precedent.
+    ever_approved = Exists(Decision.objects.filter(version=OuterRef("pk"), outcome__in=APPROVED_OUTCOMES))
+    latest = matching.filter(ever_approved, item__in=items).order_by("item_id", "-n").distinct("item_id").values("pk")
     # The matched version's own decision: "was this wording approved?" is about the text that contains it.
     decisions = Decision.objects.filter(version=OuterRef("pk")).order_by("-decided_at", "-pk")
     return (

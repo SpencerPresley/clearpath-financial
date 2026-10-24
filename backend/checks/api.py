@@ -1,11 +1,23 @@
 from django.http import HttpRequest
 from ninja import Router
 
-from checks.schemas import CheckPreviewIn, CheckPreviewOut, FindingAcceptIn, FindingDismissIn, FindingOut
-from checks.selectors import FindingRow, list_findings
+from accounts.api import current_user
+from checks import services
+from checks.engine import FindingDraft, TermsRefDraft
+from checks.schemas import (
+    CheckPreviewIn,
+    CheckPreviewOut,
+    FindingAcceptIn,
+    FindingDismissIn,
+    FindingDraftOut,
+    FindingOut,
+    TermsRefDraftOut,
+)
+from checks.selectors import FindingRow, get_finding, list_findings
+from core.domain import TermsField
 from core.errors import NotImplementedYet
 from core.schemas import ERRORS, STUB_ERRORS
-from reviews.schemas import ItemRowOut
+from reviews.schemas import ItemRowOut, SpanOut
 
 router = Router(tags=["findings"])
 
@@ -16,34 +28,66 @@ def findings(request: HttpRequest, item_id: int, version_n: int | None = None) -
     return list(list_findings(item_id=item_id, version_n=version_n))
 
 
-@router.post(
-    "/findings/{int:finding_id}/accept", response={200: FindingOut, **STUB_ERRORS}, operation_id="acceptFinding"
-)
-def accept(request: HttpRequest, finding_id: int, body: FindingAcceptIn) -> FindingOut:
-    """Accepted findings become required changes in the request-changes message. [workstream E]"""
-    raise NotImplementedYet("accepting findings")
+@router.post("/findings/{int:finding_id}/accept", response={200: FindingOut, **ERRORS}, operation_id="acceptFinding")
+def accept(request: HttpRequest, finding_id: int, body: FindingAcceptIn) -> FindingRow:
+    """The problem is real: it becomes a required change. Assignee or lead; current version only."""
+    services.accept_finding(actor=current_user(request), finding_id=finding_id, note=body.note)
+    return get_finding(finding_id=finding_id)
 
 
-@router.post(
-    "/findings/{int:finding_id}/dismiss", response={200: FindingOut, **STUB_ERRORS}, operation_id="dismissFinding"
-)
-def dismiss(request: HttpRequest, finding_id: int, body: FindingDismissIn) -> FindingOut:
-    """[workstream E]"""
-    raise NotImplementedYet("dismissing findings")
+@router.post("/findings/{int:finding_id}/dismiss", response={200: FindingOut, **ERRORS}, operation_id="dismissFinding")
+def dismiss(request: HttpRequest, finding_id: int, body: FindingDismissIn) -> FindingRow:
+    """Not a problem here, with the reason. Assignee or lead; current version only."""
+    services.dismiss_finding(actor=current_user(request), finding_id=finding_id, reason=body.reason)
+    return get_finding(finding_id=finding_id)
 
 
-@router.post(
-    "/findings/{int:finding_id}/reopen", response={200: FindingOut, **STUB_ERRORS}, operation_id="reopenFinding"
-)
-def reopen(request: HttpRequest, finding_id: int) -> FindingOut:
-    """[workstream E]"""
-    raise NotImplementedYet("reopening findings")
+@router.post("/findings/{int:finding_id}/reopen", response={200: FindingOut, **ERRORS}, operation_id="reopenFinding")
+def reopen(request: HttpRequest, finding_id: int) -> FindingRow:
+    services.reopen_finding(actor=current_user(request), finding_id=finding_id)
+    return get_finding(finding_id=finding_id)
 
 
-@router.post("/checks/preview", response={200: CheckPreviewOut, **STUB_ERRORS}, operation_id="previewChecks")
+def _finding_out(f: FindingDraft) -> FindingDraftOut:
+    return FindingDraftOut(
+        rule_id=f.rule_id,
+        citation=f.citation,
+        source=f.source,
+        severity=f.severity,
+        message=f.message,
+        suggested_fix=f.suggested_fix or "",
+        span=SpanOut(start=f.span.start, end=f.span.end) if f.span is not None else None,
+        quote=f.quote,
+    )
+
+
+def _ref_out(ref: TermsRefDraft, text: str) -> TermsRefDraftOut:
+    return TermsRefDraftOut(
+        field=TermsField(ref.field),
+        span=SpanOut(start=ref.span.start, end=ref.span.end),
+        quote=text[ref.span.start : ref.span.end],
+        value=str(ref.quoted_value.normalize()),
+    )
+
+
+@router.post("/checks/preview", response={200: CheckPreviewOut, **ERRORS}, operation_id="previewChecks")
 def preview(request: HttpRequest, body: CheckPreviewIn) -> CheckPreviewOut:
-    """Run the code rules on unsaved text; nothing is stored. [workstream C]"""
-    raise NotImplementedYet("live checks")
+    """Run the code rules on unsaved text, as the marketer types; nothing is stored."""
+    result = services.preview_checks(
+        data=services.PreviewInput(
+            content_text=body.content_text,
+            product=body.product,
+            channel=body.channel,
+            markets=tuple(body.markets),
+            partner_id=body.partner_id,
+            attachment_kinds=tuple(body.attachment_kinds),
+        )
+    )
+    return CheckPreviewOut(
+        findings=[_finding_out(f) for f in result.findings],
+        terms_refs=[_ref_out(r, body.content_text) for r in result.terms_refs],
+        ruleset_key=result.ruleset_key,
+    )
 
 
 @router.post(

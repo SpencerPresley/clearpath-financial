@@ -8,35 +8,36 @@ import * as zod from 'zod';
 
 
 /**
- * Build an xlsx of the filtered items in the background; poll `getExport`. [workstream G]
+ * Build an xlsx of the filtered view in the background; poll `getExport`. Reviewers, leads, admins.
  * @summary Create Export
  */
-export const createExportBodyFiltersApprovedWithinDaysOneMin = 0;
+export const createExportBodyFiltersOneApprovedWithinDaysOneMin = 0;
 
-export const createExportBodyFiltersMineDefault = false;
-export const createExportBodyFiltersQOneMax = 200;
+export const createExportBodyFiltersOneMineDefault = false;
+export const createExportBodyFiltersOneQOneMax = 200;
 
-export const createExportBodyFiltersSubmittedByMeDefault = false;
-export const createExportBodyFiltersUnassignedDefault = false;
-export const createExportBodyFiltersWaitingMoreThanDaysOneMin = 0;
+export const createExportBodyFiltersOneSubmittedByMeDefault = false;
+export const createExportBodyFiltersOneUnassignedDefault = false;
+export const createExportBodyFiltersOneWaitingMoreThanDaysOneMin = 0;
 
 export const createExportBodyIncludeEvidencePacksDefault = false;
+export const createExportBodySortDefault = `newest`;
 
 export const CreateExportBody = zod.object({
   "filters": zod.object({
   "approved_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "approved_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "approved_within_days": zod.union([zod.int().min(createExportBodyFiltersApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
+  "approved_within_days": zod.union([zod.int().min(createExportBodyFiltersOneApprovedWithinDaysOneMin),zod.null()]).optional().describe('Approved in the last N days.'),
   "assignee_id": zod.array(zod.int()).optional(),
   "channel": zod.array(zod.enum(['email', 'sms', 'paid_social', 'paid_search', 'display', 'direct_mail', 'landing_page', 'affiliate_page', 'call_script'])).optional(),
   "has_open_findings": zod.union([zod.boolean(),zod.null()]).optional(),
   "is_legacy": zod.union([zod.boolean(),zod.null()]).optional(),
   "market": zod.array(zod.enum(['national', 'CA']).describe('Where content is disseminated. Federal rules always apply; state rules key off these.')).optional(),
-  "mine": zod.boolean().default(createExportBodyFiltersMineDefault).describe('Assigned to the viewer.'),
+  "mine": zod.boolean().default(createExportBodyFiltersOneMineDefault).describe('Assigned to the viewer.'),
   "owner_id": zod.array(zod.int()).optional(),
   "partner_id": zod.array(zod.int()).optional(),
   "product": zod.array(zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal'])).optional(),
-  "q": zod.union([zod.string().max(createExportBodyFiltersQOneMax),zod.null()]).optional().describe('Title contains, or a display key like CP-1042.'),
+  "q": zod.union([zod.string().max(createExportBodyFiltersOneQOneMax),zod.null()]).optional().describe('Title contains, or a display key like CP-1042.'),
   "reopen_reason": zod.array(zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')).optional(),
   "risk_tier": zod.array(zod.enum(['high', 'medium', 'low'])).optional(),
   "run_from": zod.union([zod.iso.date(),zod.null()]).optional().describe('Has a placement running on or after this date.'),
@@ -44,25 +45,30 @@ export const CreateExportBody = zod.object({
   "status": zod.array(zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])).optional(),
   "submitted_after": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "submitted_before": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "submitted_by_me": zod.boolean().default(createExportBodyFiltersSubmittedByMeDefault).describe('Submitted by the viewer.'),
+  "submitted_by_me": zod.boolean().default(createExportBodyFiltersOneSubmittedByMeDefault).describe('Submitted by the viewer.'),
   "tag": zod.array(zod.string()).optional().describe('Items carrying all of these tags.'),
-  "unassigned": zod.boolean().default(createExportBodyFiltersUnassignedDefault),
-  "waiting_more_than_days": zod.union([zod.int().min(createExportBodyFiltersWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
-}).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.'),
-  "include_evidence_packs": zod.boolean().default(createExportBodyIncludeEvidencePacksDefault)
-}).describe('Export any filtered view: an xlsx index, plus an evidence pack per approved item if asked.')
+  "unassigned": zod.boolean().default(createExportBodyFiltersOneUnassignedDefault),
+  "waiting_more_than_days": zod.union([zod.int().min(createExportBodyFiltersOneWaitingMoreThanDaysOneMin),zod.null()]).optional().describe('Submitted more than N days ago.')
+}).describe('Every field narrows the result; list fields match any of their values (tags: all of them).\nEmpty means "no constraint". `mine` and `submitted_by_me` are relative to the viewer, so a saved view\nlike "My queue" works for whoever opens it.').optional(),
+  "include_evidence_packs": zod.boolean().default(createExportBodyIncludeEvidencePacksDefault).describe('Return a zip: the xlsx plus an evidence pack for every item in the view with an approval (at most 200).'),
+  "sort": zod.enum(['queue', 'oldest', 'newest', 'updated', 'title']).default(createExportBodySortDefault)
+}).describe('Export any filtered view as xlsx, in the view\'s sort order.')
 
 export const CreateExportResponse = zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
-  "download_url": zod.union([zod.string(),zod.null()]).describe('Set once status is ready.'),
+  "download_url": zod.union([zod.string(),zod.null()]).describe('Set once status is ready. Only the requester can download.'),
   "error": zod.union([zod.string(),zod.null()]),
+  "filename": zod.union([zod.string(),zod.null()]),
+  "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "id": zod.int(),
-  "item_count": zod.union([zod.int(),zod.null()]),
+  "item_count": zod.union([zod.int(),zod.null()]).describe('Rows in the file; set once ready.'),
+  "item_id": zod.union([zod.int(),zod.null()]).describe('The item, for an evidence pack.'),
+  "kind": zod.enum(['items_xlsx', 'evidence_pack']),
   "status": zod.enum(['pending', 'running', 'ready', 'failed'])
 })
 
 /**
- * [workstream G]
+ * Status of an export you requested; `download_url` once ready.
  * @summary Get Export
  */
 export const GetExportParams = zod.object({
@@ -71,16 +77,30 @@ export const GetExportParams = zod.object({
 
 export const GetExportResponse = zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
-  "download_url": zod.union([zod.string(),zod.null()]).describe('Set once status is ready.'),
+  "download_url": zod.union([zod.string(),zod.null()]).describe('Set once status is ready. Only the requester can download.'),
   "error": zod.union([zod.string(),zod.null()]),
+  "filename": zod.union([zod.string(),zod.null()]),
+  "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "id": zod.int(),
-  "item_count": zod.union([zod.int(),zod.null()]),
+  "item_count": zod.union([zod.int(),zod.null()]).describe('Rows in the file; set once ready.'),
+  "item_id": zod.union([zod.int(),zod.null()]).describe('The item, for an evidence pack.'),
+  "kind": zod.enum(['items_xlsx', 'evidence_pack']),
   "status": zod.enum(['pending', 'running', 'ready', 'failed'])
 })
 
 /**
- * The latest approval's record. 409 if the item was never approved. [workstream G]
- * @summary Evidence Pack
+ * The file. Only its requester (or an admin) can download it; 409 until it's ready.
+ * @summary Download Export
+ */
+export const DownloadExportParams = zod.object({
+  "export_id": zod.int()
+})
+
+export const DownloadExportResponse = zod.unknown()
+
+/**
+ * The latest approval's record. 409 if the item was never approved (or is a legacy import).
+ * @summary Get Evidence Pack
  */
 export const GetEvidencePackParams = zod.object({
   "item_id": zod.int()
@@ -128,6 +148,7 @@ export const GetEvidencePackResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
+  "engine_version": zod.string().describe('The code-check engine version the findings came from; \'\' if unknown.'),
   "evidence": zod.array(zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
@@ -153,6 +174,30 @@ export const GetEvidencePackResponse = zod.object({
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
   "original_name": zod.string(),
   "sha256": zod.string()
+})),
+  "findings": zod.array(zod.object({
+  "carried_from_id": zod.union([zod.int(),zod.null()]).describe('Set when a dismissal was carried forward from an earlier version.'),
+  "citation": zod.string(),
+  "created_at": zod.iso.datetime({"offset":true}),
+  "id": zod.int(),
+  "message": zod.string(),
+  "quote": zod.union([zod.string(),zod.null()]),
+  "reason": zod.string(),
+  "resolved_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "resolved_by": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]),
+  "rule_id": zod.string(),
+  "severity": zod.enum(['blocking', 'warning']),
+  "source": zod.enum(['code', 'llm', 'human']).describe('code, llm (shown as \'AI suggestion\'), or human checklist.'),
+  "span": zod.union([zod.object({
+  "end": zod.int(),
+  "start": zod.int()
+}),zod.null()]),
+  "state": zod.enum(['open', 'accepted', 'dismissed']),
+  "suggested_fix": zod.string(),
+  "version_n": zod.int()
 })),
   "generated_at": zod.iso.datetime({"offset":true}),
   "item": zod.object({
@@ -221,5 +266,26 @@ export const GetEvidencePackResponse = zod.object({
 })]),
   "version": zod.int()
 }))
-}).describe('What an approval was recorded against: the approved version, the decision, the terms it quotes, and\nthe evidence it relied on, by hash.')
+}).describe('What an approval was recorded against: the approved version, the decision and the findings triaged on\nthat version, the terms it quotes, and the evidence it relied on, by hash. The zip\n(`createEvidencePack`) holds the same record plus the files and the item history.')
+
+/**
+ * Build the evidence pack zip (files, hashes, history) in the background; poll `getExport`.
+ * @summary Create Evidence Pack
+ */
+export const CreateEvidencePackParams = zod.object({
+  "item_id": zod.int()
+})
+
+export const CreateEvidencePackResponse = zod.object({
+  "created_at": zod.iso.datetime({"offset":true}),
+  "download_url": zod.union([zod.string(),zod.null()]).describe('Set once status is ready. Only the requester can download.'),
+  "error": zod.union([zod.string(),zod.null()]),
+  "filename": zod.union([zod.string(),zod.null()]),
+  "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
+  "id": zod.int(),
+  "item_count": zod.union([zod.int(),zod.null()]).describe('Rows in the file; set once ready.'),
+  "item_id": zod.union([zod.int(),zod.null()]).describe('The item, for an evidence pack.'),
+  "kind": zod.enum(['items_xlsx', 'evidence_pack']),
+  "status": zod.enum(['pending', 'running', 'ready', 'failed'])
+})
 

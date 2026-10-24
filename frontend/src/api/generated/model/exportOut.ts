@@ -4,14 +4,21 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExportKind } from './exportKind';
 import type { ExportStatus } from './exportStatus';
 
 export interface ExportOut {
   created_at: string;
-  /** Set once status is ready. */
+  /** Set once status is ready. Only the requester can download. */
   download_url: string | null;
   error: string | null;
+  filename: string | null;
+  finished_at: string | null;
   id: number;
+  /** Rows in the file; set once ready. */
   item_count: number | null;
+  /** The item, for an evidence pack. */
+  item_id: number | null;
+  kind: ExportKind;
   status: ExportStatus;
 }

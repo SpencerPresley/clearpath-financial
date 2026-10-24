@@ -8,12 +8,16 @@ import type { DecisionLane } from './decisionLane';
 import type { DecisionOutcome } from './decisionOutcome';
 
 export interface DecisionRecordedPayload {
+  ai_review_carried_from_version_id?: number | null;
   decision_id: number;
+  engine_version?: string;
   evidence_attachment_ids?: number[];
   expires_at: string | null;
   lane: DecisionLane;
+  llm_override_reason?: string;
   outcome: DecisionOutcome;
   reason: string;
+  ruleset_date?: string | null;
   terms_version_ids?: number[];
   version_id: number;
 }

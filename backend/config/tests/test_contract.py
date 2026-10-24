@@ -105,37 +105,10 @@ def test_no_operation_returns_a_raw_dict() -> None:
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
-    ("post", "/api/items/{item}/versions", {"content_text": "v2"}),
-    ("post", "/api/items/{item}/claim", None),
-    ("post", "/api/items/{item}/assign", {"assignee_id": None}),
-    ("post", "/api/items/bulk/assign", {"item_ids": [1], "assignee_id": None}),
-    ("post", "/api/items/{item}/new-round", {}),
-    ("post", "/api/items/{item}/placements", {"location": "Blog", "first_run": "2026-11-01"}),
-    ("patch", "/api/placements/1", {"monitored": True}),
-    ("post", "/api/placements/1/confirm-takedown", None),
-    ("post", "/api/findings/1/accept", {}),
-    ("post", "/api/findings/1/dismiss", {"reason": "Footer has it"}),
-    ("post", "/api/findings/1/reopen", None),
-    (
-        "post",
-        "/api/checks/preview",
-        {"content_text": "x", "product": "personal_loan", "channel": "email", "markets": ["CA"]},
-    ),
     ("post", "/api/items/{item}/llm-check/retry", None),
-    ("post", "/api/items/{item}/decisions", {"outcome": "rejected", "version_n": 1, "reason": "No"}),
-    ("post", "/api/items/{item}/reaffirm", {"reason": "Still accurate"}),
-    ("post", "/api/items/{item}/pull", {"reason": "Rates changed"}),
     ("post", "/api/items/bulk/fast-track-approve", {"item_ids": [1], "reason": "Numbers only"}),
     ("post", "/api/terms/impact-preview", None),
     ("post", "/api/terms", None),
-    ("post", "/api/exports", {"filters": {}}),
-    ("get", "/api/exports/1", None),
-    ("get", "/api/items/{item}/evidence-pack", None),
-    ("post", "/api/imports/sample", None),
-    ("get", "/api/imports/1", None),
-    ("put", "/api/imports/1/mapping", {"columns": [{"source": "Request ID", "target": "legacy_ref"}]}),
-    ("get", "/api/imports/1/preview", None),
-    ("post", "/api/imports/1/commit", {}),
     ("get", "/api/metrics/summary", None),
     ("get", "/api/metrics/series?metric=rounds_per_item", None),
     ("post", "/api/assistant/threads", None),
@@ -191,22 +164,12 @@ def test_stub_still_validates_input_first(marketer: User) -> None:
     client = Client()
     client.force_login(marketer)
 
-    response = client.post("/api/findings/1/dismiss", {"reason": ""}, content_type="application/json")
+    response = client.post(
+        "/api/items/bulk/fast-track-approve", {"item_ids": [], "reason": "x"}, content_type="application/json"
+    )
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
-
-
-@pytest.mark.django_db
-def test_upload_import_stub_accepts_a_file(admin_user: User) -> None:
-    from django.core.files.uploadedfile import SimpleUploadedFile
-
-    client = Client()
-    client.force_login(admin_user)
-
-    response = client.post("/api/imports", {"file": SimpleUploadedFile("tracker.xlsx", b"PK...")})
-
-    assert response.status_code == 501
 
 
 @pytest.mark.django_db

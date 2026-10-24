@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any
 
+from celery.schedules import crontab
 from pydantic import BeforeValidator, Field, SecretStr
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -168,6 +169,21 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+# Django admin signs in through the SPA (allauth headless: rate limits, MFA), not its own password form:
+# config/urls.py wraps admin.site.login with allauth's secure_admin_login, which redirects here with ?next=.
+# HEADLESS_ONLY removes allauth's server-rendered login page, so Django's default /accounts/login/ would 404.
+LOGIN_URL = f"{env.frontend_base_url}/login"
+
+# Shared across uvicorn workers and deploys, so allauth's rate-limit counters hold (issue #18). Django's
+# built-in Redis backend; the client library comes with celery[redis]. Same Redis as the broker, keys prefixed.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env.redis_url,
+        "KEY_PREFIX": "clearpath",
+    }
+}
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -190,6 +206,9 @@ CELERY_BEAT_SCHEDULE = {
     # The event log is the outbox (decisions.md "Data"): poll it often; Redis is disposable.
     "dispatch-outbox": {"task": "audit.dispatch_outbox", "schedule": 2.0},
     "redeliver-stale-events": {"task": "audit.redeliver_stale_events", "schedule": 300.0},
+    # Approval expiry and 30-day warnings (product-spec "Automation": daily sweep). 06:00 UTC = before the
+    # US working day, so items land in the morning queue.
+    "expiry-sweep": {"task": "reviews.expiry_sweep", "schedule": crontab(hour=6, minute=0)},
 }
 
 LOGGING = {

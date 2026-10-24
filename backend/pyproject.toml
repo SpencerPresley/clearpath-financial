@@ -4,10 +4,15 @@ version = "0.1.0"
 description = "ClearPath Financial marketing compliance review service"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "anthropic>=1.17.0",
     "celery[redis]>=5.6.3",
     "django>=6.1.2",
     "django-allauth[mfa,socialaccount]>=65.20.1",
     "django-ninja>=1.7.1",
+    "langchain>=1.4.7",
+    "langchain-anthropic>=1.7.6",
+    "langchain-core>=1.7.0",
+    "openpyxl>=3.1.5",
     "psycopg[binary,pool]>=3.3.6",
     "pydantic-settings>=2.16.1",
     "uvicorn>=0.54.0",
@@ -19,6 +24,7 @@ package = false
 [dependency-groups]
 dev = [
     "factory-boy>=3.3.3",
+    "httpx2>=2.16.0",
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
 ]
@@ -29,12 +35,16 @@ typecheck = [
     "celery-types>=0.26.0",
     "django-stubs>=6.1.2",
     "pyrefly>=1.4.0",
+    "types-openpyxl>=3.1.5.20261017",
 ]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
-addopts = ["--strict-markers"]
+addopts = ["--strict-markers", "-m", "not live"]
+markers = [
+    "live: calls a real external API (needs credentials); deselected by default, run with `-m live`",
+]
 
 [tool.ruff]
 line-length = 120
