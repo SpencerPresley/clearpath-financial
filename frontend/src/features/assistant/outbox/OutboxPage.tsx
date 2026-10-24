@@ -2,9 +2,14 @@
  * Outbox (decisions.md "Assistant"): the demo's stand-in for real mail. Every row is an email the assistant
  * drafted and a person approved. The HTML part is rendered only inside a sandboxed iframe: `sandbox=""` turns
  * off scripts, forms, popups and same-origin access, so the message can't reach the app or the session.
+ *
+ * The open email is in the URL (`?email=<id>`), so the assistant's "Open in Outbox" lands on it. Columns are
+ * sized in CSS and a container query on .app-outbox drops To and Requested by when the page is narrow (beside
+ * the assistant panel); with an email open, the list keeps Sent, Subject and Item and the pane has the rest.
  */
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import type { MouseEvent } from 'react';
+import { z } from 'zod';
 
 import type { OutboxEmailOut } from '../../../api/generated/model';
 import { useListOutboxEmails } from '../../../api/generated/notifications/notifications';
@@ -12,14 +17,26 @@ import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
 import { apiErrorMessage } from '../../../ui/forms/apiErrors';
 import { IconButton } from '../../../ui/IconButton';
+import { useViewer } from '../../../ui/layout/Viewer';
 import { RelativeAge } from '../../../ui/RelativeAge';
-import { SkeletonTable } from '../../../ui/Skeleton';
+import { openAssistant, openAssistantThread } from '../storage';
 
-/** Sent, To, Subject, Item, Requested by, Approved by. */
-const COLUMNS = ['4.5rem', '22%', 'auto', '5.5rem', '9rem', '9rem'] as const;
-/** With a message open the detail pane carries To and the people, so the list keeps Sent, Subject, Item. */
-const COMPACT_COLUMNS = ['4.5rem', 'auto', '5.5rem'] as const;
-const SKELETON_COLUMNS = COLUMNS.map((width) => (width === 'auto' ? '1fr' : width));
+export const outboxSearchSchema = z.object({
+  email: z.coerce.number().int().positive().optional().catch(undefined),
+});
+export type OutboxSearch = z.infer<typeof outboxSearchSchema>;
+
+const COLUMNS = [
+  { id: 'sent', label: 'Sent' },
+  { id: 'to', label: 'To' },
+  { id: 'subject', label: 'Subject' },
+  { id: 'item', label: 'Item' },
+  { id: 'requested', label: 'Requested by' },
+  { id: 'approved', label: 'Approved by' },
+] as const;
+type ColumnId = (typeof COLUMNS)[number]['id'];
+/** With an email open, the pane shows To and the people. */
+const COMPACT: ReadonlySet<ColumnId> = new Set(['sent', 'subject', 'item']);
 
 const sentFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -36,45 +53,71 @@ function ItemLink({ id }: { id: number | null }) {
   );
 }
 
+function Head({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
+  return (
+    <thead>
+      <tr className="app-outbox-head">
+        {columns.map((column) => (
+          <th key={column.id} scope="col" data-col={column.id}>
+            {column.label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
 function OutboxRow({
   email,
+  columns,
   selected,
-  compact,
   onSelect,
   now,
 }: {
   email: OutboxEmailOut;
+  columns: readonly (typeof COLUMNS)[number][];
   selected: boolean;
-  compact: boolean;
   onSelect: () => void;
   now: Date;
 }) {
   const to = email.to.join(', ');
+  const cell = (id: ColumnId) => {
+    switch (id) {
+      case 'sent':
+        return <RelativeAge at={email.sent_at} now={now} />;
+      case 'to':
+        return to;
+      case 'subject':
+        return (
+          <button type="button" className="app-outbox-subject" aria-pressed={selected} onClick={onSelect}>
+            {email.subject}
+          </button>
+        );
+      case 'item':
+        return <ItemLink id={email.item_id} />;
+      case 'requested':
+        return email.requested_by.name;
+      case 'approved':
+        return email.approved_by.name;
+    }
+  };
+  // The whole row opens the email for the mouse; the Subject button stays the keyboard target.
+  const onRowClick = (event: MouseEvent<HTMLTableRowElement>) => {
+    if ((event.target as HTMLElement).closest('a, button') === null) onSelect();
+  };
   return (
-    <tr className="app-outbox-row" data-selected={selected ? 'true' : undefined}>
-      <td className="app-outbox-sent">
-        <RelativeAge at={email.sent_at} now={now} />
-      </td>
-      {!compact && (
-        <td className="app-outbox-to" title={to}>
-          {to}
+    <tr className="app-outbox-row" data-selected={selected ? 'true' : undefined} onClick={onRowClick}>
+      {columns.map((column) => (
+        <td key={column.id} data-col={column.id} title={column.id === 'to' ? to : undefined}>
+          {cell(column.id)}
         </td>
-      )}
-      <td className="app-outbox-subject-cell">
-        <button type="button" className="app-outbox-subject" aria-pressed={selected} onClick={onSelect}>
-          {email.subject}
-        </button>
-      </td>
-      <td>
-        <ItemLink id={email.item_id} />
-      </td>
-      {!compact && <td className="app-outbox-person">{email.requested_by.name}</td>}
-      {!compact && <td className="app-outbox-person">{email.approved_by.name}</td>}
+      ))}
     </tr>
   );
 }
 
 function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () => void }) {
+  const viewer = useViewer();
   const headingId = `outbox-email-${String(email.id)}`;
   return (
     <section className="app-outbox-detail" aria-labelledby={headingId}>
@@ -85,9 +128,9 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
         <IconButton icon="action.close" aria-label="Close email" onPress={onClose} />
       </header>
       <div className="app-outbox-detail-body">
-        <dl className="app-drawer-facts">
+        <dl className="app-drawer-facts app-outbox-facts">
           <div className="app-drawer-fact">
-            <dt>Sent</dt>
+            <dt>Approved and sent</dt>
             <dd>{sentFormat.format(new Date(email.sent_at))}</dd>
           </div>
           <div className="app-drawer-fact">
@@ -113,6 +156,18 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
             <dd>{email.approved_by.name}</dd>
           </div>
         </dl>
+        {email.requested_by.id === viewer.id && (
+          <Button
+            size="sm"
+            icon="nav.assistant"
+            className="app-outbox-thread"
+            onPress={() => {
+              openAssistantThread(viewer.id, email.thread_id);
+            }}
+          >
+            Open thread
+          </Button>
+        )}
         {email.html_body === '' ? (
           <pre className="app-outbox-text">{email.body}</pre>
         ) : (
@@ -129,67 +184,96 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
   );
 }
 
-export function OutboxPage() {
+function OutboxSkeleton() {
+  return (
+    <div role="status" aria-label="Loading the outbox" aria-busy="true">
+      <table className="app-mine-table app-outbox-table" aria-hidden="true">
+        <Head columns={COLUMNS} />
+        <tbody>
+          {Array.from({ length: 6 }, (_, row) => (
+            <tr key={row} className="app-outbox-row">
+              {COLUMNS.map((column, index) => (
+                <td key={column.id} data-col={column.id}>
+                  <span
+                    className="app-skeleton"
+                    style={{ width: `${String(50 + ((row * 17 + index * 29) % 40))}%` }}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function OutboxPage({
+  selectedId,
+  onSelect,
+}: {
+  selectedId?: number;
+  onSelect: (id: number | undefined) => void;
+}) {
   const list = useListOutboxEmails();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const emails = list.data ?? [];
   const selected = emails.find((email) => email.id === selectedId);
   const now = new Date();
 
   let body: React.ReactNode;
   if (list.isPending) {
-    body = <SkeletonTable rows={6} columns={SKELETON_COLUMNS} label="Loading the outbox" />;
+    body = <OutboxSkeleton />;
   } else if (list.isError) {
     body = (
-      <div className="app-mine-error" role="alert">
-        <p className="app-mine-error-title">Couldn&apos;t load the outbox.</p>
-        <p className="app-muted">{apiErrorMessage(list.error)}</p>
-        <Button
-          size="sm"
-          onPress={() => {
-            void list.refetch();
-          }}
+      <div className="app-outbox-error" role="alert">
+        <EmptyState
+          icon="feedback.error"
+          title="Couldn't load the outbox."
+          action={
+            <Button
+              size="sm"
+              onPress={() => {
+                void list.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          }
         >
-          Retry
-        </Button>
+          {apiErrorMessage(list.error)}
+        </EmptyState>
       </div>
     );
   } else if (emails.length === 0) {
     body = (
-      <EmptyState icon="nav.outbox" title="No emails yet">
+      <EmptyState
+        icon="nav.outbox"
+        title="No emails yet"
+        action={
+          <Button size="sm" icon="nav.assistant" onPress={openAssistant}>
+            Open the assistant
+          </Button>
+        }
+      >
         Emails the assistant drafts land here after you approve them.
       </EmptyState>
     );
   } else {
-    const compact = selected !== undefined;
+    const columns = selected === undefined ? COLUMNS : COLUMNS.filter((column) => COMPACT.has(column.id));
     body = (
-      <div className="app-outbox-split" data-detail={compact ? 'true' : undefined}>
+      <div className="app-outbox-split" data-detail={selected === undefined ? undefined : 'true'}>
         <table className="app-mine-table app-outbox-table" aria-label="Sent emails">
-          <colgroup>
-            {(compact ? COMPACT_COLUMNS : COLUMNS).map((width, index) => (
-              <col key={index} style={width === 'auto' ? undefined : { width }} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr className="app-outbox-head">
-              <th scope="col">Sent</th>
-              {!compact && <th scope="col">To</th>}
-              <th scope="col">Subject</th>
-              <th scope="col">Item</th>
-              {!compact && <th scope="col">Requested by</th>}
-              {!compact && <th scope="col">Approved by</th>}
-            </tr>
-          </thead>
+          <Head columns={columns} />
           <tbody>
             {emails.map((email) => (
               <OutboxRow
                 key={email.id}
                 email={email}
+                columns={columns}
                 now={now}
-                compact={compact}
                 selected={email.id === selectedId}
                 onSelect={() => {
-                  setSelectedId(email.id === selectedId ? null : email.id);
+                  onSelect(email.id === selectedId ? undefined : email.id);
                 }}
               />
             ))}
@@ -199,7 +283,7 @@ export function OutboxPage() {
           <OutboxDetail
             email={selected}
             onClose={() => {
-              setSelectedId(null);
+              onSelect(undefined);
             }}
           />
         )}
@@ -211,7 +295,7 @@ export function OutboxPage() {
     <div className="app-outbox">
       <header className="app-mine-header">
         <h1 className="app-page-title">Outbox</h1>
-        {emails.length > 0 && <span className="app-muted">Demo mail: nothing leaves ClearPath.</span>}
+        <span className="app-muted">Demo mail: nothing leaves ClearPath.</span>
       </header>
       {body}
     </div>

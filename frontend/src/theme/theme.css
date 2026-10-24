@@ -2365,12 +2365,38 @@
 @layer components {
   .app-outbox {
     @apply flex max-w-[96rem] flex-col gap-4;
+    container: outbox / inline-size;
   }
   .app-outbox-split {
     @apply grid grid-cols-[minmax(0,1fr)] items-start gap-3;
   }
   .app-outbox-split[data-detail] {
     @apply grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)];
+  }
+  /* Column widths live here (table-layout: fixed reads the header row); Subject takes what's left. */
+  .app-outbox-table [data-col='sent'] {
+    @apply w-18;
+  }
+  .app-outbox-table [data-col='to'] {
+    @apply w-[22%];
+  }
+  .app-outbox-table [data-col='item'] {
+    @apply w-22;
+  }
+  .app-outbox-table :is([data-col='requested'], [data-col='approved']) {
+    @apply w-32;
+  }
+  /* Narrow (beside the assistant panel): To and Requested by go; the detail pane shows both. */
+  @container outbox (width < 760px) {
+    .app-outbox-table :is([data-col='to'], [data-col='requested']) {
+      @apply hidden;
+    }
+  }
+  /* Too narrow for list and message side by side: the message goes under the list. */
+  @container outbox (width < 680px) {
+    .app-outbox-split[data-detail] {
+      @apply grid-cols-[minmax(0,1fr)];
+    }
   }
   .app-outbox-head > th {
     @apply h-8 border-b border-base-300 px-3 text-left align-middle text-meta font-medium text-muted;
@@ -2381,6 +2407,9 @@
   .app-outbox-row:last-child > td {
     @apply border-b-0;
   }
+  .app-outbox-row {
+    @apply cursor-default;
+  }
   .app-outbox-row:hover > td {
     @apply bg-hover;
   }
@@ -2390,10 +2419,10 @@
   .app-outbox-row[data-selected] > td:first-child {
     box-shadow: inset 2px 0 0 var(--color-primary);
   }
-  .app-outbox-sent {
+  .app-outbox-row > td[data-col='sent'] {
     @apply text-muted tabular-nums;
   }
-  .app-outbox-to {
+  .app-outbox-row > td[data-col='to'] {
     @apply text-muted;
   }
   .app-outbox-subject {
@@ -2402,11 +2431,8 @@
   .app-outbox-item {
     @apply rounded-xs font-mono text-meta text-primary underline-offset-2 hover:underline;
   }
-  .app-outbox-person {
-    @apply text-base-content;
-  }
   .app-outbox-detail {
-    @apply sticky top-0 flex max-h-[calc(100vh-var(--spacing-topbar)-3rem)] min-w-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
+    @apply sticky top-0 flex h-[calc(100dvh-var(--spacing-topbar)-6.5rem)] min-h-96 min-w-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
   }
   .app-outbox-detail-title {
     @apply truncate;
@@ -2414,14 +2440,25 @@
   .app-outbox-detail-body {
     @apply flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3;
   }
+  /* The pane header already draws a rule; the facts only need the one under them. */
+  .app-outbox-facts {
+    @apply border-t-0 pt-0;
+  }
+  .app-outbox-thread.app-btn {
+    @apply self-start;
+  }
   .app-outbox-recipients {
     @apply flex flex-col;
   }
   .app-outbox-text {
     @apply font-sans text-sm whitespace-pre-wrap text-base-content;
   }
+  /* A sandboxed srcdoc can't be measured, so the frame fills the pane rather than fitting the email. */
   .app-outbox-frame {
-    @apply h-[28rem] w-full shrink-0 rounded-md border border-base-300 bg-white;
+    @apply min-h-64 w-full flex-1 rounded-md border border-base-300 bg-white;
+  }
+  .app-outbox-error .app-empty-icon {
+    @apply text-status-error-soft-content;
   }
 }
 
@@ -3441,6 +3478,13 @@
   .app-topbar-btn[data-active] {
     @apply bg-brand-hover text-primary-content;
   }
+  .app-assistant-toggle {
+    @apply relative;
+  }
+  /* An email waits for approval somewhere: a dot on the toggle (the accessible name says it too). */
+  .app-assistant-toggle-dot {
+    @apply absolute top-1.5 right-1.5 size-2 rounded-full border border-primary bg-primary-content;
+  }
   .app-assistant-head {
     @apply flex h-10 shrink-0 items-center gap-1 border-b border-base-300 pr-1.5 pl-3;
   }
@@ -3563,8 +3607,10 @@
   .app-assistant-composer-input {
     @apply w-full resize-none rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 text-sm leading-6 text-base-content outline-none placeholder:text-muted;
   }
+  /* The shared field focus (border plus 1px ring: 2px of navy), not a bare border change. */
   .app-assistant-composer-input[data-focused] {
-    @apply border-focus;
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
   }
   .app-assistant-composer-input[data-disabled] {
     @apply cursor-not-allowed bg-base-200;
@@ -3615,5 +3661,37 @@
 @keyframes app-indeterminate-blink {
   to {
     visibility: hidden;
+  }
+}
+
+/* ---- The page area as a container: pages adapt to #main's width, which the nav and the assistant panel
+   change, not just the viewport's. ------------------------------------------------------------------------ */
+@layer components {
+  .app-main {
+    container: main / inline-size;
+  }
+  /* Review screen: risk tier steps out first (it's on Details), then the decisions take their own row under
+     the title so none of them runs under the panel. */
+  @container main (width < 1100px) {
+    .app-decision-bar-risk {
+      @apply hidden;
+    }
+  }
+  @container main (width < 1000px) {
+    .app-decision-bar {
+      @apply flex-wrap gap-y-2;
+    }
+    .app-decision-bar-heading {
+      @apply basis-full;
+    }
+    .app-decision-bar-actions {
+      @apply ml-0 items-start;
+    }
+    .app-decision-bar-buttons {
+      @apply flex-wrap justify-start;
+    }
+    .app-review-body {
+      @apply grid-cols-[minmax(0,1fr)_22rem];
+    }
   }
 }

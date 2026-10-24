@@ -78,6 +78,7 @@ export async function stubAssistant(page: Page): Promise<AssistantStub> {
       return json(route, thread, 201);
     }
     if (/^\/threads\/[^/]+\/state$/.test(path)) return json(route, state);
+    if (/^\/threads\/[^/]+\/history$/.test(path)) return json(route, []);
     if (/^\/threads\/[^/]+\/runs$/.test(path)) {
       const { message } = body as { message: { id: string; content: string } };
       human = { type: 'human', id: message.id, content: message.content };

@@ -5,7 +5,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getItemsMock } from '../../api/generated/items/items.msw';
 import { getGetMeMockHandler } from '../../api/generated/me/me.msw';
@@ -15,6 +15,7 @@ import { reviewHandlers } from '../../test/fixtures/reviewHandlers';
 import { renderApp } from '../../test/renderApp';
 import { server } from '../../test/server';
 import type { Role } from '../../ui/domain';
+import { NAV_COLLAPSED_KEY } from '../../ui/layout/AppShell';
 import { assistantHandlers, threadFixture } from './fixtures/handlers';
 import type { RunScript, ScriptedRun } from './fixtures/handlers';
 import { aiText, echoRun, EMPTY_STATE, lifecycle, values } from './fixtures/sse';
@@ -128,15 +129,73 @@ describe('assistant panel toggle', () => {
     expect(window.localStorage.getItem(ASSISTANT_OPEN_KEY)).toBe('false');
   });
 
-  it('toggles with Ctrl+. even while typing', async () => {
+  it('toggles with Ctrl+. even while typing, handing focus back to the toggle', async () => {
     const user = userEvent.setup();
     setup();
     const box = within(await panel()).getByRole('textbox', { name: 'Message the assistant' });
     await user.click(box);
     await user.keyboard('{Control>}.{/Control}');
     expect(screen.queryByRole('complementary', { name: 'Assistant' })).toBeNull();
+    const toggle = screen.getByRole('button', { name: 'Assistant' });
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute('aria-keyshortcuts', 'Meta+. Control+.');
     await user.keyboard('{Control>}.{/Control}');
     expect(await panel()).toBeInTheDocument();
+  });
+});
+
+describe('assistant toggle', () => {
+  it('marks a draft waiting for approval even with the panel closed', async () => {
+    setup({ open: false, threads: [threadFixture({ awaiting_approval: true })] });
+    const toggle = await screen.findByRole('button', {
+      name: 'Assistant, an email is waiting for your approval',
+    });
+    expect(toggle.querySelector('.app-assistant-toggle-dot')).not.toBeNull();
+  });
+});
+
+describe('assistant panel beside narrow pages', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function narrowViewport() {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(width < 1600px)',
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+  }
+
+  it('collapses the nav to the rail while open, without touching the saved choice, and restores it on close', async () => {
+    const user = userEvent.setup();
+    narrowViewport();
+    setup();
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    await panel();
+    expect(nav).toHaveAttribute('data-collapsed', 'true');
+    expect(window.localStorage.getItem(NAV_COLLAPSED_KEY)).toBeNull();
+
+    await user.click(within(await panel()).getByRole('button', { name: 'Close assistant' }));
+    expect(nav).not.toHaveAttribute('data-collapsed');
+    expect(window.localStorage.getItem(NAV_COLLAPSED_KEY)).toBeNull();
+  });
+
+  it('still lets you expand the nav while the panel is open', async () => {
+    const user = userEvent.setup();
+    narrowViewport();
+    setup();
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    await panel();
+    await user.click(screen.getByRole('button', { name: 'Expand navigation' }));
+    expect(nav).not.toHaveAttribute('data-collapsed');
+  });
+
+  it('leaves the nav alone on wide screens', async () => {
+    setup();
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    await panel();
+    expect(nav).not.toHaveAttribute('data-collapsed');
   });
 });
 

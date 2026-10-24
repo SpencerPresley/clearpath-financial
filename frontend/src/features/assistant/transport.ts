@@ -136,8 +136,8 @@ export class AssistantTransport implements AgentServerAdapter {
   /**
    * Read by useStream to build its fallback SDK Client (resolveClientApiUrl). The controller calls
    * `client.threads.getHistory` directly on hydrate, bypassing this adapter; without a URL that's a POST to
-   * http://localhost:8123. Here it stays same-origin under our owner-checked thread routes
-   * (POST /api/assistant/threads/{id}/history), and the controller ignores its failure.
+   * http://localhost:8123. Here it stays same-origin: POST /api/assistant/threads/{id}/history, an owner-checked
+   * route that answers [] (we have no branching or time-travel UI).
    */
   readonly apiUrl = `${window.location.origin}/api/assistant`;
   #threadId: string;

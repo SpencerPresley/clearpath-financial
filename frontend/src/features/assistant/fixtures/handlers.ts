@@ -95,10 +95,8 @@ export function assistantHandlers({
     http.get('*/api/assistant/threads/:threadId/state', () => HttpResponse.json(fake.state as object)),
     http.post('*/api/assistant/threads/:threadId/runs', startRun),
     http.post('*/api/assistant/threads/:threadId/interrupts/:interruptId', startRun),
-    // The SDK's own history read (see AssistantTransport.apiUrl); the backend has no such route.
-    http.post('*/api/assistant/threads/:threadId/history', () =>
-      HttpResponse.json({ code: 'not_found', message: 'Not found.' }, { status: 404 }),
-    ),
+    // The SDK's own history read (see AssistantTransport.apiUrl); the server answers [] (no branching UI).
+    http.post('*/api/assistant/threads/:threadId/history', () => HttpResponse.json([])),
   ];
   return { fake, handlers };
 }

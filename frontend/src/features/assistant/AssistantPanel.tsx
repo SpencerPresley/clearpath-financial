@@ -5,7 +5,7 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button as AriaButton, Menu, MenuItem, MenuTrigger, Popover } from 'react-aria-components';
 
 import {
@@ -21,10 +21,8 @@ import type { Role } from '../../ui/domain';
 import { useViewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { Composer } from './Composer';
-import { readActiveThread, writeActiveThread } from './storage';
+import { ASSISTANT_OPEN_EVENT, ASSISTANT_PANEL_ID, readActiveThread, writeActiveThread } from './storage';
 import { streamErrorLine, ThreadView } from './ThreadView';
-
-export const ASSISTANT_PANEL_ID = 'assistant-panel';
 
 const UNTITLED = 'Untitled thread';
 
@@ -147,6 +145,21 @@ export function AssistantPanel({ onClose, autoFocus }: { onClose: () => void; au
     !known.some((thread) => thread.id === activeId)
       ? null
       : activeId;
+
+  // "Open thread" from the Outbox while the panel is already open.
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const threadId = (event as CustomEvent<{ threadId?: unknown }>).detail.threadId;
+      if (typeof threadId !== 'string') return;
+      setPending(undefined);
+      setCreatedIds((ids) => (ids.includes(threadId) ? ids : [...ids, threadId]));
+      setActiveId(threadId);
+    };
+    window.addEventListener(ASSISTANT_OPEN_EVENT, onOpen);
+    return () => {
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, onOpen);
+    };
+  }, []);
 
   const create = useMutation({
     mutationFn: () => createAssistantThread(),
