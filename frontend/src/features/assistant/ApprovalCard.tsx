@@ -186,7 +186,7 @@ function EditForm({
         {(field) => (
           <TextAreaField
             label="Body"
-            rows={8}
+            rows={6}
             name={field.name}
             value={field.state.value}
             onChange={field.handleChange}
@@ -202,7 +202,7 @@ function EditForm({
         </p>
       )}
       <div className="app-assistant-approval-actions">
-        <Button type="submit" variant="primary" size="sm" icon="action.approve" isDisabled={pending}>
+        <Button type="submit" variant="primary" size="sm" icon="action.send" isDisabled={pending}>
           Send edited
         </Button>
         <Button size="sm" variant="ghost" onPress={onCancel} isDisabled={pending}>
