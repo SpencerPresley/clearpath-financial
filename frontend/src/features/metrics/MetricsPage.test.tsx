@@ -188,9 +188,7 @@ describe('MetricsPage', () => {
   });
 
   it('tells a marketer who opens it by URL that it is for reviewers, leads and admins, without asking', async () => {
-    server.use(
-      getGetMeMockHandler({ ...ME_LEAD, roles: ['marketer'], effective_roles: ['marketer'] }),
-    );
+    server.use(getGetMeMockHandler({ ...ME_LEAD, roles: ['marketer'], effective_roles: ['marketer'] }));
     table();
     expect(
       await screen.findByRole('heading', { name: 'Metrics is for reviewers, leads and admins' }),

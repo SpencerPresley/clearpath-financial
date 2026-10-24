@@ -13,7 +13,7 @@ import type {
   NotificationOut,
 } from '../../api/generated/model';
 import type { IconKey } from '../../ui/icons';
-import { REOPEN_REASON_LABELS, plural } from '../../ui/labels';
+import { formatDayMonth, REOPEN_REASON_LABELS, plural } from '../../ui/labels';
 
 export type Tone = 'success' | 'warning' | 'error' | 'alert';
 
@@ -81,8 +81,6 @@ function assignmentWords(mode: AssignmentMode, actor: string | null): [string, s
   }
 }
 
-const expiryFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-
 /** [before, after] around the item, or null when only the stored message can say it. */
 function words(n: NotificationOut): [string, string] | null {
   const actor = n.actor?.name ?? null;
@@ -101,7 +99,7 @@ function words(n: NotificationOut): [string, string] | null {
         : ['', ' needs re-review'];
     case 'expiry_warning':
       return detail?.kind === 'expiry_warning'
-        ? ['Approval for ', ` expires ${expiryFormat.format(new Date(detail.expires_at))}`]
+        ? ['Approval for ', ` expires ${formatDayMonth(detail.expires_at)}`]
         : null;
     case 'page_findings':
       // The drift monitor: the approved copy is intact, but partner text beside it trips blocking rules.

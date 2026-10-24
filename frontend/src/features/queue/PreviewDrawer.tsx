@@ -18,6 +18,7 @@ import { IconButton } from '../../ui/IconButton';
 import { ItemKey } from '../../ui/ItemKey';
 import { Kbd } from '../../ui/Kbd';
 import type { Viewer } from '../../ui/layout/Viewer';
+import { formatDate } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
 import {
@@ -33,14 +34,6 @@ import { TagEditor } from './TagEditor';
 import { canEditFields, canEditRisk, useItemPatch } from './useItemPatch';
 
 export const PREVIEW_HEADING_ID = 'queue-preview-title';
-
-const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-
-function formatDate(value: string | null): string {
-  if (value === null) return '—';
-  const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
-  return Number.isNaN(date.getTime()) ? '—' : dateFormat.format(date);
-}
 
 function runDates(item: ItemDetailOut): string {
   if (item.planned_first_run === null) return '—';

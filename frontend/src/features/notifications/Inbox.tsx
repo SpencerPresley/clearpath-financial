@@ -12,14 +12,13 @@ import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
+import { formatDateTime } from '../../ui/labels';
 import { formatAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
 import { describeNotification } from './text';
 import type { useNotifications } from './useNotifications';
 
 const LIMIT = 50; // the API's default page
-
-const absoluteFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -62,9 +61,9 @@ function Row({ row, now }: { row: NotificationOut; now: Date }) {
         )}
         {line.after && <span className="app-inbox-fixed">{line.after}</span>}
       </span>
-      <time className="app-inbox-age" dateTime={at.toISOString()} title={absoluteFormat.format(at)}>
+      <time className="app-inbox-age" dateTime={at.toISOString()} title={formatDateTime(at)}>
         <span aria-hidden="true">{formatAge(at, now)}</span>
-        <span className="sr-only">{absoluteFormat.format(at)}</span>
+        <span className="sr-only">{formatDateTime(at)}</span>
       </time>
     </ListBoxItem>
   );
