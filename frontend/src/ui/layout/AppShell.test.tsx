@@ -86,6 +86,16 @@ describe('AppShell', () => {
     expect(panel).toHaveTextContent('test@clearpath.test');
     expect(panel).toHaveTextContent('Compliance lead, Reviewer');
     expect(within(panel).getByRole('button', { name: 'Sign out' })).toBeEnabled();
+    expect(within(panel).queryByRole('button', { name: 'Reset demo…' })).not.toBeInTheDocument();
+  });
+
+  it('offers admins Reset demo behind a confirmation', async () => {
+    const user = userEvent.setup();
+    renderApp({ roles: ['admin'] });
+    await user.click(await screen.findByRole('button', { name: 'Test User, account' }));
+    await user.click(await screen.findByRole('button', { name: 'Reset demo…' }));
+    expect(await screen.findByRole('alertdialog', { name: 'Reset the demo?' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument();
   });
 
   it('signs out and returns to the sign-in form', async () => {
