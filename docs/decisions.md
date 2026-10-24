@@ -67,6 +67,7 @@ The brief says: "The compliance marketing team's **review process** ... currentl
 | Pushing rates to affiliates | The real fix is a ClearPath-hosted rate feed or widget. We aren't the CMS. | — |
 | Multi-state rules beyond California | Each state is legal research, not code (see above) | — |
 | Real outbound email | Replaced by an Outbox page | — |
+| Google login | Needs the custom domain for the OAuth redirect URI, and evaluators' emails would have to be added as consent-screen test users. Email/password demo logins cover the demo. | The `django-allauth[socialaccount]` extra is installed; it's added if time allows. |
 
 ## Key design decisions
 
