@@ -71,7 +71,7 @@ def test_error_envelope_is_a_component() -> None:
 def test_schema_component_names_say_what_they_are() -> None:
     schemas = api.get_openapi_schema()["components"]["schemas"]
     enums = {name for name, schema in schemas.items() if "enum" in schema}
-    domain_models = {"PersonalLoanTerms", "CreditCardTerms", "FieldChange", "ItemFilter", "JsonValue"}
+    domain_models = {"PersonalLoanTerms", "CreditCardTerms", "FieldChange", "LegacyTimeline", "ItemFilter", "JsonValue"}
     domain_models |= {name for name in schemas if name.endswith("Payload")}
 
     unclear = {n for n in set(schemas) - enums - domain_models if not n.endswith(("In", "Out", "Query"))}

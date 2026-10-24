@@ -6,9 +6,9 @@ completeness test fails if an EventType has no payload model.
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Final, Literal
+from typing import Final, Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from core.domain import (
     AssignmentMode,
@@ -102,10 +102,32 @@ class ItemNewRoundStartedPayload(EventPayload):
     round: int
 
 
+class LegacyTimeline(BaseModel):
+    """The tracker's own dates for an imported row. The event's `occurred_at` is the import time, so metrics
+    (time to first review, rounds per item) read these instead. Every field is optional: the tracker is messy,
+    and a missing date is recorded as missing rather than guessed."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    submitted_at: datetime | None = None
+    first_reviewed_at: datetime | None = None
+    decided_at: datetime | None = None
+    outcome: DecisionOutcome | None = None
+    rounds: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _dates_in_order(self) -> Self:
+        dates = [d for d in (self.submitted_at, self.first_reviewed_at, self.decided_at) if d is not None]
+        if dates != sorted(dates):
+            raise ValueError("submitted_at, first_reviewed_at, and decided_at must be in order")
+        return self
+
+
 class ItemImportedPayload(EventPayload):
     import_id: int
     legacy_ref: str
     row_number: int
+    timeline: LegacyTimeline = LegacyTimeline()
 
 
 # --- versions, checks, findings ------------------------------------------------------------------------------
