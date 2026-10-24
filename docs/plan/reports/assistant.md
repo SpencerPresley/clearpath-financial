@@ -116,6 +116,11 @@ I used the prompt-engineering and context-engineering skills. The prompt goes to
 - **Email:** recipients only from the directory; nothing is sent before approval; what to say after each outcome.
 - **Answer style:** short, the app's terms, CP- keys, no emoji.
 
+**Cache marker on the wire, checked offline.** A recording middleware on a `create_agent` graph passed the
+two-block `SystemMessage` through `ChatAnthropic._get_request_payload`: block 1 keeps `cache_control` and block 2
+has none (scratchpad `cache_check.py`). Whether the cache actually hits is only visible live: the usage log's
+`cache_read` must be above 0 on a second call.
+
 **Bounding context:**
 - `ContextEditingMiddleware(ClearToolUsesEdit(trigger=30k, keep=4))` trims old tool results from the model request
   only; the checkpoint keeps them.
@@ -197,6 +202,10 @@ autocommit connections.
 | `frontend/src/routes/outbox.tsx`, `routeTree.gen.ts`, `src/test/server.ts`, `e2e/*` | Outbox route (`?email=`), default MSW handler, e2e + screenshot specs |
 
 ## Open items and risks
+
+- **No separate `draft_email` tool.** The brief listed `draft_email` and `send_email`. decisions.md allows one write
+  tool, and the approval card is the draft: `send_email` pauses before anything is sent, and the user sends, edits or
+  declines it. A second tool would only add a step the model could skip.
 
 - **Non-assistant email fails.** `EMAIL_BACKEND` is global, and the Outbox backend refuses messages without the
   assistant's metadata, so an allauth password-reset email would raise. Before this branch the SMTP default had no
