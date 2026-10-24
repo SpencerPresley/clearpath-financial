@@ -370,6 +370,39 @@ def test_edits_need_the_reviewed_version_triaged_first(submit: Submit, reviewer:
 
 
 @pytest.mark.django_db
+def test_reposting_edits_refuses_findings_accepted_on_v2(ready: ReviewItem, reviewer: User, clock: FixedClock) -> None:
+    # Review finding 2: accepted on the reviewer's v2 means v2 still must change; it can't be approved.
+    with pytest.raises(FindingsNeedTriage):
+        _decide(
+            reviewer,
+            ready.pk,
+            clock,
+            outcome=DecisionOutcome.APPROVED_WITH_EDITS,
+            edited_content_text="Guaranteed approval. " + RATE_COPY,
+        )
+    guaranteed = Finding.objects.get(version__item_id=ready.pk, version__n=2, rule_id="claims.guaranteed")
+    accept_finding(actor=reviewer, finding_id=guaranteed.pk, clock=clock)
+    dismiss_all(ready.pk, reviewer, clock)
+
+    with pytest.raises(AcceptedFindingsBlockApproval):
+        _decide(reviewer, ready.pk, clock, outcome=DecisionOutcome.APPROVED_WITH_EDITS, version_n=2)
+    assert not Decision.objects.exists()
+
+
+@pytest.mark.django_db
+def test_an_already_decided_reviewer_version_needs_new_edits(
+    ready: ReviewItem, reviewer: User, clock: FixedClock
+) -> None:
+    _decide(reviewer, ready.pk, clock, outcome=DecisionOutcome.APPROVED_WITH_EDITS, edited_content_text=RATE_COPY)
+    ReviewItem.objects.filter(pk=ready.pk).update(status=ItemStatus.IN_REVIEW)
+
+    with pytest.raises(InvalidInput) as caught:
+        _decide(reviewer, ready.pk, clock, outcome=DecisionOutcome.APPROVED_WITH_EDITS, version_n=2)
+
+    assert caught.value.fields[0].loc == ("body", "edited_content_text")
+
+
+@pytest.mark.django_db
 def test_approve_with_edits_without_text_needs_a_reviewer_version(
     ready: ReviewItem, reviewer: User, clock: FixedClock
 ) -> None:
@@ -460,6 +493,30 @@ def test_reaffirm_rechecks_and_refuses_on_new_findings(rereview: ReviewItem, rev
     assert ReviewItem.objects.get(pk=rereview.pk).open_findings_count == 1
     dismiss_finding(actor=reviewer, finding_id=new.pk, reason="Imagery unchanged", clock=clock)
     reaffirm(actor=reviewer, item_id=rereview.pk, reason="Still accurate", clock=clock)
+
+
+@pytest.mark.django_db
+def test_reaffirm_after_a_failed_ai_check_takes_an_override(
+    rereview: ReviewItem, reviewer: User, clock: FixedClock
+) -> None:
+    # Review finding 3: the endpoint must be able to satisfy the AI gate it applies.
+    ai_done(rereview.pk, CheckStatus.FAILED)
+
+    with pytest.raises(InvalidInput):
+        reaffirm(actor=reviewer, item_id=rereview.pk, reason="Still accurate", clock=clock)
+    result = reaffirm(
+        actor=reviewer, item_id=rereview.pk, reason="Still accurate", llm_override_reason="Re-read it", clock=clock
+    )
+
+    assert Decision.objects.get(pk=result.decision_id).llm_override_reason == "Re-read it"
+
+
+@pytest.mark.django_db
+def test_pull_refuses_ended_placements(rereview: ReviewItem, reviewer: User, marketer: User, clock: FixedClock) -> None:
+    ended = _placement(rereview, marketer, last_run=date(2026, 10, 5))
+
+    with pytest.raises(InvalidInput):
+        pull_item(actor=reviewer, item_id=rereview.pk, reason="x", placement_ids=(ended.pk,), clock=clock)
 
 
 @pytest.mark.django_db

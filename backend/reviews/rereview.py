@@ -45,7 +45,9 @@ def reopen_item(  # the event's fields
     generated_version_id: int | None = None,
 ) -> int:
     """approved -> needs_rereview(reason) for live content, back to the reviewer who approved it (sticky).
-    Returns the ITEM_REOPENED event id. Joins the caller's transaction if there is one."""
+    Returns the ITEM_REOPENED event id. Lock-order contract (see reviews.assignment): one item per transaction,
+    because it takes the assignment lock after the item's row lock. A fan-out calls it once per item, each in its
+    own transaction (optionally after locking only that same item to add its generated version)."""
     with transaction.atomic():
         item = locked_item(item_id)
         _require_current(item)
@@ -99,7 +101,8 @@ def send_back(
     offer_terms_id: int | None = None,
     generated_version_id: int | None = None,
 ) -> int:
-    """Live -> `reopen_item`, not live -> `expire_item` (ruling 2). The entry point for F's terms fan-out."""
+    """Live -> `reopen_item`, not live -> `expire_item` (ruling 2). The entry point for F's terms fan-out: one
+    item per transaction (lock order, see `reopen_item`)."""
     action = reopen_item if is_item_live(item_id=item_id, today=clock.today()) else expire_item
     return action(
         item_id=item_id,
@@ -191,5 +194,11 @@ def run_expiry_sweep(*, clock: Clock = SYSTEM_CLOCK) -> SweepResult:
             reopened.append(item_id)
         elif outcome is False:
             expired.append(item_id)
-    warned = [item_id for item_id in soon if _warn_if_due(item_id, clock)]
+    for item_id in soon:
+        try:
+            if _warn_if_due(item_id, clock):
+                warned.append(item_id)
+        except DomainError:  # as above: skip this item, warn the rest
+            logger.warning("expiry warning skipped item_id=%d", item_id, exc_info=True)
+            skipped.append(item_id)
     return SweepResult(reopened=tuple(reopened), expired=tuple(expired), warned=tuple(warned), skipped=tuple(skipped))

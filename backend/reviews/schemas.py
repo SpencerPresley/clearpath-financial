@@ -347,6 +347,9 @@ class DecisionIn(Schema):
 
 class ReaffirmIn(Schema):
     reason: str = Field(min_length=1, max_length=10_000)
+    llm_override_reason: str | None = Field(
+        default=None, max_length=2000, description="Required when the version's AI check failed."
+    )
 
 
 class PullIn(Schema):

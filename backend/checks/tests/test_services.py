@@ -166,6 +166,59 @@ def test_identical_dismissed_finding_is_carried_forward(
 
 
 @pytest.mark.django_db
+def test_a_later_accept_beats_an_older_dismissal(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    # Review finding 1: v1 dismissed, v2 (same text) accepted as a real problem; v3 must not resurrect v1's dismissal.
+    item = make_item(marketer)
+    versions = []
+    for n in (1, 2, 3):
+        version = make_version(item, "Guaranteed approval.", n=n)
+        with transaction.atomic():
+            run_code_checks(version=version, clock=clock)
+        finding = Finding.objects.get(version=version, rule_id="claims.guaranteed")
+        if n == 1:
+            _dismiss(finding, reviewer, clock.now())
+        elif n == 2:
+            assert finding.state == "dismissed"  # carried from v1
+            Finding.objects.filter(pk=finding.pk).update(state=FindingState.ACCEPTED, carried_from=None)
+        versions.append(finding)
+
+    assert (versions[2].state, versions[2].carried_from_id) == ("open", None)  # pyrefly: ignore[missing-attribute]
+
+
+@pytest.mark.django_db
+def test_human_checklist_dismissals_carry_only_into_text_only_versions(
+    marketer: User, reviewer: User, clock: FixedClock
+) -> None:
+    from core.domain import VersionOrigin
+
+    item = make_item(marketer)
+    v1 = make_version(item, "Personal loans.")
+    with transaction.atomic():
+        run_code_checks(version=v1, clock=clock)
+    _dismiss(Finding.objects.get(version=v1, source="human"), reviewer, clock.now(), reason="Imagery fine")
+    resubmitted = make_version(item, "Personal loans.", n=2)
+    edited = make_version(item, "Personal loans.", n=3, origin=VersionOrigin.REVIEWER_EDIT, author=reviewer)
+
+    with transaction.atomic():
+        run_code_checks(version=resubmitted, clock=clock)
+    _dismiss(Finding.objects.get(version=resubmitted, source="human"), reviewer, clock.now(), reason="New mockup ok")
+    with transaction.atomic():
+        run_code_checks(version=edited, clock=clock)
+
+    assert Finding.objects.get(version=edited, source="human").reason == "New mockup ok"
+    # A marketer's resubmission may carry a new creative: the checklist starts open again.
+    item2 = make_item(marketer)
+    a = make_version(item2, "Personal loans.")
+    with transaction.atomic():
+        run_code_checks(version=a, clock=clock)
+    _dismiss(Finding.objects.get(version=a, source="human"), reviewer, clock.now())
+    b = make_version(item2, "Personal loans.", n=2)
+    with transaction.atomic():
+        run_code_checks(version=b, clock=clock)
+    assert Finding.objects.get(version=b, source="human").state == "open"
+
+
+@pytest.mark.django_db
 def test_a_different_quote_is_not_carried(marketer: User, reviewer: User, clock: FixedClock) -> None:
     item = make_item(marketer)
     v1 = make_version(item, "Guaranteed approval.")

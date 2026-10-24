@@ -8009,6 +8009,19 @@
       },
       "ReaffirmIn": {
         "properties": {
+          "llm_override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when the version's AI check failed.",
+            "title": "Llm Override Reason"
+          },
           "reason": {
             "maxLength": 10000,
             "minLength": 1,

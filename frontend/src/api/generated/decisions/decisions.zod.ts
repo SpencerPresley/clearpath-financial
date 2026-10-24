@@ -189,11 +189,14 @@ export const ReaffirmApprovalParams = zod.object({
   "item_id": zod.int()
 })
 
+export const reaffirmApprovalBodyLlmOverrideReasonOneMax = 2000;
+
 export const reaffirmApprovalBodyReasonMax = 10000;
 
 
 
 export const ReaffirmApprovalBody = zod.object({
+  "llm_override_reason": zod.union([zod.string().max(reaffirmApprovalBodyLlmOverrideReasonOneMax),zod.null()]).optional().describe('Required when the version\'s AI check failed.'),
   "reason": zod.string().min(1).max(reaffirmApprovalBodyReasonMax)
 })
 

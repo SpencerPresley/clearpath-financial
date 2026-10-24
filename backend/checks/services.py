@@ -48,6 +48,7 @@ from core.domain import (
     Product,
     Severity,
     TermsField,
+    VersionOrigin,
 )
 from core.errors import InvalidInput, InvalidTransition, NotFound
 from partners.models import Partner
@@ -125,29 +126,51 @@ def _span(draft: FindingDraft) -> tuple[int | None, int | None, str | None]:
     return draft.span.start, draft.span.end, draft.quote
 
 
-def _dismissed_earlier(version: Version) -> dict[tuple[str, str | None], Finding]:
-    """The latest dismissed finding per (rule, quote) on the item's earlier versions."""
+# Human checklist items have no quote, so (rule, None) would match on every later version: a Reg B imagery
+# dismissal on v1 would silently cover a changed creative on v5. They carry only into versions whose creative
+# can't have changed: the reviewer's own edit and the generated fast-track version (text-only changes).
+_HUMAN_CARRIES_INTO: Final = frozenset({VersionOrigin.REVIEWER_EDIT, VersionOrigin.FAST_TRACK})
+
+
+def _carryable_dismissals(version: Version) -> dict[tuple[str, str | None], Finding]:
+    """Per (rule, quote): the dismissal to carry into `version`, if the latest earlier version that raised that
+    (rule, quote) left every such finding dismissed. A later accept or reopen of the same finding wins over an
+    older dismissal (a reviewer's "this is a real problem" must not be undone by history)."""
     earlier = (
-        Finding.objects.filter(
-            version__item_id=version.item.pk, version__n__lt=version.n, state=FindingState.DISMISSED.value
-        )
-        .select_related("resolved_by")
+        Finding.objects.filter(version__item_id=version.item.pk, version__n__lt=version.n)
+        .select_related("resolved_by", "version")
+        .defer("version__content_text", "version__search_vector")
         .order_by("version__n", "pk")
     )
-    return {(f.rule_id, f.quote): f for f in earlier}
+    latest: dict[tuple[str, str | None], tuple[int, list[Finding]]] = {}
+    for f in earlier:
+        key = (f.rule_id, f.quote)
+        n, found = latest.get(key, (f.version.n, []))
+        if f.version.n > n:
+            n, found = f.version.n, []
+        found.append(f)
+        latest[key] = (n, found)
+    human_ok = VersionOrigin(version.origin) in _HUMAN_CARRIES_INTO
+    return {
+        key: found[-1]
+        for key, (_, found) in latest.items()
+        if all(f.state == FindingState.DISMISSED for f in found)
+        and (human_ok or found[-1].source != FindingSource.HUMAN)
+    }
 
 
 def persist_findings(*, version: Version, drafts: Sequence[FindingDraft], clock: Clock = SYSTEM_CLOCK) -> int:
     """Store findings on `version`, carrying identical dismissals forward (spec §4.2 ruling 4). Returns the number
     of findings created.
 
-    A finding with the same rule and the same quote (both None for a spanless finding) as one dismissed on an
-    earlier version of the item is created dismissed, with the original reason and resolver, `carried_from` set,
-    and a FINDING_DISMISSED event (`carried=True`, no actor). Drafts that collide on the unique key
+    A finding with the same rule and the same quote (both None for a spanless finding) as one whose latest earlier
+    occurrence is dismissed is created dismissed, with the original reason and resolver, `carried_from` set, and a
+    FINDING_DISMISSED event (`carried=True`, no actor). Human checklist items carry only into reviewer-edit and
+    fast-track versions (see `_HUMAN_CARRIES_INTO`). Drafts that collide on the unique key
     `(source, rule_id, span)`, within the batch or with rows already on the version, are skipped: the first wins.
     """
     now = clock.now()
-    carry = _dismissed_earlier(version)
+    carry = _carryable_dismissals(version)
     existing = set(Finding.objects.filter(version=version).values_list("source", "rule_id", "span_start", "span_end"))
     created = 0
     for draft in drafts:

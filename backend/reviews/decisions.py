@@ -1,11 +1,12 @@
 """Decisions and their gates (spec §4.2 ruling 3), reaffirm, and pull.
 
 Gates on the version being approved, in this order, each its own 409:
-1. no open finding (`open_findings_block_decision`), warnings and human checklist items included;
-2. no accepted finding on a plain Approve (`accepted_findings_block_approval`): accepted means "must change",
-   and the approved version is exactly what goes live;
-3. the AI check isn't pending or running (`ai_check_pending`); if it failed, `llm_override_reason` is required;
-4. the copy quotes no superseded offer terms (`stale_offer_terms`).
+1. the copy quotes no superseded offer terms (`stale_offer_terms`): first, because triage can't fix it;
+2. no open finding (`open_findings_block_decision`), warnings and human checklist items included;
+3. no accepted finding (`accepted_findings_block_approval`): accepted means "must change", and the approved
+   version is exactly what goes live (approve with edits checks the reviewer's v+1, where vN's accepted
+   findings were addressed);
+4. the AI check isn't pending or running (`ai_check_pending`); if it failed, `llm_override_reason` is required.
 Request changes and Reject need only a reason. Every decision records the exact version, the offer-terms
 versions it quotes, the rule-set date and engine version, evidence hashes, the approver, and (approvals) expiry.
 """
@@ -146,16 +147,16 @@ def _require_current_terms(version: Version, at: datetime) -> tuple[int, ...]:
 
 
 def _require_approvable(
-    item: ReviewItem, version: Version, *, plain: bool, override: str | None, at: datetime
+    item: ReviewItem, version: Version, *, override: str | None, at: datetime
 ) -> tuple[str, tuple[int, ...]]:
-    """Every approval gate on the version being approved. Returns (override reason, quoted terms ids)."""
+    """Every approval gate on the version being approved, in the module docstring's order. Returns (override
+    reason to record, quoted terms ids)."""
+    terms_ids = _require_current_terms(version, at)
     _require_triaged(version)
-    if plain:
-        accepted = _states(version).get(FindingState.ACCEPTED, 0)
-        if accepted:
-            raise AcceptedFindingsBlockApproval(accepted_count=accepted)
-    recorded_override = _require_ai_done(item, override)
-    return recorded_override, _require_current_terms(version, at)
+    accepted = _states(version).get(FindingState.ACCEPTED, 0)
+    if accepted:
+        raise AcceptedFindingsBlockApproval(accepted_count=accepted)
+    return _require_ai_done(item, override), terms_ids
 
 
 def _open_summaries(version: Version) -> list[FindingSummary]:
@@ -222,8 +223,9 @@ def _write(  # noqa: PLR0913  # the decision's columns
     reason: str,
     evidence: Sequence[Attachment],
     approval: _Approval | None,
-    at: datetime,
+    clock: Clock,
 ) -> Decision:
+    at = clock.now()
     carried_from = version.based_on if VersionOrigin(version.origin) is not VersionOrigin.SUBMISSION else None
     decision = Decision.objects.create(
         item=item,
@@ -274,14 +276,14 @@ def _write(  # noqa: PLR0913  # the decision's columns
         item.save(update_fields=["approved_at", "approval_expires_at"])
     if action is Action.REJECT:
         # Rejecting content that's still running (a re-review taken to full review) must take it down too.
-        live = Placement.objects.select_for_update().filter(live_placements_q(timezone.localdate(at)), item=item)
+        live = Placement.objects.select_for_update().filter(live_placements_q(clock.today()), item=item)
         _request_takedowns(item, list(live), reason=reason, actor=actor, at=at)
     return decision
 
 
-def _approval(item: ReviewItem, version: Version, *, plain: bool, override: str | None, clock: Clock) -> _Approval:
+def _approval(item: ReviewItem, version: Version, *, override: str | None, clock: Clock) -> _Approval:
     now = clock.now()
-    recorded_override, terms_ids = _require_approvable(item, version, plain=plain, override=override, at=now)
+    recorded_override, terms_ids = _require_approvable(item, version, override=override, at=now)
     expires_at = approval_expiry(
         channel=Channel(item.channel),
         decided_at=now,
@@ -307,7 +309,8 @@ def _edited_version(
     """The version an approve-with-edits approves: the reviewer's new v+1, or (re-posting after triage) the
     current reviewer-edit version. Returns it with the refusal to raise if v+1 has open findings."""
     if data.edited_content_text is None:
-        if VersionOrigin(reviewed.origin) is not VersionOrigin.REVIEWER_EDIT:
+        if VersionOrigin(reviewed.origin) is not VersionOrigin.REVIEWER_EDIT or reviewed.decisions.exists():
+            # Only the reviewer-edit version still waiting from a refused edit can be approved without text.
             raise InvalidInput.for_field("edited_content_text", "Include your edited copy.")
         return reviewed, None
     _require_triaged(reviewed)
@@ -359,9 +362,9 @@ def record_decision(*, actor: User, item_id: int, data: DecisionInput, clock: Cl
         if data.outcome is DecisionOutcome.APPROVED_WITH_EDITS:
             version, refusal = _edited_version(item, version, actor=actor, data=data, clock=clock)
             if refusal is None:
-                approval = _approval(item, version, plain=False, override=data.llm_override_reason, clock=clock)
+                approval = _approval(item, version, override=data.llm_override_reason, clock=clock)
         elif data.outcome is DecisionOutcome.APPROVED:
-            approval = _approval(item, version, plain=True, override=data.llm_override_reason, clock=clock)
+            approval = _approval(item, version, override=data.llm_override_reason, clock=clock)
         result: DecisionResult | FindingsNeedTriage
         if refusal is not None:
             result = refusal
@@ -376,7 +379,7 @@ def record_decision(*, actor: User, item_id: int, data: DecisionInput, clock: Cl
                 reason=reason,
                 evidence=evidence,
                 approval=approval,
-                at=now,
+                clock=clock,
             )
             result = _result(written, item)
     if isinstance(result, FindingsNeedTriage):
@@ -393,17 +396,19 @@ def _approved_version_n(item: ReviewItem) -> int | None:
     return decision.version.n if decision is not None else None
 
 
-def reaffirm(*, actor: User, item_id: int, reason: str, clock: Clock = SYSTEM_CLOCK) -> DecisionResult:
+def reaffirm(
+    *, actor: User, item_id: int, reason: str, llm_override_reason: str | None = None, clock: Clock = SYSTEM_CLOCK
+) -> DecisionResult:
     """needs_rereview -> approved on the same (approved, current) version, with a fresh expiry.
 
     The code checks re-run first against today's rules and terms: catching rule changes is what expiry is for.
     New findings are kept and the reaffirm refused (`findings_need_triage`) until they're triaged; the usual
-    approval gates then apply, so copy quoting superseded terms can't be reaffirmed (fast-track or pull it).
+    approval gates then apply, so copy quoting superseded terms can't be reaffirmed (fast-track or pull it). If
+    the version's AI check failed, `llm_override_reason` is required again: a reaffirm is a new approval.
     """
     reason = reason.strip()
     if not reason:
         raise InvalidInput.for_field("reason", "Give a reason for the decision.")
-    now = clock.now()
     result: DecisionResult | FindingsNeedTriage
     with transaction.atomic():
         item = locked_item(item_id)
@@ -422,7 +427,7 @@ def reaffirm(*, actor: User, item_id: int, reason: str, clock: Clock = SYSTEM_CL
         if new:
             result = FindingsNeedTriage(version_n=version.n, findings=new)
         else:
-            approval = _approval(item, version, plain=True, override=None, clock=clock)
+            approval = _approval(item, version, override=llm_override_reason, clock=clock)
             written = _write(
                 item,
                 version,
@@ -433,7 +438,7 @@ def reaffirm(*, actor: User, item_id: int, reason: str, clock: Clock = SYSTEM_CL
                 reason=reason,
                 evidence=[],
                 approval=approval,
-                at=now,
+                clock=clock,
             )
             result = _result(written, item)
     if isinstance(result, FindingsNeedTriage):
@@ -481,8 +486,10 @@ def pull_item(
         require_transition(item, Action.PULL)
         if placement_ids:
             ids = list(dict.fromkeys(placement_ids))
-            placements = list(Placement.objects.select_for_update().filter(item=item, pk__in=ids))
-            if len(placements) != len(ids) or any(p.takedown_state == TakedownState.CONFIRMED for p in placements):
+            placements = list(
+                Placement.objects.select_for_update().filter(live_placements_q(clock.today()), item=item, pk__in=ids)
+            )
+            if len(placements) != len(ids):
                 raise InvalidInput.for_field("placement_ids", "Pick live placements of this item.")
         else:
             placements = list(Placement.objects.select_for_update().filter(live_placements_q(clock.today()), item=item))

@@ -6,6 +6,8 @@
  */
 
 export interface ReaffirmIn {
+  /** Required when the version's AI check failed. */
+  llm_override_reason?: string | null;
   /**
      * @minLength 1
      * @maxLength 10000
