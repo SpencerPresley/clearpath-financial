@@ -64,15 +64,24 @@ describe('library search params', () => {
     });
   });
 
-  it('searches precedents with the query, mode, and the same filters', () => {
+  it('searches precedents with the query, mode, and the same filters, but never the legacy choice', () => {
     expect(
-      toSearchParams(parse({ tab: 'precedents', query: ' credit score ', mode: 'text', legacy: 'exclude' })),
+      toSearchParams(
+        parse({
+          tab: 'precedents',
+          query: ' credit score ',
+          mode: 'text',
+          legacy: 'only',
+          channel: ['email'],
+        }),
+      ),
     ).toEqual({
       query: 'credit score',
       mode: 'text',
       limit: 50,
-      is_legacy: false,
+      channel: ['email'],
     });
+    expect(hasFilters(parse({ tab: 'precedents', legacy: 'only' }))).toBe(false);
   });
 
   it('exports the approved view: its filters plus status approved, in its sort', () => {

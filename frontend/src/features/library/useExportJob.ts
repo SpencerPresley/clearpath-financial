@@ -1,15 +1,17 @@
 /*
- * One export job (an xlsx of a view, or an item's evidence pack): start it, poll GET /exports/{id} until it's
- * ready or failed, then hand back its download_url. The download is a plain link: the mutator parses non-JSON
- * bodies as text, which would corrupt an xlsx or zip, and a link keeps the browser's own download handling.
+ * One export job (an xlsx of a view, or an item's evidence pack), read from the page's job store (exportJobs.tsx):
+ * poll GET /exports/{id} until it's ready or failed, then hand back its download_url. The download is a plain
+ * link: the mutator parses non-JSON bodies as text, which would corrupt an xlsx or zip, and a link keeps the
+ * browser's own download handling.
  */
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 
 import { getGetExportQueryKey, useGetExport } from '../../api/generated/exports/exports';
 import type { ExportOut } from '../../api/generated/model';
 import { errorStatus } from '../../ui/errorMessage';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
+import { useExportJobs } from './exportJobs';
+import type { JobRecord } from './exportJobs';
 
 export const POLL_MS = 1000;
 
@@ -25,18 +27,36 @@ export type ExportJobState =
 const inFlight = (job: ExportOut | undefined) =>
   job === undefined || job.status === 'pending' || job.status === 'running';
 
-export interface StartOutcome {
-  isPending: boolean;
-  error: unknown;
+/** Callbacks for the starting mutation's own options (they run even if the control has unmounted meanwhile). */
+export function useJobCallbacks() {
+  const queryClient = useQueryClient();
+  const { set } = useExportJobs();
+  return {
+    starting: (key: string, extra: Partial<JobRecord> = {}) => {
+      set(key, { phase: 'starting', ...extra });
+    },
+    started: (key: string, job: ExportOut, extra: Partial<JobRecord> = {}) => {
+      queryClient.setQueryData(getGetExportQueryKey(job.id), job);
+      set(key, { phase: 'tracking', jobId: job.id, ...extra });
+    },
+    refused: (key: string, error: unknown, extra: Partial<JobRecord> = {}) => {
+      set(key, {
+        phase: 'refused',
+        message: apiErrorMessage(error),
+        httpStatus: errorStatus(error),
+        ...extra,
+      });
+    },
+    clear: (key: string) => {
+      set(key, undefined);
+    },
+  };
 }
 
-/**
- * `start` is the caller's mutation (createExport or createEvidencePack); pass its pending flag and error, and
- * call `track(job)` from its onSuccess.
- */
-export function useExportJob(mutation: StartOutcome) {
-  const queryClient = useQueryClient();
-  const [jobId, setJobId] = useState<number | null>(null);
+export function useExportJob(key: string) {
+  const { records } = useExportJobs();
+  const record = records[key];
+  const jobId = record?.phase === 'tracking' ? (record.jobId ?? null) : null;
   const poll = useGetExport(jobId ?? 0, {
     query: {
       enabled: jobId !== null,
@@ -44,26 +64,17 @@ export function useExportJob(mutation: StartOutcome) {
     },
   });
 
-  const track = (job: ExportOut) => {
-    queryClient.setQueryData(getGetExportQueryKey(job.id), job);
-    setJobId(job.id);
-  };
-  const reset = () => {
-    setJobId(null);
-  };
-
   let state: ExportJobState;
-  if (mutation.isPending) {
+  if (record === undefined) {
+    state = { kind: 'idle' };
+  } else if (record.phase === 'starting') {
     state = { kind: 'starting' };
-  } else if (jobId === null) {
-    state =
-      mutation.error === null || mutation.error === undefined
-        ? { kind: 'idle' }
-        : {
-            kind: 'refused',
-            message: apiErrorMessage(mutation.error),
-            status: errorStatus(mutation.error),
-          };
+  } else if (record.phase === 'refused') {
+    state = {
+      kind: 'refused',
+      message: record.message ?? 'The request was refused.',
+      status: record.httpStatus,
+    };
   } else if (poll.isError && poll.data === undefined) {
     state = { kind: 'lost', message: apiErrorMessage(poll.error) };
   } else {
@@ -76,6 +87,5 @@ export function useExportJob(mutation: StartOutcome) {
       state = { kind: 'running', job };
     }
   }
-
-  return { state, track, reset, refetch: () => void poll.refetch() };
+  return { state, record };
 }

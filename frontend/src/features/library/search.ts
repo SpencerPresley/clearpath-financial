@@ -73,7 +73,8 @@ export const CLEARED: LibraryFilterPatch = {
 };
 
 export function hasFilters(search: LibrarySearch): boolean {
-  if (search.legacy !== 'include') return true;
+  // Legacy items have no versions, so precedent search ignores the legacy choice (and the chip is hidden there).
+  if (search.tab === 'approved' && search.legacy !== 'include') return true;
   if (search.tab === 'approved' && search.q !== undefined) return true;
   return FILTER_KEYS.some((key) => search[key] !== undefined);
 }
@@ -106,11 +107,13 @@ export function toListParams(search: LibrarySearch, cursor?: string | null): Lis
 }
 
 export function toSearchParams(search: LibrarySearch): SearchLibraryParams {
+  const filter = toItemFilter(search);
+  delete filter.is_legacy;
   return {
     query: (search.query ?? '').trim(),
     mode: search.mode,
     limit: SEARCH_LIMIT,
-    ...toItemFilter(search),
+    ...filter,
   };
 }
 

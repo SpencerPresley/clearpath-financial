@@ -31,13 +31,16 @@ import {
   ChartLineIcon,
   ChatCircleIcon,
   CheckCircleIcon,
+  CheckFatIcon,
   CheckIcon,
+  CheckSquareIcon,
+  CircleDashedIcon,
   ColumnsIcon,
   CopyIcon,
   CpuIcon,
   DotsSixVerticalIcon,
-  DownloadSimpleIcon,
   DotsThreeIcon,
+  DownloadSimpleIcon,
   EnvelopeSimpleIcon,
   EqualsIcon,
   ExportIcon,
@@ -50,6 +53,7 @@ import {
   FunnelIcon,
   GavelIcon,
   HandshakeIcon,
+  HourglassMediumIcon,
   InfoIcon,
   KanbanIcon,
   KeyboardIcon,
@@ -81,6 +85,7 @@ import {
   WarningOctagonIcon,
   XCircleIcon,
   XIcon,
+  XSquareIcon,
 } from '@phosphor-icons/react';
 import type { Icon as PhosphorIcon, IconWeight } from '@phosphor-icons/react';
 
@@ -164,6 +169,13 @@ export const icons = {
   'action.drag': bold(DotsSixVerticalIcon),
   /** Save a built file (export, evidence pack) to disk; action.export starts building it. */
   'action.download': regular(DownloadSimpleIcon),
+  /** A chosen option in a checkable menu or list (not a decision: that's action.approve). */
+  'action.check': bold(CheckFatIcon),
+  /** Background jobs (imports): waiting to run, running, finished, failed. */
+  'job.pending': regular(CircleDashedIcon),
+  'job.running': regular(HourglassMediumIcon),
+  'job.done': regular(CheckSquareIcon),
+  'job.failed': regular(XSquareIcon),
   // Column sort state (server-sorted columns only).
   'sort.ascending': regular(ArrowUpIcon),
   'sort.descending': regular(ArrowDownIcon),

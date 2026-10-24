@@ -1,84 +1,88 @@
 /*
  * Export the approved view as it's filtered: xlsx, or a zip with an evidence pack per approved item. The job runs
- * in the background (spec §5.5: long operations show progress and leave the screen usable); its state sits
- * beside the button in one line, ending in a download link or the reason it failed.
+ * in the background (spec §5.5: long operations show progress and leave the screen usable). Its one-line state
+ * lives in the page's job store and shows on both tabs, ending in a download link or the reason it failed;
+ * Retry re-sends the request that failed, not whatever the filters say now.
  */
 import { Menu, MenuItem, MenuTrigger, Popover } from 'react-aria-components';
 
 import { useCreateExport } from '../../api/generated/exports/exports';
+import type { ExportIn } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { DownloadLink } from '../../ui/DownloadLink';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { plural } from '../../ui/labels';
+import { EXPORT_KEY } from './exportJobs';
 import { exportBody } from './search';
 import type { LibrarySearch } from './search';
-import { useExportJob } from './useExportJob';
-import type { ExportJobState } from './useExportJob';
+import { useExportJob, useJobCallbacks } from './useExportJob';
 
-export function ExportControl({ search }: { search: LibrarySearch }) {
-  const create = useCreateExport();
-  const job = useExportJob(create);
-  const lastPacks = create.variables?.data.include_evidence_packs ?? false;
-
-  const start = (packs: boolean) => {
-    job.reset();
-    create.mutate({ data: exportBody(search, packs) }, { onSuccess: job.track });
+function useStartExport() {
+  const callbacks = useJobCallbacks();
+  const create = useCreateExport({
+    mutation: {
+      onMutate: ({ data }) => {
+        callbacks.starting(EXPORT_KEY, { request: data });
+      },
+      onSuccess: (job, { data }) => {
+        callbacks.started(EXPORT_KEY, job, { request: data });
+      },
+      onError: (error, { data }) => {
+        callbacks.refused(EXPORT_KEY, error, { request: data });
+      },
+    },
+  });
+  return (request: ExportIn) => {
+    create.mutate({ data: request });
   };
-  const busy = job.state.kind === 'starting' || job.state.kind === 'running';
+}
 
+/** The Export menu: the approved view only (precedent search can't be expressed as an export filter). */
+export function ExportMenu({ search }: { search: LibrarySearch }) {
+  const start = useStartExport();
+  const { state } = useExportJob(EXPORT_KEY);
+  const busy = state.kind === 'starting' || state.kind === 'running';
   return (
-    <div className="app-export">
-      <ExportStatus
-        state={job.state}
-        onRetry={() => {
-          start(lastPacks);
-        }}
-        onDismiss={() => {
-          job.reset();
-          create.reset();
-        }}
-      />
-      <MenuTrigger>
-        <Button size="sm" icon="action.export" isDisabled={busy}>
-          Export
-        </Button>
-        <Popover className="app-popover" placement="bottom end" offset={4}>
-          <Menu
-            className="app-menu"
-            aria-label="Export"
-            onAction={(key) => {
-              start(key === 'packs');
-            }}
+    <MenuTrigger>
+      <Button size="sm" icon="action.export" isDisabled={busy}>
+        Export
+      </Button>
+      <Popover className="app-popover" placement="bottom end" offset={4}>
+        <Menu
+          className="app-menu"
+          aria-label="Export"
+          onAction={(key) => {
+            start(exportBody(search, key === 'packs'));
+          }}
+        >
+          <MenuItem id="xlsx" textValue="Export view (.xlsx)" className="app-menu-item app-export-option">
+            <span className="app-export-option-label">Export view (.xlsx)</span>
+            <span className="app-export-option-hint">One row per item, in this order</span>
+          </MenuItem>
+          <MenuItem
+            id="packs"
+            textValue="Export view with evidence packs (.zip)"
+            className="app-menu-item app-export-option"
           >
-            <MenuItem id="xlsx" textValue="Export view (.xlsx)" className="app-menu-item app-export-option">
-              <span className="app-export-option-label">Export view (.xlsx)</span>
-              <span className="app-export-option-hint">One row per item, in this order</span>
-            </MenuItem>
-            <MenuItem
-              id="packs"
-              textValue="Export view with evidence packs (.zip)"
-              className="app-menu-item app-export-option"
-            >
-              <span className="app-export-option-label">Export view with evidence packs (.zip)</span>
-              <span className="app-export-option-hint">Adds a pack per approved item, up to 200</span>
-            </MenuItem>
-          </Menu>
-        </Popover>
-      </MenuTrigger>
-    </div>
+            <span className="app-export-option-label">Export view with evidence packs (.zip)</span>
+            <span className="app-export-option-hint">Adds a pack per approved item, up to 200</span>
+          </MenuItem>
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 
-function ExportStatus({
-  state,
-  onRetry,
-  onDismiss,
-}: {
-  state: ExportJobState;
-  onRetry: () => void;
-  onDismiss: () => void;
-}) {
+/** The export job's state, one line; rendered on both tabs so leaving the approved view doesn't lose it. */
+export function ExportStatus() {
+  const start = useStartExport();
+  const callbacks = useJobCallbacks();
+  const { state, record } = useExportJob(EXPORT_KEY);
+  const dismiss = () => {
+    callbacks.clear(EXPORT_KEY);
+  };
+
   switch (state.kind) {
     case 'idle':
       return <span className="app-export-status" role="status" />;
@@ -102,7 +106,7 @@ function ExportStatus({
           <DownloadLink href={state.url} filename={state.job.filename}>
             Download
           </DownloadLink>
-          <IconButton icon="action.close" size="sm" aria-label="Dismiss export" onPress={onDismiss} />
+          <IconButton icon="action.close" size="sm" aria-label="Dismiss export" onPress={dismiss} />
         </span>
       );
     case 'refused':
@@ -114,10 +118,18 @@ function ExportStatus({
           <span className="app-export-message" title={state.message}>
             {state.message}
           </span>
-          <Button size="sm" variant="ghost" onPress={onRetry}>
-            Retry export
-          </Button>
-          <IconButton icon="action.close" size="sm" aria-label="Dismiss export" onPress={onDismiss} />
+          {record?.request !== undefined && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                if (record.request !== undefined) start(record.request);
+              }}
+            >
+              Retry export
+            </Button>
+          )}
+          <IconButton icon="action.close" size="sm" aria-label="Dismiss export" onPress={dismiss} />
         </span>
       );
   }

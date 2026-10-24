@@ -38,16 +38,16 @@ test('library: filter the approved view, export it, then find a precedent and it
   });
 
   await page.getByRole('tab', { name: 'Precedents' }).click();
-  await page.getByRole('searchbox', { name: 'Search approved copy' }).fill("won't affect your credit score");
+  await page.getByRole('searchbox', { name: 'Search precedents' }).fill("won't affect your credit score");
   const hits = page.getByRole('list', { name: 'Precedents' });
   await expect(hits.locator('mark').first()).toHaveText("won't affect your credit score");
   await expect(page).toHaveURL(/tab=precedents/);
   const lapsed = hits.getByRole('listitem').nth(1);
-  await expect(lapsed.getByText('Re-review')).toBeVisible();
+  await expect(lapsed.getByText('Needs re-review')).toBeVisible();
   await expect(lapsed.getByText('Matched v2')).toBeVisible();
 
   const first = hits.getByRole('listitem').first();
-  await first.getByRole('button', { name: 'Evidence pack for CP-1088' }).click();
+  await first.getByRole('button', { name: 'Build item pack for CP-1088' }).click();
   await expect(first.getByRole('link', { name: 'Download evidence pack for CP-1088' })).toHaveAttribute(
     'href',
     '/api/exports/38/download',

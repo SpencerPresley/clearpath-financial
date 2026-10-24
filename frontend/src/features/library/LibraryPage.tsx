@@ -11,7 +11,8 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { useViewer } from '../../ui/layout/Viewer';
 import type { Role } from '../../ui/domain';
 import { ApprovedList } from './ApprovedList';
-import { ExportControl } from './ExportControl';
+import { ExportJobsProvider } from './exportJobs';
+import { ExportMenu, ExportStatus } from './ExportControl';
 import { LibraryFilters } from './LibraryFilters';
 import { PrecedentResults, PrecedentSearchBar } from './Precedents';
 import { CLEARED } from './search';
@@ -35,60 +36,67 @@ export function LibraryPage() {
   };
 
   return (
-    <section className="app-library" aria-labelledby="library-title">
-      <h1 id="library-title" className="app-library-heading">
-        Library
-      </h1>
-      <Tabs
-        selectedKey={search.tab}
-        onSelectionChange={(key: Key) => {
-          if (key === 'approved' || key === 'precedents') update({ tab: key satisfies LibraryTab });
-        }}
-        className="app-library-tabs"
-      >
-        <div className="app-library-tabbar">
-          <TabList aria-label="Library views" className="app-tabs app-library-tablist">
-            <Tab id="approved" className="app-tab">
-              Approved to run
-            </Tab>
-            <Tab id="precedents" className="app-tab">
-              Precedents
-            </Tab>
-          </TabList>
-          {search.tab === 'approved' && canExport && <ExportControl search={search} />}
-        </div>
-        <TabPanel id="approved" className="app-library-panel">
-          <LibraryFilters search={search} onChange={update} />
-          <ApprovedList
-            search={search}
-            rows={rows}
-            query={query}
-            onClear={clear}
-            onPrecedents={() => {
-              update({ tab: 'precedents' });
-            }}
-          />
-        </TabPanel>
-        <TabPanel id="precedents" className="app-library-panel">
-          <PrecedentSearchBar
-            search={search}
-            onQuery={(q) => {
-              update({ query: q }, true);
-            }}
-            onMode={(mode) => {
-              update({ mode });
-            }}
-          />
-          <LibraryFilters search={search} onChange={update} />
-          <PrecedentResults
-            search={search}
-            onMode={(mode) => {
-              update({ mode });
-            }}
-            onClear={clear}
-          />
-        </TabPanel>
-      </Tabs>
-    </section>
+    <ExportJobsProvider>
+      <section className="app-library" aria-labelledby="library-title">
+        <h1 id="library-title" className="app-library-heading">
+          Library
+        </h1>
+        <Tabs
+          selectedKey={search.tab}
+          onSelectionChange={(key: Key) => {
+            if (key === 'approved' || key === 'precedents') update({ tab: key satisfies LibraryTab });
+          }}
+          className="app-library-tabs"
+        >
+          <div className="app-library-tabbar">
+            <TabList aria-label="Library views" className="app-tabs app-library-tablist">
+              <Tab id="approved" className="app-tab">
+                Approved to run
+              </Tab>
+              <Tab id="precedents" className="app-tab">
+                Precedents
+              </Tab>
+            </TabList>
+            {canExport && (
+              <div className="app-export">
+                <ExportStatus />
+                {search.tab === 'approved' && <ExportMenu search={search} />}
+              </div>
+            )}
+          </div>
+          <TabPanel id="approved" className="app-library-panel">
+            <LibraryFilters search={search} onChange={update} />
+            <ApprovedList
+              search={search}
+              rows={rows}
+              query={query}
+              onClear={clear}
+              onPrecedents={() => {
+                update({ tab: 'precedents' });
+              }}
+            />
+          </TabPanel>
+          <TabPanel id="precedents" className="app-library-panel">
+            <PrecedentSearchBar
+              search={search}
+              onQuery={(q) => {
+                update({ query: q }, true);
+              }}
+              onMode={(mode) => {
+                update({ mode });
+              }}
+            />
+            <LibraryFilters search={search} onChange={update} />
+            <PrecedentResults
+              search={search}
+              onMode={(mode) => {
+                update({ mode });
+              }}
+              onClear={clear}
+            />
+          </TabPanel>
+        </Tabs>
+      </section>
+    </ExportJobsProvider>
   );
 }

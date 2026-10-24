@@ -58,7 +58,7 @@ export function FilterChip({ label, options, selected, mode = 'multiple', onChan
                 {({ isSelected }) => (
                   <>
                     <span className="app-menu-check-mark" aria-hidden="true">
-                      {isSelected && <Icon name="action.approve" size={12} />}
+                      {isSelected && <Icon name="action.check" size={12} />}
                     </span>
                     {option.label}
                   </>

@@ -21,11 +21,11 @@ import type { LibraryItemsQuery } from './useLibraryItems';
 const COLUMNS = [
   { id: 'key', label: 'Item', width: '5.5rem' },
   { id: 'title', label: 'Title', width: undefined },
-  { id: 'product', label: 'Product', width: '7.5rem' },
-  { id: 'channel', label: 'Channel', width: '7.5rem' },
+  { id: 'product', label: 'Product', width: '8.5rem' },
+  { id: 'channel', label: 'Channel', width: '7rem' },
   { id: 'partner', label: 'Partner', width: '7.5rem' },
   { id: 'run', label: 'Planned run', width: '10.5rem' },
-  { id: 'pack', label: 'Evidence pack', width: '8rem' },
+  { id: 'pack', label: 'Evidence pack', width: '7.5rem' },
 ] as const;
 
 const TITLE_MIN = 240;
@@ -90,14 +90,15 @@ function Row({ row }: { row: ItemRowOut }) {
       </td>
       <td className="app-td">
         <span className="app-library-title">
-          <Link to="/items/$itemId" params={{ itemId: String(row.id) }} className="app-library-link">
+          <Link
+            to="/items/$itemId"
+            params={{ itemId: String(row.id) }}
+            className="app-library-link"
+            title={row.title}
+          >
             {row.title}
           </Link>
-          {row.is_legacy && (
-            <span className="app-badge app-badge-outline" title="Imported from the tracker">
-              Legacy
-            </span>
-          )}
+          {row.is_legacy && <span className="app-badge app-badge-outline">Legacy</span>}
         </span>
       </td>
       <td className="app-td" title={product}>

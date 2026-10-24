@@ -24,8 +24,8 @@ import { CLEARED, hasFilters } from './search';
 import type { LibraryFilterPatch, LibrarySearch } from './search';
 
 const LEGACY_OPTIONS = [
-  { id: 'exclude', label: 'Exclude legacy' },
-  { id: 'only', label: 'Legacy only' },
+  { id: 'exclude', label: 'Excluded' },
+  { id: 'only', label: 'Only' },
 ];
 
 function rangeText(label: string, from: string | undefined, to: string | undefined): string {
@@ -145,10 +145,11 @@ export function LibraryFilters({
   onChange: (patch: LibraryFilterPatch) => void;
 }) {
   const partners = useListPartners();
+  const precedents = search.tab === 'precedents';
   const partnerOptions = (partners.data ?? []).map((p) => ({ id: String(p.id), label: p.name }));
 
   return (
-    <div className="app-filter-bar" role="group" aria-label="Filters">
+    <div className="app-library-filters" role="group" aria-label="Filters">
       {search.tab === 'approved' && (
         <TitleSearch
           value={search.q}
@@ -188,17 +189,23 @@ export function LibraryFilters({
           }}
         />
       )}
+      {/* Precedent hits are versions, but this filters on the item's latest approval: say so there. */}
       <DateRangeChip
-        label="Approved"
-        description="Approval date, inclusive."
+        label={precedents ? 'Item last approved' : 'Approved'}
+        description={
+          precedents
+            ? "The item's latest approval date, inclusive (not the matched version's)."
+            : 'Approval date, inclusive.'
+        }
         from={search.approved_from}
         to={search.approved_to}
         onChange={(approved_from, approved_to) => {
           onChange({ approved_from, approved_to });
         }}
       />
+      {/* Placements (where approved content runs), not the planned run dates the table shows. */}
       <DateRangeChip
-        label="Running"
+        label="Placement running"
         description="Has a placement running in these dates."
         from={search.run_from}
         to={search.run_to}
@@ -206,20 +213,24 @@ export function LibraryFilters({
           onChange({ run_from, run_to });
         }}
       />
-      <FilterChip
-        label="Legacy"
-        mode="single"
-        options={LEGACY_OPTIONS}
-        selected={search.legacy === 'include' ? [] : [search.legacy]}
-        onChange={(ids) => {
-          const choice = ids[0];
-          onChange({ legacy: choice === 'exclude' || choice === 'only' ? choice : 'include' });
-        }}
-      />
+      {/* Precedent search covers versions; legacy items have none, so the chip could only empty the list. */}
+      {!precedents && (
+        <FilterChip
+          label="Legacy"
+          mode="single"
+          options={LEGACY_OPTIONS}
+          selected={search.legacy === 'include' ? [] : [search.legacy]}
+          onChange={(ids) => {
+            const choice = ids[0];
+            onChange({ legacy: choice === 'exclude' || choice === 'only' ? choice : 'include' });
+          }}
+        />
+      )}
       {hasFilters(search) && (
         <Button
           size="sm"
           variant="ghost"
+          className="app-library-clear"
           onPress={() => {
             onChange(CLEARED);
           }}

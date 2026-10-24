@@ -9,11 +9,12 @@ import type { IconKey } from './icons';
 
 export type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'error' | 'alert';
 
-interface Meta {
+export interface BadgeMeta {
   label: string;
   tone: Tone;
   icon: IconKey;
 }
+type Meta = BadgeMeta;
 
 export const STATUS_META: Record<ItemStatus, Meta> = {
   draft: { label: 'Draft', tone: 'neutral', icon: 'status.draft' },
@@ -45,7 +46,8 @@ export const RISK_META: Record<RiskTier, { label: string; icon: IconKey }> = {
   low: { label: 'Low risk', icon: 'risk.low' },
 };
 
-function Badge({ meta, className = 'app-badge' }: { meta: Meta; className?: string }) {
+/** Any icon + label mark with a §5.2 tone; the named badges below are this with a fixed vocabulary. */
+export function Badge({ meta, className = 'app-badge' }: { meta: Meta; className?: string }) {
   return (
     <span className={className} data-tone={meta.tone}>
       <Icon name={meta.icon} size={14} />

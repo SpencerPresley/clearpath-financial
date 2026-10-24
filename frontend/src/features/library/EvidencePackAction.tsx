@@ -1,8 +1,9 @@
 /*
- * Per-item evidence pack (approved version, decision record, terms snapshot, evidence hashes): POST
- * /items/{id}/evidence-pack starts a job, the row polls it, and a download link replaces the button. Legacy
- * items have no decision record (ledger ruling), so they say so instead of offering a button that can only be
- * refused; any other refusal (409) shows the server's reason in place of the button.
+ * Per-item evidence pack (the item's latest approved version, its decision record, terms snapshot, evidence
+ * hashes): POST /items/{id}/evidence-pack starts a job, the page's job store keeps it (so a row that's filtered
+ * away and back, or a tab switch, finds it still running or ready), and a download link replaces the button.
+ * Legacy items have no decision record (ledger ruling), so they say so instead of offering a button that can
+ * only be refused; any other refusal (409) shows the server's reason in place of the button.
  */
 import { Button as AriaButton } from 'react-aria-components';
 
@@ -11,7 +12,8 @@ import { Button } from '../../ui/Button';
 import { DownloadLink } from '../../ui/DownloadLink';
 import { Icon } from '../../ui/Icon';
 import { Tooltip } from '../../ui/Tooltip';
-import { useExportJob } from './useExportJob';
+import { packKey } from './exportJobs';
+import { useExportJob, useJobCallbacks } from './useExportJob';
 
 /** The server's 409 sentence for a legacy item (exports.evidence.latest_approval), so the two never disagree. */
 export function legacyPackReason(itemKey: string): string {
@@ -61,18 +63,32 @@ export function EvidencePackAction({
   /** A table cell: short labels, reasons in a tooltip. */
   compact?: boolean;
 }) {
-  const create = useCreateEvidencePack();
-  const job = useExportJob(create);
+  const key = packKey(itemId);
+  const callbacks = useJobCallbacks();
+  const create = useCreateEvidencePack({
+    mutation: {
+      onMutate: ({ itemId: id }) => {
+        callbacks.starting(packKey(id));
+      },
+      onSuccess: (job, { itemId: id }) => {
+        callbacks.started(packKey(id), job);
+      },
+      onError: (error, { itemId: id }) => {
+        callbacks.refused(packKey(id), error);
+      },
+    },
+  });
+  const { state } = useExportJob(key);
 
   if (isLegacy) {
     return <Reason short="No pack" message={legacyPackReason(itemKey)} itemKey={itemKey} compact={compact} />;
   }
 
   const start = () => {
-    job.reset();
-    create.mutate({ itemId }, { onSuccess: job.track });
+    create.mutate({ itemId });
   };
-  const { state } = job;
+  // The label names the item, not a version: the pack records the item's latest approval.
+  const label = compact ? 'Build pack' : 'Build item pack';
 
   switch (state.kind) {
     case 'idle':
@@ -81,10 +97,10 @@ export function EvidencePackAction({
           size="sm"
           variant="ghost"
           icon="action.export"
-          aria-label={`Evidence pack for ${itemKey}`}
+          aria-label={`${label} for ${itemKey}`}
           onPress={start}
         >
-          {compact ? 'Build pack' : 'Evidence pack'}
+          {label}
         </Button>
       );
     case 'starting':

@@ -70,7 +70,7 @@ describe('Library: approved to run', () => {
       within(legacy).getByRole('button', { name: "Why there's no evidence pack for CP-412" }),
     ).toBeInTheDocument();
     expect(within(legacy).getByText(/CP-412 is a legacy import with no decision record/)).toBeInTheDocument();
-    expect(within(legacy).queryByRole('button', { name: /^Evidence pack for/ })).toBeNull();
+    expect(within(legacy).queryByRole('button', { name: /^Build pack for/ })).toBeNull();
   });
 
   it('writes filters to the URL and sends them to the API', async () => {
@@ -173,6 +173,108 @@ describe('Library: approved to run', () => {
     expect(screen.getByRole('button', { name: 'Retry export' })).toBeInTheDocument();
   });
 
+  it('retries the export that failed, not the filters on screen now', async () => {
+    serveLibrary(APPROVED_ROWS);
+    const posted: ExportIn[] = [];
+    server.use(
+      http.post('*/api/exports', async ({ request }) => {
+        posted.push((await request.json()) as ExportIn);
+        return HttpResponse.json(exportJob({ id: 10 + posted.length }), { status: 202 });
+      }),
+      http.get('*/api/exports/11', () =>
+        HttpResponse.json(exportJob({ id: 11, status: 'failed', error: 'The export ran out of time.' })),
+      ),
+      http.get('*/api/exports/12', () => HttpResponse.json(exportJob({ id: 12, status: 'running' }))),
+    );
+    const { router } = renderApp(`/library${searchString({ channel: ['email'] })}`);
+    await screen.findByRole('table', { name: 'Approved to run' });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Export view \(\.xlsx\)/ }));
+    await screen.findByText('The export ran out of time.');
+
+    await router.navigate({ to: '/library', search: { channel: ['sms'] } });
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry export' }));
+    await waitFor(() => {
+      expect(posted).toHaveLength(2);
+    });
+    expect(posted[1]).toEqual(posted[0]);
+    expect(posted[1]?.filters).toEqual({ channel: ['email'], status: ['approved'] });
+  });
+
+  it('keeps a running export and its download across a tab switch', async () => {
+    serveLibrary(APPROVED_ROWS);
+    serveSearch(PRECEDENT_HITS);
+    let ready = false;
+    server.use(
+      http.post('*/api/exports', () => HttpResponse.json(exportJob({ id: 9 }), { status: 202 })),
+      http.get('*/api/exports/9', () =>
+        HttpResponse.json(
+          ready
+            ? exportJob({
+                id: 9,
+                status: 'ready',
+                filename: 'x.xlsx',
+                download_url: '/api/exports/9/download',
+              })
+            : exportJob({ id: 9, status: 'running' }),
+        ),
+      ),
+    );
+    renderApp('/library');
+    await screen.findByRole('table', { name: 'Approved to run' });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Export view \(\.xlsx\)/ }));
+    await screen.findByText(/Building export/);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Precedents' }));
+    expect(await screen.findByText(/Building export/)).toBeInTheDocument();
+    ready = true;
+    expect(await screen.findByRole('link', { name: 'Download' }, { timeout: 4000 })).toHaveAttribute(
+      'href',
+      '/api/exports/9/download',
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Approved to run' }));
+    expect(await screen.findByRole('link', { name: 'Download' })).toBeInTheDocument();
+  });
+
+  it("keeps a row's evidence pack when a filter hides the row and brings it back", async () => {
+    server.use(
+      http.get('*/api/library', ({ request }) => {
+        const channels = new URL(request.url).searchParams.getAll('channel');
+        const rows =
+          channels.length === 0 ? APPROVED_ROWS : APPROVED_ROWS.filter((r) => channels.includes(r.channel));
+        return HttpResponse.json({ rows, next_cursor: null });
+      }),
+      http.post('*/api/items/1088/evidence-pack', () =>
+        HttpResponse.json(exportJob({ id: 31, kind: 'evidence_pack', item_id: 1088 }), { status: 202 }),
+      ),
+      http.get('*/api/exports/31', () =>
+        HttpResponse.json(
+          exportJob({
+            id: 31,
+            kind: 'evidence_pack',
+            status: 'ready',
+            download_url: '/api/exports/31/download',
+          }),
+        ),
+      ),
+    );
+    const { router } = renderApp('/library');
+    const row = await screen.findByRole('row', { name: /CP-1088/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Build pack for CP-1088' }));
+    await within(row).findByRole('link', { name: 'Download evidence pack for CP-1088' });
+
+    await router.navigate({ to: '/library', search: { channel: ['sms'] } });
+    await waitFor(() => {
+      expect(screen.queryByRole('row', { name: /CP-1088/ })).toBeNull();
+    });
+    await router.navigate({ to: '/library', search: {} });
+    const back = await screen.findByRole('row', { name: /CP-1088/ });
+    expect(
+      await within(back).findByRole('link', { name: 'Download evidence pack for CP-1088' }),
+    ).toBeInTheDocument();
+  });
+
   it('hides Export from marketers (the server refuses them)', async () => {
     server.use(getGetMeMockHandler(ME_LIBRARY_MARKETER));
     serveLibrary(APPROVED_ROWS);
@@ -203,7 +305,7 @@ describe('Library: approved to run', () => {
     );
     renderApp('/library');
     const row = await screen.findByRole('row', { name: /CP-1088/ });
-    await userEvent.click(within(row).getByRole('button', { name: 'Evidence pack for CP-1088' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Build pack for CP-1088' }));
     const link = await within(row).findByRole('link', { name: 'Download evidence pack for CP-1088' });
     expect(link).toHaveAttribute('href', '/api/exports/31/download');
   });
@@ -220,15 +322,24 @@ describe('Library: approved to run', () => {
     );
     renderApp('/library');
     const row = await screen.findByRole('row', { name: /CP-1081/ });
-    await userEvent.click(within(row).getByRole('button', { name: 'Evidence pack for CP-1081' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Build pack for CP-1081' }));
     expect(
       await within(row).findByText('CP-1081 has no approval yet; an evidence pack records one.'),
     ).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: 'Evidence pack for CP-1081' })).toBeNull();
+    expect(within(row).queryByRole('button', { name: 'Build pack for CP-1081' })).toBeNull();
   });
 });
 
 describe('Library: precedents', () => {
+  it('has no Legacy filter, and a legacy choice in the URL never reaches the search', async () => {
+    serveSearch(PRECEDENT_HITS);
+    renderApp(`/library${searchString({ tab: 'precedents', query: 'credit score', legacy: 'only' })}`);
+    await screen.findByRole('list', { name: 'Precedents' });
+    expect(screen.queryByRole('button', { name: /^Legacy/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Item last approved' })).toBeInTheDocument();
+    expect(searchRequests.at(-1)?.searchParams.has('is_legacy')).toBe(false);
+  });
+
   it('switches views through the URL', async () => {
     serveLibrary(APPROVED_ROWS);
     const { router } = renderApp('/library');
@@ -238,7 +349,7 @@ describe('Library: precedents', () => {
     await waitFor(() => {
       expect(router.state.location.search).toMatchObject({ tab: 'precedents' });
     });
-    expect(await screen.findByRole('heading', { name: 'Search past approvals' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Search precedents' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
     expect(searchRequests).toHaveLength(0);
   });
@@ -248,7 +359,7 @@ describe('Library: precedents', () => {
     const { router } = renderApp(`/library${searchString({ tab: 'precedents' })}`);
 
     await userEvent.type(
-      await screen.findByRole('searchbox', { name: 'Search approved copy' }),
+      await screen.findByRole('searchbox', { name: 'Search precedents' }),
       "won't affect your credit score",
     );
     const list = await screen.findByRole('list', { name: 'Precedents' });
@@ -274,7 +385,7 @@ describe('Library: precedents', () => {
     // Precedent value doesn't lapse, run-permission does: the current status sits beside the matched outcome.
     const lapsed = within(list).getAllByRole('listitem')[1];
     if (lapsed === undefined) throw new Error('no hit');
-    expect(within(lapsed).getByText('Re-review')).toBeInTheDocument();
+    expect(within(lapsed).getByText('Needs re-review')).toBeInTheDocument();
     expect(within(lapsed).getByText('Approved')).toBeInTheDocument();
   });
 

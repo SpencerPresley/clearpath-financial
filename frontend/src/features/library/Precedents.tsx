@@ -61,7 +61,7 @@ function QueryField({
   }, [text]);
   return (
     <SearchField
-      aria-label="Search approved copy"
+      aria-label="Search precedents"
       value={text}
       onChange={setText}
       className="app-precedent-search"
@@ -105,6 +105,7 @@ export function PrecedentSearchBar({
           Text
         </ToggleButton>
       </ToggleButtonGroup>
+      {/* Its own line in both modes, so switching mode never reflows the results below. */}
       <p className="app-precedent-hint">{MODE_HINT[search.mode]}</p>
     </div>
   );
@@ -122,12 +123,17 @@ function Hit({ hit }: { hit: SearchHitOut }) {
           to="/items/$itemId"
           params={{ itemId: String(hit.item_id) }}
           className="app-library-link app-precedent-title"
+          title={hit.title}
         >
           {hit.title}
         </Link>
         <span className="app-precedent-now">
           <span className="app-precedent-label">Now</span>
           <StatusBadge status={hit.status} />
+        </span>
+        {/* Beside the item's status, not the matched version: the pack records the item's latest approval. */}
+        <span className="app-precedent-action">
+          <EvidencePackAction itemId={hit.item_id} itemKey={hit.key} isLegacy={false} />
         </span>
       </div>
       <p className="app-precedent-snippet">
@@ -142,9 +148,6 @@ function Hit({ hit }: { hit: SearchHitOut }) {
           )}
         </span>
         <span className="app-precedent-facts">{meta.join(' · ')}</span>
-        <span className="app-precedent-action">
-          <EvidencePackAction itemId={hit.item_id} itemKey={hit.key} isLegacy={false} />
-        </span>
       </div>
     </li>
   );
@@ -162,12 +165,23 @@ function HitsSkeleton() {
               <span className="app-precedent-now">
                 <SkeletonBadge />
               </span>
+              <span className="app-precedent-action">
+                <SkeletonText width="6rem" />
+              </span>
             </div>
+            {/* Same rows as a hit: head (button height), two snippet lines, the badge-height meta row. */}
             <p className="app-precedent-snippet">
-              <SkeletonText width={`${String(60 + ((i * 13) % 30))}%`} />
+              <span className="app-precedent-skel-line">
+                <SkeletonText width={`${String(70 + ((i * 13) % 25))}%`} />
+              </span>
+              <span className="app-precedent-skel-line">
+                <SkeletonText width={`${String(35 + ((i * 11) % 30))}%`} />
+              </span>
             </p>
             <div className="app-precedent-meta">
-              <SkeletonText width="12rem" />
+              <SkeletonText width="5rem" />
+              <SkeletonBadge />
+              <SkeletonText width="10rem" />
             </div>
           </li>
         ))}
@@ -192,9 +206,9 @@ export function PrecedentResults({
   if (!enabled) {
     return (
       <div className="app-library-region">
-        <EmptyState icon="action.search" title="Search past approvals">
-          Finds approved wording in every version that was ever approved, including items that have since
-          expired or gone back for re-review.
+        <EmptyState icon="action.search" title="Search precedents">
+          A precedent is approved wording: every version that was ever approved, including items that have
+          since expired or gone back for re-review.
         </EmptyState>
       </div>
     );

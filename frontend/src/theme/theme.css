@@ -2369,6 +2369,29 @@
   .app-pack-why[data-hovered] {
     @apply bg-hover text-base-content;
   }
+  /* Library filter row: one line at 1280 (§5.3), chips give up width before anything wraps. */
+  .app-library-filters {
+    @apply flex min-w-0 flex-nowrap items-center gap-1.5;
+  }
+  /* Empty chips keep their labels; set chips (the long ones, "Channel: Email, SMS") give up width first. */
+  .app-library-filters > .app-chip {
+    @apply shrink-0;
+  }
+  .app-library-filters > .app-chip[data-active] {
+    @apply max-w-56 min-w-24 shrink;
+  }
+  .app-library-filters > .app-queue-search {
+    @apply min-w-32 shrink;
+  }
+  .app-btn.app-library-clear {
+    @apply ml-auto shrink-0;
+  }
+  /* Chip and step buttons drop the browser outline in their own rules, so they carry the focus ring here. */
+  .app-chip-btn[data-focus-visible],
+  .app-import-steps-btn[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
   .app-pack-why[data-focus-visible] {
     outline: 2px solid var(--color-focus);
     outline-offset: -2px;
@@ -2430,11 +2453,12 @@
   }
 
   /* ---- Precedent search ------------------------------------------------------------------------- */
+  /* Search box and mode on one row, the mode's hint on its own reserved line below (no reflow on switch). */
   .app-precedent-bar {
-    @apply flex flex-wrap items-center gap-x-3 gap-y-1;
+    @apply grid grid-cols-[minmax(0,30rem)_auto_1fr] items-center gap-x-3 gap-y-1;
   }
   .app-precedent-search {
-    @apply flex h-8 w-[30rem] max-w-full items-center gap-2 rounded-md border border-base-300 bg-base-100 px-2.5;
+    @apply flex h-8 w-full items-center gap-2 rounded-md border border-base-300 bg-base-100 px-2.5;
     transition-property: border-color, box-shadow;
     transition-duration: 120ms;
   }
@@ -2449,7 +2473,7 @@
     display: none;
   }
   .app-precedent-hint {
-    @apply text-meta text-muted;
+    @apply col-span-full h-4 truncate text-meta text-muted;
   }
   .app-precedents {
     @apply flex flex-col;
@@ -2458,7 +2482,7 @@
     @apply flex flex-col gap-1.5 border-b border-base-300 px-3 py-2.5;
   }
   .app-precedent-head {
-    @apply flex min-w-0 items-center gap-2;
+    @apply flex min-h-7 min-w-0 items-center gap-2;
   }
   .app-precedent-title {
     @apply flex-1;
@@ -2474,7 +2498,10 @@
     text-wrap: pretty;
   }
   .app-precedent-meta {
-    @apply flex min-h-7 min-w-0 items-center gap-3 text-meta text-muted;
+    @apply flex min-h-5 min-w-0 items-center gap-3 text-meta text-muted;
+  }
+  .app-precedent-skel-line {
+    @apply flex h-5 items-center;
   }
   .app-precedent-version {
     @apply flex shrink-0 items-center gap-1.5 text-base-content;
@@ -2483,7 +2510,7 @@
     @apply min-w-0 truncate;
   }
   .app-precedent-action {
-    @apply ml-auto shrink-0;
+    @apply flex w-36 shrink-0 justify-end;
   }
   /* The matched words: a neutral selection tint and weight, never the browser's yellow (warning amber, §5.2). */
   .app-snippet-mark {
@@ -2577,6 +2604,13 @@
   button.app-import-steps-btn[data-hovered] {
     @apply bg-hover text-base-content;
   }
+  /* A step you can go back to reads as a link: primary text, underlined on hover (plain steps never change). */
+  .app-import-steps-pick {
+    @apply text-primary;
+  }
+  button.app-import-steps-pick[data-hovered] {
+    @apply text-primary underline underline-offset-2;
+  }
   .app-import-step-num {
     @apply inline-flex size-5 items-center justify-center rounded-full border border-base-300 text-meta font-medium tabular-nums;
   }
@@ -2632,8 +2666,28 @@
   .app-import-banner {
     @apply flex items-center gap-2 rounded-md border border-status-error-line bg-status-error-soft px-3 py-2 text-ui text-status-error-soft-content;
   }
-  .app-import-message {
-    @apply text-base-content;
+  .app-td.app-import-message {
+    @apply py-1.5 leading-5 whitespace-normal text-base-content;
+    text-wrap: pretty;
+  }
+  /* The long columns table keeps Save in reach: the actions pin to the bottom of the scrolling main. */
+  .app-import-actions-sticky {
+    @apply sticky -bottom-5 z-10 -mx-6 border-t border-base-300 bg-base-100 px-6 py-3;
+  }
+  .app-import-outcome {
+    @apply text-ui text-base-content;
+  }
+  .app-import-outcome[data-outcome='Skipped'] {
+    @apply text-muted;
+  }
+  .app-import-group-icon {
+    @apply shrink-0 text-muted;
+  }
+  .app-import-group[data-severity='error'] .app-import-group-icon {
+    @apply text-status-error;
+  }
+  .app-import-group[data-severity='warning'] .app-import-group-icon {
+    @apply text-status-warning-soft-content;
   }
   .app-import-ref {
     @apply font-mono text-meta tabular-nums;
@@ -2695,9 +2749,6 @@
   }
   .app-import-group-title {
     @apply text-ui font-semibold text-base-content tabular-nums;
-  }
-  .app-import-group-effect {
-    @apply text-meta text-muted;
   }
   .app-import-group-panel {
     @apply max-h-[28rem] overflow-auto border-t border-base-300;
