@@ -513,6 +513,7 @@ def test_rows_carry_notes_latest_decision_and_approval_expiry(
         "Disclosures present.",
         AT + timedelta(days=1),
     )
+    assert (row.latest_decision.approver.id, row.latest_decision.approver.name) == (reviewer.pk, "Riley Reviewer")
     blank = rows[undecided.pk]
     assert (blank.notes, blank.approval_expires_at, blank.latest_decision) == ("", None, None)
 

@@ -185,11 +185,10 @@ class Evidence:
 
 
 @dataclass(frozen=True)
-class DecisionRow(DecisionSummary):  # outcome, reason, decided_at
+class DecisionRow(DecisionSummary):  # outcome, reason, decided_at, approver
     id: int
     version_n: int
     lane: DecisionLane
-    approver: PartyRef
     ruleset_date: date
     engine_version: str
     expires_at: datetime | None

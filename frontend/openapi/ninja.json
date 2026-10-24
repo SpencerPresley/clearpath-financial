@@ -1404,10 +1404,10 @@
           "outcome",
           "reason",
           "decided_at",
+          "approver",
           "id",
           "version_n",
           "lane",
-          "approver",
           "ruleset_date",
           "engine_version",
           "expires_at",
@@ -1598,6 +1598,9 @@
       "DecisionSummaryOut": {
         "description": "The latest decision as a queue row shows it; `DecisionOut` is the full record.",
         "properties": {
+          "approver": {
+            "$ref": "#/components/schemas/PartyRefOut"
+          },
           "decided_at": {
             "format": "date-time",
             "title": "Decided At",
@@ -1614,7 +1617,8 @@
         "required": [
           "outcome",
           "reason",
-          "decided_at"
+          "decided_at",
+          "approver"
         ],
         "title": "DecisionSummaryOut",
         "type": "object"

@@ -58,6 +58,7 @@ class DecisionSummaryOut(Schema):
     outcome: DecisionOutcome
     reason: str
     decided_at: datetime
+    approver: PartyRefOut
 
 
 class ItemRowOut(Schema):
@@ -200,7 +201,6 @@ class DecisionOut(DecisionSummaryOut):
     id: int
     version_n: int
     lane: DecisionLane
-    approver: PartyRefOut
     ruleset_date: date
     engine_version: str = Field(description="The code-check engine version the findings came from; '' if unknown.")
     expires_at: datetime | None

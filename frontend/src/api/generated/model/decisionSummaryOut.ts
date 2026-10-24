@@ -5,11 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DecisionOutcome } from './decisionOutcome';
+import type { PartyRefOut } from './partyRefOut';
 
 /**
  * The latest decision as a queue row shows it; `DecisionOut` is the full record.
  */
 export interface DecisionSummaryOut {
+  approver: PartyRefOut;
   decided_at: string;
   outcome: DecisionOutcome;
   reason: string;

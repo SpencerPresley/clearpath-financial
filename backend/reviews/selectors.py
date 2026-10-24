@@ -152,6 +152,7 @@ class DecisionSummary:
     outcome: DecisionOutcome
     reason: str
     decided_at: datetime
+    approver: PartyRef
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,10 @@ def _latest_decision(item: ReviewItem) -> DecisionSummary | None:
         outcome=DecisionOutcome(outcome),
         reason=item.latest_decision_reason,  # pyrefly: ignore[missing-attribute]  # row_queryset annotation
         decided_at=item.latest_decision_at,  # pyrefly: ignore[missing-attribute]
+        approver=PartyRef(
+            id=item.latest_decision_approver_id,  # pyrefly: ignore[missing-attribute]
+            name=item.latest_decision_approver_name,  # pyrefly: ignore[missing-attribute]
+        ),
     )
 
 
@@ -241,20 +246,29 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
     )
 
 
-def _latest_decision_field(field: str) -> Subquery:
+def _display_name(user: str) -> Coalesce:
+    """The name a cell shows for the user at relation `user` (as `_person`): display name, else email."""
+    return Coalesce(NullIf(F(f"{user}__display_name"), Value("")), F(f"{user}__email"), output_field=CharField())
+
+
+def _latest_decision_field(field: str | Expression) -> Subquery:
     # Same order as records' decision list, so a row and the item's detail agree on which one is latest.
     latest = Decision.objects.filter(item=OuterRef("pk")).order_by("-decided_at", "-pk")
+    if not isinstance(field, str):
+        latest, field = latest.annotate(value=field), "value"
     return Subquery(latest.values(field)[:1])
 
 
 def row_queryset(qs: QuerySet[ReviewItem]) -> QuerySet[ReviewItem]:
-    """Join what a row displays in one query (no N+1). The latest decision is three correlated lookups on
+    """Join what a row displays in one query (no N+1). The latest decision is five correlated lookups on
     `decision_item_idx`, evaluated for the rows returned."""
     return qs.select_related("partner", "owner", "assignee").annotate(
         current_version_n=F("current_version__n"),
         latest_decision_outcome=_latest_decision_field("outcome"),
         latest_decision_reason=_latest_decision_field("reason"),
         latest_decision_at=_latest_decision_field("decided_at"),
+        latest_decision_approver_id=_latest_decision_field("approver_id"),
+        latest_decision_approver_name=_latest_decision_field(_display_name("approver")),
     )
 
 
@@ -315,14 +329,7 @@ _COLUMN_SORTS: Final[dict[tuple[ItemSort, ItemSort], tuple[_Key, ...]]] = {
     (ItemSort.TITLE, ItemSort.TITLE_DESC): (_Key("title", "str"), _ID),
     (ItemSort.STATUS, ItemSort.STATUS_DESC): (_Key("sort_status", "int", _rank("status", STATUS_ORDER)), _ID),
     (ItemSort.RISK_TIER, ItemSort.RISK_TIER_DESC): (_Key("sort_risk", "int", _rank("risk_tier", RISK_ORDER)), _ID),
-    (ItemSort.ASSIGNEE, ItemSort.ASSIGNEE_DESC): (
-        # The name a cell shows (_person): display name, else email.
-        *_by_name(
-            "assignee",
-            Coalesce(NullIf(F("assignee__display_name"), Value("")), F("assignee__email"), output_field=CharField()),
-        ),
-        _ID,
-    ),
+    (ItemSort.ASSIGNEE, ItemSort.ASSIGNEE_DESC): (*_by_name("assignee", _display_name("assignee")), _ID),
     (ItemSort.PARTNER, ItemSort.PARTNER_DESC): (*_by_name("partner", F("partner__name")), _ID),
     (ItemSort.OPEN_FINDINGS, ItemSort.OPEN_FINDINGS_DESC): (_Key("open_findings_count", "int"), _ID),
     (ItemSort.ROUND, ItemSort.ROUND_DESC): (_Key("round", "int"), _ID),

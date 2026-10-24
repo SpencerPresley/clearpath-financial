@@ -83,6 +83,10 @@ export const ListItemsResponse = zod.object({
   "is_legacy": zod.boolean(),
   "key": zod.string(),
   "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
@@ -694,6 +698,10 @@ export const UpdateItemResponse = zod.object({
   "is_legacy": zod.boolean(),
   "key": zod.string(),
   "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
@@ -754,6 +762,10 @@ export const AssignItemResponse = zod.object({
   "is_legacy": zod.boolean(),
   "key": zod.string(),
   "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
@@ -855,6 +867,10 @@ export const ClaimItemResponse = zod.object({
   "is_legacy": zod.boolean(),
   "key": zod.string(),
   "latest_decision": zod.union([zod.object({
+  "approver": zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),
   "decided_at": zod.iso.datetime({"offset":true}),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
   "reason": zod.string()
