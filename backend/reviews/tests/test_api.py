@@ -66,7 +66,7 @@ def test_submit_item_round_trip(marketer: User) -> None:
     assert fetched.json() == body
 
     history = client.get(f"/api/items/{body['id']}/history").json()["entries"]
-    assert [e["type"] for e in history] == ["item.submitted"]
+    assert [e["type"] for e in history] == ["item.submitted", "checks.completed", "item.assigned"]
     assert history[0]["payload"]["version_n"] == 1
     assert history[0]["to_status"] == "submitted"
 

@@ -41,6 +41,7 @@ from core.domain import (
 from core.errors import InvalidInput, NotFound, NotPermitted
 from core.permissions import REVIEW_ROLES, has_role, require_role
 from partners.models import Partner
+from reviews.assignment import auto_assign
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, ReviewItem, SavedView, Version
 from reviews.risk import derive_risk_tier
@@ -87,8 +88,9 @@ def _resolve_partner(data: SubmitItemInput) -> Partner | None:
 
 
 def submit_item(*, actor: User, data: SubmitItemInput, clock: Clock = SYSTEM_CLOCK) -> SubmitItemResult:
-    """A marketer submits new content: creates the item in `submitted` with v1, runs code checks, and
-    records ITEM_SUBMITTED. The LLM pre-review is started by an outbox handler on that event (workstream D)."""
+    """A marketer submits new content: creates the item in `submitted` with v1, records ITEM_SUBMITTED, runs code
+    checks, and auto-assigns a reviewer (ITEM_ASSIGNED). The LLM pre-review is started by an outbox handler on
+    ITEM_SUBMITTED (workstream D)."""
     require_role(actor, Role.MARKETER)
     if data.planned_last_run is not None and data.planned_last_run < data.planned_first_run:
         raise InvalidInput.for_field("planned_last_run", "The last run date is before the first run date.")
@@ -128,12 +130,8 @@ def submit_item(*, actor: User, data: SubmitItemInput, clock: Clock = SYSTEM_CLO
             origin=VersionOrigin.SUBMISSION,
             created_at=now,
         )
-        checks = run_code_checks(version=version, clock=clock)
         item.current_version = version
-        item.open_findings_count = checks.open_findings_count
-        item.save(update_fields=["current_version", "open_findings_count"])
-        # Seam (workstream E): assign_on_submit(item, clock) here, under pg_advisory_xact_lock, recording
-        # ITEM_ASSIGNED with its reason (decisions.md "Reviewer assignment").
+        item.save(update_fields=["current_version"])
         event = record_event(
             type=EventType.ITEM_SUBMITTED,
             entity=EntityType.ITEM,
@@ -150,6 +148,10 @@ def submit_item(*, actor: User, data: SubmitItemInput, clock: Clock = SYSTEM_CLO
             at=now,
             to_status=ItemStatus.SUBMITTED,
         )
+        checks = run_code_checks(version=version, clock=clock)
+        item.open_findings_count = checks.open_findings_count
+        item.save(update_fields=["open_findings_count"])
+        auto_assign(item=item, actor=actor, clock=clock)
 
     return SubmitItemResult(
         item_id=item.pk,
