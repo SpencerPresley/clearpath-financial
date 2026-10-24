@@ -7,10 +7,11 @@ to below as `shot NN`).
 
 Covered: every guided path in `docs/demo.md` for reviewer, lead, marketer and admin; then keyboard-only through
 the reviewer loop, backend-down states, the assistant without a key, import, metrics, terms publish, single and
-bulk fast-track, drift simulate/check, notifications, Reset demo, and API permission probes (`fetch` from each
-role's session against every lead/admin/reviewer-only mutation).
+bulk fast-track, AI-failure override approval, drift simulate/check/restore/reaffirm, notifications, Outbox,
+Reset demo, a make-interfaces-feel-better polish pass, and API permission probes (`fetch` from each role's session
+against every lead/admin/reviewer-only mutation).
 
-**Counts:** 4 blockers, 18 should-fix, 16 nits.
+**Counts:** 4 blockers, 20 should-fix, 17 nits.
 
 Environment notes, not product findings: the dev CSRF and drift-fetch allowlists are pinned to ports
 5173/8000 (`config/settings/dev.py`), so a second local stack on other ports can't sign in and can't run
@@ -23,8 +24,8 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
 
 ### B1. Fast-track approves a drift re-review whose partner page still shows the bad copy
 
-- **Role / screen:** Lead (and any reviewer), Queue → Needs re-review → bulk "Fast-track N re-reviews…". The
-  single-item page does the same thing.
+- **Role / screen:** Lead (and any reviewer), Queue → Needs re-review → bulk "Fast-track N re-reviews…", and the
+  CP-7 review screen.
 - **Steps:**
   1. Fresh seed. CP-7 (LendCompare) is `needs_rereview` with reason `drift_detected`. Its latest check is
      `modified`: the live page says 7.99% and "Guaranteed approval for most applicants" (shot 54). The item page
@@ -36,6 +37,14 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   `fast_track`). Placement 7 is still live and monitored, and its latest check is still `modified`. Partner
   LendCompare now shows CP-7 "Approved, 0 open findings" (shot 95), and Metrics counts CP-7 as a fixed live
   re-review.
+- **Single item, same result (re-run on a fresh seed):** after the publish, CP-7's own page puts "Fast-track
+  approve v4" first in the decision bar, and the banner changes from "The partner page doesn't show approved v3…"
+  to "v4 was generated with the new numbers". The Findings tab says "AI review carried from v3 · only offer-terms
+  numbers changed" (shot 131 vs shot 130). The drift explanation disappears from the screen at the moment it matters
+  most.
+- **Related dead button in the same state:** after Restore original page → Check now (result `unchanged`), the bar
+  offers "Reaffirm v3" (shot 132). Submitting it fails with "The current version isn't the approved one. Fast-track it
+  or review it." (shot 134). The server is right; the UI is offering an action it can never complete.
 - **Expected:** a drift re-review closes only when a check finds the approved copy back on the page (Reaffirm),
   through a full review, or through Pull. Ledger ruling: "Reaffirm on drift_detected only when the latest check is
   unchanged." Fast-track is meant for re-reviews where only numbers changed, and it was never meant to clear a
@@ -44,13 +53,14 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   evaluators will be probing for this kind of bypass.
 - **Cause:** `backend/reviews/decisions.py:358` checks only `version.origin == FAST_TRACK`. The
   `drift_not_restored` guard (docstring at line 409) protects only reaffirm. In the frontend,
-  `features/review/decisionModes.ts:13` (`fastTrackAvailable`) also ignores `reopen_reason`, so the item page would
-  show Fast-track approve too.
+  `features/review/decisionModes.ts:13` (`fastTrackAvailable`) also ignores `reopen_reason`, and `StatusNote.tsx`
+  picks the fast-track message before the drift message.
 - **Fix:** in `record_decision`'s fast-track lane, refuse when `reopen_reason == drift_detected` and the latest
   check on any live monitored placement isn't `unchanged` (use the same check as reaffirm). Bulk then skips the item
-  with that reason. Mirror the rule in `fastTrackAvailable`. Alternatively, make the terms fan-out leave drift
-  items alone. Also have the bulk dialog list which items are eligible before you confirm: it said "7 items"
-  while it could only ever approve 6.
+  with that reason. Mirror the rule in `fastTrackAvailable`, keep the drift message first in `StatusNote` while the
+  drift is unresolved, and hide Reaffirm when the current version isn't the approved one. Alternatively, make the
+  terms fan-out leave drift items alone. Also have the bulk dialog list which items are eligible before you
+  confirm: it said "7 items" while it could only ever approve 6.
 
 ### B2. The "as low as" suggestion proposes a rate ClearPath doesn't offer
 
@@ -82,17 +92,20 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   the new numbers; check them and start round 3." For `approval_expired`: keep the date. Use the same wording in
   `waitingOn.ts`.
 
-### B4. Library "Approved to run" lists legacy items whose approval has expired
+### B4. After a fast-track approval, the AI status names the wrong version
 
-- **Role / screen:** Any role, Library → Approved to run.
-- **Saw:** CP-198 (expires Aug 23, 2026), CP-203 (Sep 20, 2026) and CP-210 (Sep 25, 2026) appear on the first page
-  under "Approved to run", with no expired marker (shot 100). Today is Oct 24, 2026.
-- **Expected:** this tab answers "can I run this?", and for these rows the answer is no. Legacy items are
-  excluded from the expiry sweep by design (spec §4.2 #7), so their status stays `approved` forever. That makes
-  the Library the one place where expiry has to be enforced.
-- **Fix:** exclude rows with `expires < today` from Approved to run (or default the list to unexpired approvals),
-  and show past dates as "Expired Aug 23, 2026" in the neutral expired style wherever they still appear
-  (precedents, partner history).
+- **Role / screen:** Reviewer/lead, CP-2 review screen → Findings tab.
+- **Steps:** Fresh seed. Open CP-2 (needs re-review): the Findings tab says "AI review carried from v3 · only
+  offer-terms numbers changed" (shot 30). Fast-track approve v4. Look at the Findings tab again.
+- **Saw:** "AI review carried from v4 · only offer-terms numbers changed" (shot 138). v4 is the version that
+  was never AI-reviewed. The record says otherwise: `latest_decision.ai_review_carried_from_n` is 3.
+- **Expected:** spec §4.2 #4, "The decision records 'AI review carried from vN'". Which version the AI actually
+  read is the provenance fact an AI-security evaluator will check first, and the screen states it wrongly right
+  after the approval.
+- **Cause:** `frontend/src/features/review/LlmStatus.tsx:86` uses `item.latest_decision?.version_n` (the version
+  just approved) instead of `latest_decision.ai_review_carried_from_n`.
+- **Fix:** read `ai_review_carried_from_n`, and when it's null fall back to "AI check skipped for this version".
+  Add a test that fast-tracks v4 and asserts "carried from v3".
 
 ---
 
@@ -111,17 +124,22 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
 - **Fix:** navigate to `/` on sign-out (or in `onSignedIn` when the user id changed).
 
 ### S2. "Search (soon)" sits in the header of every screen
-- Disabled search box with the label "Search (soon)" (shot 02 and every later shot). Spec §2 anti-goal: "Fake
+- **Role / screen:** All roles, top bar. **Steps:** sign in.
+- **Saw:** a disabled search box with the label "Search (soon)" (shot 02 and every later shot). Spec §2 anti-goal: "Fake
   depth: … 'coming soon' screens … fails the project." The ledger says a real quick-jump is in flight. Make sure
   it merges before the demo; otherwise remove the box.
 
-### S3. The decision record isn't visible anywhere in the app
+### S3. The decision record isn't visible as a unit anywhere in the app
 - **Role / screen:** Reviewer/lead, review screen (all tabs) and queue preview drawer.
-- **Saw:** after fast-tracking CP-2, the screen shows "Approved v4 by Dana Kim now · expires Oct 24, 2027"
-  (shot 35) but nothing shows the offer-terms versions it was approved against, the rule-set date, "AI review
-  carried from v3", the override reason, or evidence hashes. No frontend file reads `terms_versions`,
-  `ruleset_date`, `ai_review_carried_from_n` or `llm_override_reason` (grep). They're only in the evidence-pack zip
-  from the Library.
+- **Steps:** Approve CP-40 with an AI override reason ("Provider outage; read by hand"; the form is shot 135),
+  then look at every tab. Separately, fast-track CP-2 and open Details.
+- **Saw:** the header shows "Approved v1 by Rachel Okafor now · expires Apr 24, 2027" (shot 137), but the override
+  reason appears in none of Findings, History or Details, though the API has it
+  (`latest_decision.llm_override_reason`). On CP-2, Details shows the offer terms the *current version* quotes (shot
+  35), not the terms versions the decision recorded. There's no rule-set date or evidence hash anywhere. The
+  Findings tab's AI line is the only decision-record fact on screen, and it's wrong after approval (B4). No
+  frontend file reads `terms_versions`, `ruleset_date`, `ai_review_carried_from_n` or `llm_override_reason`
+  (grep). They're only in the evidence-pack zip from the Library.
 - **Expected:** product-spec "What it does that a spreadsheet can't" #3, the approval record, is the main argument
   against Excel, and evaluators can't see it without downloading a zip.
 - **Fix:** add a "Decision" block to Details (or a History entry that expands) that renders `listDecisions` for the
@@ -140,7 +158,9 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   tooltip can carry "first submitted Aug 26".
 
 ### S5. One concept has five names: drift
-- Queue drawer: "Re-review: Drift detected" (shot 121). Item banner: "Re-review: Live copy changed", including for
+- **Role / screen:** Reviewer/lead, queue preview drawer, item banner, Details → Where it runs. **Steps:** open
+  CP-7 from the queue with Enter, then with o.
+- **Saw:** Queue drawer: "Re-review: Drift detected" (shot 121). Item banner: "Re-review: Live copy changed", including for
   *missing* copy (shots 54, 93). Placement chip: "Changed on the page" / "Copy missing". API/docs: `modified`,
   "drift". Terms reopen reason: "Terms changed" in the queue vs "Offer terms changed" on the item.
 - **Cause:** two label maps that disagree, `features/queue/labels.ts:23-26` and `ui/labels.ts:53-56`.
@@ -180,11 +200,14 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   a decision, "Next in queue (j)" that opens the next row of the view the reviewer came from.
 
 ### S9. Raw identifiers in the audit trail and Details
-- History shows `llm_check.started`, "Dismissed human.reg_b_discouragement on v3" and "Accepted
+- **Role / screen:** Reviewer/lead, review screen → History and Details. **Steps:** open CP-2, check both tabs.
+  Also approve CP-40 after a PL terms publish.
+- **Saw:** History shows `llm_check.started`, "Dismissed human.reg_b_discouragement on v3" and "Accepted
   claims.credit_impact on v2" (shot 34). Details → Offer terms quoted shows "apr min: 9.99%" twice, "term months:
   24" and "term months: 60" as separate rows, and "origination fee min pct" (shot 35), which also triggers a React
   duplicate-key console error (`features/review/tabs.tsx:149`). Offer terms itself uses "APR min" and "Loan terms
-  (months)" (shot 81).
+  (months)" (shot 81). A 409 on approval reads "This version quotes offer terms no longer in effect
+  (personal_loan v2)" (shot 137-lead-cp40-approve-result).
 - **Expected:** §5.4 domain-native copy. The History tab is what an examiner reads.
 - **Fix:** reuse the Offer terms field labels in `tabs.tsx`, and dedupe by field and value. Map rule ids to rule
   titles and every event type to a sentence (add a test that fails on an unmapped event type).
@@ -198,13 +221,17 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   the page and try again." for 403, and "The server had a problem. Try again in a minute." for 5xx.
 
 ### S11. Suggested fixes can't be applied; people retype them
-- Marketer resubmit (shot 13), the new-submission panel (shot 20) and reviewer Approve with edits (shot 53) all
+- **Role / screen:** Marketer (Resubmit, New submission) and reviewer (Approve with edits). **Steps:** open
+  CP-22 → Resubmit, or CP-26 → press E.
+- **Saw:** Marketer resubmit (shot 13), the new-submission panel (shot 20) and reviewer Approve with edits (shot 53) all
   show "Suggested: …" as plain text. "Fix it once" (§1 Marketer) and approve-with-edits throughput both rely on
   copying it.
 - **Fix:** an "Apply" button on findings that have a span and a literal suggestion. It replaces the span in the
   editor, and code checks re-run as usual.
 
 ### S12. Suggestion and citation text that undermines trust
+- **Role / screen:** Reviewer (CP-26 Findings) and marketer (CP-22 Resubmit). **Steps:** open each and read the
+  suggestions.
 - CP-26's AI suggestion replaces "Rates this low won't last, so go look before they're gone!" with "Checking your
   rate takes two minutes.", which is the sentence directly before it, so applying it duplicates a line (shot 52;
   scripted seed content).
@@ -215,13 +242,16 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   Use "ClearPath card program policy" and keep the caveat in code comments.
 
 ### S13. Duplicate notifications, against the ledger ruling
-- Dana's inbox has pairs at the same minute for CP-21, CP-13 and CP-5: "… is back for your review" plus
+- **Role / screen:** Reviewer, notification bell. **Steps:** fresh seed, sign in as Dana, open the bell.
+- **Saw:** Dana's inbox has pairs at the same minute for CP-21, CP-13 and CP-5: "… is back for your review" plus
   "… needs re-review · offer terms changed" (shot 62). Ledger ruling: "one notification per action — a reopen's
   sticky reassignment doesn't also send 'back for your review'." Either the seed predates the dedupe, or the
   dedupe isn't wired. Reseed after fixing, and add a seed-level assertion.
 
 ### S14. The drift evidence is squeezed into the side panel
-- CP-7's "Approved v3 compared with the page" diff is a single flattened paragraph in the ~390 px Details panel,
+- **Role / screen:** Reviewer/lead, CP-7 → Details → Where it runs. **Steps:** fresh seed, open CP-7 Details at
+  1440 and at 1280.
+- **Saw:** CP-7's "Approved v3 compared with the page" diff is a single flattened paragraph in the ~390 px Details panel,
   under the metadata. Meanwhile the 760 px center shows the unchanged approved copy (shots 54, 123). Drift is the
   most persuasive demo moment, and its evidence is the hardest thing on the screen to read.
 - **Fix:** while an item is `drift_detected`, give the center pane a "Live page vs approved vN" mode (same diff
@@ -249,14 +279,42 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
   so the spec and the product agree.
 
 ### S17. The item header shows the previous round's decision next to the new status
-- After Priya resubmits CP-22: status "Submitted", header right "Changes requested v2 by Samuel Ortega 9d" (shots
+- **Role / screen:** Marketer and reviewer, item header. **Steps:** as Priya, resubmit CP-22 with the issuer line.
+- **Saw:** after Priya resubmits CP-22: status "Submitted", header right "Changes requested v2 by Samuel Ortega 9d" (shots
   16, 17). It reads as two current states. **Fix:** once the item has moved past that decision, show it as history
   ("Last round: changes requested on v2") or drop it from the header.
 
 ### S18. Reset demo leaves stale screens behind
-- With the Import page open on job 2, Reset demo finished ("Demo reset · 44 items seeded", shot 117) but the page
+- **Role / screen:** Admin, account menu → Reset demo…, with Import open. **Steps:** Import → Load sample tracker
+  → Save and continue → Reset demo → confirm.
+- **Saw:** with the Import page open on job 2, Reset demo finished ("Demo reset · 44 items seeded", shot 117) but the page
   kept showing the deleted job's preview with an "Import 0 items" button (it 404s in the background). Same for any
   open item. **Fix:** on the reset-done notice, `queryClient.clear()` and navigate to the role's landing page.
+
+### S19. Library "Approved to run" lists legacy items whose approval has expired (borderline blocker)
+- **Role / screen:** Any role, Library → Approved to run. **Steps:** open the Library.
+- **Saw:** CP-198 (expires Aug 23, 2026), CP-203 (Sep 20, 2026) and CP-210 (Sep 25, 2026) are on the first page
+  under "Approved to run", with no expired marker (shot 100). Today is Oct 24, 2026.
+- **Expected:** this tab answers "can I run this?", and for these rows the answer is no. Legacy items are
+  excluded from the expiry sweep by design (spec §4.2 #7), so their status stays `approved` forever. That makes
+  the Library the one place where expiry has to be enforced. I kept it out of the blockers because each date shown
+  is true and the cause is a filter, but a marketer reusing creative from this list would run expired content.
+- **Fix:** exclude rows with `expires < today` from Approved to run, and show past dates as "Expired Aug 23,
+  2026" in the neutral expired style wherever they still appear (precedents, partner history).
+
+### S20. In-review items that quote superseded terms aren't flagged until Approve
+- **Role / screen:** Lead/reviewer, CP-40 review screen. **Steps:** publish PL terms v3 (APR min 10.49%), open
+  CP-40 (in review, quotes 9.99%), triage all three findings, click Approve, fill in both Reason and Override
+  reason, submit.
+- **Saw:** the Findings tab still says "all triaged" and nothing mentions the rate. Only after both reasons
+  are typed does the form show "This version quotes offer terms no longer in effect (personal_loan v2). Request
+  changes or edit the rates." (409; shot 137-lead-cp40-approve-result).
+- **Expected:** the server is right to refuse (§4.1, approvals reference current terms). But the reviewer should
+  know before triaging that the copy quotes retired terms. Lever 2 (faster rounds) means not finding out at the last
+  click.
+- **Fix:** on a terms publish, re-run `pricing.terms_current` on the current version of in-review items for that
+  product (or flag them in `StatusNote`: "Quotes PL v2; v3 is now in effect"), and disable Approve with that reason
+  shown in the decision bar's status line.
 
 ---
 
@@ -302,6 +360,24 @@ Check now. Celery's prefork pool crashes on macOS here (`ValueError: not enough 
 16. **Bulk bar offers fast-track to items that can't take it.** "Fast-track 1 re-review…" appears for CP-16, an
     approval-expiry re-review that can't be fast-tracked (shot 88). Disable it with a tooltip when no selected item
     qualifies.
+17. **Small hit areas on frequent controls** (measured at 1440, queue). Filter clear × is 25×24, the
+    keyboard-shortcuts button 28×28, the bell 32×32, the row checkbox's label 36×35. The skill's floor is 40×40.
+    Density is a deliberate §5.1 choice, so extend the hit area with a pseudo-element rather than growing the
+    visible control.
+
+---
+
+## Polish checklist (make-interfaces-feel-better)
+
+Measured with `getComputedStyle` / `getBoundingClientRect` on the queue at 1440×900.
+
+| Check | Result |
+|---|---|
+| Tabular numbers on dynamic figures | Pass: stats strip and Age column are `tabular-nums`. |
+| Font smoothing | Pass: body is `antialiased`. |
+| No `transition: all` | Pass: 0 elements with `transition-property: all` and a non-zero duration. |
+| Minimum hit area 40×40 | Fail on four frequent controls (Nit 17). |
+| Restraint (§5.6) | Pass: no sparkle/wand icons, gradients, emoji or celebratory copy. Cards are used for panels, not everything. |
 
 ---
 
@@ -336,7 +412,11 @@ Enforcement is in services, as spec §4.3 requires. The admin user endpoints ret
   outcome exactly (shots 83–85). The fast-track diff for CP-2 is correct to the dollar ($15,000 / 48 mo / 9.99% →
   $380.37).
 - **Drift demo.** Simulate → Check now → "Copy missing" → re-review took under 10 s against a real fetch (shot
-  93).
+  93). Restore original page → Check now → `unchanged` brings back Reaffirm, as demo.md describes (shot 132).
+- **The AI-failure override** is a separate, required "Override reason" field below the decision reason, with
+  "The AI check failed. This is recorded on the decision." (shot 135). The AI-never-approves rule is visible in the
+  UI, not just in code.
+- **Outbox empty state:** "Demo mail: nothing leaves ClearPath. No emails yet … Open the assistant" (shot 140).
 - **Stats strip ↔ view parity.** Each count matched its view's row count (checked twice: 18/5/2/11/4 at landing,
   18/3/2/10/3 later).
 - **Metrics** separate native and imported figures, drill to items, and carry the strongest single number in the
@@ -352,13 +432,15 @@ Enforcement is in services, as spec §4.3 requires. The admin user endpoints ret
 then high-risk items. A stats strip sits above. Pressing `?` shows j/k/o, and CP-2 opens to a banner saying
 exactly why it's back ("Offer terms changed … v4 was generated with the new numbers") plus a one-click diff that
 shows only 9.49→9.99 and 376→380. That's the clearest "beats Excel + email" moment in the product: no
-spreadsheet ever told anyone which approved ads quote a rate that just changed. The approval itself never shows
-what it was approved against (S3), and after deciding there's no "next" (S8). The evaluator understands the
-product in about 90 seconds, then sees "Search (soon)" (S2).
+spreadsheet ever told anyone which approved ads quote a rate that just changed. After she fast-tracks it, the
+screen claims the AI review was carried from v4 (B4), and the approval never shows what it was approved against
+(S3). After deciding there's no "next" (S8). The evaluator understands the product in about 90 seconds, then sees
+"Search (soon)" (S2).
 
 **Compliance lead (Rachel).** The Offer terms page with its impact preview is excellent and makes the fan-out
 concrete. The drift demo works and reads like real monitoring. But a lead who publishes a rate change and then
-uses the obvious bulk action approves the LendCompare listing whose live page says "Guaranteed approval" (B1). An
+uses the obvious bulk action, or the primary button on CP-7 itself, approves the LendCompare listing whose live
+page says "Guaranteed approval" (B1). An
 AI-security evaluator who tries "what happens if I bulk-approve after a terms change" finds a control bypass in
 the most security-shaped feature. The Waiting >3 days count also jumps by four the moment she publishes (S4), so
 the bottleneck signal stops meaning anything right when she's looking at it.
