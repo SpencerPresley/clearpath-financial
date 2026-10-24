@@ -3,7 +3,7 @@
  * unread_count. A failed poll leaves the bell quiet (no count, no alarm); the error shows inside the inbox.
  */
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 
 import type { NotificationOut } from '../../api/generated/model';
@@ -23,6 +23,7 @@ const INBOX_MAX_HEIGHT = 544; // 34rem; React Aria also caps it to the space bel
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const notifications = useNotifications();
   const markRead = useMarkRead();
@@ -38,7 +39,7 @@ export function NotificationBell() {
     // Land on the page, not back on the bell (where the popover would restore focus and open its tooltip
     // over the review header). Focus moved out before the popover unmounts isn't restored.
     void navigate({ to: '/items/$itemId', params: { itemId: link.itemId }, search: link.search }).then(() => {
-      focusMain();
+      focusMain(bellRef.current);
     });
   };
 
@@ -46,6 +47,7 @@ export function NotificationBell() {
     <DialogTrigger isOpen={open} onOpenChange={setOpen}>
       <Tooltip content="Notifications" placement="bottom">
         <AriaButton
+          ref={bellRef}
           className="app-topbar-btn app-bell"
           aria-label={label}
           data-active={open ? 'true' : undefined}

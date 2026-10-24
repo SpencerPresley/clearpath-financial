@@ -122,6 +122,7 @@ function nthButton(name: string, index: number): HTMLElement {
   return button;
 }
 const approveButton = () => nthButton('Approve', 0);
+const COMMENT_301 = 'Footer disclosure looks right now. Waiting on the APR range.';
 
 describe('ReviewPage', () => {
   afterEach(() => {
@@ -444,6 +445,23 @@ describe('ReviewPage', () => {
     });
     expect(comment).toHaveAttribute('data-linked', 'true');
     expect(comment).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('brings a linked comment into view once, not on every return to Comments', async () => {
+    const user = userEvent.setup();
+    renderReview({ path: '/items/1042?tab=comments&v=2&comment=301' });
+    const first = (await screen.findByText(COMMENT_301)).closest('li');
+    await waitFor(() => {
+      expect(first).toHaveFocus();
+    });
+
+    await user.click(screen.getByRole('tab', { name: /Findings/ }));
+    await user.click(screen.getByRole('tab', { name: /Comments/ }));
+
+    const again = (await screen.findByText(COMMENT_301)).closest('li');
+    expect(again).not.toHaveFocus();
+    expect(again).not.toHaveAttribute('data-linked');
+    expect(again).toHaveAttribute('aria-current', 'true');
   });
 
   it('ignores a linked comment that is not on the version shown', async () => {

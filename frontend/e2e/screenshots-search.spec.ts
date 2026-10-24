@@ -31,7 +31,8 @@ const shots: { name: string; type: string; mode?: SearchMode; ready: (page: Page
   {
     name: 'hint',
     type: 'f',
-    ready: (page) => expect(page.getByText('Type a CP key, title words or tracker ID.')).toBeVisible(),
+    ready: (page) =>
+      expect(page.getByRole('listbox').getByText('Type a CP key, title words or tracker ID.')).toBeVisible(),
   },
   {
     name: 'results',
@@ -55,19 +56,20 @@ const shots: { name: string; type: string; mode?: SearchMode; ready: (page: Page
   {
     name: 'no-match',
     type: 'zzz',
-    ready: (page) => expect(page.getByText('No items match “zzz”.')).toBeVisible(),
+    ready: (page) => expect(page.getByRole('listbox').getByText('No items match “zzz”.')).toBeVisible(),
   },
   {
     name: 'searching',
     type: 'fall',
     mode: 'loading',
-    ready: (page) => expect(page.getByText('Searching…')).toBeVisible(),
+    ready: (page) => expect(page.getByRole('listbox').getByText('Searching…')).toBeVisible(),
   },
   {
     name: 'error',
     type: 'fall',
     mode: 'error',
-    ready: (page) => expect(page.getByText('Search is temporarily unavailable.')).toBeVisible(),
+    ready: (page) =>
+      expect(page.getByRole('listbox').getByText('Search is temporarily unavailable.')).toBeVisible(),
   },
 ];
 

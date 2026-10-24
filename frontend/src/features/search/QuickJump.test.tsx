@@ -104,6 +104,69 @@ describe('QuickJump', () => {
     expect(box()).toHaveValue('');
   });
 
+  it('never opens an answer to an older search: Enter waits for what is typed now', async () => {
+    const user = userEvent.setup();
+    serveItems();
+    const { router } = renderJump();
+    const input = await screen.findByRole('combobox', { name: 'Jump to item' });
+
+    await user.type(input, 'fall');
+    await results(4);
+    // Keep typing and press Enter before the debounce fires: "fall"'s top row (CP-1042) must not open.
+    await user.type(input, ' promo landing{Enter}');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/items/1070');
+    });
+  });
+
+  it('opens the top result when Enter comes before the results do', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('*/api/items', async ({ request }) => {
+        await delay(300);
+        const rows = jumpResults(new URL(request.url).searchParams.get('q') ?? '');
+        return HttpResponse.json({ rows, next_cursor: null, total: rows.length });
+      }),
+    );
+    const { router } = renderJump();
+
+    await user.type(await screen.findByRole('combobox', { name: 'Jump to item' }), 'CP-1042{Enter}');
+    expect(router.state.location.pathname).toBe('/');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/items/1042');
+    });
+  });
+
+  it('says why the list is empty to a screen reader, not just "0 options"', async () => {
+    const user = userEvent.setup();
+    serveItems();
+    renderJump();
+
+    await user.type(await screen.findByRole('combobox', { name: 'Jump to item' }), 'zzz');
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('status').some((s) => s.textContent === 'No items match “zzz”.')).toBe(true);
+    });
+  });
+
+  it('Escape clears the box and returns focus to where ⌘K took it from', async () => {
+    const user = userEvent.setup();
+    serveItems();
+    renderJump();
+    const other = await screen.findByRole('textbox', { name: 'Some other field' });
+
+    await user.click(other);
+    await user.keyboard('{Control>}k{/Control}');
+    await user.keyboard('fall');
+    await results(4);
+    await user.keyboard('{Escape}');
+
+    expect(other).toHaveFocus();
+    expect(box()).toHaveValue('');
+  });
+
   it('opens the highlighted result', async () => {
     const user = userEvent.setup();
     serveItems();
@@ -140,7 +203,11 @@ describe('QuickJump', () => {
 
     await user.type(await screen.findByRole('combobox', { name: 'Jump to item' }), 'f');
 
-    expect(await screen.findByText('Type a CP key, title words or tracker ID.')).toBeInTheDocument();
+    expect(
+      await within(await screen.findByRole('listbox')).findByText(
+        'Type a CP key, title words or tracker ID.',
+      ),
+    ).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(asked).toHaveLength(0);
   });
@@ -152,7 +219,9 @@ describe('QuickJump', () => {
 
     await user.type(await screen.findByRole('combobox', { name: 'Jump to item' }), 'zzz');
 
-    expect(await screen.findByText('No items match “zzz”.')).toBeInTheDocument();
+    expect(
+      await within(await screen.findByRole('listbox')).findByText('No items match “zzz”.'),
+    ).toBeInTheDocument();
   });
 
   it('shows that it is searching', async () => {

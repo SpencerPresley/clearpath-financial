@@ -3849,13 +3849,17 @@
 /* ---- Quick-jump results (features/search) and linked comments (review Comments tab). ----------------- */
 @keyframes app-linked-fade {
   from {
-    background-color: oklch(38% 0.11 262 / 0.12);
+    background-color: color-mix(in oklch, var(--color-focus) 14%, transparent);
   }
   to {
     background-color: transparent;
   }
 }
 @layer components {
+  /* The ComboBox root; the visible field is its Group, which the results popover anchors to. */
+  .app-search-root {
+    @apply flex w-full max-w-md;
+  }
   .app-jump-hint {
     @apply flex shrink-0 opacity-80;
   }
@@ -3864,10 +3868,18 @@
   }
   /* At least as wide as the field; results need room for a title and a status badge. */
   .app-jump {
-    @apply w-[max(var(--trigger-width),32rem)];
+    @apply w-[max(var(--trigger-width),36rem)];
   }
   .app-jump-item {
-    @apply grid h-9 grid-cols-[4.5rem_minmax(0,1fr)_auto_auto] gap-2;
+    @apply grid h-9 grid-cols-[4.5rem_minmax(0,1fr)_auto_auto_1.25rem] gap-2;
+  }
+  .app-jump-item[data-hovered] {
+    @apply bg-hover;
+  }
+  /* The keyboard highlight is what Enter opens: stronger than hover, with the focus color's bar. */
+  .app-jump-item[data-focused] {
+    background-color: color-mix(in oklch, var(--color-focus) 10%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-focus);
   }
   .app-jump-key {
     @apply font-mono text-meta text-muted tabular-nums;
@@ -3878,6 +3890,13 @@
   .app-jump-ref {
     @apply font-mono text-meta text-muted;
   }
+  /* The return-key mark on the top row while nothing is highlighted: Enter opens it. */
+  .app-jump-enter {
+    @apply invisible flex justify-end;
+  }
+  .app-menu:not(:has(.app-jump-item[data-focused])) .app-jump-item:first-child .app-jump-enter {
+    @apply visible;
+  }
   .app-jump-note {
     @apply flex items-center gap-2 px-2 py-2 text-ui text-muted;
   }
@@ -3885,10 +3904,10 @@
     @apply text-status-error-soft-content;
   }
 
-  /* A comment opened from a link (?comment=): a lasting bar, plus a tint that fades so the eye finds it. */
+  /* A comment opened from a link (?comment=), the first time it's shown: a tint that fades so the eye finds it.
+     Nothing lasting, so it doesn't read as a second focus ring once focus moves on. */
   .app-timeline > li.app-comment[data-linked] {
     @apply -mx-2 rounded-sm px-2;
-    box-shadow: inset 2px 0 0 var(--color-focus);
     animation: app-linked-fade 2.4s ease-out 0.2s both;
   }
   .app-timeline > li.app-comment[data-linked]:focus-visible {
@@ -3898,6 +3917,7 @@
   @media (prefers-reduced-motion: reduce) {
     .app-timeline > li.app-comment[data-linked] {
       animation: none;
+      background-color: color-mix(in oklch, var(--color-focus) 8%, transparent);
     }
   }
 }

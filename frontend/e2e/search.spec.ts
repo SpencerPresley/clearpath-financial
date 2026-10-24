@@ -25,6 +25,30 @@ test('jump to an item from anywhere: / focuses, a CP key and Enter opens it', as
   expect(search.asked).toEqual(['CP-1042']); // debounced: one request for the settled text
 });
 
+test('Enter right after typing opens what was typed, never the previous search’s top row', async ({
+  page,
+}) => {
+  await stubApi(page);
+  await stubSearch(page);
+  await page.goto('/');
+  const box = page.getByRole('combobox', { name: 'Jump to item' });
+  await expect(box).toBeVisible();
+
+  // A pasted key and an immediate Enter: no results on screen yet.
+  await box.focus();
+  await box.fill('CP-1061');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/items\/1061$/);
+
+  // "fall" lists CP-1042 first; refining to "fall promo landing" and pressing Enter at once must open CP-1070.
+  await page.keyboard.press('ControlOrMeta+k');
+  await box.pressSequentially('fall');
+  await expect(page.getByRole('option', { name: /CP-1042/ })).toBeVisible();
+  await box.pressSequentially(' promo landing');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/items\/1070$/);
+});
+
 test('⌘K / Ctrl+K finds a legacy item by its old tracker ID', async ({ page }) => {
   await stubApi(page);
   await stubSearch(page);

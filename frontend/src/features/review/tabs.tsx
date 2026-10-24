@@ -62,24 +62,32 @@ export function CommentsTab({
   versionN,
   canComment,
   highlightId,
+  shownLinks,
 }: {
   itemId: number;
   versionN: number;
   canComment: boolean;
   /** A linked comment (`?comment=`): scrolled into view, focused and briefly highlighted once it loads. */
   highlightId?: number;
+  /**
+   * Links already brought into view on this page. The tab panel remounts on every return to Comments while
+   * `?comment=` stays in the URL; only the first showing takes focus and plays the highlight.
+   */
+  shownLinks?: Set<number>;
 }) {
   const queryClient = useQueryClient();
   const comments = useListComments(itemId, { version_n: versionN });
-  const broughtIntoView = useRef<number | null>(null);
-  const linked = highlightId !== undefined && comments.data?.some((c) => c.id === highlightId) === true;
+  const [fresh] = useState(() => highlightId !== undefined && !(shownLinks?.has(highlightId) ?? false));
+  const loaded = comments.data?.some((c) => c.id === highlightId) === true;
+  const done = useRef(false);
   useEffect(() => {
-    if (!linked || broughtIntoView.current === highlightId) return;
-    broughtIntoView.current = highlightId;
+    if (!fresh || !loaded || done.current || highlightId === undefined) return;
+    done.current = true;
+    shownLinks?.add(highlightId);
     const node = document.getElementById(commentDomId(highlightId));
     node?.scrollIntoView({ block: 'center' });
     node?.focus({ preventScroll: true });
-  }, [linked, highlightId]);
+  }, [fresh, loaded, highlightId, shownLinks]);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const add = useAddComment({
@@ -111,7 +119,7 @@ export function CommentsTab({
               id={commentDomId(comment.id)}
               className="app-comment"
               {...(comment.id === highlightId
-                ? { 'data-linked': 'true', tabIndex: -1, 'aria-current': 'true' as const }
+                ? { tabIndex: -1, 'aria-current': 'true' as const, 'data-linked': fresh ? 'true' : undefined }
                 : {})}
             >
               <p className="app-timeline-meta">
