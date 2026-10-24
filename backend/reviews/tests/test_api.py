@@ -277,6 +277,7 @@ def test_patch_saved_view_by_its_owner_only(reviewer: User, lead: User) -> None:
     assert (body["name"], body["sort"], body["columns"]) == ("Mine", "risk_tier_desc", ["title"])
     assert (body["filters"]["mine"], body["filters"]["risk_tier"]) == (True, ["high"])
     assert foreign.status_code == 404
+    assert client.get("/api/views").json()[0]["name"] == "Mine"  # the lead's PATCH changed nothing
 
 
 @pytest.mark.django_db

@@ -5,12 +5,14 @@ return a typed result. `submit_item` is the reference implementation other actio
 """
 
 import hashlib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
 from django.core.files.uploadedfile import UploadedFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from accounts.models import User
 from audit.payloads import (
@@ -24,6 +26,7 @@ from audit.payloads import (
 from audit.services import record_event
 from checks.services import recheck_for_evidence, run_code_checks
 from core.clock import SYSTEM_CLOCK, Clock
+from core.db import constraint_name
 from core.domain import (
     PARTNER_CHANNELS,
     AttachmentKind,
@@ -392,17 +395,38 @@ class NewSavedView:
     columns: tuple[str, ...] = ()
 
 
+def _view_name_taken(*, actor: User, name: str, other_than: int | None = None) -> bool:
+    return SavedView.objects.filter(owner=actor, name=name).exclude(pk=other_than).exists()
+
+
+def _duplicate_view_name() -> InvalidInput:
+    return InvalidInput.for_field("name", "You already have a view with this name.")
+
+
+@contextmanager
+def _unique_view_name() -> Iterator[None]:
+    """The pre-check gives the usual answer; the constraint decides a race between two saves of one name."""
+    try:
+        with transaction.atomic():
+            yield
+    except IntegrityError as exc:
+        if constraint_name(exc) == "saved_view_unique_name":
+            raise _duplicate_view_name() from exc
+        raise
+
+
 def create_saved_view(*, actor: User, data: NewSavedView, clock: Clock = SYSTEM_CLOCK) -> int:
-    if SavedView.objects.filter(owner=actor, name=data.name).exists():
-        raise InvalidInput.for_field("name", "You already have a view with this name.")
-    view = SavedView.objects.create(
-        owner=actor,
-        name=data.name,
-        filters=data.filters.model_dump(mode="json"),
-        sort=data.sort.value,
-        columns=list(data.columns),
-        created_at=clock.now(),
-    )
+    if _view_name_taken(actor=actor, name=data.name):
+        raise _duplicate_view_name()
+    with _unique_view_name():
+        view = SavedView.objects.create(
+            owner=actor,
+            name=data.name,
+            filters=data.filters.model_dump(mode="json"),
+            sort=data.sort.value,
+            columns=list(data.columns),
+            created_at=clock.now(),
+        )
     return view.pk
 
 
@@ -417,21 +441,24 @@ class SavedViewChanges:
 
 
 def update_saved_view(*, actor: User, view_id: int, changes: SavedViewChanges) -> None:
-    """Save a modified view in place. Only its owner sees it, so another user's view is a 404, as in delete."""
-    view = SavedView.objects.filter(owner=actor, pk=view_id).first()
-    if view is None:
-        raise NotFound.entity("saved view", view_id)
+    """Save a modified view in place. Only its owner sees it, so another user's view is a 404, as in delete.
+    One UPDATE of just the given columns, so two concurrent edits of different fields both land."""
+    mine = SavedView.objects.filter(owner=actor, pk=view_id)
+    values: dict[str, object] = {}
     if changes.name is not None:
-        if SavedView.objects.filter(owner=actor, name=changes.name).exclude(pk=view_id).exists():
-            raise InvalidInput.for_field("name", "You already have a view with this name.")
-        view.name = changes.name
+        if _view_name_taken(actor=actor, name=changes.name, other_than=view_id):
+            raise _duplicate_view_name()
+        values["name"] = changes.name
     if changes.filters is not None:
-        view.filters = changes.filters.model_dump(mode="json")
+        values["filters"] = changes.filters.model_dump(mode="json")
     if changes.sort is not None:
-        view.sort = changes.sort.value
+        values["sort"] = changes.sort.value
     if changes.columns is not None:
-        view.columns = list(changes.columns)
-    view.save(update_fields=["name", "filters", "sort", "columns"])
+        values["columns"] = list(changes.columns)
+    with _unique_view_name():
+        found = mine.update(**values) if values else int(mine.exists())
+    if not found:
+        raise NotFound.entity("saved view", view_id)
 
 
 def delete_saved_view(*, actor: User, view_id: int) -> None:

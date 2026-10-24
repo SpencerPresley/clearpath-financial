@@ -1,3 +1,5 @@
+import base64
+import json
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -392,6 +394,27 @@ def test_column_sorts_run_both_ways(
         return _ids(list_items(viewer=reviewer, filters=ALL_STATUSES, sort=sort, clock=clock).rows)
 
     assert (ids(ascending), ids(descending)) == (order, order[::-1])
+
+
+@pytest.mark.django_db
+def test_name_sorts_ignore_case(marketer: User, reviewer: User, user_factory: UserFactory, clock: FixedClock) -> None:
+    # Case-only ties fall to id. Without lower(), en_US collation puts "bea" before "BEA" (and C collation
+    # the reverse), so the id tiebreak only decides when the names compare equal.
+    upper = make_item(marketer, assignee=user_factory(display_name="BEA"))
+    lower = make_item(marketer, assignee=user_factory(display_name="bea"))
+
+    rows = list_items(viewer=reviewer, filters=ItemFilter(), sort=ItemSort.ASSIGNEE, clock=clock).rows
+
+    assert _ids(rows) == [upper.pk, lower.pk]
+
+
+@pytest.mark.django_db
+def test_a_cursor_postgres_cannot_take_is_invalid_input(reviewer: User, clock: FixedClock) -> None:
+    raw = json.dumps({"s": "assignee", "v": [0, "\u0000", 1]}).encode()
+    cursor = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+    with pytest.raises(InvalidInput):
+        list_items(viewer=reviewer, filters=ItemFilter(), sort=ItemSort.ASSIGNEE, cursor=cursor, clock=clock)
 
 
 @pytest.mark.django_db

@@ -89,6 +89,9 @@ _DUMP: Final = {
     "terms": TypeAdapter(OfferTermsRow),
     "item": TypeAdapter(ItemRow),
 }
+# Queue working fields, not the approval's record: internal notes, and the latest decision and approval expiry,
+# which can postdate (and contradict) the approval the pack records. The decision itself carries `expires_at`.
+_NOT_IN_PACK: Final = {"notes", "latest_decision", "approval_expires_at"}
 
 
 def _json(value: object) -> bytes:
@@ -158,7 +161,7 @@ def write_evidence_pack(pack: EvidencePack, zf: zipfile.ZipFile, *, partner_file
 
     files["decision.json"] = _json(
         {
-            "item": _DUMP["item"].dump_python(pack.item, mode="json"),
+            "item": _DUMP["item"].dump_python(pack.item, mode="json", exclude=_NOT_IN_PACK),
             "decision": _DUMP["decision"].dump_python(pack.decision, mode="json"),
             "decision_label": OUTCOME_LABELS[pack.decision.outcome],
             "findings": _DUMP["findings"].dump_python(pack.findings, mode="json"),

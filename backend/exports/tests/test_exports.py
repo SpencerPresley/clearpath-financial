@@ -208,6 +208,10 @@ def test_evidence_pack_zip_verifies(
     assert terms["quoted_in_approved_version"][0]["quote"] == "7.49%"
     decision = json.loads(zf.read("decision.json"))
     assert (decision["decision_label"], decision["findings"][0]["state"]) == ("Approve", "dismissed")
+    # The pack records the approval, not the queue's working fields: no internal notes, and no "latest
+    # decision" that could contradict the approval it records.
+    assert {"notes", "latest_decision", "approval_expires_at"}.isdisjoint(decision["item"])
+    assert decision["item"]["key"] == f"CP-{approved.item.pk}"
     assert "attachment.added" in {e["type"] for e in json.loads(zf.read("history.json"))}
     summary = zf.read("summary.txt").decode()
     assert "Decision:         Approve (Standard review) by Dana Kim" in summary

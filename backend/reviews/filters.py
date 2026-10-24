@@ -22,7 +22,9 @@ class ItemSort(StrEnum):
     UPDATED = "updated"  # most recently changed first
     TITLE = "title"
     TITLE_DESC = "title_desc"
-    STATUS = "status"  # board order: submitted, in review, changes requested, needs re-review, approved, ...
+    STATUS = (
+        "status"  # draft, then board order: submitted, in review, changes requested, needs re-review, approved, ...
+    )
     STATUS_DESC = "status_desc"
     RISK_TIER = "risk_tier"  # low, medium, high
     RISK_TIER_DESC = "risk_tier_desc"

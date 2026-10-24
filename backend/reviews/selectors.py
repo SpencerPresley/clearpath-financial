@@ -374,12 +374,15 @@ def _decode_cursor(sort: ItemSort, cursor: str) -> list[Any]:
         values: list[Any] = data["v"]
         if len(values) != len(keys):
             raise _bad_cursor()
-        return [
+        decoded = [
             datetime.fromisoformat(v) if key.kind == "datetime" else int(v) if key.kind == "int" else str(v)
             for v, key in zip(values, keys, strict=True)
         ]
     except (ValueError, KeyError, TypeError) as exc:  # binascii.Error is a ValueError
         raise _bad_cursor() from exc
+    if any(isinstance(v, str) and "\x00" in v for v in decoded):  # no column holds one; Postgres refuses it
+        raise _bad_cursor()
+    return decoded
 
 
 def _scoped(filters: ItemFilter, sort: ItemSort) -> ItemFilter:

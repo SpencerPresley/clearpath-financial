@@ -26,6 +26,7 @@ from core.domain import (
     VersionOrigin,
 )
 from core.errors import InvalidInput, NotFound, NotPermitted
+from reviews import services as services_module
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, ReviewItem, Version
 from reviews.records import get_saved_view
@@ -91,6 +92,28 @@ def test_update_saved_view_refuses_a_taken_name_and_other_owners(
     update_saved_view(actor=reviewer, view_id=mine, changes=SavedViewChanges(name="Mine"))  # its own name is fine
 
     assert get_saved_view(owner=reviewer, view_id=mine).name == "Mine"
+
+
+@pytest.mark.django_db
+def test_a_name_race_the_precheck_misses_is_still_a_422(
+    reviewer: User, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def make(name: str) -> int:
+        return create_saved_view(
+            actor=reviewer, data=NewSavedView(name=name, filters=ItemFilter(), sort=ItemSort.QUEUE), clock=clock
+        )
+
+    first = make("Taken")
+    other = make("Other")
+    monkeypatch.setattr(services_module, "_view_name_taken", lambda **_: False)  # both saves passed the check
+
+    with pytest.raises(InvalidInput):
+        make("Taken")
+    with pytest.raises(InvalidInput):
+        update_saved_view(actor=reviewer, view_id=other, changes=SavedViewChanges(name="Taken"))
+
+    assert get_saved_view(owner=reviewer, view_id=first).name == "Taken"
+    assert get_saved_view(owner=reviewer, view_id=other).name == "Other"
 
 
 COPY = "Rates from 7.49% APR. Checking your rate won't affect your credit score."
