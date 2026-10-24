@@ -191,11 +191,10 @@ def test_concurrent_assignment_never_picks_from_a_stale_load(
     assert t1_assigned.wait(timeout=10)
     thread2 = threading.Thread(target=t2)
     thread2.start()
-    if locked:
-        _wait_for_a_blocked_advisory_lock()
-        assert "t2" not in picks  # still waiting on T1
-    else:
-        thread2.join(timeout=10)
+    # With the lock, T2 waits on the advisory lock before reading any load. Without it, T2 reads the loads, then
+    # waits on Dana's user row (T1 updated last_assigned_at): a row lock that comes too late to help.
+    _wait_for_a_blocked_lock("advisory" if locked else "transactionid")
+    assert "t2" not in picks  # still waiting on T1
     release_t1.set()
     thread1.join(timeout=10)
     thread2.join(timeout=10)
@@ -208,15 +207,15 @@ def test_concurrent_assignment_never_picks_from_a_stale_load(
         assert picks["t2"] == dana.pk
 
 
-def _wait_for_a_blocked_advisory_lock() -> None:
+def _wait_for_a_blocked_lock(locktype: str) -> None:
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted")
+            cursor.execute("SELECT count(*) FROM pg_locks WHERE locktype = %s AND NOT granted", [locktype])
             if cursor.fetchone()[0]:
                 return
         time.sleep(0.02)
-    raise AssertionError("T2 never waited on the assignment lock")
+    raise AssertionError(f"T2 never waited on a {locktype} lock")
 
 
 # --- claim -----------------------------------------------------------------------------------------------------
