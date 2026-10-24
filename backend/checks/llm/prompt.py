@@ -28,9 +28,9 @@ from core.domain import CreditCardTerms, PersonalLoanTerms
 # LLM result keyed on content + rule set must include this, or a prompt fix keeps serving old findings.
 PROMPT_VERSION = "2026-10-24.1"
 
-_RULE_CATALOG = "\n".join(
-    f'<rule id="{rule.spec.id}" title="{rule.spec.title}">\n{rule.guidance}\n</rule>' for rule in LLM_RULES
-)
+# Titles stay out of the catalog: several contain double quotes, which would break the attribute. The item message
+# lists the applicable rules with their titles.
+_RULE_CATALOG = "\n".join(f'<rule id="{rule.spec.id}">\n{rule.guidance}\n</rule>' for rule in LLM_RULES)
 
 SYSTEM_TEXT = f"""\
 You pre-review consumer-credit marketing copy for ClearPath Financial, a nonbank lender offering personal loans, \
