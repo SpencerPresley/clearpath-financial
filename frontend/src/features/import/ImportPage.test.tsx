@@ -42,6 +42,29 @@ beforeEach(() => {
 });
 
 describe('Import: start', () => {
+  it('polls recent imports while one is committing, until it lands', async () => {
+    let calls = 0;
+    server.use(
+      http.get('*/api/imports', () => {
+        calls += 1;
+        const [first, ...rest] = recentImports();
+        if (first === undefined) throw new Error('fixture');
+        const row =
+          calls < 2 ? { ...first, status: 'committing' as const, summary: null, committed_at: null } : first;
+        return HttpResponse.json([row, ...rest]);
+      }),
+    );
+    renderApp('/import');
+    const table = await screen.findByRole('table', { name: 'Recent imports' });
+    expect(within(table).getByText('Importing')).toBeInTheDocument();
+    expect(
+      await within(table).findByText('178 created · 2 skipped', {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    const settled = calls;
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(calls).toBe(settled);
+  });
+
   it('is for admins only', async () => {
     server.use(getGetMeMockHandler(ME_LIBRARY_REVIEWER));
     renderApp('/import');
@@ -209,7 +232,7 @@ describe('Import: steps', () => {
     renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Import 178 items' }));
-    expect(await screen.findByText(/Importing 178 rows/)).toBeInTheDocument();
+    expect(await screen.findByText(/Importing 178 items/)).toBeInTheDocument();
     expect(
       await screen.findByRole('heading', { name: 'Imported 178 items' }, { timeout: 5000 }),
     ).toBeInTheDocument();
@@ -219,10 +242,51 @@ describe('Import: steps', () => {
       'href',
       '/items/400',
     );
-    expect(screen.getByRole('link', { name: 'Open in library' })).toHaveAttribute(
+    // Two of the created rows are approved: those are what the library's approved view adds.
+    expect(screen.getByRole('link', { name: 'Approved legacy items (2)' })).toHaveAttribute(
       'href',
       '/library?legacy=only',
     );
+  });
+
+  it('lists what the import skipped and warned about, collapsed under the created items', async () => {
+    serveJob(
+      importJob({ status: 'committed', summary: { created: 5, skipped: 2, partners_created: 0 } }),
+      () => committedPreview(),
+    );
+    renderApp(`/import${searchString({ job: 7 })}`);
+
+    const skipped = await screen.findByRole('button', { name: 'Skipped (2)' });
+    const warnings = screen.getByRole('button', { name: /^Warnings \(\d+\)$/ });
+    expect(skipped).toHaveAttribute('aria-expanded', 'false');
+    expect(warnings).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(skipped);
+    const table = screen.getByRole('table', { name: 'Skipped rows' });
+    expect(
+      within(table).getByRole('row', { name: /68.*MCR-25-066.*Duplicate of an earlier row/ }),
+    ).toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: /19.*Not a tracker row/ })).toBeInTheDocument();
+  });
+
+  it('offers to map values from the preview while some are unmapped', async () => {
+    serveJob(
+      importJob({ status: 'mapped' }),
+      importPreview({ unmapped: CUSTOM_UNMAPPED, problems: CUSTOM_PROBLEMS }),
+    );
+    const { router } = renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Map 3 values' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ job: 7, step: 'values' });
+    });
+    expect(await screen.findByRole('table', { name: 'Values to map' })).toBeInTheDocument();
+  });
+
+  it('shows each problem row as imported or skipped, from the preview rows', async () => {
+    serveJob(importJob({ status: 'mapped' }), importPreview());
+    renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
+    await userEvent.click(await screen.findByRole('button', { name: /^Info · / }));
+    const info = screen.getByRole('table', { name: 'Info' });
+    expect(within(info).getByRole('row', { name: /^19 .*Skipped/ })).toBeInTheDocument();
   });
 
   it("shows the server's reason when commit is refused (409)", async () => {

@@ -97,7 +97,7 @@ export function ColumnsStep({
           </tbody>
         </table>
       </div>
-      <footer className="app-import-actions">
+      <footer className="app-import-actions app-import-actions-sticky">
         <Button
           variant="primary"
           isDisabled={save.isPending}

@@ -20,7 +20,7 @@ test('import: load the sample, keep the column guesses, preview, commit, and ope
   await expect(page.getByRole('table', { name: 'Warnings' }).getByRole('row', { name: /^92/ })).toBeVisible();
 
   await page.getByRole('button', { name: 'Import 178 items' }).click();
-  await expect(page.getByText('Importing 178 rows…')).toBeVisible();
+  await expect(page.getByText('Importing 178 items…')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Imported 178 items' })).toBeVisible();
   expect(api.posted.map((p) => `${p.method} ${p.path}`)).toEqual([
     'POST /imports/sample',

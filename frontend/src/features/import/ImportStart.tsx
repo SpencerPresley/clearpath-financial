@@ -14,12 +14,13 @@ import {
   useUploadImport,
 } from '../../api/generated/imports/imports';
 import type { ImportJobOut, ImportJobSummaryOut } from '../../api/generated/model';
+import { Badge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { errorMessage } from '../../ui/errorMessage';
 import { fieldErrorsFrom } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
-import { formatDate, plural } from '../../ui/labels';
+import { formatDate } from '../../ui/labels';
 import { SkeletonTable } from '../../ui/Skeleton';
 import { IMPORT_STATUS_META } from './labels';
 
@@ -27,12 +28,7 @@ const XLSX = ['.xlsx', 'application/vnd.openxmlformats-officedocument.spreadshee
 const RECENT_COLUMNS = ['16rem', '7rem', '5rem', '9rem', '8rem', '1fr'] as const;
 
 function ImportStatusBadge({ status }: { status: ImportJobSummaryOut['status'] }) {
-  const meta = IMPORT_STATUS_META[status];
-  return (
-    <span className="app-badge" data-tone={meta.tone}>
-      {meta.label}
-    </span>
-  );
+  return <Badge meta={IMPORT_STATUS_META[status]} />;
 }
 
 function outcome(job: ImportJobSummaryOut): string {
@@ -43,8 +39,16 @@ function outcome(job: ImportJobSummaryOut): string {
   return 'Not imported yet';
 }
 
+/** While any listed import is committing, poll so its row turns Imported or Failed without a reload. */
+export const RECENT_POLL_MS = 2000;
+
 function RecentImports() {
-  const recent = useListImports();
+  const recent = useListImports({
+    query: {
+      refetchInterval: (q) =>
+        (q.state.data ?? []).some((job) => job.status === 'committing') ? RECENT_POLL_MS : false,
+    },
+  });
   if (recent.isPending) {
     return <SkeletonTable rows={3} columns={RECENT_COLUMNS.map((w) => w)} label="Loading recent imports" />;
   }
@@ -162,7 +166,7 @@ export function ImportStart({ onStarted }: { onStarted: (jobId: number) => void 
         <div className="app-import-source">
           <h2 className="app-import-source-title">Try the sample</h2>
           <p className="app-import-source-detail">
-            The team&apos;s 2025–26 review tracker: {plural(180, 'row')}, with the usual mess.
+            The team&apos;s 2025–26 review tracker, with the tracker&apos;s known inconsistencies.
           </p>
           <div className="app-import-source-action">
             <Button

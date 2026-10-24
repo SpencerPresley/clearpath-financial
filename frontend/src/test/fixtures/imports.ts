@@ -254,6 +254,14 @@ export const CUSTOM_PROBLEMS: ImportProblemOut[] = [
   ...SAMPLE_PROBLEMS.slice(3, 5),
 ];
 
+/** The custom file's rows behind CUSTOM_PROBLEMS: unmapped values block 12 and 15; 41 and 57 import with a note. */
+export const CUSTOM_ROWS: ImportPreviewRowOut[] = [
+  previewRow({ row_number: 12, action: 'blocked', status: null, problem_count: 1 }),
+  previewRow({ row_number: 15, action: 'blocked', partner: null, problem_count: 1 }),
+  previewRow({ row_number: 41, problem_count: 1 }),
+  previewRow({ row_number: 57, problem_count: 1 }),
+];
+
 export function recentImports(): ImportJobSummaryOut[] {
   return [
     {

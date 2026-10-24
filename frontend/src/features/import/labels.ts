@@ -10,7 +10,7 @@ import type {
   ProblemSeverity,
 } from '../../api/generated/model';
 import { Channel, Product, RiskTier } from '../../api/generated/model';
-import type { Tone } from '../../ui/badges';
+import type { BadgeMeta } from '../../ui/badges';
 import { STATUS_META } from '../../ui/badges';
 import { CHANNEL_LABELS, PRODUCT_LABELS } from '../../ui/labels';
 
@@ -46,18 +46,23 @@ export const REQUIRED_TARGETS: readonly ImportTargetField[] = [
   'status',
 ];
 
-export const IMPORT_STATUS_META: Record<ImportStatus, { label: string; tone: Tone }> = {
-  uploaded: { label: 'Uploaded', tone: 'neutral' },
-  mapped: { label: 'Mapped', tone: 'neutral' },
-  committing: { label: 'Importing', tone: 'info' },
-  committed: { label: 'Imported', tone: 'success' },
-  failed: { label: 'Failed', tone: 'error' },
+/*
+ * A finished import is neutral, not success green: green means approved content (§5.2), and an import approves
+ * nothing. Label + glyph either way, so tone is never the only signal.
+ */
+export const IMPORT_STATUS_META: Record<ImportStatus, BadgeMeta> = {
+  uploaded: { label: 'Uploaded', tone: 'neutral', icon: 'job.pending' },
+  mapped: { label: 'Mapped', tone: 'neutral', icon: 'job.pending' },
+  committing: { label: 'Importing', tone: 'info', icon: 'job.running' },
+  committed: { label: 'Imported', tone: 'neutral', icon: 'job.done' },
+  failed: { label: 'Failed', tone: 'error', icon: 'job.failed' },
 };
 
-export const SEVERITY_GROUPS: readonly { severity: ProblemSeverity; title: string; effect: string }[] = [
-  { severity: 'error', title: 'Errors', effect: 'The row is skipped' },
-  { severity: 'warning', title: 'Warnings', effect: 'Imported with a note' },
-  { severity: 'info', title: 'Info', effect: 'Read from a non-standard form' },
+/** Problem groups by severity. What each row's problem does is the row's Outcome column, not the group. */
+export const SEVERITY_GROUPS: readonly { severity: ProblemSeverity; title: string }[] = [
+  { severity: 'error', title: 'Errors' },
+  { severity: 'warning', title: 'Warnings' },
+  { severity: 'info', title: 'Info' },
 ];
 
 /** Statuses an imported row can take (backend IMPORTABLE_STATUSES). */

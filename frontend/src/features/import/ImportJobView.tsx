@@ -5,10 +5,12 @@
 import { Button as AriaButton } from 'react-aria-components';
 
 import type { ImportPreviewOut } from '../../api/generated/model';
+import { Badge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { cx } from '../../ui/cx';
 import { EmptyState } from '../../ui/EmptyState';
 import { errorMessage, errorStatus } from '../../ui/errorMessage';
+import { Icon } from '../../ui/Icon';
 import { plural } from '../../ui/labels';
 import { SkeletonTable, SkeletonText } from '../../ui/Skeleton';
 import { ColumnsStep } from './ColumnsStep';
@@ -40,8 +42,9 @@ function StepList({
         const body = (
           <>
             <span className="app-import-step-num" aria-hidden="true">
-              {i + 1}
+              {state === 'done' ? <Icon name="action.check" size={12} /> : i + 1}
             </span>
+            {state === 'done' && <span className="sr-only">Done: </span>}
             {s.label}
           </>
         );
@@ -54,7 +57,7 @@ function StepList({
           >
             {pickable ? (
               <AriaButton
-                className={cx('app-import-steps-btn')}
+                className={cx('app-import-steps-btn', 'app-import-steps-pick')}
                 onPress={() => {
                   onPick(s.id as EditableStep);
                 }}
@@ -179,6 +182,9 @@ export function ImportJobView({
         committing={commit.isPending}
         commitError={commit.error}
         onCommit={commit.commit}
+        onMapValues={() => {
+          onStep('values');
+        }}
       />
     );
   }
@@ -188,9 +194,7 @@ export function ImportJobView({
       <div className="app-import-job-head">
         <div className="app-import-job-file">
           <span className="app-import-job-name">{data.filename}</span>
-          <span className="app-badge" data-tone={meta.tone}>
-            {meta.label}
-          </span>
+          <Badge meta={meta} />
           <span className="app-import-job-meta">
             Sheet “{data.sheet_name}” · {plural(data.row_count, 'row')}
           </span>
