@@ -87,19 +87,28 @@ class Role(StrEnum):
 # Percentages are APR / fee percents as Decimals (7.49 means 7.49%).
 
 
+_ZERO = Decimal(0)
+_HUNDRED = Decimal(100)
+
+Apr = Annotated[Decimal, Field(gt=_ZERO, lt=_HUNDRED)]
+Percent = Annotated[Decimal, Field(ge=_ZERO, lt=_HUNDRED)]
+Money = Annotated[Decimal, Field(ge=_ZERO)]
+PositiveMoney = Annotated[Decimal, Field(gt=_ZERO)]
+
+
 class _Terms(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class PersonalLoanTerms(_Terms):
     product: Literal[Product.PERSONAL_LOAN] = Product.PERSONAL_LOAN
-    apr_min: Decimal = Field(gt=0, lt=100)
-    apr_max: Decimal = Field(gt=0, lt=100)
-    amount_min: Decimal = Field(gt=0)
-    amount_max: Decimal = Field(gt=0)
+    apr_min: Apr
+    apr_max: Apr
+    amount_min: PositiveMoney
+    amount_max: PositiveMoney
     term_months: tuple[int, ...] = Field(min_length=1)
-    origination_fee_min_pct: Decimal = Field(ge=0, lt=100)
-    origination_fee_max_pct: Decimal = Field(ge=0, lt=100)
+    origination_fee_min_pct: Percent
+    origination_fee_max_pct: Percent
 
     @model_validator(mode="after")
     def _ranges_ordered(self) -> Self:
@@ -114,13 +123,13 @@ class PersonalLoanTerms(_Terms):
 
 class CreditCardTerms(_Terms):
     product: Literal[Product.CREDIT_CARD] = Product.CREDIT_CARD
-    purchase_apr_min: Decimal = Field(gt=0, lt=100)
-    purchase_apr_max: Decimal = Field(gt=0, lt=100)
+    purchase_apr_min: Apr
+    purchase_apr_max: Apr
     purchase_apr_variable: bool = True
-    intro_apr: Decimal | None = Field(default=None, ge=0, lt=100)
+    intro_apr: Percent | None = None
     intro_months: int | None = Field(default=None, gt=0)
-    balance_transfer_fee_pct: Decimal = Field(ge=0, lt=100)
-    annual_fee: Decimal = Field(ge=0)
+    balance_transfer_fee_pct: Percent
+    annual_fee: Money
     issuing_bank: str = Field(min_length=1)
 
     @model_validator(mode="after")
