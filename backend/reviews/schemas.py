@@ -17,6 +17,7 @@ from core.domain import (
     DecisionLane,
     DecisionOutcome,
     ItemStatus,
+    LlmFailureCode,
     Market,
     Product,
     ReopenReason,
@@ -200,6 +201,17 @@ class ItemDetailOut(ItemRowOut):
     versions: list[VersionSummaryOut]
     latest_decision: DecisionOut | None
     live_placements_count: int
+    numbers_change: bool | None = Field(
+        description="Generated (fast-track) current version only: false when none of the numbers the copy quotes "
+        "changed (no diff from the approved version; fast-track confirms it against the new terms). Null otherwise."
+    )
+    llm_check_failure_code: LlmFailureCode | None = Field(
+        description="Why the current version's AI check failed; null unless llm_check_status is failed. "
+        "not_configured: no API key on this server, so Retry won't help."
+    )
+    llm_check_failure_reason: str | None = Field(
+        description="The failure as a plain sentence; null unless llm_check_status is failed."
+    )
 
 
 class ResubmitIn(Schema):

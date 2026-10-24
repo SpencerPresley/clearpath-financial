@@ -42,6 +42,7 @@ from core.errors import InvalidInput
 from reviews.assignment import locked_item
 from reviews.decisions import DecisionInput, record_decision
 from reviews.models import ReviewItem, Version
+from reviews.records import get_item_detail
 from reviews.tests.conftest import Submit, dismiss_all
 from reviews.versions import create_version, resubmit_item
 
@@ -555,6 +556,72 @@ def test_no_api_key_fails_with_a_plain_reason(
     failed = _event(item_id, EventType.LLM_CHECK_FAILED).payload
     assert failed["code"] == LlmFailureCode.NOT_CONFIGURED
     assert "API key" in failed["error"]
+
+
+@pytest.mark.django_db
+def test_item_detail_carries_the_failure_until_a_retry_succeeds(
+    submitted: Callable[..., int],
+    models: Models,
+    reviewer: User,
+    clock: FixedClock,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    """The review screen shows why the check failed from the item itself, not from history."""
+    models.extend([_refused(), _good()])
+    item_id = submitted()
+    client = Client()
+    client.force_login(reviewer)
+    assert client.get(f"/api/items/{item_id}").json()["llm_check_failure_code"] is None
+
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+    failed = client.get(f"/api/items/{item_id}").json()
+    with django_capture_on_commit_callbacks(execute=True):
+        prereview.retry_check(actor=reviewer, item_id=item_id, clock=clock)
+    retried = client.get(f"/api/items/{item_id}").json()
+
+    assert failed["llm_check_status"] == "failed"
+    assert failed["llm_check_failure_code"] == "provider_refused"
+    assert failed["llm_check_failure_reason"].startswith("The AI service refused the request.")
+    assert retried["llm_check_status"] == "succeeded"
+    assert (retried["llm_check_failure_code"], retried["llm_check_failure_reason"]) == (None, None)
+
+
+@pytest.mark.django_db
+def test_item_detail_says_when_the_ai_check_isnt_configured(
+    submitted: Callable[..., int], reviewer: User, django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    item_id = submitted()
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+
+    detail = get_item_detail(item_id=item_id)
+
+    assert detail.llm_check_failure_code == LlmFailureCode.NOT_CONFIGURED
+    assert detail.llm_check_failure_reason is not None
+    assert "API key" in detail.llm_check_failure_reason
+
+
+@pytest.mark.django_db
+def test_item_detail_shows_the_current_versions_failure(
+    submitted: Callable[..., int],
+    models: Models,
+    reviewer: User,
+    marketer: User,
+    clock: FixedClock,
+    django_capture_on_commit_callbacks: OnCommit,
+) -> None:
+    """v1's check was refused; after a resubmit, v2's answer was unreadable twice. The item shows v2's reason."""
+    models.extend([_refused(), _prose(), _prose()])
+    item_id = submitted()
+    _run_handler(item_id, django_capture_on_commit_callbacks)
+    _changes_requested(item_id, reviewer, clock)
+    resubmit_item(actor=marketer, item_id=item_id, content_text=COPY + " Terms apply.", clock=clock)
+    assert get_item_detail(item_id=item_id).llm_check_failure_code is None  # v2 pending
+
+    _run_handler(item_id, django_capture_on_commit_callbacks, EventType.ITEM_RESUBMITTED)
+
+    detail = get_item_detail(item_id=item_id)
+    assert detail.llm_check_status == CheckStatus.FAILED
+    assert detail.llm_check_failure_code == LlmFailureCode.INVALID_OUTPUT
 
 
 @pytest.mark.django_db

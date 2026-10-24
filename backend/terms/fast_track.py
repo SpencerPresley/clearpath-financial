@@ -2,17 +2,19 @@
 
 Thin over E's decision service: `record_decision(lane=FAST_TRACK)` applies every approval gate (current version,
 current offer terms, no open or accepted findings; the AI check is skipped on generated versions) and records "AI
-review carried from vN". Bulk runs one item per transaction through `run_bulk`, so an item with open findings comes
-back as a skip (`open_findings_block_decision`) and goes to the normal lane; the others are approved.
+review carried from vN". The single approve is the assignee's or a lead's and names the version on screen. Bulk is a
+lead's (product-spec Roles: bulk actions are Lead) and runs one item per transaction through `run_bulk`, so an item
+with open findings comes back as a skip (`open_findings_block_decision`) and goes to the normal lane; the others are
+approved.
 """
 
 from collections.abc import Iterable, Mapping
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import DecisionLane, DecisionOutcome
+from core.domain import DecisionLane, DecisionOutcome, Role
 from core.errors import NotFound
-from core.permissions import REVIEW_ROLES, require_role
+from core.permissions import require_role
 from reviews.assignment import BulkResult, run_bulk
 from reviews.decisions import DecisionInput, DecisionResult, record_decision
 from reviews.models import ReviewItem
@@ -50,14 +52,13 @@ def bulk_fast_track_approve(
     seen_versions: Mapping[int, int] | None = None,
     clock: Clock = SYSTEM_CLOCK,
 ) -> BulkResult:
-    """Reviewers and leads. Each item is the single fast-track in its own transaction, with the same per-item check
-    (the item's assignee or a lead), so a reviewer's bulk approve covers only their own items and the rest come back
-    as `not_permitted` skips. Anything that can't be fast-tracked is a skip with its error code, never an exception.
+    """Leads only. Each item is the single fast-track in its own transaction, with its checks. Anything that can't be
+    fast-tracked is a skip with its error code, never an exception.
 
-    `seen_versions` maps an item to the version the reviewer saw; that item is approved only at that version (else
+    `seen_versions` maps an item to the version the lead saw; that item is approved only at that version (else
     `stale_version`). An item without an entry is approved at its current version.
     """
-    require_role(actor, *REVIEW_ROLES)
+    require_role(actor, Role.LEAD)
     seen = dict(seen_versions or {})
     return run_bulk(
         item_ids,

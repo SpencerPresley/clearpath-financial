@@ -8,6 +8,7 @@ import type { Channel } from './channel';
 import type { CheckStatus } from './checkStatus';
 import type { DecisionOut } from './decisionOut';
 import type { ItemStatus } from './itemStatus';
+import type { LlmFailureCode } from './llmFailureCode';
 import type { Market } from './market';
 import type { PartyRefOut } from './partyRefOut';
 import type { Product } from './product';
@@ -34,9 +35,15 @@ export interface ItemDetailOut {
   legacy_reviewer: string;
   legacy_submitter: string;
   live_placements_count: number;
+  /** Why the current version's AI check failed; null unless llm_check_status is failed. not_configured: no API key on this server, so Retry won't help. */
+  llm_check_failure_code: LlmFailureCode | null;
+  /** The failure as a plain sentence; null unless llm_check_status is failed. */
+  llm_check_failure_reason: string | null;
   llm_check_status: CheckStatus;
   markets: Market[];
   notes: string;
+  /** Generated (fast-track) current version only: false when none of the numbers the copy quotes changed (no diff from the approved version; fast-track confirms it against the new terms). Null otherwise. */
+  numbers_change: boolean | null;
   open_findings_count: number;
   owner: PartyRefOut | null;
   partner: PartyRefOut | null;

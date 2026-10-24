@@ -10,16 +10,18 @@ from django.urls import reverse
 from accounts.models import User
 from audit.models import Event
 from audit.outbox import EventRecord
-from audit.payloads import EventPayload
+from audit.payloads import EventPayload, LlmCheckFailedPayload
 from checks.models import TermsRef
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import (
     AttachmentKind,
+    CheckStatus,
     DecisionLane,
     DecisionOutcome,
     EntityType,
     EventType,
     ItemStatus,
+    LlmFailureCode,
     Product,
     Role,
     TakedownState,
@@ -277,6 +279,39 @@ class ItemDetail(ItemRow):
     versions: tuple[VersionSummary, ...]
     latest_decision: DecisionRow | None
     live_placements_count: int
+    numbers_change: bool | None
+    llm_check_failure_code: LlmFailureCode | None
+    llm_check_failure_reason: str | None
+
+
+def _numbers_change(item_id: int, current: VersionDetail | None) -> bool | None:
+    """For a generated (fast-track) version only: whether its text differs from the approved text it was rendered
+    from, i.e. whether any number the copy quotes changed (terms.impact's `numbers_change`). None otherwise."""
+    if current is None or current.origin is not VersionOrigin.FAST_TRACK or current.based_on_n is None:
+        return None
+    based_on_sha = (
+        Version.objects.filter(item_id=item_id, n=current.based_on_n).values_list("content_sha256", flat=True).first()
+    )
+    return based_on_sha != current.content_sha256
+
+
+def _llm_failure(
+    item_id: int, status: CheckStatus, current: VersionDetail | None
+) -> tuple[LlmFailureCode | None, str | None]:
+    """Why the current version's AI check failed: the latest LLM_CHECK_FAILED for that version. Nothing unless the
+    item's check is `failed` (a retry clears it)."""
+    if status is not CheckStatus.FAILED or current is None:
+        return None, None
+    payload = (
+        Event.objects.filter(item_id=item_id, type=EventType.LLM_CHECK_FAILED, payload__version_id=current.id)
+        .order_by("-id")
+        .values_list("payload", flat=True)
+        .first()
+    )
+    if payload is None:
+        return None, None
+    failed = LlmCheckFailedPayload.model_validate(payload)
+    return failed.code, failed.error
 
 
 def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
@@ -293,6 +328,7 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
     current_n = getattr(item, "current_version_n", None)
     current = get_version(item_id=item_id, n=current_n) if isinstance(current_n, int) else None
     latest = next(iter(_decisions(item_id)[:1]), None)
+    failure_code, failure_reason = _llm_failure(item_id, row.llm_check_status, current)
     return ItemDetail(
         **{field: getattr(row, field) for field in ItemRow.__dataclass_fields__},
         notes=item.notes,
@@ -310,6 +346,9 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
         versions=versions,
         latest_decision=_decision_row(latest) if latest else None,
         live_placements_count=item.live_placements_count,  # pyrefly: ignore[missing-attribute]
+        numbers_change=_numbers_change(item_id, current),
+        llm_check_failure_code=failure_code,
+        llm_check_failure_reason=failure_reason,
     )
 
 

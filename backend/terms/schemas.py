@@ -95,7 +95,7 @@ class BulkFastTrackIn(Schema):
         default_factory=list,
         max_length=500,
         description=(
-            "The generated version each item showed when the reviewer chose it. Send it: an item listed here is "
+            "The generated version each item showed when the lead chose it. Send it: an item listed here is "
             "approved only at that version (else skipped as stale_version); an item without an entry is approved "
             "at whatever version is current, which a later terms change may have replaced unseen."
         ),
