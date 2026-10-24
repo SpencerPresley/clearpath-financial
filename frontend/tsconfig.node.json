@@ -7,7 +7,9 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "module": "nodenext",
+    "module": "esnext",
+    /* Bundler resolution so e2e can share src/test/fixtures (extensionless imports), as Playwright does. */
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",

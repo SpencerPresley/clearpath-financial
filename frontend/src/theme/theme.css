@@ -438,6 +438,918 @@
     @apply flex h-row items-center gap-4 border-b border-base-300 px-3;
   }
 
+  /* ==== Review, intake, My submissions (workstream I) ============================================ */
+
+  /* ---- Marketer screens: New submission, My submissions, Resubmit (features/submit, features/mine) */
+  /* New submission. One column below 1280px (fields, copy, live checks, files); at 1280px+ the live checks
+     sit in a 22rem column beside everything and stay in view while the marketer scrolls the form. */
+  .app-submit {
+    @apply grid max-w-[80rem] gap-x-6 gap-y-5;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'title' 'fields' 'copy' 'live' 'files' 'actions';
+  }
+  @media (width >= 80rem) {
+    .app-submit {
+      grid-template-columns: minmax(0, 1fr) 22rem;
+      grid-template-areas: 'title title' 'fields live' 'copy live' 'files live' 'actions live';
+      grid-template-rows: auto auto auto auto 1fr;
+    }
+    .app-submit-live {
+      @apply sticky top-0 self-start;
+    }
+  }
+  .app-submit-title {
+    grid-area: title;
+    @apply mb-0;
+  }
+  .app-submit-fields {
+    grid-area: fields;
+    @apply grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-3;
+  }
+  .app-submit-wide {
+    @apply md:col-span-3;
+  }
+  .app-submit-prescreen {
+    @apply md:col-span-3;
+  }
+  .app-submit-slot {
+    @apply hidden md:block;
+  }
+  .app-submit-copy {
+    grid-area: copy;
+    @apply flex min-w-0 flex-col gap-3;
+  }
+  .app-submit-live {
+    grid-area: live;
+  }
+  .app-submit-files {
+    grid-area: files;
+    @apply grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-2;
+  }
+  .app-submit-actions {
+    grid-area: actions;
+    @apply flex flex-wrap items-center gap-3 self-start border-t border-base-300 pt-4;
+  }
+
+  /* Fetch from a URL: its own field under the editor, so Enter fetches instead of submitting. */
+  .app-fetch-url {
+    @apply flex max-w-xl flex-col gap-1;
+  }
+  .app-fetch-url-field {
+    @apply flex flex-col gap-1;
+  }
+  .app-fetch-url-row {
+    @apply flex gap-2;
+  }
+
+  /* Queued files: name, size, kind, remove. Rows on rules, not cards. */
+  .app-file-list {
+    @apply flex flex-col divide-y divide-base-300 rounded-md border border-base-300 bg-base-100;
+  }
+  .app-file-row {
+    @apply flex min-h-10 items-center gap-3 py-1.5 pr-1 pl-2.5;
+  }
+  .app-file-name {
+    @apply min-w-0 flex-1 truncate text-ui text-base-content;
+  }
+  .app-file-size {
+    @apply shrink-0 text-meta text-muted tabular-nums;
+  }
+  .app-file-kind {
+    @apply w-44 shrink-0;
+  }
+  .app-file-empty {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1;
+  }
+
+  /* Submit with open findings: an inline strip in place of the Submit button (no modal, spec §5.7). */
+  .app-confirm-strip {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-base-300 bg-base-100 py-1.5 pr-1.5 pl-3;
+  }
+  .app-confirm-text {
+    @apply flex items-center gap-1.5 text-ui text-base-content tabular-nums;
+  }
+  .app-confirm-text [data-severity='blocking'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-confirm-text [data-severity='warning'] {
+    @apply text-status-warning-soft-content;
+  }
+  .app-form-error {
+    @apply basis-full text-ui font-medium text-status-error-soft-content;
+  }
+
+  /* Live code checks beside a copy editor (ui/findings/LiveFindings). A flat panel on a rule, no shadow. */
+  .app-live {
+    @apply flex flex-col rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-live-head {
+    @apply flex h-10 items-center gap-2 border-b border-base-300 px-3;
+  }
+  .app-live-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-live-count {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-live-status {
+    @apply ml-auto text-meta text-muted;
+  }
+  .app-live-body {
+    @apply flex flex-col gap-4 p-3;
+  }
+  .app-live-body[aria-busy='true'] .app-live-list {
+    opacity: 0.6;
+  }
+  .app-live-group {
+    @apply flex flex-col gap-2;
+  }
+  .app-live-group-label {
+    @apply text-meta font-medium text-muted;
+  }
+  .app-live-list {
+    @apply flex flex-col;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-live-item {
+    @apply border-b border-base-300 py-2.5 first:pt-0 last:border-b-0 last:pb-0;
+  }
+  .app-live-empty {
+    @apply text-ui text-muted;
+  }
+  .app-live-note {
+    @apply border-t border-base-300 px-3 py-2 text-meta text-muted;
+  }
+
+  /* My submissions: one dense table per section, same columns in every section so they line up. */
+  .app-mine {
+    @apply flex max-w-[80rem] flex-col gap-6;
+  }
+  .app-mine-header {
+    @apply flex items-center justify-between gap-4;
+  }
+  .app-mine-header .app-page-title {
+    @apply mb-0;
+  }
+  .app-mine-section {
+    @apply flex flex-col gap-2;
+  }
+  .app-mine-heading {
+    @apply flex items-baseline gap-2 text-ui font-semibold text-base-content;
+  }
+  .app-mine-count {
+    @apply font-normal text-muted tabular-nums;
+  }
+  .app-mine-table {
+    @apply w-full table-fixed border-separate border-spacing-0 rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-mine-row > td {
+    @apply h-row border-b border-base-300 px-3 align-middle text-ui;
+  }
+  .app-mine-row:last-child > td {
+    @apply border-b-0;
+  }
+  .app-mine-row {
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-mine-row:hover {
+    @apply bg-hover;
+  }
+  .app-mine-title {
+    @apply truncate;
+  }
+  .app-mine-row .app-item-key {
+    @apply whitespace-nowrap;
+  }
+  .app-mine-link {
+    @apply rounded-xs font-medium text-base-content underline-offset-2 hover:underline;
+  }
+  .app-mine-why {
+    @apply truncate text-muted;
+  }
+  .app-mine-age,
+  .app-mine-action {
+    @apply text-right;
+  }
+  .app-mine-error {
+    @apply flex flex-col items-start gap-2 py-2;
+  }
+  .app-mine-error-title {
+    @apply text-ui font-medium text-base-content;
+  }
+
+  /* Resubmit / new round: the request and the editor in one column, live checks beside at 1280px+. */
+  .app-resubmit {
+    @apply flex max-w-[80rem] flex-col gap-4;
+  }
+  .app-resubmit-header .app-page-title {
+    @apply mb-0.5;
+  }
+  .app-resubmit-subtitle {
+    @apply text-ui;
+  }
+  .app-resubmit-context {
+    @apply text-ui text-base-content;
+  }
+  .app-resubmit-loading {
+    @apply flex flex-col gap-3 py-2;
+  }
+  .app-resubmit-form {
+    @apply grid grid-cols-1 items-start gap-x-6 gap-y-5 xl:grid-cols-[minmax(0,1fr)_22rem];
+  }
+  .app-resubmit-main {
+    @apply flex min-w-0 flex-col gap-4;
+  }
+  .app-resubmit-live {
+    @apply xl:sticky xl:top-0;
+  }
+  .app-requested {
+    @apply flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3;
+  }
+  .app-requested-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-requested-decision {
+    @apply flex flex-col gap-1;
+  }
+  .app-requested-by {
+    @apply text-meta text-muted;
+  }
+  .app-requested-reason {
+    @apply max-w-prose text-ui whitespace-pre-wrap text-base-content;
+    text-wrap: pretty;
+  }
+  .app-requested-list {
+    @apply flex flex-col divide-y divide-base-300 border-t border-base-300;
+  }
+  .app-requested-list > li {
+    @apply py-2.5 last:pb-0;
+  }
+  .app-resubmit-toolbar {
+    @apply flex items-center gap-3;
+  }
+  .app-resubmit-summary {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-resubmit-diff {
+    @apply min-h-48 rounded-md border border-base-300 bg-base-100 px-3 py-2.5;
+  }
+  .app-resubmit-actions {
+    @apply border-t-0 pt-0;
+  }
+
+  /* Segmented control (Edit / Changes vs v2): a pressed segment sits raised on a rule, no shadow. */
+  .app-segmented {
+    @apply inline-flex rounded-md border border-base-300 bg-base-200 p-0.5;
+  }
+  .app-segment {
+    @apply inline-flex h-7 cursor-default items-center rounded-sm border border-transparent px-2.5 text-ui font-medium text-muted outline-none;
+    transition-property: background-color, border-color, color;
+    transition-duration: 120ms;
+  }
+  .app-segment[data-hovered] {
+    @apply text-base-content;
+  }
+  .app-segment[data-selected] {
+    @apply border-base-300 bg-base-100 text-base-content;
+  }
+  .app-segment[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
+
+  /* ---- Form fields (ui/forms/fields.tsx) -------------------------------------------------------- */
+  .app-field {
+    @apply flex min-w-0 flex-col gap-1;
+  }
+  .app-field-label {
+    @apply text-ui font-medium text-base-content;
+  }
+  .app-field-description {
+    @apply text-meta text-muted;
+  }
+  .app-field-error {
+    @apply text-meta font-medium text-status-error-soft-content;
+  }
+  .app-input {
+    @apply h-8 w-full min-w-0 rounded-md border border-base-300 bg-base-100 px-2.5 text-ui text-base-content outline-none placeholder:text-muted;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-input.app-textarea {
+    @apply h-auto py-1.5 leading-5;
+    resize: vertical;
+  }
+  /* Text inputs show focus on mouse focus too: the caret alone is easy to lose. */
+  .app-input[data-focused],
+  .app-select-button[data-focus-visible],
+  .app-select-button[data-pressed] {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+    outline: none;
+  }
+  .app-input[data-invalid],
+  [data-invalid] > .app-select-button {
+    @apply border-status-error;
+  }
+  .app-input[data-disabled] {
+    @apply bg-base-200 text-muted;
+  }
+  .app-select-button {
+    @apply flex h-8 w-full min-w-0 cursor-default items-center justify-between gap-2 rounded-md border border-base-300 bg-base-100 px-2.5 text-left text-ui text-base-content outline-none;
+  }
+  .app-select-button[data-size='sm'] {
+    @apply h-7 px-2;
+  }
+  .app-select-button[data-hovered] {
+    @apply bg-base-200;
+  }
+  .app-select-value {
+    @apply truncate;
+  }
+  .app-select-value[data-placeholder] {
+    @apply text-muted;
+  }
+  .app-select-popover {
+    min-width: var(--trigger-width);
+    @apply max-h-72 overflow-auto;
+  }
+  .app-option[data-selected] {
+    @apply font-medium text-primary;
+  }
+  .app-checkbox-row {
+    @apply flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5;
+  }
+  .app-checkbox {
+    @apply inline-flex cursor-default items-center gap-2 text-ui text-base-content;
+  }
+  .app-checkbox-box {
+    @apply relative inline-flex size-4 shrink-0 rounded-xs border border-base-content/40 bg-base-100;
+    transition-property: background-color, border-color;
+    transition-duration: 120ms;
+  }
+  .app-checkbox[data-selected] .app-checkbox-box {
+    @apply border-primary bg-primary;
+  }
+  /* The tick: two borders of a rotated box (no glyph borrowed from the icon registry). */
+  .app-checkbox[data-selected] .app-checkbox-box::after {
+    content: '';
+    position: absolute;
+    left: 4.5px;
+    top: 1.5px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--color-primary-content);
+    border-width: 0 2px 2px 0;
+    rotate: 45deg;
+  }
+  .app-checkbox[data-focus-visible] .app-checkbox-box {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .app-checkbox[data-disabled] {
+    @apply text-muted;
+  }
+
+  /* ---- Modal dialogs (ui/Dialog.tsx): confirmations and shortcut help only ------------------------- */
+  .app-modal-overlay {
+    @apply fixed inset-0 z-40 flex items-start justify-center pt-[12vh];
+    background: oklch(25% 0.025 258 / 0.32);
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-modal-overlay[data-entering],
+  .app-modal-overlay[data-exiting] {
+    opacity: 0;
+  }
+  .app-modal {
+    @apply w-[28rem] max-w-[calc(100vw-2rem)] rounded-lg border border-base-300 bg-base-100 shadow-overlay;
+  }
+  .app-modal[data-size='md'] {
+    @apply w-[36rem];
+  }
+  .app-dialog {
+    @apply flex flex-col gap-3 p-4 outline-none;
+  }
+  .app-dialog-header {
+    @apply -mt-1 -mr-1 flex items-center justify-between gap-3;
+  }
+  .app-dialog-title {
+    @apply text-sm font-semibold text-base-content;
+  }
+  .app-dialog-actions {
+    @apply flex justify-end gap-2 pt-1;
+  }
+
+  /* ---- Copy: read-only text, the highlighting editor, diffs (ui/copy) ---------------------------- */
+  /* One set of text metrics for every copy surface, so the editor's backdrop lines up with its textarea. */
+  .app-copy {
+    @apply font-sans text-sm leading-[1.375rem] text-base-content;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+  }
+  /*
+   * Flagged spans (spec §5.2). Severity: blocking = tinted fill + red underline; warning = amber underline,
+   * no fill (so severity also reads without color). Source, by underline shape: code = solid, AI = dashed,
+   * checklist = dotted.
+   */
+  .app-mark {
+    @apply bg-transparent text-inherit;
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    text-decoration-skip-ink: none;
+    transition-property: outline-color, background-color;
+    transition-duration: 120ms;
+  }
+  .app-mark[data-severity='blocking'] {
+    @apply bg-status-error-soft;
+    text-decoration-color: var(--color-status-error-soft-content);
+  }
+  .app-mark[data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+  }
+  /* Every finding on the span is triaged: keep the line (still traceable), drop the fill and color. */
+  .app-mark[data-resolved] {
+    @apply bg-transparent;
+    text-decoration-color: var(--color-muted);
+    text-decoration-thickness: 1px;
+  }
+  /* Accepted = must change: quiet like any triaged span, but the line keeps its severity color. */
+  .app-mark[data-resolved][data-accepted][data-severity='blocking'] {
+    text-decoration-color: var(--color-status-error-soft-content);
+    text-decoration-thickness: 1.5px;
+  }
+  .app-mark[data-resolved][data-accepted][data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+    text-decoration-thickness: 1.5px;
+  }
+  .app-mark[data-source='code'] {
+    text-decoration-style: solid;
+  }
+  .app-mark[data-source='llm'] {
+    text-decoration-style: dashed;
+  }
+  .app-mark[data-source='human'] {
+    text-decoration-style: dotted;
+  }
+  /* The selected finding's span: a focus-navy tint plus a thicker line. Background, not outline, so a
+     span split by an overlapping finding still reads as one run. */
+  .app-mark[data-active] {
+    background-color: oklch(38% 0.11 262 / 0.13);
+    text-decoration-thickness: 3px;
+  }
+  .app-mark[data-clickable] {
+    cursor: pointer;
+  }
+  /* A second finding on the same text: its own line, below the first (decorations of nested inlines
+     both paint). Same vocabulary: severity color, source style, muted when triaged. */
+  .app-mark-under {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 7px;
+    text-decoration-skip-ink: none;
+  }
+  .app-mark-under[data-severity='blocking'] {
+    text-decoration-color: var(--color-status-error-soft-content);
+  }
+  .app-mark-under[data-severity='warning'] {
+    text-decoration-color: var(--color-status-warning-soft-content);
+  }
+  .app-mark-under[data-resolved]:not([data-accepted]) {
+    text-decoration-color: var(--color-muted);
+    text-decoration-thickness: 1px;
+  }
+  .app-mark-under[data-source='llm'] {
+    text-decoration-style: dashed;
+  }
+  .app-mark-under[data-source='human'] {
+    text-decoration-style: dotted;
+  }
+
+  .app-copy-editor {
+    @apply grid rounded-md border border-base-300 bg-base-100;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-copy-editor:focus-within {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+  }
+  .app-copy-editor[data-invalid] {
+    @apply border-status-error;
+  }
+  .app-copy-editor > .app-copy {
+    grid-area: 1 / 1;
+    @apply min-h-48 px-3 py-2.5;
+  }
+  /* The backdrop draws only fills and underlines; the textarea above it draws the text and caret. */
+  .app-copy-backdrop {
+    color: transparent;
+    pointer-events: none;
+  }
+  .app-copy-input {
+    @apply w-full resize-none overflow-hidden border-0 bg-transparent outline-none placeholder:text-muted;
+  }
+  .app-copy-input:focus-visible {
+    outline: none; /* the editor frame shows focus */
+  }
+
+  /* Diffs: shape, not status color. Insert = underline on a neutral tint; delete = struck, muted. */
+  .app-diff-ins {
+    @apply rounded-xs bg-hover no-underline;
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-base-content);
+  }
+  .app-diff-del {
+    @apply text-muted;
+    text-decoration-line: line-through;
+    text-decoration-thickness: 1.5px;
+  }
+  /* A replacement ("5.99" → "6.49") reads as two words, not "5.996.49". Diffs are read-only, so the gap
+     can't misalign anything. */
+  .app-diff-del + .app-diff-ins {
+    margin-left: 0.25em;
+  }
+
+  /* ---- Finding summary (ui/findings) ------------------------------------------------------------- */
+  .app-finding-summary {
+    @apply flex min-w-0 flex-col gap-1.5;
+  }
+  /* Triaged: red/amber means "still open", so the pill goes outline-only (glyph + word keep severity). */
+  .app-finding-summary[data-quiet] .app-badge {
+    @apply border-base-300 bg-transparent text-muted;
+  }
+  .app-finding-tags {
+    @apply flex flex-wrap items-center gap-x-2.5 gap-y-1;
+  }
+  .app-finding-message {
+    @apply text-ui text-base-content;
+  }
+  .app-finding-citation {
+    @apply text-muted;
+  }
+  .app-finding-quote {
+    @apply self-start rounded-xs bg-base-200 px-1 font-mono text-meta text-base-content;
+  }
+  .app-finding-fix {
+    @apply text-meta text-muted;
+  }
+  .app-finding-fix-label {
+    @apply font-medium text-base-content;
+  }
+
+  /* ---- Review screen (features/review) ----------------------------------------------------------- */
+  /* The screen owns the main area edge to edge: bar on top, copy and side panel scroll independently. */
+  .app-review {
+    @apply -mx-6 -my-5 grid grid-rows-[auto_minmax(0,1fr)];
+    height: calc(100% + 2.5rem);
+  }
+  .app-review-error {
+    @apply max-w-3xl;
+  }
+  .app-review-top {
+    @apply z-10 border-b border-base-300 bg-base-100;
+  }
+  /* Two-line identity (title over key + state) so the decisions fit one row down to 1280px. */
+  .app-decision-bar {
+    @apply flex min-h-15 items-center gap-4 px-5 py-2.5;
+  }
+  .app-decision-bar-heading {
+    @apply flex min-w-0 flex-1 flex-col gap-1;
+  }
+  .app-decision-bar-title {
+    @apply min-w-0 truncate text-sm font-semibold text-base-content;
+  }
+  .app-decision-bar-meta {
+    @apply flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap;
+  }
+  .app-decision-bar-meta > * {
+    @apply shrink-0;
+  }
+  /* Risk tier is also on the Details tab; below 1366px the bar keeps room for the decisions. */
+  @media (width < 1366px) {
+    .app-decision-bar-risk {
+      @apply hidden;
+    }
+  }
+  .app-meta-text {
+    @apply text-meta whitespace-nowrap text-muted;
+  }
+  /* Buttons on one row; why Approve is off sits under them, right-aligned, never over the identity. */
+  .app-decision-bar-actions {
+    @apply ml-auto flex shrink-0 flex-col items-end gap-1;
+  }
+  .app-decision-bar-buttons {
+    @apply flex items-center justify-end gap-2;
+  }
+  .app-decision-bar-note {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-btn[aria-pressed='true'][data-variant='secondary'] {
+    @apply border-base-content/30 bg-base-200;
+  }
+  .app-gate-note {
+    @apply text-ui text-muted tabular-nums;
+  }
+  .app-decision-summary {
+    @apply text-ui text-muted;
+  }
+  .app-decision-panel {
+    @apply max-h-[45vh] overflow-auto border-t border-base-300 bg-base-200 px-5 py-3;
+  }
+  .app-decision-form {
+    @apply flex max-w-3xl flex-col gap-3;
+  }
+  .app-decision-panel-title {
+    @apply text-sm font-semibold text-base-content;
+  }
+  .app-decision-fields {
+    @apply flex flex-col gap-3;
+  }
+  .app-decision-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-checkbox-stack {
+    @apply flex flex-col gap-1.5 pt-1;
+  }
+  .app-plain-list {
+    @apply flex flex-col gap-0.5 text-ui text-base-content;
+  }
+
+  .app-review-body {
+    @apply grid min-h-0 grid-cols-[minmax(0,1fr)_26rem];
+  }
+  .app-review-center-wrap {
+    @apply flex min-h-0 flex-col gap-3 overflow-auto px-6 py-4;
+  }
+  .app-review-center {
+    @apply flex max-w-[52rem] flex-col gap-3;
+  }
+  .app-copy-toolbar {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .app-version-select {
+    @apply w-auto min-w-48 max-w-80;
+  }
+  .app-copy-legend {
+    @apply ml-auto flex items-center gap-2.5 text-meta text-muted;
+  }
+  .app-copy-legend .app-mark {
+    @apply px-0.5 text-meta;
+  }
+  .app-legend-line {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-muted);
+  }
+  .app-legend-line[data-source='llm'] {
+    text-decoration-style: dashed;
+  }
+  .app-legend-line[data-source='human'] {
+    text-decoration-style: dotted;
+  }
+  /* The copy reads as the document under review: a flat sheet on the canvas, measure capped for reading. */
+  .app-copy-sheet {
+    @apply rounded-lg border border-base-300 bg-base-100 px-6 py-5;
+  }
+  .app-copy-caption {
+    @apply inline-flex items-center gap-1.5 text-meta text-muted;
+  }
+  .app-copy-skeleton {
+    @apply flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 px-6 py-6;
+  }
+  .app-edit-pane {
+    @apply flex flex-col gap-2;
+  }
+  .app-edit-findings {
+    @apply flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 px-4 py-3;
+  }
+  .app-mockup {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-mockup-image {
+    @apply max-h-[32rem] max-w-full self-start rounded-md object-contain;
+    outline: 1px solid oklch(0% 0 0 / 0.1);
+    outline-offset: -1px;
+  }
+
+  /* Banners above the copy: large areas, so the alert tone uses its soft fill here (see the token note). */
+  .app-note {
+    @apply flex items-center gap-2.5 rounded-md border px-3 py-2 text-ui;
+  }
+  .app-note[data-tone='alert'] {
+    @apply border-status-alert-line bg-status-alert-soft text-status-alert-soft-content;
+  }
+  .app-note[data-tone='neutral'] {
+    @apply border-status-neutral-line bg-status-neutral-soft text-status-neutral-soft-content;
+  }
+  .app-note > span {
+    @apply min-w-0 flex-1;
+  }
+  .app-note strong {
+    @apply font-semibold;
+  }
+
+  /* Side panel: tabs pinned, panel content scrolls. */
+  .app-review-panel {
+    @apply flex min-h-0 flex-col border-l border-base-300 bg-base-100;
+  }
+  /* RAC marks the whole Tabs container focus-visible when a tab has focus; the tab shows it instead. */
+  .app-review-panel[data-focus-visible] {
+    outline: none;
+  }
+  .app-tabs {
+    @apply flex h-10 shrink-0 items-stretch gap-1 border-b border-base-300 px-2;
+  }
+  .app-tab {
+    @apply inline-flex cursor-default items-center gap-1.5 px-2 text-ui text-muted outline-none;
+    transition-property: color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-tab[data-hovered] {
+    @apply text-base-content;
+  }
+  .app-tab[data-selected] {
+    @apply font-medium text-base-content;
+    box-shadow: inset 0 -2px 0 var(--color-primary);
+  }
+  .app-tab[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -4px;
+  }
+  .app-tab-count {
+    @apply inline-flex h-4 min-w-4 items-center justify-center rounded-xs bg-base-200 px-1 text-meta font-medium text-muted;
+  }
+  .app-tab-panel {
+    @apply min-h-0 flex-1 overflow-auto p-3 outline-none;
+  }
+  .app-tab-panel[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+
+  .app-findings {
+    @apply flex flex-col gap-4;
+  }
+  .app-finding-group {
+    @apply flex flex-col gap-1;
+  }
+  .app-finding-group-title {
+    @apply flex items-baseline justify-between px-1 pb-0.5 text-meta font-semibold text-base-content;
+  }
+  .app-finding-group-count {
+    @apply font-normal text-muted tabular-nums;
+  }
+  .app-finding-card {
+    @apply flex flex-col gap-2 rounded-md border border-transparent px-3 py-2.5 outline-none;
+    transition-property: background-color, border-color, box-shadow;
+    transition-duration: 120ms;
+  }
+  .app-finding-card:hover {
+    @apply bg-hover;
+  }
+  .app-finding-card[data-active] {
+    @apply bg-base-100;
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px var(--color-focus);
+  }
+  .app-finding-card:not([data-state='open']) .app-finding-message {
+    @apply text-muted;
+  }
+  .app-finding-state {
+    @apply flex flex-col gap-0.5 text-meta text-muted;
+  }
+  .app-finding-reason {
+    @apply text-ui text-base-content;
+  }
+  .app-finding-actions {
+    @apply flex items-center gap-1.5;
+  }
+  /* A lone ghost button (Reopen) lines up with the text above it, not with its own padding. */
+  .app-finding-actions > .app-btn[data-variant='ghost']:first-child {
+    @apply -ml-2;
+  }
+  .app-finding-keys {
+    @apply ml-auto flex items-center gap-1;
+  }
+  .app-dismiss-form {
+    @apply flex flex-col gap-2;
+  }
+
+  .app-llm-status {
+    @apply relative mb-3 flex items-center gap-2 overflow-hidden rounded-md border border-base-300 px-3 py-2 text-ui text-base-content;
+  }
+  .app-llm-status[data-state='succeeded'],
+  .app-llm-status[data-state='skipped'] {
+    @apply border-transparent px-1 py-0.5 text-meta text-muted;
+  }
+  .app-llm-status[data-state='failed'] {
+    @apply border-status-error-line bg-status-error-soft text-status-error-soft-content;
+  }
+  .app-llm-status-note {
+    @apply text-muted;
+  }
+  .app-llm-status[data-state='failed'] .app-llm-status-note {
+    color: inherit;
+  }
+  /* Indeterminate progress: a thin bar along the bottom edge; static under reduced motion. */
+  .app-llm-progress {
+    @apply absolute inset-x-0 bottom-0 h-0.5 bg-base-300;
+  }
+  .app-llm-progress::after {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1/3 bg-primary;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .app-llm-progress::after {
+      animation: app-indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+  }
+
+  .app-inline-error {
+    @apply flex items-center gap-3 rounded-md border border-status-error-line bg-status-error-soft px-3 py-2 text-ui text-status-error-soft-content;
+  }
+  .app-panel-stack {
+    @apply flex flex-col gap-4;
+  }
+  .app-panel-skeleton {
+    @apply flex flex-col gap-2.5 p-1;
+  }
+  .app-panel-form {
+    @apply flex flex-col gap-2 border-t border-base-300 pt-3;
+  }
+  .app-panel-heading {
+    @apply mb-1.5 text-meta font-semibold text-base-content;
+  }
+  .app-timeline {
+    @apply flex flex-col;
+  }
+  .app-timeline > li {
+    @apply border-b border-base-300 py-2 last:border-b-0;
+  }
+  .app-timeline-text {
+    @apply text-ui text-base-content;
+  }
+  .app-timeline-meta {
+    @apply text-meta text-muted;
+  }
+  .app-timeline-actor {
+    @apply font-medium text-base-content;
+  }
+  .app-comment-body {
+    @apply mt-0.5 text-ui whitespace-pre-wrap text-base-content;
+  }
+  .app-details {
+    @apply grid grid-cols-[8.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-ui;
+  }
+  .app-detail-row {
+    display: contents;
+  }
+  .app-detail-row dt {
+    @apply text-muted;
+  }
+  .app-detail-row dd {
+    @apply min-w-0 text-base-content;
+    overflow-wrap: anywhere;
+  }
+  .app-terms-group {
+    @apply mb-2;
+  }
+  .app-terms-label {
+    @apply text-ui font-medium text-base-content;
+  }
+  .app-evidence-list {
+    @apply flex flex-col;
+  }
+  .app-evidence {
+    @apply flex flex-col gap-0.5 border-b border-base-300 py-2 last:border-b-0;
+  }
+  .app-link {
+    @apply font-medium text-primary underline decoration-primary/30 underline-offset-2;
+  }
+  .app-link:hover {
+    @apply decoration-primary;
+  }
+  .app-hash {
+    @apply font-mono text-meta text-muted;
+  }
+  .app-file-input {
+    @apply text-ui text-base-content file:mr-3 file:h-7 file:rounded-md file:border file:border-base-300 file:bg-base-100 file:px-2 file:text-ui file:font-medium;
+  }
+  .app-shortcuts {
+    @apply flex flex-col gap-1.5;
+  }
+  .app-shortcut {
+    @apply grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3 text-ui;
+  }
+
   /* ---- App shell ------------------------------------------------------------------------------- */
   .app-shell {
     @apply grid h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
@@ -578,5 +1490,15 @@
   }
   .app-swatch {
     @apply flex min-h-14 flex-col justify-between gap-1 rounded-md border border-base-300 px-2 py-1.5 text-meta;
+  }
+}
+
+/* Indeterminate progress for long operations (AI check); spec §5.5. */
+@keyframes app-indeterminate {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 300% 0;
   }
 }
