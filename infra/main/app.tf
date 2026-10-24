@@ -71,6 +71,10 @@ resource "aws_instance" "app" {
     delete_on_termination = true
   }
 
+  # First boot downloads the compose plugin from GitHub through the NAT; without
+  # this the instance can boot before the private route to the NAT exists.
+  depends_on = [aws_route.private_nat]
+
   tags = {
     Name                   = "${local.name}-app"
     (local.deploy_tag_key) = local.deploy_tag_value
