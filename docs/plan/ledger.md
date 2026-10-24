@@ -28,7 +28,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | Favicon | orchestrator | PR #65 merged | done |
 | Placements UI (#64) | sonnet agent | PR #66 merged | done (rebased by orchestrator; CI green incl. E2E) |
 | SUBMITTED 2026-10-24 | Spencer | — | email sent | demo reset at 22:27 UTC (44 items); site https://clearpath.spencerpresley.com |
-| Walkthrough review 2 | fresh reviewer | — | in progress | hosted READ-ONLY (evaluators active) + local for mutations; findings → GitHub issues label walkthrough-2 |
+| Walkthrough review 2 | fresh reviewer | PR #87 merged (branch kept: issue screenshots link to it) | done: 1 blocker (#67 legacy items never finish loading), 11 should-fix, 8 nits → #67–#86; hosted untouched; no permission leaks | docs/plan/reviews/walkthrough-2.md |
 | Docs: README + ARCHITECTURE | agent | PR #61 merged | done | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
 | Fixes: import + users | agent (worktree) | PR #49 merged | done | S15 import demo, S16 users screen + availability + workload |
 | Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
