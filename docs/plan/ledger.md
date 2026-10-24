@@ -139,8 +139,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 
 Resurface these when Spencer is back. Each has what I did meanwhile.
 
-- (none blocking) FYI at deploy: the hosted demo password will be generated and stored in SSM
-  (`/clearpath/prod/DEMO_USER_PASSWORD`); Spencer should copy it into 1Password and share it with evaluators.
+- **For Spencer (not blocking):** the hosted demo is live at https://d1qhgfjuad1hh0.cloudfront.net (US only).
+  Logins are in docs/demo.md; the shared password is in SSM. Read it with
+  `aws ssm get-parameter --profile clearpath --region us-east-1 --name /clearpath/prod/DEMO_USER_PASSWORD --with-decryption --query Parameter.Value --output text`
+  and put it in 1Password for evaluators. Optional: a custom subdomain of spencerpresley.com (needs a DNS CNAME +
+  ACM validation record at Squarespace; I'd prepare the Terraform and hand you the two records).
 
 
 ## Orchestrator notes
@@ -158,6 +161,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 - Backend gaps from I (bundle into next backend follow-up): ItemRowOut lacks latest decision reason and approval_expires_at (/mine does N fetches; Approved shows no expiry); SubmitItemIn takes no attachments (evidence uploads after create; E's re-check PR #26 now resolves attachment findings on upload); single-item fast-track endpoint (F); shell Viewer from /api/me (H2).
 
+- Before handing to evaluators: run Reset demo once all walkthrough fixes are deployed (removes smoke item CP-223 and any test state).
 - Deploy wave checklist: apply edge.tf (/demo-partners/*) and the DEMO_USER_PASSWORD SSM param BEFORE the first seeding deploy (otherwise CloudFront serves index.html there and the 07:00 sweep marks seeded placements missing); terraform apply for the /demo-partners/* CloudFront route (infra/main/edge.tf); CONN_MAX_AGE under ASGI (verify Django docs; likely CONN_MAX_AGE=0 + psycopg pool); set FRONTEND_BASE_URL to the CloudFront domain (admin login redirects there); settings for DOCUMENTS_BUCKET (S3 storage) and CloudFront-Viewer-Address as allauth client IP header (from #18 comments).
 
 - G follow-ups for J/later: stale running jobs if the worker dies (no redelivery), old export files never deleted, Request-ID reuse across files is skipped as duplicate.
