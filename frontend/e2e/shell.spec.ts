@@ -9,8 +9,8 @@ test('app shell renders with navigation and a quiet API status', async ({ page }
   const nav = page.getByRole('navigation', { name: 'Primary' });
   await expect(nav.getByRole('link', { name: 'Queue' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
-  await expect(page.getByRole('img', { name: 'API online' })).toBeVisible();
-  await expect(page.getByText('API unavailable')).toHaveCount(0);
+  await expect(page.getByText('Server connected')).toBeAttached();
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 test('API status is prominent when the API is down', async ({ page }) => {
@@ -18,7 +18,7 @@ test('API status is prominent when the API is down', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByRole('alert')).toContainText('API unavailable');
+  await expect(page.getByRole('alert')).toContainText("Can't reach server");
 });
 
 test('design gallery is reachable by URL and absent from the nav', async ({ page }) => {

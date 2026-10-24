@@ -1,6 +1,6 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button as AriaButton } from 'react-aria-components';
+import { Button as AriaButton, Focusable } from 'react-aria-components';
 
 import { ApiStatusBadge } from '../../features/system/ApiStatusBadge';
 import { Icon } from '../Icon';
@@ -35,18 +35,27 @@ function NavItem({ section, collapsed }: { section: NavSection; collapsed: boole
   const label = <span className={collapsed ? 'sr-only' : 'app-nav-item-label'}>{section.label}</span>;
 
   if (section.to === undefined) {
-    // Not built yet: visible and named, but not a link to a placeholder page.
-    return (
+    // Not built yet: a disabled link (no href, no placeholder page). Focusable so keyboard users can
+    // discover it, with the same tooltip as real links when the rail is collapsed.
+    const item = (
       <span
-        className="app-nav-item"
+        role="link"
         aria-disabled="true"
-        title={collapsed ? `${section.label} (not available yet)` : undefined}
+        aria-label={`${section.label}, soon`}
+        tabIndex={0}
+        className="app-nav-item"
       >
         <Icon name={section.icon} />
         {label}
         {!collapsed && <span className="app-nav-item-note">Soon</span>}
-        <span className="sr-only">, not available yet</span>
       </span>
+    );
+    return collapsed ? (
+      <Tooltip content={`${section.label} · Soon`} placement="right">
+        <Focusable>{item}</Focusable>
+      </Tooltip>
+    ) : (
+      item
     );
   }
 

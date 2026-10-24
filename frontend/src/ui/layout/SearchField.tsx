@@ -10,7 +10,7 @@ export function SearchField() {
   return (
     <AriaSearchField isDisabled aria-label="Search items" className="app-search">
       <Icon name="action.search" size={14} />
-      <Input placeholder="Search isn't available yet" />
+      <Input placeholder="Search (soon)" />
     </AriaSearchField>
   );
 }

@@ -23,6 +23,8 @@ import { SkeletonBadge, SkeletonTable, SkeletonText } from '../Skeleton';
 import { showToast } from '../toast';
 import { Tooltip } from '../Tooltip';
 
+const RADIUS_PX = { xs: '2px', sm: '3px', md: '4px', lg: '6px' } as const;
+
 const NOW = new Date('2026-10-24T15:00:00Z');
 const hoursAgo = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000);
 
@@ -129,10 +131,9 @@ export function DesignGallery() {
           ))}
         </div>
         <p className="app-gallery-label">
-          Warm colors side by side (brand accent is wordmark-only and never a state):
+          The three warm status colors side by side (no warm brand color competes with them):
         </p>
         <div className="app-gallery-row">
-          <Swatch bg="primary" fg="brand-accent" name="Brand accent" />
           <Swatch bg="status-warning" fg="status-warning-content" name="Warning" />
           <Swatch bg="status-alert" fg="status-alert-content" name="Alert" />
           <Swatch bg="status-error" fg="status-error-content" name="Error" />
@@ -148,7 +149,7 @@ export function DesignGallery() {
           <Swatch bg="base-200" fg="base-content" name="Base 200 · canvas" />
           <Swatch bg="base-200" fg="muted" name="Muted text" />
           <Swatch bg="base-300" fg="base-content" name="Base 300 · rules" />
-          <Swatch bg="neutral" fg="neutral-content" name="Neutral · tooltip, toast" />
+          <Swatch bg="neutral" fg="neutral-content" name="Inverse surface · tooltip, toast" />
           <Swatch bg="base-100" fg="focus" name="Focus ring" />
         </div>
       </Section>
@@ -187,7 +188,7 @@ export function DesignGallery() {
               className="app-gallery-panel flex size-16 items-end p-1.5 text-meta"
               style={{ borderRadius: `var(--radius-${size})` }}
             >
-              {size}
+              {size} · {RADIUS_PX[size]}
             </div>
           ))}
           <div className="flex h-16 w-40 items-end rounded-lg bg-base-100 p-1.5 text-meta shadow-overlay">
@@ -273,8 +274,14 @@ export function DesignGallery() {
             <Button variant={variant} isDisabled>
               Disabled
             </Button>
-            <IconButton icon="action.more" aria-label="More actions" variant={variant} />
-            <IconButton icon="action.filter" aria-label="Filter" variant={variant} size="sm" />
+            {variant === 'danger' ? (
+              <IconButton icon="action.reject" aria-label="Reject" variant="danger" />
+            ) : (
+              <>
+                <IconButton icon="action.more" aria-label="More actions" variant={variant} />
+                <IconButton icon="action.filter" aria-label="Filter" variant={variant} size="sm" />
+              </>
+            )}
           </div>
         ))}
       </Section>
@@ -290,7 +297,13 @@ export function DesignGallery() {
             <RelativeAge at={hoursAgo(24 * 120)} now={NOW} />
             <RelativeAge at="not a date" now={NOW} />
           </span>
-          <Tooltip content="Assign to me">
+          <Tooltip
+            content={
+              <span className="flex items-center gap-1.5">
+                Shortcut <Kbd keys={['C']} />
+              </span>
+            }
+          >
             <Button size="sm" icon="action.assign">
               Claim
             </Button>
@@ -305,7 +318,7 @@ export function DesignGallery() {
         <div className="app-gallery-row">
           <Button
             onPress={() => {
-              showToast({ title: 'Assigned to you', description: 'CP-1042' });
+              showToast({ title: 'Claimed', description: <ItemKey value="CP-1042" copyable={false} /> });
             }}
           >
             Show confirmation
@@ -313,8 +326,7 @@ export function DesignGallery() {
           <Button
             onPress={() => {
               showToast({
-                title: "Couldn't save the decision",
-                description: 'The API is unavailable. Try again in a minute.',
+                title: 'Decision not saved. Try again in a minute.',
                 tone: 'error',
               });
             }}

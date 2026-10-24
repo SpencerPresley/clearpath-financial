@@ -8,14 +8,14 @@ import { server } from '../../test/server';
 import { ApiStatusBadge } from './ApiStatusBadge';
 
 describe('ApiStatusBadge', () => {
-  it('stays quiet when the health endpoint reports ok: named for screen readers only', async () => {
+  it('shows nothing visible when the health endpoint reports ok, and takes no tab stop', async () => {
     server.use(getHealthMockHandler({ status: 'ok', database: true }));
 
-    renderWithQuery(<ApiStatusBadge />);
+    const { container } = renderWithQuery(<ApiStatusBadge />);
 
-    const indicator = await screen.findByRole('img', { name: 'API online' });
-    expect(indicator).not.toHaveTextContent('API online'); // glyph only, no visible text
+    expect(await screen.findByText('Server connected')).toHaveClass('sr-only');
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.querySelector('[tabindex]')).toBeNull();
   });
 
   it('shows nothing visible while the first check is in flight', () => {
@@ -23,15 +23,16 @@ describe('ApiStatusBadge', () => {
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(screen.getByText('Checking API')).toHaveClass('sr-only');
+    expect(screen.getByText('Checking server connection')).toHaveClass('sr-only');
   });
 
-  it('alerts visibly when the health endpoint fails', async () => {
+  it('alerts visibly, with the consequence, when the health endpoint fails', async () => {
     server.use(http.get('*/api/health', () => HttpResponse.json({ detail: 'down' }, { status: 503 })));
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('API unavailable');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Can't reach server · changes won't save");
   });
 
   it('alerts visibly when the health endpoint reports a non-ok status', async () => {
@@ -39,6 +40,6 @@ describe('ApiStatusBadge', () => {
 
     renderWithQuery(<ApiStatusBadge />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('API unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent("Can't reach server");
   });
 });

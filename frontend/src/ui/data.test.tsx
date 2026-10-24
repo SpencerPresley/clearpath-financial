@@ -100,25 +100,25 @@ describe('toast', () => {
     render(<ToastHost />);
 
     act(() => {
-      showToast({ title: 'Assigned to you', description: 'CP-1042' });
+      showToast({ title: 'Claimed', description: 'CP-1042' });
     });
 
     const region = await screen.findByRole('region', { name: 'Notifications' });
-    expect(region).toHaveTextContent('Assigned to you');
+    expect(region).toHaveTextContent('Claimed');
     expect(region).toHaveTextContent('CP-1042');
 
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
     await waitFor(() => {
-      expect(screen.queryByText('Assigned to you')).toBeNull();
+      expect(screen.queryByText('Claimed')).toBeNull();
     });
   });
 
   it('marks error toasts with the error tone and icon', async () => {
     render(<ToastHost />);
     act(() => {
-      showToast({ title: "Couldn't save the decision", tone: 'error' });
+      showToast({ title: 'Decision not saved. Try again in a minute.', tone: 'error' });
     });
-    const title = await screen.findByText("Couldn't save the decision");
+    const title = await screen.findByText('Decision not saved. Try again in a minute.');
     const toast = title.closest('[data-tone]');
     expect(toast).toHaveAttribute('data-tone', 'error');
     expect(toast?.querySelector('svg[data-icon="feedback.error"]')).not.toBeNull();

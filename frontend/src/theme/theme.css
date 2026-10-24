@@ -36,9 +36,10 @@
   --color-secondary: oklch(46% 0.03 258);
   --color-secondary-content: oklch(98.5% 0.004 258);
 
-  /* Accent: the single warm brand color. Wordmark only; never a UI state (it would sit beside amber). */
-  --color-accent: var(--color-brand-accent);
-  --color-accent-content: var(--color-primary);
+  /* No warm accent: every warm hue (red 26, red-orange 42, amber 80) is a status in spec §5.2, so a warm
+     brand color would read as one. daisyUI requires an accent; it aliases the navy. */
+  --color-accent: var(--color-primary);
+  --color-accent-content: var(--color-primary-content);
 
   --color-neutral: oklch(27% 0.025 258);
   --color-neutral-content: oklch(97.5% 0.004 258);
@@ -77,11 +78,10 @@
   --color-transparent: transparent;
 
   /* Brand */
-  --color-brand-accent: oklch(84% 0.1 82); /* muted gold, on navy only */
   --color-brand-muted: oklch(80% 0.03 262); /* secondary text on navy chrome */
-  --color-nav-active: oklch(93.5% 0.02 262); /* selected nav row: a navy tint, not a status */
+  --color-nav-active: oklch(94% 0.005 258); /* selected nav row: grey, so it never reads as info blue */
   --color-muted: oklch(47% 0.022 258); /* secondary text on base-100/200 */
-  --color-focus: oklch(45% 0.16 262); /* focus ring on light surfaces */
+  --color-focus: oklch(38% 0.11 262); /* focus ring on light surfaces: brand navy, lifted for 3:1+ */
   --color-focus-on-brand: oklch(98.5% 0.005 262); /* focus ring on navy chrome */
   --color-skeleton: oklch(93% 0.006 252);
   --color-hover: oklch(25% 0.025 258 / 0.06); /* translucent, so hover reads on any light surface */
@@ -136,7 +136,8 @@
   /*
    * Alert red-orange: live content at risk, act now (needs re-review, drift). Hue sits between error
    * (26) and warning (80); alert badges are also the only solid-filled status badge, so they separate
-   * from error by fill and glyph as well as hue.
+   * from error by fill and glyph as well as hue. Don't put alert on its soft fill in a badge: alert-soft
+   * and error-soft are both pale warm tints and read alike; soft is for large areas (row highlight) only.
    */
   --color-status-alert: oklch(53% 0.15 42);
   --color-status-alert-content: oklch(99% 0.005 44);
@@ -326,6 +327,7 @@
     @apply bg-hover;
   }
   .app-menu-item[data-disabled] {
+    opacity: 0.6;
     @apply text-muted;
   }
   .app-menu-header {
@@ -393,6 +395,9 @@
   .app-toast-title {
     @apply font-medium;
   }
+  .app-toast .app-item-key {
+    color: inherit; /* item keys sit on the inverse surface here */
+  }
   .app-toast-close {
     @apply inline-flex size-7 shrink-0 cursor-default items-center justify-center rounded-md;
   }
@@ -455,14 +460,14 @@
     @apply flex items-center gap-2 pr-2 text-sm font-semibold tracking-tight whitespace-nowrap;
   }
   .app-wordmark-mark {
-    @apply size-2.5 rotate-45 rounded-xs bg-brand-accent;
+    @apply size-3 rounded-xs border-2 border-primary-content;
   }
   .app-wordmark-product {
     @apply font-normal text-brand-muted;
   }
 
   .app-search {
-    @apply flex h-8 w-full max-w-md cursor-not-allowed items-center gap-2 rounded-md border border-dashed border-brand-muted/40 bg-brand-field px-2.5 text-brand-muted;
+    @apply flex h-8 w-full max-w-md cursor-not-allowed items-center gap-2 rounded-md border border-brand-muted/25 bg-brand-field px-2.5 text-brand-muted;
   }
   .app-search input {
     @apply min-w-0 flex-1 cursor-not-allowed bg-transparent text-ui outline-none placeholder:text-brand-muted;
@@ -475,7 +480,7 @@
     @apply inline-flex size-8 items-center justify-center rounded-md text-brand-muted;
   }
   .app-api-down {
-    @apply inline-flex h-7 items-center gap-1.5 rounded-md bg-status-error px-2.5 text-ui font-medium text-status-error-content;
+    @apply inline-flex h-7 items-center gap-1.5 rounded-sm border border-status-error-line bg-status-error-soft px-2 text-ui font-medium text-status-error-soft-content;
   }
   .app-user-btn {
     @apply inline-flex h-8 cursor-default items-center gap-2 rounded-md pr-1.5 pl-1 text-ui text-primary-content;
@@ -515,6 +520,7 @@
   }
   .app-nav-item[aria-current='page'] {
     @apply bg-nav-active font-medium text-primary;
+    box-shadow: inset 2px 0 0 var(--color-primary);
   }
   .app-nav-item[aria-disabled='true'] {
     @apply cursor-default text-muted;
@@ -571,6 +577,6 @@
     @apply text-meta text-muted;
   }
   .app-swatch {
-    @apply flex h-14 flex-col justify-between rounded-md border border-base-300 px-2 py-1.5 text-meta;
+    @apply flex min-h-14 flex-col justify-between gap-1 rounded-md border border-base-300 px-2 py-1.5 text-meta;
   }
 }

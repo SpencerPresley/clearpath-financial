@@ -19,7 +19,6 @@ const PAIRS: [string, string, number][] = [
   ['brand-muted', 'brand-field', 4.5],
   ['status-error-content', 'status-error-hover', 4.5],
   ['muted', 'base-300', 3],
-  ['brand-accent', 'primary', 4.5],
   ['brand-muted', 'primary', 4.5],
   ['primary', 'base-100', 4.5],
   ['primary', 'nav-active', 4.5],

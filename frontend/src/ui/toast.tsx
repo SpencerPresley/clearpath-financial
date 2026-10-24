@@ -16,11 +16,14 @@ import {
   UNSTABLE_ToastRegion as AriaToastRegion,
 } from 'react-aria-components';
 
+import type { ReactNode } from 'react';
+
 import { Icon } from './Icon';
 
 export interface ToastContent {
   title: string;
-  description?: string;
+  /** One line. Render item keys with <ItemKey copyable={false} /> so they match the rest of the app. */
+  description?: ReactNode;
   /** neutral: confirmation. error: something failed; say what happened and what to do (§5.4). */
   tone?: 'neutral' | 'error';
 }

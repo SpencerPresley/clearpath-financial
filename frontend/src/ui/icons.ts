@@ -5,10 +5,12 @@
  * Rules:
  * - Same meaning, same glyph everywhere: pick the key, never the glyph.
  * - Different meanings, different glyphs: icons.test.ts fails on any shared glyph not in SHARED_GLYPHS.
- * - States are enclosed glyphs (CheckCircle), actions are bare (Check), so "Approved" and "Approve" never
- *   collide but still read as related.
- * - Finding source is carried by shape: code check = filled, AI suggestion = outline, checklist = its own
- *   glyph. No sparkles or wands for AI (spec §5.6).
+ * - Decision pairs: the state is enclosed (CheckCircle, XCircle), the action bare (Check) or a sibling
+ *   glyph (ArrowUUpLeft vs ArrowBendUpLeft), so "Approved" and "Approve" are distinct but read as related.
+ * - Finding source is carried by shape: code check = a filled rule (Ruler, spec §5.2 "solid rule icon"),
+ *   AI suggestion = outline, checklist = its own glyph. No sparkles or wands for AI (spec §5.6).
+ * - Distinct objects aren't enough: glyphs for different meanings must also differ in silhouette at 16px
+ *   (blocking = filled octagon; app error = outline circle). Check new glyphs on /dev/design.
  */
 import {
   ArrowBendUpLeftIcon,
@@ -34,7 +36,7 @@ import {
   FilePlusIcon,
   FileTextIcon,
   FlagIcon,
-  FolderUserIcon,
+  FolderSimpleUserIcon,
   FunnelIcon,
   GavelIcon,
   HandshakeIcon,
@@ -47,11 +49,10 @@ import {
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
   PercentIcon,
-  PlugsConnectedIcon,
   PlugsIcon,
   ProhibitIcon,
-  QueueIcon,
-  ShieldCheckIcon,
+  TrayIcon,
+  RulerIcon,
   SidebarSimpleIcon,
   SignOutIcon,
   SortAscendingIcon,
@@ -95,7 +96,7 @@ export const icons = {
   'severity.warning': fill(WarningIcon),
 
   // Finding source (spec §5.2: shape, not color).
-  'source.code': fill(ShieldCheckIcon),
+  'source.code': fill(RulerIcon),
   'source.ai': regular(CpuIcon),
   'source.human': regular(ListChecksIcon),
 
@@ -134,8 +135,8 @@ export const icons = {
   'action.sign_out': regular(SignOutIcon),
 
   // Navigation sections (product-spec Screens). Shares with entities/actions are allowlisted below.
-  'nav.queue': regular(QueueIcon),
-  'nav.my_submissions': regular(FolderUserIcon),
+  'nav.queue': regular(TrayIcon),
+  'nav.my_submissions': regular(FolderSimpleUserIcon),
   'nav.new_submission': regular(FilePlusIcon),
   'nav.library': regular(BooksIcon),
   'nav.offer_terms': regular(PercentIcon),
@@ -146,9 +147,8 @@ export const icons = {
   'nav.user': regular(UserCircleIcon),
 
   // System and feedback.
-  'system.api_online': regular(PlugsConnectedIcon),
   'system.api_offline': bold(PlugsIcon),
-  'feedback.error': fill(WarningCircleIcon),
+  'feedback.error': regular(WarningCircleIcon),
   'feedback.info': regular(InfoIcon),
 } as const satisfies Record<string, IconDef>;
 

@@ -48,9 +48,9 @@ describe('AppShell', () => {
   it('shows unbuilt sections as disabled, not as links to placeholder pages', async () => {
     renderApp();
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const library = within(nav).getByText('Library').closest('.app-nav-item');
+    const library = within(nav).getByRole('link', { name: 'Library, soon' });
     expect(library).toHaveAttribute('aria-disabled', 'true');
-    expect(library?.tagName).not.toBe('A');
+    expect(library.tagName).not.toBe('A');
   });
 
   it('filters sections by the viewer roles', async () => {
@@ -65,16 +65,30 @@ describe('AppShell', () => {
     renderApp();
     const search = await screen.findByRole('searchbox', { name: 'Search items' });
     expect(search).toBeDisabled();
-    expect(search).toHaveAttribute('placeholder', "Search isn't available yet");
+    expect(search).toHaveAttribute('placeholder', 'Search (soon)');
   });
 
-  it('opens the user menu and says plainly that sign-in is not wired yet', async () => {
+  it('opens the account panel and says plainly that sign-in is not wired yet', async () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(await screen.findByRole('button', { name: /Demo user/ }));
-    const menu = await screen.findByRole('menu');
-    expect(menu).toHaveTextContent('No sign-in yet');
-    expect(within(menu).getByRole('menuitem', { name: 'Sign out' })).toHaveAttribute('aria-disabled', 'true');
+    const panel = await screen.findByRole('dialog', { name: 'Account' });
+    expect(panel).toHaveTextContent('No sign-in yet');
+    // No inert "Sign out": the action doesn't exist until accounts do.
+    expect(within(panel).queryByText('Sign out')).toBeNull();
+  });
+
+  it('keeps unbuilt sections reachable by keyboard and named in the collapsed rail', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(NAV_COLLAPSED_KEY, 'true');
+    renderApp();
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    const library = within(nav).getByRole('link', { name: 'Library, soon' });
+    expect(library).toHaveAttribute('aria-disabled', 'true');
+    expect(library).not.toHaveAttribute('href');
+    for (let i = 0; i < 20 && document.activeElement !== library; i += 1) await user.tab();
+    expect(library).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Library · Soon');
   });
 
   it('collapses the nav, keeps every item named, and remembers the choice', async () => {
@@ -106,19 +120,17 @@ describe('AppShell', () => {
 });
 
 describe('API status in the shell', () => {
-  it('is quiet when the API is up: no visible alert', async () => {
+  it('is quiet when the API is up: no visible signal', async () => {
     server.use(getHealthMockHandler({ status: 'ok', database: true }));
     renderApp();
-    expect(await screen.findByRole('img', { name: 'API online' })).toBeInTheDocument();
-    expect(screen.queryByText('API online')).toBeNull(); // named, but no visible text
-    expect(screen.queryByText('API unavailable')).toBeNull();
+    expect(await screen.findByText('Server connected')).toHaveClass('sr-only');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('is prominent when the API is down', async () => {
     server.use(http.get('*/api/health', () => HttpResponse.json({ detail: 'down' }, { status: 503 })));
     renderApp();
-    const alert = await screen.findByText('API unavailable');
-    expect(alert).not.toHaveClass('sr-only');
-    expect(alert.closest('[role="alert"]')).not.toBeNull();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Can't reach server · changes won't save");
   });
 });
