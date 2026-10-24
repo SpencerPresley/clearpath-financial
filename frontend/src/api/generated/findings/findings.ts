@@ -520,7 +520,8 @@ export const getRetryLlmCheckUrl = (itemId: number,) => {
 }
 
 /**
- * Re-run a failed AI check on the current version. [workstream D]
+ * Run a failed AI check again on the current version (reviewer or lead, while the item is under review).
+ * It starts as `pending`; poll the item for the result.
  * @summary Retry Llm Check
  */
 export const retryLlmCheck = async (itemId: number, options?: Parameters<typeof customFetch>[1]): Promise<ItemRowOut> => {
