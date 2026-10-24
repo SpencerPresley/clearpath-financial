@@ -25,13 +25,14 @@ function groupOf(finding: GroupableFinding): FindingGroupId {
   return finding.source === 'human' ? 'checklist' : finding.severity;
 }
 
+// Stable: by position in the copy, never by triage state, so cards don't move under the reviewer while
+// they triage (open/resolved is shown on the card, and n/p skip nothing).
 function order(a: GroupableFinding, b: GroupableFinding): number {
-  const openA = a.state === 'open' ? 0 : 1;
-  const openB = b.state === 'open' ? 0 : 1;
-  return openA - openB || (a.span?.start ?? Infinity) - (b.span?.start ?? Infinity);
+  const start = (f: GroupableFinding) => f.span?.start ?? Number.MAX_SAFE_INTEGER;
+  return start(a) - start(b);
 }
 
-/** Blocking → warning → checklist (human items, whatever their severity); open first, then by position. */
+/** Blocking → warning → checklist (human items, whatever their severity); then by position in the copy. */
 export function groupFindings<T extends GroupableFinding>(findings: readonly T[]): FindingGroup<T>[] {
   return GROUPS.map((group) => ({
     ...group,

@@ -20,6 +20,8 @@ export interface SpanMark {
   quote?: string | null;
   /** Accessible description, e.g. "Blocking · Code check: Rate claim needs the APR range". */
   label: string;
+  /** Accepted or dismissed: drawn quieter so open findings stand out. */
+  resolved?: boolean;
 }
 
 export interface Segment {
@@ -52,8 +54,13 @@ export function toUtf16Span(
 
 const SEVERITY_RANK: Record<Severity, number> = { blocking: 0, warning: 1 };
 
+// Open before resolved, then blocking before warning, then by start: the first mark styles the segment.
 function byPriority(a: SpanMark, b: SpanMark): number {
-  return SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.start - b.start;
+  return (
+    Number(a.resolved === true) - Number(b.resolved === true) ||
+    SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+    a.start - b.start
+  );
 }
 
 /** Splits `text` at every mark boundary; each character appears in exactly one segment. */

@@ -11,6 +11,7 @@ export interface MarkableFinding {
   severity: Severity;
   source: FindingSource;
   message: string;
+  state?: 'open' | 'accepted' | 'dismissed';
 }
 
 /** Spans arrive as code-point offsets (Python); marks are UTF-16 (see segments.ts). */
@@ -29,6 +30,7 @@ export function marksFromFindings(text: string, findings: readonly MarkableFindi
       source: finding.source,
       quote: finding.quote,
       label: `${SEVERITY_META[finding.severity].label} · ${SOURCE_META[finding.source].label}: ${finding.message}`,
+      resolved: finding.state !== undefined && finding.state !== 'open',
     });
   });
   return marks;

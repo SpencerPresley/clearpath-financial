@@ -41,10 +41,12 @@ import {
   GavelIcon,
   HandshakeIcon,
   InfoIcon,
+  KeyboardIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
   MinusCircleIcon,
+  MinusIcon,
   NotePencilIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
@@ -133,6 +135,9 @@ export const icons = {
   'action.open_external': regular(ArrowSquareOutIcon),
   'action.toggle_nav': regular(SidebarSimpleIcon),
   'action.sign_out': regular(SignOutIcon),
+  // Pull live content: the bare sibling of status.withdrawn (MinusCircle), like Approve / Approved.
+  'action.pull': regular(MinusIcon),
+  'action.shortcuts': regular(KeyboardIcon),
 
   // Navigation sections (product-spec Screens). Shares with entities/actions are allowlisted below.
   'nav.queue': regular(TrayIcon),

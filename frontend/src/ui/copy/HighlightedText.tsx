@@ -43,6 +43,7 @@ export function HighlightedText({
             data-severity={top.severity}
             data-source={top.source}
             data-active={active ? 'true' : undefined}
+            data-resolved={segment.marks.every((m) => m.resolved === true) ? 'true' : undefined}
             data-clickable={onMarkPress === undefined ? undefined : 'true'}
             data-mark-ids={segment.marks.map((m) => m.id).join(' ')}
             title={segment.marks.map((m) => m.label).join('\n')}
