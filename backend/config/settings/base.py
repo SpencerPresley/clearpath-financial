@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     "accounts",
     "partners",
     "terms",
+    "reviews",
 ]
 
 MIDDLEWARE = [
@@ -166,6 +167,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Evidence attachments. Local filesystem in dev; production overrides STORAGES with S3 (workstream A).
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # --- Celery ---
 CELERY_BROKER_URL = env.redis_url

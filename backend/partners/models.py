@@ -10,7 +10,7 @@ class Partner(models.Model):
 
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=enum_choices(PartnerType))
-    status = models.CharField(max_length=20, choices=enum_choices(PartnerStatus), default=PartnerStatus.ACTIVE)
+    status = models.CharField(max_length=20, choices=enum_choices(PartnerStatus), default=PartnerStatus.ACTIVE.value)
     website = models.URLField(blank=True)
     contact_email = models.EmailField(blank=True)
     agreement_signed_on = models.DateField(null=True, blank=True)
