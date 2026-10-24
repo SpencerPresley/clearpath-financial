@@ -1,3 +1,5 @@
+import base64
+import json
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -5,8 +7,8 @@ from django.db.models import Count, Max, Q, Sum
 
 from accounts.models import User
 from checks.models import Finding
-from core.domain import FindingState, ItemStatus, PartnerStatus, PartnerType
-from core.errors import NotFound
+from core.domain import FindingSource, FindingState, ItemStatus, PartnerStatus, PartnerType, Severity
+from core.errors import InvalidInput, NotFound, NotPermitted
 from partners.models import Partner
 from reviews.records import AttachmentRow, can_read_partner_attachments, list_partner_attachments
 
@@ -121,4 +123,88 @@ def get_partner_detail(*, partner_id: int, viewer: User) -> PartnerDetail:
         if can_read_partner_attachments(viewer)
         else (),
         repeat_issues=repeat_issues(partner_id=partner_id),
+    )
+
+
+# --- findings history ----------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PartnerFindingRow:
+    """One finding on one version of one of the partner's items: the partner's findings history."""
+
+    id: int
+    item_id: int
+    item_key: str
+    item_title: str
+    item_is_legacy: bool
+    version_n: int
+    rule_id: str
+    citation: str
+    source: FindingSource
+    severity: Severity
+    state: FindingState
+    message: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class PartnerFindingPage:
+    rows: tuple[PartnerFindingRow, ...]
+    next_cursor: str | None
+
+
+def _encode_finding_cursor(finding: Finding) -> str:
+    raw = json.dumps({"at": finding.created_at.isoformat(), "id": finding.pk}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_finding_cursor(cursor: str) -> tuple[datetime, int]:
+    try:
+        data = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+        return datetime.fromisoformat(data["at"]), int(data["id"])
+    except (ValueError, KeyError, TypeError) as exc:  # binascii.Error is a ValueError
+        raise InvalidInput(
+            "This page link is out of date. Reload the list.", fields=[], details={"field": "cursor"}
+        ) from exc
+
+
+def list_partner_findings(
+    *, partner_id: int, viewer: User, cursor: str | None = None, limit: int = 50
+) -> PartnerFindingPage:
+    """Every finding on any version of the partner's items, newest first (ties by id), one page per call.
+
+    Reviewers, leads, and admins (as for partner agreements: the history is a review tool). Two queries: the
+    partner's existence and the page."""
+    if not can_read_partner_attachments(viewer):
+        raise NotPermitted("A partner's findings history is for reviewers and leads.")
+    if not Partner.objects.filter(pk=partner_id).exists():
+        raise NotFound.entity("partner", partner_id)
+    qs = Finding.objects.filter(version__item__partner_id=partner_id)
+    if cursor is not None:
+        at, pk = _decode_finding_cursor(cursor)
+        qs = qs.filter(Q(created_at__lt=at) | Q(created_at=at, pk__lt=pk))
+    findings = list(qs.select_related("version__item").order_by("-created_at", "-pk")[: limit + 1])
+    has_more = len(findings) > limit
+    findings = findings[:limit]
+    return PartnerFindingPage(
+        rows=tuple(
+            PartnerFindingRow(
+                id=f.pk,
+                item_id=f.version.item.pk,
+                item_key=f.version.item.key,
+                item_title=f.version.item.title,
+                item_is_legacy=f.version.item.is_legacy,
+                version_n=f.version.n,
+                rule_id=f.rule_id,
+                citation=f.citation,
+                source=FindingSource(f.source),
+                severity=Severity(f.severity),
+                state=FindingState(f.state),
+                message=f.message,
+                created_at=f.created_at,
+            )
+            for f in findings
+        ),
+        next_cursor=_encode_finding_cursor(findings[-1]) if has_more and findings else None,
     )

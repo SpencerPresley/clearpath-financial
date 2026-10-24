@@ -18,12 +18,16 @@ import type {
 
 import {
   AttachmentKind,
+  FindingSource,
+  FindingState,
   PartnerStatus,
-  PartnerType
+  PartnerType,
+  Severity
 } from '../model';
 import type {
   AttachmentOut,
   PartnerDetailOut,
+  PartnerFindingPageOut,
   PartnerRowOut
 } from '../model';
 
@@ -39,6 +43,8 @@ export const getUpdatePartnerResponseMock = (overrideResponse: Partial<Extract<P
 export const getListPartnerAttachmentsResponseMock = (): AttachmentOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({content_type: faker.string.alpha({length: {min: 10, max: 20}}), download_url: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), kind: faker.helpers.arrayElement(Object.values(AttachmentKind)), original_name: faker.string.alpha({length: {min: 10, max: 20}}), sha256: faker.string.alpha({length: {min: 10, max: 20}}), size_bytes: faker.number.int(), uploaded_at: faker.date.past().toISOString().slice(0, 19) + 'Z', uploaded_by: {id: faker.number.int(), name: faker.string.alpha({length: {min: 10, max: 20}})}})))
 
 export const getUploadPartnerAttachmentResponseMock = (overrideResponse: Partial<Extract<AttachmentOut, object>> = {}): AttachmentOut => ({content_type: faker.string.alpha({length: {min: 10, max: 20}}), download_url: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), kind: faker.helpers.arrayElement(Object.values(AttachmentKind)), original_name: faker.string.alpha({length: {min: 10, max: 20}}), sha256: faker.string.alpha({length: {min: 10, max: 20}}), size_bytes: faker.number.int(), uploaded_at: faker.date.past().toISOString().slice(0, 19) + 'Z', uploaded_by: {id: faker.number.int(), name: faker.string.alpha({length: {min: 10, max: 20}})}, ...overrideResponse})
+
+export const getListPartnerFindingsResponseMock = (overrideResponse: Partial<Extract<PartnerFindingPageOut, object>> = {}): PartnerFindingPageOut => ({next_cursor: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), rows: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({citation: faker.string.alpha({length: {min: 10, max: 20}}), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.number.int(), item_id: faker.number.int(), item_is_legacy: faker.datatype.boolean(), item_key: faker.string.alpha({length: {min: 10, max: 20}}), item_title: faker.string.alpha({length: {min: 10, max: 20}}), message: faker.string.alpha({length: {min: 10, max: 20}}), rule_id: faker.string.alpha({length: {min: 10, max: 20}}), severity: faker.helpers.arrayElement(Object.values(Severity)), source: faker.helpers.arrayElement(Object.values(FindingSource)), state: faker.helpers.arrayElement(Object.values(FindingState)), version_n: faker.number.int()})), ...overrideResponse})
 
 
 export const getListPartnersMockHandler = (overrideResponse?: PartnerRowOut[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PartnerRowOut[]> | PartnerRowOut[]), options?: RequestHandlerOptions) => {
@@ -112,11 +118,24 @@ export const getUploadPartnerAttachmentMockHandler = (overrideResponse?: Attachm
       })
   }, options)
 }
+
+export const getListPartnerFindingsMockHandler = (overrideResponse?: PartnerFindingPageOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PartnerFindingPageOut> | PartnerFindingPageOut), options?: RequestHandlerOptions) => {
+  return http.get('*/api/partners/:partnerId/findings', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListPartnerFindingsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getPartnersMock = () => [
   getListPartnersMockHandler(),
   getCreatePartnerMockHandler(),
   getGetPartnerMockHandler(),
   getUpdatePartnerMockHandler(),
   getListPartnerAttachmentsMockHandler(),
-  getUploadPartnerAttachmentMockHandler()
+  getUploadPartnerAttachmentMockHandler(),
+  getListPartnerFindingsMockHandler()
 ]

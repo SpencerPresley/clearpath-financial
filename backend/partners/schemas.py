@@ -4,7 +4,7 @@ from ninja import Schema
 from pydantic import Field
 
 from accounts.schemas import EMAIL_PATTERN
-from core.domain import PartnerStatus, PartnerType
+from core.domain import FindingSource, FindingState, PartnerStatus, PartnerType, Severity
 from reviews.schemas import AttachmentOut
 
 
@@ -54,3 +54,24 @@ class PartnerUpdateIn(Schema):
     contact_email: str | None = Field(default=None, max_length=254, pattern=rf"^$|{EMAIL_PATTERN}")
     agreement_signed_on: date | None = None
     notes: str | None = Field(default=None, max_length=10_000)
+
+
+class PartnerFindingOut(Schema):
+    id: int
+    item_id: int
+    item_key: str = Field(examples=["CP-1042"])
+    item_title: str
+    item_is_legacy: bool
+    version_n: int
+    rule_id: str = Field(examples=["ftc.material_connection"])
+    citation: str = Field(examples=["16 CFR 255.5"])
+    source: FindingSource = Field(description="code, llm (shown as 'AI suggestion'), or human checklist.")
+    severity: Severity
+    state: FindingState
+    message: str
+    created_at: datetime
+
+
+class PartnerFindingPageOut(Schema):
+    rows: list[PartnerFindingOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` for the next page; null on the last page.")

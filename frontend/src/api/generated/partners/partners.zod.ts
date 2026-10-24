@@ -253,3 +253,41 @@ export const UploadPartnerAttachmentResponse = zod.object({
 }).describe('A person or partner shown in a cell.')
 })
 
+/**
+ * The findings history: every finding on any version of the partner's items, newest first. Reviewers, leads,
+ * and admins. `next_cursor` is null on the last page.
+ * @summary List Findings
+ */
+export const ListPartnerFindingsParams = zod.object({
+  "partner_id": zod.int()
+})
+
+export const listPartnerFindingsQueryLimitDefault = 50;
+export const listPartnerFindingsQueryLimitMax = 200;
+
+
+
+export const ListPartnerFindingsQueryParams = zod.object({
+  "cursor": zod.union([zod.string(),zod.null()]).optional(),
+  "limit": zod.int().min(1).max(listPartnerFindingsQueryLimitMax).default(listPartnerFindingsQueryLimitDefault)
+})
+
+export const ListPartnerFindingsResponse = zod.object({
+  "next_cursor": zod.union([zod.string(),zod.null()]).describe('Pass as `cursor` for the next page; null on the last page.'),
+  "rows": zod.array(zod.object({
+  "citation": zod.string(),
+  "created_at": zod.iso.datetime({"offset":true}),
+  "id": zod.int(),
+  "item_id": zod.int(),
+  "item_is_legacy": zod.boolean(),
+  "item_key": zod.string(),
+  "item_title": zod.string(),
+  "message": zod.string(),
+  "rule_id": zod.string(),
+  "severity": zod.enum(['blocking', 'warning']),
+  "source": zod.enum(['code', 'llm', 'human']).describe('code, llm (shown as \'AI suggestion\'), or human checklist.'),
+  "state": zod.enum(['open', 'accepted', 'dismissed']),
+  "version_n": zod.int()
+}))
+})
+
