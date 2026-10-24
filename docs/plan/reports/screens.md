@@ -268,3 +268,27 @@ rate terms, spec §4.2 ruling 1).
 Private database, migrated and seeded, then dropped. Preview: "2 approved items quote v1; 1 will need re-review, 1
 will expire."; publish v2 and its history diff; the unchanged gate. Partners list, detail, items, findings history,
 upload, edit, create, and a duplicate-name 422 landing on Name.
+
+## Decisions needed (all three PRs)
+
+Every one of these is reversible. Each is listed with its default as built.
+
+1. **Who reads metrics.** Built: reviewers, leads and admins; marketers get a 403. The nav shows Metrics to leads only (product-spec Roles). Changing who can read is a one-line `require_role` change.
+2. **Per-source figures.** When native and imported data both contribute, the tiles show each source's figure and no blended number. The blended median is still in the API.
+3. **Imported data's reach.** Imported history feeds time to first review, rounds and throughput. It doesn't feed time per round or time to fix live content, because the tracker has no per-round dates and imported items are never reopened.
+4. **Attribution by end time.** A measurement counts in the period where it ends.
+5. **Open fix-live clocks are a drill-down list, not a queue link.** This deviates from the plan: the queue can't show withdrawn items whose takedowns are pending, and ruling 6 counts those as open.
+6. **Reviewers and partner pages (P1).**
+   - Should Partners, and Offer terms read-only, appear in reviewers' nav?
+   - Separately, the review screen's owner should link the partner name to `/partners/$id`.
+7. **Library Approved and Expires columns (L6).** #32 now provides `approval_expires_at`. Adding a column breaks the 1280 fit, so something has to give way; Planned run is the candidate.
+8. **Plan path.** The issue named `frontend-secondary.md`; the brief's `docs/plan/screens.md` was used.
+
+## Follow-ups for other owners
+
+- **reviews/:** `q` should match `legacy_ref`, and `ItemRowOut` should carry `legacy_ref` (L7). Precedent search should have paging.
+- **terms/:** `ImpactPreviewOut.normal_lane` isn't a subset of `will_need_rereview`.
+- **imports/ (G):** stuck commit jobs have no timeout and no retry.
+- **K (Outbox):** `AppShell.test.tsx` uses Outbox as its "unbuilt section" example. Change it when Outbox lands.
+- **queue:** move it onto `ui/FilterChip`. Its chip already regains its focus ring through J's `.app-chip-btn[data-focus-visible]` rule.
+- **Unverified live:** the outbox → Celery fan-out after a terms publish, and the Library, Import, Terms and Partners review fixes against a real backend. The import summary and the library's legacy view were checked live after the fixes, by J's owner, on a private DB.
