@@ -81,8 +81,9 @@ class Finding(models.Model):
 class TermsRef(models.Model):
     """A rate, fee, or representative-example claim found in a version's copy (spec §4.2 ruling 1).
 
-    An item "quotes v12" if its current version has TermsRefs to OfferTerms v12. Fast-track replaces these
-    spans when terms change.
+    An approved item "quotes v12" if its approved version (the version of its latest approving Decision) has
+    TermsRefs to OfferTerms v12. Not the current version: after a terms change, fast-track generates v+1 and
+    current moves on while the approval still covers the old text. Fast-track replaces these spans in v+1.
     """
 
     version = models.ForeignKey("reviews.Version", on_delete=models.PROTECT, related_name="terms_refs")
