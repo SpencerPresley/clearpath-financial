@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from demo.content.calendar import GO_LIVE
+from demo.content.calendar import GO_LIVE, TRACKER_IMPORTED
 from demo.content.cards import CC_STORIES
 from demo.content.mortgages import MTG_STORIES
 from demo.content.people import PARTNERS, PERSONAS, TERMS
@@ -23,7 +23,7 @@ CATALOG: Final = Catalog(
             cover="sam",
             cover_reason="Covering for Leah while she's out.",
         ),
-        ImportTracker(day(1, "17:30")),
+        ImportTracker(day(1, "17:30"), dated=TRACKER_IMPORTED),
     ),
     go_live=GO_LIVE,
 )

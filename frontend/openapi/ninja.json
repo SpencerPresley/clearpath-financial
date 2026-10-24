@@ -4088,6 +4088,14 @@
             },
             "title": "Value Mappings",
             "type": "array"
+          },
+          "values": {
+            "description": "Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as.",
+            "items": {
+              "$ref": "#/components/schemas/ValueReadingOut"
+            },
+            "title": "Values",
+            "type": "array"
           }
         },
         "required": [
@@ -4105,7 +4113,8 @@
           "error",
           "columns",
           "status_values",
-          "value_mappings"
+          "value_mappings",
+          "values"
         ],
         "title": "ImportJobOut",
         "type": "object"
@@ -4254,6 +4263,17 @@
       },
       "ImportPreviewOut": {
         "properties": {
+          "already_imported_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportSourceOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Before commit: the earlier import that created the rows counted as already imported, when it's a single one."
+          },
           "counts": {
             "$ref": "#/components/schemas/ImportCountsOut"
           },
@@ -4293,7 +4313,8 @@
           "counts",
           "problems",
           "unmapped",
-          "rows"
+          "rows",
+          "already_imported_from"
         ],
         "title": "ImportPreviewOut",
         "type": "object"
@@ -4485,6 +4506,37 @@
           "message"
         ],
         "title": "ImportProblemOut",
+        "type": "object"
+      },
+      "ImportSourceOut": {
+        "properties": {
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "filename",
+          "committed_at"
+        ],
+        "title": "ImportSourceOut",
         "type": "object"
       },
       "ImportStatus": {
@@ -12007,6 +12059,59 @@
         "title": "ValueMappingOut",
         "type": "object"
       },
+      "ValueReadingOut": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImportValueField"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "default",
+                  "matched",
+                  "mapped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "default: the built-in table; matched: a partner under another spelling; mapped: the admin's mapping; null: not recognized yet.",
+            "title": "Source"
+          },
+          "source_value": {
+            "title": "Source Value",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), or for trigger terms with source default, unknown and left blank.",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field",
+          "source_value",
+          "rows",
+          "value",
+          "source"
+        ],
+        "title": "ValueReadingOut",
+        "type": "object"
+      },
       "VersionCreatedEventOut": {
         "properties": {
           "actor": {
@@ -12418,6 +12523,48 @@
         ],
         "title": "WireToolCallOut",
         "type": "object"
+      },
+      "WorkloadOut": {
+        "description": "One reviewer's open load, as lowest-load assignment counts it.",
+        "properties": {
+          "auto_assigned": {
+            "description": "In lowest-load assignment's pool now: active, available, granted reviewer.",
+            "title": "Auto Assigned",
+            "type": "boolean"
+          },
+          "is_available": {
+            "title": "Is Available",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_items": {
+            "description": "Assigned items in a queue status.",
+            "title": "Open Items",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "weighted_load": {
+            "description": "High 3, medium 2, low 1 per open item: what assignment compares.",
+            "title": "Weighted Load",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "name",
+          "is_available",
+          "auto_assigned",
+          "open_items",
+          "weighted_load"
+        ],
+        "title": "WorkloadOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -12623,7 +12770,7 @@
     },
     "/api/admin/users": {
       "post": {
-        "description": "Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]",
+        "description": "Admins provision accounts (no public signup). Records USER_CREATED. 422 on `body.email` if it's taken.",
         "operationId": "createUser",
         "parameters": [],
         "requestBody": {
@@ -12706,16 +12853,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12731,7 +12868,7 @@
     },
     "/api/admin/users/{user_id}": {
       "patch": {
-        "description": "Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]",
+        "description": "Change roles, active, availability, or name. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED /\nUSER_AVAILABILITY_CHANGED. 409 if it would leave no active admin, or an admin deactivates themselves.",
         "operationId": "updateUser",
         "parameters": [
           {
@@ -12824,16 +12961,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -23185,6 +23312,98 @@
           }
         ],
         "summary": "List Users",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/workload": {
+      "get": {
+        "description": "Open items and weighted load per reviewer, heaviest first: the load lowest-load assignment ranks by.\nLeads and admins.",
+        "operationId": "getReviewerWorkload",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkloadOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Reviewer Workload",
         "tags": [
           "users"
         ]

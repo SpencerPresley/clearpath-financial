@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
-from typing import Final
+from typing import Final, Literal
 
 from openpyxl.utils.datetime import from_excel
 from pydantic import ValidationError
@@ -324,6 +324,76 @@ def _int(cell: RawCell) -> int | None:
     return None
 
 
+# --- one value -------------------------------------------------------------------------------------------------
+
+# Where a value's reading came from: the built-in tables, a partner matched under a different spelling, or the
+# admin's mapping. None: not recognized, so the admin must map it.
+type ValueSource = Literal["default", "matched", "mapped"]
+
+_ENUM_TABLES: Final[Mapping[ImportValueField, Mapping[str, Product | Channel | RiskTier]]] = {
+    ImportValueField.PRODUCT: PRODUCT_MAP,
+    ImportValueField.CHANNEL: CHANNEL_MAP,
+    ImportValueField.RISK_TIER: RISK_TIER_MAP,
+}
+
+
+def read_value(
+    field_: ImportValueField,
+    raw: str,
+    values: Mapping[tuple[ImportValueField, str], str],
+    directory: PartnerDirectory,
+) -> tuple[str | None, ValueSource | None]:
+    """What one raw value imports as: an enum value, a partner name, or "yes"/"no" for trigger terms. The row
+    parser and the Values step's inventory both read through here, so they can't disagree. Trigger terms `?` is
+    a known "unknown" (None, "default"), recognized before any mapping."""
+    if field_ is ImportValueField.TRIGGER_TERMS and raw in TRIGGER_UNKNOWN:
+        return None, "default"
+    mapped = values.get((field_, value_key(raw)))
+    if mapped is not None:
+        return mapped, "mapped"
+    if field_ is ImportValueField.PARTNER:
+        match = directory.resolve(raw)
+        if match is None:
+            return None, None
+        return match.name, "matched" if match.fuzzy else "default"
+    if field_ is ImportValueField.TRIGGER_TERMS:
+        flag = TRIGGER_TERMS_MAP.get(value_key(raw))
+        return (None, None) if flag is None else ("yes" if flag else "no", "default")
+    hit = _ENUM_TABLES[field_].get(value_key(raw))
+    return (None, None) if hit is None else (hit.value, "default")
+
+
+@dataclass(frozen=True)
+class ValueReading:
+    """One distinct value in a mapped value column, and what it imports as (the Values step)."""
+
+    field: ImportValueField
+    source_value: str
+    rows: int
+    value: str | None  # None: not recognized (map it); for trigger terms with source "default", unknown
+    source: ValueSource | None
+
+
+def value_inventory(
+    workbook: RawWorkbook, mapping: ImportMapping, directory: PartnerDirectory
+) -> tuple[ValueReading, ...]:
+    """Every distinct value in each mapped product, channel, partner, risk tier and trigger terms column, read
+    the way the rows are. Counted over every sheet row, like the status values."""
+    sheet = workbook.tracker
+    columns = _column_index(mapping, sheet.headers)
+    values = {(o.field, value_key(o.source_value)): o.value for o in mapping.values}
+    out: list[ValueReading] = []
+    for field_ in ImportValueField:
+        index = columns.get(ImportTargetField(field_.value))
+        if index is None:
+            continue
+        counts = Counter(v for r in sheet.rows if (v := r.cells[index].display))
+        for raw, n in sorted(counts.items()):
+            value, source = read_value(field_, raw, values, directory)
+            out.append(ValueReading(field_, raw, n, value, source))
+    return tuple(out)
+
+
 # --- one row ---------------------------------------------------------------------------------------------------
 
 
@@ -356,11 +426,11 @@ class _RowParser:
         column = self.headers[i] if i is not None else None
         self.problems.append(Problem(self.row.row_number, column, kind, severity, value, message))
 
-    def override(self, field_: ImportValueField, raw: str) -> str | None:
-        return self.values.get((field_, value_key(raw)))
+    def read(self, field_: ImportValueField, raw: str) -> tuple[str | None, ValueSource | None]:
+        return read_value(field_, raw, self.values, self.directory)
 
     def enum_value[E: Product | Channel | RiskTier](
-        self, target: ImportTargetField, table: Mapping[str, E], enum: type[E], *, required: bool
+        self, target: ImportTargetField, enum: type[E], *, required: bool
     ) -> E | None:
         raw = self.cell(target).display
         label = TARGET_LABELS[target]
@@ -368,15 +438,13 @@ class _RowParser:
             if required:
                 self.problem(target, K.MISSING_VALUE, S.ERROR, f"{label} is blank.")
             return None
-        mapped = self.override(ImportValueField(target.value), raw)
-        if mapped is not None:
-            return enum(mapped)
-        hit = table.get(value_key(raw))
-        if hit is None:
+        value, _ = self.read(ImportValueField(target.value), raw)
+        if value is None:
             self.unmapped.append((target, raw))
             severity = S.ERROR if required else S.WARNING
             self.problem(target, K.UNKNOWN_VALUE, severity, f"{label} {raw!r} isn't a known value; map it.")
-        return hit
+            return None
+        return enum(value)
 
     def parse(self, ref: str) -> ParsedRow:  # noqa: C901, PLR0912, PLR0915  # one block per tracker column
         year_hint = ref_year(ref)
@@ -396,25 +464,22 @@ class _RowParser:
         if asset_url is not None and len(asset_url) > URL_MAX:
             asset_url = None
 
-        product = self.enum_value(T.PRODUCT, PRODUCT_MAP, Product, required=True)
-        channel = self.enum_value(T.CHANNEL, CHANNEL_MAP, Channel, required=True)
+        product = self.enum_value(T.PRODUCT, Product, required=True)
+        channel = self.enum_value(T.CHANNEL, Channel, required=True)
 
         partner_name: str | None = None
         partner_raw = self.cell(T.PARTNER).display
         if partner_raw is not None:
-            mapped_partner = self.override(ImportValueField.PARTNER, partner_raw)
-            match = PartnerMatch(mapped_partner, fuzzy=False) if mapped_partner else self.directory.resolve(partner_raw)
-            if match is None:
+            partner_name, source = self.read(ImportValueField.PARTNER, partner_raw)
+            if partner_name is None:
                 self.unmapped.append((T.PARTNER, partner_raw))
                 self.problem(T.PARTNER, K.UNKNOWN_PARTNER, S.ERROR, f"No partner matches {partner_raw!r}; map it.")
-            else:
-                partner_name = match.name
-                if match.fuzzy:
-                    self.problem(T.PARTNER, K.FUZZY_PARTNER, S.WARNING, f"Matched to partner {match.name!r}.")
+            elif source == "matched":
+                self.problem(T.PARTNER, K.FUZZY_PARTNER, S.WARNING, f"Matched to partner {partner_name!r}.")
 
         risk_tier: RiskTier | None = None
         if self.mapped(T.RISK_TIER):
-            risk_tier = self.enum_value(T.RISK_TIER, RISK_TIER_MAP, RiskTier, required=False)
+            risk_tier = self.enum_value(T.RISK_TIER, RiskTier, required=False)
         if risk_tier is None and product is not None and channel is not None:
             risk_tier = derive_risk_tier(
                 product=product, channel=channel, has_partner=partner_name is not None, is_prescreen=False
@@ -519,14 +584,12 @@ class _RowParser:
         if raw is None or raw in TRIGGER_UNKNOWN:
             self.problem(T.TRIGGER_TERMS, K.UNKNOWN_TRIGGER_TERMS, S.WARNING, "Trigger terms unknown; left blank.")
             return None
-        mapped = self.override(ImportValueField.TRIGGER_TERMS, raw)
-        if mapped is not None:
-            return TRIGGER_TERMS_MAP.get(mapped)
-        hit = TRIGGER_TERMS_MAP.get(value_key(raw))
-        if hit is None:
+        value, _ = self.read(ImportValueField.TRIGGER_TERMS, raw)
+        if value is None:
             self.unmapped.append((T.TRIGGER_TERMS, raw))
             self.problem(T.TRIGGER_TERMS, K.UNKNOWN_VALUE, S.WARNING, f"Trigger terms {raw!r} isn't Y or N; map it.")
-        return hit
+            return None
+        return TRIGGER_TERMS_MAP.get(value)
 
     def status(self) -> StatusTarget | None:
         raw = self.cell(T.STATUS).display

@@ -42,7 +42,7 @@ export const GetDemoResetResponse = zod.object({
 }).describe('A Reset demo job. `seeded_items` is set once it\'s done; `error` says what happened if it failed.')
 
 /**
- * Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]
+ * Admins provision accounts (no public signup). Records USER_CREATED. 422 on `body.email` if it's taken.
  * @summary Create User
  */
 export const createUserBodyDisplayNameMax = 120;
@@ -73,7 +73,8 @@ export const CreateUserResponse = zod.object({
 }).describe('A person as shown in pickers (assignee, @mention) and the admin user list.')
 
 /**
- * Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]
+ * Change roles, active, availability, or name. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED /
+ * USER_AVAILABILITY_CHANGED. 409 if it would leave no active admin, or an admin deactivates themselves.
  * @summary Update User
  */
 export const UpdateUserParams = zod.object({

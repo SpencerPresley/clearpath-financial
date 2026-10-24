@@ -20,11 +20,14 @@ import {
   Role
 } from '../model';
 import type {
-  UserOut
+  UserOut,
+  WorkloadOut
 } from '../model';
 
 
 export const getListUsersResponseMock = (): UserOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({display_name: faker.string.alpha({length: {min: 10, max: 20}}), email: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.number.int(), is_active: faker.datatype.boolean(), is_available: faker.datatype.boolean(), roles: faker.helpers.arrayElements(Object.values(Role))})))
+
+export const getGetReviewerWorkloadResponseMock = (): WorkloadOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({auto_assigned: faker.datatype.boolean(), is_available: faker.datatype.boolean(), name: faker.string.alpha({length: {min: 10, max: 20}}), open_items: faker.number.int(), user_id: faker.number.int(), weighted_load: faker.number.int()})))
 
 
 export const getListUsersMockHandler = (overrideResponse?: UserOut[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<UserOut[]> | UserOut[]), options?: RequestHandlerOptions) => {
@@ -38,6 +41,19 @@ export const getListUsersMockHandler = (overrideResponse?: UserOut[] | ((info: P
       })
   }, options)
 }
+
+export const getGetReviewerWorkloadMockHandler = (overrideResponse?: WorkloadOut[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<WorkloadOut[]> | WorkloadOut[]), options?: RequestHandlerOptions) => {
+  return http.get('*/api/users/workload', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetReviewerWorkloadResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getUsersMock = () => [
-  getListUsersMockHandler()
+  getListUsersMockHandler(),
+  getGetReviewerWorkloadMockHandler()
 ]

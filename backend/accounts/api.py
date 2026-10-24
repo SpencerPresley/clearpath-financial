@@ -3,10 +3,9 @@ from ninja import Router, Status
 
 from accounts import selectors, services
 from accounts.models import User
-from accounts.schemas import DemoResetOut, MeOut, MeUpdateIn, UserCreateIn, UserOut, UserUpdateIn
+from accounts.schemas import DemoResetOut, MeOut, MeUpdateIn, UserCreateIn, UserOut, UserUpdateIn, WorkloadOut
 from core.domain import Role
-from core.errors import NotImplementedYet
-from core.schemas import ERRORS, STUB_ERRORS
+from core.schemas import ERRORS
 from demo.services import DemoResetJob, get_reset, request_reset
 
 me_router = Router(tags=["me"])
@@ -44,16 +43,35 @@ def list_users(
     return list(selectors.list_users(role=role, include_inactive=include_inactive))
 
 
-@admin_router.post("/admin/users", response={201: UserOut, **STUB_ERRORS}, operation_id="createUser")
-def create_user(request: HttpRequest, body: UserCreateIn) -> Status[UserOut]:
-    """Admins provision accounts (no public signup). Records USER_CREATED. [admin user management]"""
-    raise NotImplementedYet("user management")
+@users_router.get("/users/workload", response={200: list[WorkloadOut], **ERRORS}, operation_id="getReviewerWorkload")
+def reviewer_workload(request: HttpRequest) -> list[selectors.WorkloadRow]:
+    """Open items and weighted load per reviewer, heaviest first: the load lowest-load assignment ranks by.
+    Leads and admins."""
+    return list(selectors.reviewer_workload(viewer=current_user(request)))
 
 
-@admin_router.patch("/admin/users/{int:user_id}", response={200: UserOut, **STUB_ERRORS}, operation_id="updateUser")
-def update_user(request: HttpRequest, user_id: int, body: UserUpdateIn) -> UserOut:
-    """Change roles or deactivate. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED. [admin user management]"""
-    raise NotImplementedYet("user management")
+@admin_router.post("/admin/users", response={201: UserOut, **ERRORS}, operation_id="createUser")
+def create_user(request: HttpRequest, body: UserCreateIn) -> Status[selectors.UserRow]:
+    """Admins provision accounts (no public signup). Records USER_CREATED. 422 on `body.email` if it's taken."""
+    new = services.NewUser(
+        email=body.email, display_name=body.display_name, roles=tuple(body.roles), password=body.password
+    )
+    user_id = services.create_user(actor=current_user(request), new=new)
+    return Status(201, selectors.get_user(user_id))
+
+
+@admin_router.patch("/admin/users/{int:user_id}", response={200: UserOut, **ERRORS}, operation_id="updateUser")
+def update_user(request: HttpRequest, user_id: int, body: UserUpdateIn) -> selectors.UserRow:
+    """Change roles, active, availability, or name. Records USER_ROLES_CHANGED / USER_ACTIVE_CHANGED /
+    USER_AVAILABILITY_CHANGED. 409 if it would leave no active admin, or an admin deactivates themselves."""
+    changes = services.UserChanges(
+        display_name=body.display_name,
+        roles=None if body.roles is None else tuple(body.roles),
+        is_active=body.is_active,
+        is_available=body.is_available,
+    )
+    services.update_user(actor=current_user(request), user_id=user_id, changes=changes)
+    return selectors.get_user(user_id)
 
 
 @admin_router.post("/admin/demo/reset", response={202: DemoResetOut, **ERRORS}, operation_id="resetDemo")

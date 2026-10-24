@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 from django.db import connection, transaction
-from django.db.models import Case, IntegerField, Sum, Value, When
+from django.db.models import Case, Count, IntegerField, QuerySet, Sum, Value, When
 
 from accounts.models import User
 from audit.payloads import ItemAssignedPayload
@@ -100,20 +100,34 @@ def _set_assignee(  # the event's fields
     return Assignment(assignee_id=user.pk if user is not None else None, mode=mode, reason=reason)
 
 
-def _loads(user_ids: Iterable[int], *, excluding_item_id: int) -> dict[int, int]:
+@dataclass(frozen=True)
+class ReviewerLoad:
+    open_items: int  # assigned items in a queue status
+    weighted: int  # the load rule 2 ranks by: high 3, medium 2, low 1 per open item
+
+
+def weighted_loads(user_ids: Iterable[int], *, excluding_item_id: int | None = None) -> dict[int, ReviewerLoad]:
+    """Open load per reviewer, the number lowest-load assignment compares. Users with no open items are absent.
+    Also read by the lead's workload view (accounts.selectors.reviewer_workload), so the two can't disagree."""
     weight = Case(
         *(When(risk_tier=tier.value, then=Value(w)) for tier, w in TIER_WEIGHT.items()),
         default=Value(1),
         output_field=IntegerField(),
     )
-    rows = (
-        ReviewItem.objects.filter(assignee_id__in=list(user_ids), status__in=QUEUE_STATUSES)
-        .exclude(pk=excluding_item_id)
-        .values("assignee_id")
-        .annotate(load=Sum(weight))
-        .values_list("assignee_id", "load")
-    )
-    return {uid: int(load) for uid, load in rows}
+    items = ReviewItem.objects.filter(assignee_id__in=list(user_ids), status__in=QUEUE_STATUSES)
+    if excluding_item_id is not None:
+        items = items.exclude(pk=excluding_item_id)
+    rows = items.values("assignee_id").annotate(load=Sum(weight), n=Count("pk")).values_list("assignee_id", "load", "n")
+    return {uid: ReviewerLoad(open_items=int(n), weighted=int(load)) for uid, load, n in rows}
+
+
+def auto_assign_pool() -> QuerySet[User]:
+    """Who lowest-load assignment picks from (the item's owner aside): active, available, granted `reviewer`."""
+    return User.objects.filter(is_active=True, is_available=True, roles__contains=[Role.REVIEWER.value])
+
+
+def _loads(user_ids: Iterable[int], *, excluding_item_id: int) -> dict[int, int]:
+    return {uid: load.weighted for uid, load in weighted_loads(user_ids, excluding_item_id=excluding_item_id).items()}
 
 
 def _previous_reviewer(item: ReviewItem) -> User | None:
@@ -163,11 +177,7 @@ def auto_assign(
                     reopen_event_id=reopen_event_id,
                 )
             unavailable = f"{_name(previous)} is unavailable. "
-    pool = list(
-        User.objects.filter(is_active=True, is_available=True, roles__contains=[Role.REVIEWER.value]).exclude(
-            pk=item.owner_id  # pyrefly: ignore[missing-attribute]
-        )
-    )
+    pool = list(auto_assign_pool().exclude(pk=item.owner_id))  # pyrefly: ignore[missing-attribute]
     if not pool:
         return _set_assignee(
             item,

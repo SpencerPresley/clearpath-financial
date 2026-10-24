@@ -10,6 +10,7 @@ import type { ImportSummaryOut } from './importSummaryOut';
 import type { PartyRefOut } from './partyRefOut';
 import type { StatusValueOut } from './statusValueOut';
 import type { ValueMappingOut } from './valueMappingOut';
+import type { ValueReadingOut } from './valueReadingOut';
 
 export interface ImportJobOut {
   columns: ImportColumnOut[];
@@ -31,4 +32,6 @@ export interface ImportJobOut {
   summary: ImportSummaryOut | null;
   updated_at: string;
   value_mappings: ValueMappingOut[];
+  /** Every distinct value in the mapped product, channel, partner, risk tier and trigger terms columns, and what it imports as. */
+  values: ValueReadingOut[];
 }

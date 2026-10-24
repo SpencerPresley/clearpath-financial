@@ -15,8 +15,8 @@ from core.permissions import require_role
 from imports.domain import ImportStatus, ImportTargetField, ImportValueField, RowAction
 from imports.mapping import DEFAULT_STATUS_MAP, guess_target, value_key
 from imports.models import ImportJob, ImportRow
-from imports.normalize import ImportCounts, ParsedRow, Problem, UnmappedValue
-from imports.services import evaluate, job_mapping, job_workbook
+from imports.normalize import ImportCounts, ParsedRow, Problem, UnmappedValue, ValueReading, value_inventory
+from imports.services import evaluate, job_mapping, job_workbook, partner_directory
 from reviews.selectors import PartyRef
 
 _PARSED_ROW: Final = TypeAdapter(ParsedRow)
@@ -78,6 +78,16 @@ class ImportJobDetail(ImportJobRow):
     columns: tuple[ImportColumn, ...]
     status_values: tuple[StatusValue, ...]
     value_mappings: tuple[ValueMapping, ...]
+    values: tuple[ValueReading, ...]  # every distinct product/channel/partner/... value and what it imports as
+
+
+@dataclass(frozen=True)
+class ImportSource:
+    """The earlier import a re-imported sheet's rows came from."""
+
+    job_id: int
+    filename: str
+    committed_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -104,6 +114,8 @@ class ImportPreview:
     problems: tuple[Problem, ...]
     unmapped: tuple[UnmappedValue, ...]
     rows: tuple[PreviewRow, ...]
+    # Before commit, when rows are already in the app: the one import that created them (None if none or several).
+    already_imported_from: ImportSource | None = None
 
 
 def _jobs() -> QuerySet[ImportJob]:
@@ -165,7 +177,8 @@ def _status_values(job: ImportJob) -> tuple[StatusValue, ...]:
 def get_import(*, viewer: User, job_id: int) -> ImportJobDetail:
     require_role(viewer, Role.ADMIN)
     job = _job(job_id)
-    sheet, mapping = job_workbook(job).tracker, job_mapping(job)
+    workbook, mapping = job_workbook(job), job_mapping(job)
+    sheet = workbook.tracker
     columns = tuple(
         ImportColumn(
             name=header,
@@ -181,6 +194,7 @@ def get_import(*, viewer: User, job_id: int) -> ImportJobDetail:
         columns=columns,
         status_values=_status_values(job),
         value_mappings=tuple(ValueMapping(o.field, o.source_value, o.value) for o in mapping.values),
+        values=value_inventory(workbook, mapping, partner_directory(workbook)),
     )
 
 
@@ -236,4 +250,21 @@ def get_preview(*, viewer: User, job_id: int) -> ImportPreview:
         problems=sheet_problems + tuple(p for r in rows for p in r.problems),
         unmapped=unmapped,
         rows=tuple(_preview_row(r, i) for r, i in zip(rows, item_ids, strict=True)),
+        already_imported_from=_source_of(rows) if status is not ImportStatus.COMMITTED else None,
     )
+
+
+def _source_of(rows: tuple[ParsedRow, ...]) -> ImportSource | None:
+    """The single earlier import that created the rows this one would skip as already imported. One query."""
+    refs = [r.legacy_ref for r in rows if r.action is RowAction.SKIP_ALREADY_IMPORTED and r.legacy_ref]
+    if not refs:
+        return None
+    sources = list(
+        ImportRow.objects.filter(legacy_ref__in=refs, action=RowAction.CREATE.value)
+        .values_list("job_id", "job__filename", "job__committed_at")
+        .distinct()[:2]
+    )
+    if len(sources) != 1:
+        return None
+    job_id, filename, committed_at = sources[0]
+    return ImportSource(job_id=job_id, filename=filename, committed_at=committed_at)

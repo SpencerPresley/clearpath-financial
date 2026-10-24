@@ -67,10 +67,28 @@ class ValueMappingOut(Schema):
     value: str
 
 
+class ValueReadingOut(Schema):
+    field: ImportValueField
+    source_value: str
+    rows: int
+    value: str | None = Field(
+        description="What it imports as: the app value, a partner name, or yes/no. Null: not recognized (map it), "
+        "or for trigger terms with source default, unknown and left blank."
+    )
+    source: Literal["default", "matched", "mapped"] | None = Field(
+        description="default: the built-in table; matched: a partner under another spelling; mapped: the admin's "
+        "mapping; null: not recognized yet."
+    )
+
+
 class ImportJobOut(ImportJobSummaryOut):
     columns: list[ImportColumnOut]
     status_values: list[StatusValueOut] = Field(description="Distinct values in the mapped status column.")
     value_mappings: list[ValueMappingOut]
+    values: list[ValueReadingOut] = Field(
+        description="Every distinct value in the mapped product, channel, partner, risk tier and trigger terms "
+        "columns, and what it imports as."
+    )
 
 
 class ColumnMappingIn(Schema):
@@ -143,6 +161,12 @@ class ImportPreviewRowOut(Schema):
     item_id: int | None = Field(description="The item commit created from this row; null before commit or if skipped.")
 
 
+class ImportSourceOut(Schema):
+    job_id: int
+    filename: str
+    committed_at: datetime | None
+
+
 class ImportPreviewOut(Schema):
     job_id: int
     status: ImportStatus
@@ -150,6 +174,10 @@ class ImportPreviewOut(Schema):
     problems: list[ImportProblemOut]
     unmapped: list[UnmappedValueOut] = Field(description="Values the admin must map before those rows import.")
     rows: list[ImportPreviewRowOut]
+    already_imported_from: ImportSourceOut | None = Field(
+        description="Before commit: the earlier import that created the rows counted as already imported, when "
+        "it's a single one."
+    )
 
 
 class ImportCommitIn(Schema):

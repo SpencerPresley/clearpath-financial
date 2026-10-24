@@ -353,8 +353,12 @@ class SetAvailability:
 
 @dataclass(frozen=True)
 class ImportTracker:
+    """`at` is where the import replays (it sets the legacy items' keys); `dated` is the time it records, when the
+    story puts it earlier than its replay slot."""
+
     at: When
     by: str = "admin"
+    dated: When | None = None
 
 
 @dataclass(frozen=True)
