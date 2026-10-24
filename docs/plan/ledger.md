@@ -18,7 +18,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | D2 llm wiring (#5) | agent (worktree `wsD/llm-wiring`) | — | in progress | outbox handler → task → findings; failed/skipped/retry; stuck-running reconciliation. Unblocks Approve |
 | F offer terms (#7) | agent (worktree `wsF/offer-terms`) | — | in progress | publish, impact preview, per-item fan-out, fast-track (single + bulk) |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
-| H2 queue (#9, part 2) | agent (worktree `wsH/queue`) | — | in progress | table, filters, saved views, board, drawer, /api/me wiring |
+| H2 queue (#9, part 2) | agent (worktree) | PR #29 | rebasing (conflict with #28 in theme.css/icons.ts) | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
+| API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
@@ -27,6 +28,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: every queue stat is defined as a filter and equals its view's total; "Needs re-review" = status needs_rereview; legacy excluded from both — a number that doesn't match the list it links to is the fastest way to lose a compliance team's trust.
 
 - Ruling: AI (llm) findings are always severity=warning, enforced at persistence — the AI never blocks or approves on its own judgment; blocking belongs to deterministic checks and the human — cost if wrong: a real AI catch needs the reviewer to accept it (which then blocks approve anyway).
 - Ruling: Reaffirm is not offered on terms_changed re-reviews — the old version quotes superseded terms and reaffirm re-runs code checks against current terms — Fast-track or the normal lane instead.
@@ -82,6 +85,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- UI glossary nit for the wave walkthrough: status badge says "Re-review" while lane/view/stat say "Needs re-review"; pick one label (spec §5.4).
 
 - Backend gaps from I (bundle into next backend follow-up): ItemRowOut lacks latest decision reason and approval_expires_at (/mine does N fetches; Approved shows no expiry); SubmitItemIn takes no attachments (evidence uploads after create; E's re-check PR #26 now resolves attachment findings on upload); single-item fast-track endpoint (F); shell Viewer from /api/me (H2).
 
