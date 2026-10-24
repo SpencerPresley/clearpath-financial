@@ -57,20 +57,26 @@ trigger isn't involved in `ALTER TABLE`).
 These are checked on the version being approved, in this order:
 
 1. The decided version is the current one (`stale_version`).
-2. No open finding, warnings and human checklist items included (`open_findings_block_decision`).
-3. Plain Approve only: no *accepted* finding (`accepted_findings_block_approval`). Accepted means a required
-   change, and the approved version is exactly what goes live.
-4. AI check: `pending`/`running` → `ai_check_pending`. `failed` → `llm_override_reason` is required (422 on that
-   field) and recorded. `succeeded`/`skipped` → pass.
-5. The copy quotes no superseded offer terms (`stale_offer_terms`).
+2. The copy quotes no superseded offer terms (`stale_offer_terms`). This comes first because triage can't fix it.
+3. No open finding, warnings and human checklist items included (`open_findings_block_decision`).
+4. No *accepted* finding on the version being approved (`accepted_findings_block_approval`). Accepted means a
+   required change, and the approved version is exactly what goes live. For approve-with-edits this is v+1,
+   where vN's accepted findings were addressed.
+5. AI check: `pending`/`running` → `ai_check_pending`. `failed` → `llm_override_reason` is required (422 on that
+   field) and recorded; reaffirm takes it too. `succeeded`/`skipped` → pass.
 
 Request changes and Reject need a non-blank reason only. Reject also requests takedown of any live placements.
 
 **Approve with edits** first requires vN fully triaged (accepted is fine) and its AI check done. The reviewer's
 text then becomes v+1 (`reviewer_edit`): code checks run and identical dismissals carry. If v+1 has open
 findings, v+1 is committed as current and `findings_need_triage` (409, `details.findings`) returns them. The
-reviewer triages and re-posts `approved_with_edits` on v+1 without text. Otherwise v+1 is approved in the same
-call.
+reviewer triages and re-posts `approved_with_edits` on v+1 without text. That re-post works only while v+1 has
+no decision. Otherwise v+1 is approved in the same call.
+
+**Carry-forward** handles a finding with the same `(rule_id, quote)` as on an earlier version. It's created
+dismissed only if the latest earlier version that raised it left it dismissed, so a later accept or reopen wins.
+Human checklist items (no quote) carry only into reviewer-edit and fast-track versions; a marketer's
+resubmission starts the checklist open.
 
 **Reaffirm** re-runs the code checks on the same version first. New findings are committed and the reaffirm is
 refused with `findings_need_triage`. After that, gates 2–5 apply.
@@ -110,7 +116,7 @@ record_decision(*, actor, item_id, data: DecisionInput, clock) -> DecisionResult
   # F bulk fast-track: run_bulk(ids, lambda i: record_decision(actor=..., item_id=i, data=DecisionInput(
   #   outcome=APPROVED, version_n=<current n>, reason=..., lane=DecisionLane.FAST_TRACK), clock=...))
   # Items with open findings come back as skips with code open_findings_block_decision (ruling 4).
-reaffirm(*, actor, item_id, reason, clock) -> DecisionResult
+reaffirm(*, actor, item_id, reason, llm_override_reason=None, clock) -> DecisionResult
 pull_item(*, actor, item_id, reason, placement_ids=(), clock) -> None
 approval_expiry(*, channel, decided_at, planned_first_run, planned_last_run, today) -> datetime
 
@@ -144,7 +150,8 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
   1. Lock the item.
   2. `create_version(origin=FAST_TRACK, based_on=<approved version>, author=<lead>)`.
   3. `send_back(reason=TERMS_CHANGED, offer_terms_id=..., generated_version_id=...)`.
-  4. Bulk approve through `run_bulk` + `record_decision(lane=FAST_TRACK)`.
+  4. Bulk approve through `run_bulk` + `record_decision(lane=FAST_TRACK)`, one item per transaction. `run_bulk`
+     does that already; call `send_back` the same way, never several items in one transaction (lock order).
   5. Catch `StaleTermsRef` from `render_fast_track` and leave that item in the normal lane: `send_back` without
      a generated version.
   6. Find affected approvals by the approving Decision's `terms_versions` (or the approved version's TermsRefs).
@@ -170,8 +177,11 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
 
 ## Rulings made here (reversible)
 
-- Ruling: plain Approve refuses accepted findings — accepted = required change, and the approved version is
-  what goes live — cost if wrong: drop gate 3.
+- Ruling: every approval refuses accepted findings on the approved version — accepted = required change, and the
+  approved version is what goes live — cost if wrong: drop gate 4.
+- Ruling: human checklist dismissals carry only into reviewer-edit and fast-track versions — they have no quote,
+  so carrying on `(rule_id, None)` would cover a changed creative forever; not carrying at all would make every
+  approve-with-edits two-phase — cost if wrong: one origin set.
 - Ruling: approve-with-edits is two-phase when v+1 raises findings (v+1 kept, 409 with them) — the brief's
   single call can't satisfy ruling 3's "every finding triaged" for findings that didn't exist before the call —
   cost if wrong: one endpoint contract.
@@ -184,8 +194,14 @@ accept_finding / dismiss_finding / reopen_finding(*, actor, finding_id, note|rea
   wrong: one gate.
 - Ruling: reaffirm re-runs code checks and refuses on new findings — expiry exists to catch rule changes — cost
   if wrong: one call.
-- Ruling: sticky assignment needs the previous reviewer active, available, a reviewer by effective role (leads
-  count) and not the owner; otherwise lowest load, and the reason says so — cost if wrong: a condition.
+- Ruling: sticky goes to the current assignee, else the last decision's approver. The reviewer must be active,
+  available, a reviewer by effective role (leads count) and not the owner; otherwise lowest load, and the reason
+  says so — a lead's manual reassignment while the item sat with the marketer must hold ("manual assignment
+  skips automatic") — cost if wrong: a condition.
+- Ruling: `send_back`/`reopen_item` run one item per transaction (documented, not enforced) — they take the
+  assignment lock after the item's row lock, so a multi-item transaction can deadlock against a concurrent claim.
+  A runtime guard can't tell F's outer transaction from pytest's test transaction — cost if wrong: F must loop
+  with a transaction per item.
 - Ruling: deciders and triagers are the assignee or a lead, never the item's owner — cost if wrong: one check.
 - Ruling: `send_window` expiry is midnight after `max(planned_last_run or planned_first_run, today)`; a channel
   missing from ExpiryPolicy gets 6 months — cost if wrong: a constant.

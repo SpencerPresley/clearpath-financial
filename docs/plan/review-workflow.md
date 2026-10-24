@@ -62,12 +62,15 @@ through `claim` (an explicit full review); triage on a fast-track version leaves
 ## Rulings made here (reversible; recorded again in the report)
 
 1. **Approve needs every finding on the approved version dismissed** (open blocks per ruling 3; *accepted*
-   also blocks plain Approve, because accepted = required change and the approved version is exactly what
-   goes live). Approve-with-edits needs vN triaged (accepted is fine: the edits address them) and v+1 clean.
+   also blocks, because accepted = required change and the approved version is exactly what goes live).
+   Approve-with-edits needs vN triaged (accepted is fine: the edits address them) and v+1 clean.
 2. **Approve-with-edits is two-phase when v+1 raises findings.** v+1 (`reviewer_edit`) is persisted with its
    code findings and carried dismissals. If any v+1 finding is open, the service commits v+1 and raises
-   `EditsNeedTriage` (409, findings in `details`); the reviewer triages and re-posts `approved_with_edits`
-   on `version_n = v+1` without text. Otherwise the approval is recorded in the same call.
+   `FindingsNeedTriage` (409, findings in `details`); the reviewer triages and re-posts `approved_with_edits`
+   on `version_n = v+1` without text (only while v+1 is undecided). Otherwise the approval is recorded in the
+   same call.
+2a. **Human checklist dismissals carry only into reviewer-edit and fast-track versions** (added after review):
+   a marketer's resubmission may carry a new creative, so its checklist starts open.
 3. **AI check on reviewer-edit versions is carried, not re-run** (deviation from ruling 4): v+1 keeps vN's
    `llm_check_status` and the decision records `ai_review_carried_from = vN`. D2's handler skips
    `origin=reviewer_edit`. Fast-track versions set `llm_check_status = skipped` (ruling 4).
@@ -75,10 +78,10 @@ through `claim` (an explicit full review); triage on a fast-track version leaves
    a terms version not in effect now, approve/reaffirm/fast-track are refused. Otherwise F's fan-out (which
    looks for items quoting the *old* version) would miss an approval recorded against an already-old version.
 5. **Reaffirm re-runs code checks** on the same version (insert-only, existing rows win the unique key); any
-   new open finding is committed and the reaffirm refused (`EditsNeedTriage`-style 409 `findings_need_triage`).
-6. **Sticky assignment respects availability**: the previous reviewer (approver of the latest decision, else
-   the current assignee) gets it back only if active, available, a reviewer by effective role, and not the
-   owner; otherwise lowest load. Leads who reviewed get sticky work back (effective role); the lowest-load pool
+   new open finding is committed and the reaffirm refused (409 `findings_need_triage`).
+6. **Sticky assignment respects availability**: the previous reviewer (the current assignee, so a lead's manual
+   reassignment holds; else the approver of the latest decision) gets it back only if active, available, a
+   reviewer by effective role, and not the owner; otherwise lowest load. Leads who reviewed get sticky work back (effective role); the lowest-load pool
    uses stored `reviewer` (Foundation).
 7. **Decider and triager = the assignee or a lead**; never the item's owner (no self-review).
 8. **Expiry**: `fixed_months` → decided_at + N months (day clamped to month end); `send_window` → midnight

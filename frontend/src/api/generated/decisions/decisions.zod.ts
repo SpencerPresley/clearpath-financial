@@ -91,7 +91,7 @@ export const recordDecisionBodyReasonMax = 10000;
 
 
 export const RecordDecisionBody = zod.object({
-  "edited_content_text": zod.union([zod.string().min(1).max(recordDecisionBodyEditedContentTextOneMax),zod.null()]).optional().describe('Approve with edits: the reviewer\'s v+1, which is what\'s approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field.'),
+  "edited_content_text": zod.union([zod.string().min(1).max(recordDecisionBodyEditedContentTextOneMax),zod.null()]).optional().describe('Approve with edits: the reviewer\'s v+1, which is what\'s approved. If v+1 raises findings, the response is 409 findings_need_triage and v+1 becomes current; triage, then post approved_with_edits again on v+1 without this field (and with llm_override_reason again if the AI check failed).'),
   "evidence_attachment_ids": zod.array(zod.int()).max(recordDecisionBodyEvidenceAttachmentIdsMax).optional(),
   "llm_override_reason": zod.union([zod.string().max(recordDecisionBodyLlmOverrideReasonOneMax),zod.null()]).optional().describe('Required to approve when the AI check failed.'),
   "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),
