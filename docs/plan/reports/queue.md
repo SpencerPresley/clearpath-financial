@@ -104,7 +104,7 @@ which took `index` from 671 kB to 542 kB).
   queue order.
 - Inline risk change → `PATCH` 200 `low`.
 - The Product chip sends `?product=credit_card&unassigned=true&sort=queue&limit=50`; the rows narrow.
-- Save view → `POST /api/views` 201 and the URL becomes `view=saved:N`; a duplicate name gets a 422, shown inline.
+- Save view → `POST /api/views` 201 and the URL becomes `view=saved:N`; a duplicate name gets a 422 from the server. The save form puts the server message in an alert, but no test exercises that path and I did not check it against the real 422.
 - Stats strip shows real counts; the drawer loads detail plus findings ("No open findings"); the board loads lanes.
 - No 4xx/5xx other than the expected `/api/me` 401 before sign-in.
 
