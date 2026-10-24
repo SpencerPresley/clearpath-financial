@@ -43,7 +43,9 @@ export function describeEvent(entry: Entry, { versions, users }: HistoryLookups)
     case 'item.reopened': {
       const failed = entry.payload.failed_snapshot_ids ?? [];
       const why =
-        failed.length > 0 ? ` (page couldn’t be fetched on ${plural(failed.length, 'check')} in a row)` : '';
+        failed.length > 0
+          ? ` (page couldn’t be fetched on ${plural(failed.length, 'daily check')} in a row)`
+          : '';
       return `Sent to re-review: ${REOPEN_REASON_LABELS[entry.payload.reason]}${why}`;
     }
     case 'item.expired':

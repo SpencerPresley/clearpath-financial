@@ -88,7 +88,7 @@ describe('describeEvent', () => {
       'Placement checked: copy unchanged, 2 new blocking findings beside it',
     );
     expect(describeEvent(gone, { versions, users })).toBe(
-      'Sent to re-review: Live copy changed (page couldn’t be fetched on 3 checks in a row)',
+      'Sent to re-review: Live copy changed (page couldn’t be fetched on 3 daily checks in a row)',
     );
   });
 

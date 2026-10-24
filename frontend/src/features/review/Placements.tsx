@@ -90,13 +90,13 @@ function FailedNote({ snapshot, failureStreak }: { snapshot: SnapshotOut; failur
   if (snapshot.reopened_item) {
     return (
       <p className="app-drift-note">
-        {plural(failureStreak, 'check')} in a row couldn’t fetch the page, so the approved copy counts as
-        missing.
+        {plural(failureStreak, 'daily check')} in a row couldn’t fetch the page, so the approved copy counts
+        as missing.
       </p>
     );
   }
   const streak =
-    failureStreak > 1 ? ` ${plural(failureStreak, 'check')} in a row couldn’t fetch the page.` : '';
+    failureStreak > 1 ? ` ${plural(failureStreak, 'daily check')} in a row couldn’t fetch the page.` : '';
   return (
     <p className="app-drift-note">
       {snapshot.error_message ?? 'The page could not be checked.'}

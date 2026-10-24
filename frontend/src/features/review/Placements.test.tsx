@@ -226,7 +226,7 @@ describe('PlacementsSection', () => {
     expect(screen.queryByText('New blocking findings')).not.toBeInTheDocument();
   });
 
-  it('counts checks in a row that could not fetch the page', async () => {
+  it('counts daily checks in a row that could not fetch the page', async () => {
     const gone = {
       status: 'failed' as const,
       result: null,
@@ -240,7 +240,7 @@ describe('PlacementsSection', () => {
     expect(await screen.findByText('Check failed')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'The site returned an error. (HTTP 404) 2 checks in a row couldn’t fetch the page. Nothing changed on the item.',
+        'The site returned an error. (HTTP 404) 2 daily checks in a row couldn’t fetch the page. Nothing changed on the item.',
       ),
     ).toBeInTheDocument();
   });
@@ -267,7 +267,9 @@ describe('PlacementsSection', () => {
     expect(await screen.findByText('Page unreachable')).toBeInTheDocument();
     expect(screen.getByText('This check sent the item to re-review.')).toBeInTheDocument();
     expect(
-      screen.getByText('3 checks in a row couldn’t fetch the page, so the approved copy counts as missing.'),
+      screen.getByText(
+        '3 daily checks in a row couldn’t fetch the page, so the approved copy counts as missing.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Nothing changed on the item/)).not.toBeInTheDocument();
   });

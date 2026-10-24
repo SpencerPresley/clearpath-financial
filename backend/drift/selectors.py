@@ -10,7 +10,7 @@ from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import CheckStatus, DriftResult, DriftTrigger, Severity
 from core.errors import NotFound
 from drift import demo
-from drift.services import MISSING_AFTER, CheckRow, failure_streak
+from drift.services import MISSING_AFTER, STREAK_CHECKS, CheckRow, failure_streak
 from reviews.diff import DiffOp, DiffSegment
 from reviews.models import Placement, ReviewItem, Snapshot
 from reviews.selectors import PartyRef, live_placements_q
@@ -145,12 +145,10 @@ def _demo_ref(url: str) -> DemoPageRef | None:
 
 
 def _failure_streaks(placement_ids: list[int]) -> dict[int, int]:
-    """Per placement, how many of its latest finished checks in a row couldn't fetch the page, up to MISSING_AFTER
+    """Per placement, how many of its latest scheduled checks in a row couldn't fetch the page, up to MISSING_AFTER
     (the point where it counts as missing copy). One query: the latest MISSING_AFTER finished checks per placement."""
     recent = (
-        Snapshot.objects.filter(
-            placement_id__in=placement_ids, status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)
-        )
+        Snapshot.objects.filter(STREAK_CHECKS, placement_id__in=placement_ids)
         .annotate(
             rank=Window(
                 RowNumber(), partition_by=[F("placement_id")], order_by=[F("requested_at").desc(), F("pk").desc()]
@@ -158,12 +156,18 @@ def _failure_streaks(placement_ids: list[int]) -> dict[int, int]:
         )
         .filter(rank__lte=MISSING_AFTER)
         .order_by("placement_id", "rank")
-        .values_list("pk", "placement_id", "status", "error_code")
+        .values_list("pk", "placement_id", "status", "error_code", "trigger")
     )
     rows: dict[int, list[CheckRow]] = {}
-    for pk, placement_id, status, error_code in recent:
+    for pk, placement_id, status, error_code, trigger in recent:
         rows.setdefault(placement_id, []).append(
-            CheckRow(id=pk, status=CheckStatus(status), error_code=error_code, reopened=False)
+            CheckRow(
+                id=pk,
+                status=CheckStatus(status),
+                error_code=error_code,
+                reopened=False,
+                trigger=DriftTrigger(trigger),
+            )
         )
     return {placement_id: len(failure_streak(checks)) for placement_id, checks in rows.items()}
 

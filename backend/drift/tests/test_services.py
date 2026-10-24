@@ -486,8 +486,33 @@ def test_drifted_copy_reopens_instead_of_flagging(placement: Placement, clock: F
 # --- a page that can't be fetched: missing after repeated failures --------------------------------------------
 
 
-def _row(pk: int, status: CheckStatus, error_code: str = "", *, reopened: bool = False) -> services.CheckRow:
-    return services.CheckRow(id=pk, status=status, error_code=error_code, reopened=reopened)
+def _row(
+    pk: int,
+    status: CheckStatus,
+    error_code: str = "",
+    *,
+    reopened: bool = False,
+    trigger: DriftTrigger = DriftTrigger.SCHEDULED,
+) -> services.CheckRow:
+    return services.CheckRow(id=pk, status=status, error_code=error_code, reopened=reopened, trigger=trigger)
+
+
+def test_manual_failures_neither_count_nor_reset_the_streak() -> None:
+    failed, manual = CheckStatus.FAILED, DriftTrigger.MANUAL
+
+    assert services.failure_streak(
+        [
+            _row(5, failed, "timeout", trigger=manual),
+            _row(4, failed, "http_error"),
+            _row(3, failed, "http_error", trigger=manual),
+            _row(2, failed, "timeout"),
+            _row(1, CheckStatus.SUCCEEDED),
+        ]
+    ) == (4, 2)
+    # A manual check that read the page is still a success: it ends the streak.
+    assert services.failure_streak(
+        [_row(3, failed, "http_error"), _row(2, CheckStatus.SUCCEEDED, trigger=manual), _row(1, failed, "http_error")]
+    ) == (3,)
 
 
 def test_failure_streak_counts_consecutive_fetch_failures_newest_first() -> None:
@@ -566,6 +591,28 @@ def test_a_failure_on_our_side_ends_the_streak(placement: Placement, clock: Fixe
     assert item_of(placement).status == ItemStatus.APPROVED
 
 
+def test_impatient_check_now_during_an_outage_cannot_reopen(
+    placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    first = _fail(placement, clock)
+    second = _fail(placement, clock)
+    manual = []
+    for _ in range(3):
+        claim = check(placement, clock, actor=reviewer)
+        assert not services.fail(claim=claim, error=FetchError(FetchFailure.TIMEOUT), clock=clock)
+        manual.append(claim.snapshot_id)
+
+    # Recorded and shown, but no transition; and the scheduled streak (2) is intact.
+    assert Snapshot.objects.filter(pk__in=manual, status=CheckStatus.FAILED).count() == 3
+    assert item_of(placement).status == ItemStatus.APPROVED
+
+    third = _fail(placement, clock)
+
+    assert item_of(placement).reopen_reason == ReopenReason.DRIFT_DETECTED
+    reopened = Event.objects.get(type=EventType.ITEM_REOPENED)
+    assert reopened.payload["failed_snapshot_ids"] == [third.snapshot_id, second.snapshot_id, first.snapshot_id]
+
+
 def test_a_page_that_stays_unreachable_reopens_once(
     placement: Placement, clock: FixedClock, enqueued: list[int]
 ) -> None:
@@ -593,7 +640,7 @@ def test_failed_fetches_on_a_placement_that_is_not_live_move_nothing(
 
 
 def test_the_read_counts_new_blocking_findings_and_the_failure_streak(
-    placement: Placement, clock: FixedClock, enqueued: list[int]
+    placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
 ) -> None:
     from drift.selectors import item_drift
 
@@ -607,3 +654,15 @@ def test_the_read_counts_new_blocking_findings_and_the_failure_streak(
     failing = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
     assert failing.latest is not None
     assert (failing.latest.new_blocking_count, failing.failure_streak) == (0, 2)
+
+    for _ in range(3):  # manual failures are shown as the latest check but don't move the streak
+        services.fail(
+            claim=check(placement, clock, actor=reviewer), error=FetchError(FetchFailure.TIMEOUT), clock=clock
+        )
+    clicked = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
+    assert clicked.latest is not None
+    assert (clicked.latest.trigger, clicked.latest.status, clicked.failure_streak) == (
+        DriftTrigger.MANUAL,
+        CheckStatus.FAILED,
+        2,
+    )

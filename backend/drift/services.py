@@ -20,8 +20,10 @@ A check is a Snapshot moving pending -> running -> succeeded | failed:
 - A fetch failure is never a result: it ends `failed` with an error code, which the review screen shows (one 404
   or outage doesn't reopen anything). But MISSING_AFTER consecutive fetch failures of a live placement (any
   `FetchFailure`, HTTP 404/410 included) count as missing copy: the item is reopened (drift_detected) with those
-  failed checks linked. A success ends the streak, and so does a failure on our side (`stuck`, `error`,
-  `no_approved_version`): those say nothing about the page.
+  failed checks linked. Only scheduled (daily) checks count: a failed manual Check now is recorded and shown but
+  neither counts nor resets, so a partner outage plus impatient clicking can't reopen the item. A success (manual
+  or scheduled) ends the streak, and so does a failure on our side (`stuck`, `error`, `no_approved_version`):
+  those say nothing about the page.
 - `reconcile` (beat) fails checks stuck running and re-enqueues pending ones whose message was lost.
 """
 
@@ -71,6 +73,10 @@ LOST_AFTER: Final = timedelta(hours=1)  # pending this long: stop re-enqueueing,
 _DRIFTED: Final = frozenset({DriftResult.MODIFIED, DriftResult.MISSING})
 MISSING_AFTER: Final = 3  # consecutive fetch failures of a live placement that count as missing copy
 FETCH_FAILURE_CODES: Final = frozenset(code.value for code in FetchFailure)  # the page couldn't be read
+# The checks the failure streak reads: finished ones, except failed manual checks (they neither count nor reset).
+STREAK_CHECKS: Final = Q(status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)) & ~Q(
+    status=CheckStatus.FAILED.value, trigger=DriftTrigger.MANUAL.value
+)
 
 
 def _enqueue(snapshot_id: int) -> None:
@@ -120,14 +126,18 @@ class CheckRow:
     status: CheckStatus
     error_code: str
     reopened: bool  # this check sent the item to re-review
+    trigger: DriftTrigger
 
 
 def failure_streak(rows: Iterable[CheckRow]) -> tuple[int, ...]:
-    """The ids of the consecutive fetch failures at the head of `rows` (newest first). A success ends it, so does a
-    failure on our side (not a FetchFailure code), and so does a check that already reopened the item: that streak
-    is spent, so a page that stays unreachable doesn't send the item back again on the very next check."""
+    """The ids of the consecutive scheduled fetch failures at the head of `rows` (newest first). Failed manual checks
+    are skipped: they neither count nor reset. A success ends it, so does a failure on our side (not a FetchFailure
+    code), and so does a check that already reopened the item: that streak is spent, so a page that stays
+    unreachable doesn't send the item back again on the very next check."""
     streak: list[int] = []
     for row in rows:
+        if row.status is CheckStatus.FAILED and row.trigger is DriftTrigger.MANUAL:
+            continue
         if row.status is not CheckStatus.FAILED or row.error_code not in FETCH_FAILURE_CODES or row.reopened:
             break
         streak.append(row.id)
@@ -428,18 +438,22 @@ def fail(
             http_status=error.http_status if error is not None else None,
             at=clock.now(),
         )
-        if error_code not in FETCH_FAILURE_CODES:
+        if error_code not in FETCH_FAILURE_CODES or claim.trigger is DriftTrigger.MANUAL:
             return False
         recent = (
-            Snapshot.objects.filter(
-                placement_id=claim.placement_id, status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)
-            )
+            Snapshot.objects.filter(STREAK_CHECKS, placement_id=claim.placement_id)
             .order_by("-requested_at", "-pk")
-            .values_list("pk", "status", "error_code", "reopen_event_id")[:MISSING_AFTER]
+            .values_list("pk", "status", "error_code", "reopen_event_id", "trigger")[:MISSING_AFTER]
         )
         streak = failure_streak(
-            CheckRow(id=pk, status=CheckStatus(status), error_code=code_, reopened=event_id is not None)
-            for pk, status, code_, event_id in recent
+            CheckRow(
+                id=pk,
+                status=CheckStatus(status),
+                error_code=code_,
+                reopened=event_id is not None,
+                trigger=DriftTrigger(trigger),
+            )
+            for pk, status, code_, event_id, trigger in recent
         )
         if len(streak) < MISSING_AFTER or not _at_risk(item, claim.placement_id, clock):
             return False
