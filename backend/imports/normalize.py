@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from typing import Final
 
+from openpyxl.utils.datetime import from_excel
 from pydantic import ValidationError
 
 from audit.payloads import LegacyTimeline
@@ -56,6 +57,10 @@ _INITIAL_LAST = re.compile(r"^(?P<initial>[A-Za-z])\.?\s+(?P<last>.+)$")
 _URL = re.compile(r"https?://[^\s;,]+")
 _TRAILING_SEPARATOR = re.compile(r"[\s\-:;|]+$")
 _SUFFIXES: Final = "bcdefghijklmnopqrstuvwxyz"
+_MIN_PARTNER_PREFIX: Final = 4
+_LINK_SCHEMES: Final = ("http://", "https://")
+# Excel date serials for 1954-2119: a date typed into a General-format cell arrives as a plain number.
+_SERIAL_RANGE: Final = (20_000, 80_000)
 
 
 # --- inputs ----------------------------------------------------------------------------------------------------
@@ -101,12 +106,15 @@ class PartnerDirectory:
         return cls(names=names)
 
     def resolve(self, raw: str) -> PartnerMatch | None:
-        """Normalized key, then a unique prefix (`CardPerks` -> `CardPerks Weekly`)."""
+        """Normalized key, then a unique prefix of at least 4 characters (`CardPerks` -> `CardPerks Weekly`;
+        `R` matches nothing)."""
         key = partner_key(raw)
         if not key:
             return None
         name = self.names.get(key)
         if name is None:
+            if len(key) < _MIN_PARTNER_PREFIX:
+                return None
             prefixed = [n for k, n in self.names.items() if k.startswith(key)]
             if len(prefixed) != 1:
                 return None
@@ -222,11 +230,14 @@ def _date(year: int, month: int, day: int) -> date | None:
 
 def parse_date(cell: RawCell, *, year_hint: int | None) -> ParsedDate:
     """Real dates, `M/D/YY` (US order, 20YY), `M/D/YYYY`, ISO `YYYY-MM-DD`, and `Mon D` with the year from
-    `year_hint` (the Request ID's `MCR-YY-` prefix)."""
+    `year_hint` (the Request ID's `MCR-YY-` prefix). A bare number in the Excel date-serial range is a date
+    whose cell lost its date format."""
     if cell.when is not None:
         return ParsedDate(cell.when.date(), coerced=False, failed=False)
     text = cell.text
     if text is None:
+        if cell.number is not None and _SERIAL_RANGE[0] <= cell.number <= _SERIAL_RANGE[1]:
+            return ParsedDate(from_excel(cell.number).date(), coerced=True, failed=False)
         return ParsedDate(None, coerced=False, failed=cell.number is not None)
     on: date | None = None
     if m := _US_DATE.match(text):
@@ -285,10 +296,15 @@ def resolve_person(raw: str, people: Sequence[str]) -> str | None:
     return hits.pop() if len(hits) == 1 else None
 
 
+def is_web_link(url: str) -> bool:
+    """Only http(s) links are kept: a workbook can carry `file:` or `javascript:` hyperlinks."""
+    return url.casefold().startswith(_LINK_SCHEMES)
+
+
 def split_asset(cell: RawCell) -> tuple[str | None, str | None]:
     """(title, url) from the three shapes: a hyperlinked file name, `<name> - <url>` text, or a bare name."""
     text = cell.text
-    if cell.hyperlink:
+    if cell.hyperlink and is_web_link(cell.hyperlink):
         return (text or cell.hyperlink)[:TITLE_MAX], cell.hyperlink
     if text is None:
         return None, None
@@ -456,9 +472,8 @@ class _RowParser:
             self.problem(T.EXPIRES_ON, K.MISSING_EXPIRY, S.WARNING, "Approved with no expiry; left blank.")
 
         placement_cell = self.cell(T.PLACEMENT)
-        urls = ([placement_cell.hyperlink] if placement_cell.hyperlink else []) + _URL.findall(
-            placement_cell.text or ""
-        )
+        link = placement_cell.hyperlink
+        urls = ([link] if link and is_web_link(link) else []) + _URL.findall(placement_cell.text or "")
         placement_urls = tuple(dict.fromkeys(urls))
 
         timeline = None
@@ -621,12 +636,21 @@ def normalize(
     ref_i = columns[T.LEGACY_REF]
     unmapped: Counter[tuple[ImportTargetField, str]] = Counter()
 
+    # Approvers resolve against the Lists sheet's reviewers, else the names in the Reviewer column.
+    reviewer_i = columns.get(T.REVIEWER)
+    assigned = (r.cells[reviewer_i].display for r in sheet.rows) if reviewer_i is not None else iter(())
+    people = tuple(dict.fromkeys((*workbook.reviewers, *(p for p in assigned if p))))
+    required_i = [columns[t] for t in REQUIRED_TARGETS if t is not T.LEGACY_REF]
+
     parsed: list[ParsedRow] = []
     first_seen: dict[str, list[tuple[RawRow, ParsedRow]]] = {}
     for row in sheet.rows:
         ref_cell = row.cells[ref_i]
         ref = ref_cell.display
-        if ref is None or len(ref) > REF_MAX or not _REF.match(ref):
+        # A ref-shaped cell with every other required column blank (a stray total, a footnote number) is not a
+        # data row either.
+        blank = all(row.cells[i].is_empty for i in required_i)
+        if ref is None or len(ref) > REF_MAX or not _REF.match(ref) or blank:
             parsed.append(_not_data(row, sheet.headers[ref_i], ref))
             continue
         parser = _RowParser(
@@ -636,7 +660,7 @@ def normalize(
             statuses=statuses,
             values=values,
             directory=directory,
-            reviewers=workbook.reviewers,
+            reviewers=people,
         )
         result = parser.parse(ref)
         unmapped.update(parser.unmapped)

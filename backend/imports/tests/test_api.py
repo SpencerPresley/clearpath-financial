@@ -81,6 +81,24 @@ def test_sample_flow_load_map_preview_commit(admin_user: User, django_capture_on
     assert "columns" not in listed[0]
 
 
+def test_imported_open_items_stay_out_of_the_review_queue(
+    admin_user: User, lead: User, django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    from reviews.tests.factories import make_item
+
+    real = make_item(lead)
+    job_id = _client(admin_user).post("/api/imports/sample").json()["id"]
+    with django_capture_on_commit_callbacks(execute=True):
+        _client(admin_user).post(f"/api/imports/{job_id}/commit", {}, content_type="application/json")
+    client = _client(lead)
+
+    queue = client.get("/api/items").json()["rows"]
+    assert [r["id"] for r in queue] == [real.pk]
+    legacy_open = client.get("/api/items?is_legacy=true").json()["rows"]
+    assert len(legacy_open) == 16
+    assert client.get("/api/items/stats").json()["open"] == 1
+
+
 def test_upload_reads_the_workbook(admin_user: User) -> None:
     upload = SimpleUploadedFile("tracker.xlsx", SAMPLE_TRACKER_PATH.read_bytes())
 
@@ -120,7 +138,7 @@ def test_bad_mapping_values_are_422(admin_user: User) -> None:
     )
 
     assert response.status_code == 422
-    assert response.json()["fields"][0]["loc"] == ["body", "value_mappings.0.value"]
+    assert response.json()["fields"][0]["loc"] == ["body", "value_mappings", 0, "value"]
 
 
 def test_unknown_import_is_404(admin_user: User) -> None:

@@ -8,8 +8,8 @@ domain event, and the job is idempotent on its own row, so re-POSTing commit aft
 import io
 import logging
 import uuid
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import IO, Final
 
@@ -34,7 +34,7 @@ from core.domain import (
     RiskTier,
     Role,
 )
-from core.errors import Conflict, InvalidInput, NotFound
+from core.errors import Conflict, FieldIssue, InvalidInput, NotFound
 from core.permissions import require_role
 from imports.domain import ImportStatus, ImportTargetField, ImportValueField, RowAction
 from imports.mapping import (
@@ -44,6 +44,7 @@ from imports.mapping import (
     PARTNER_TYPE_MAP,
     TARGET_LABELS,
     guess_column_mapping,
+    partner_key,
     value_key,
 )
 from imports.models import ImportJob, ImportRow
@@ -168,18 +169,31 @@ def create_sample_import(*, actor: User, clock: Clock = SYSTEM_CLOCK) -> int:
 # --- mapping --------------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class MappingUpdate:
+    """What the admin changed. `columns` merge into the saved mapping; a list left as None keeps the saved one,
+    so a PUT that only remaps a column doesn't erase status or value mappings."""
+
+    columns: Mapping[str, ImportTargetField] = field(default_factory=dict)
+    statuses: tuple[StatusOverride, ...] | None = None
+    values: tuple[ValueOverride, ...] | None = None
+
+
+def _invalid(loc: tuple[str | int, ...], message: str) -> InvalidInput:
+    return InvalidInput(message, fields=[FieldIssue(loc=("body", *loc), message=message)])
+
+
 def _check_status_override(o: StatusOverride, index: int) -> StatusOverride:
-    loc = f"status_values.{index}"
     if o.status not in IMPORTABLE_STATUSES:
-        raise InvalidInput.for_field(f"{loc}.status", f"Imported items can't be {o.status.replace('_', ' ')}.")
+        raise _invalid(("status_values", index, "status"), f"Imported items can't be {o.status.replace('_', ' ')}.")
     outcome = o.outcome or IMPLIED_OUTCOME.get(o.status)
     if outcome not in _ALLOWED_OUTCOMES[o.status]:
-        raise InvalidInput.for_field(f"{loc}.outcome", f"A {o.status.replace('_', ' ')} item can't have that decision.")
+        message = f"A {o.status.replace('_', ' ')} item can't have that decision."
+        raise _invalid(("status_values", index, "outcome"), message)
     return StatusOverride(source_value=o.source_value, status=o.status, outcome=outcome)
 
 
 def _check_value_override(o: ValueOverride, index: int, directory: PartnerDirectory) -> ValueOverride:
-    loc = f"value_mappings.{index}.value"
     valid: Iterable[str]
     match o.field:
         case ImportValueField.PRODUCT:
@@ -193,35 +207,56 @@ def _check_value_override(o: ValueOverride, index: int, directory: PartnerDirect
         case ImportValueField.PARTNER:
             valid = directory.names.values()
     if o.value not in valid:
-        raise InvalidInput.for_field(loc, f"{o.value!r} isn't a valid {TARGET_LABELS[ImportTargetField(o.field)]}.")
+        label = TARGET_LABELS[ImportTargetField(o.field)]
+        raise _invalid(("value_mappings", index, "value"), f"{o.value!r} isn't a valid {label}.")
     return o
 
 
-def set_mapping(*, actor: User, job_id: int, mapping: ImportMapping, clock: Clock = SYSTEM_CLOCK) -> None:
-    """Save the admin's column, status-value, and value mappings. Headers left out keep their current target."""
+def _check_columns(
+    headers: Sequence[str], saved: Mapping[str, str], update: Mapping[str, ImportTargetField]
+) -> dict[str, str]:
+    for i, header in enumerate(update):
+        if header not in headers:
+            raise _invalid(("columns", i, "source"), f"The sheet has no column {header!r}.")
+    merged = {**saved, **{h: t.value for h, t in update.items()}}
+    claimed: dict[str, str] = {}
+    for header in headers:
+        target = merged.get(header, ImportTargetField.IGNORE.value)
+        if target == ImportTargetField.IGNORE.value:
+            continue
+        if target in claimed:
+            label = TARGET_LABELS[ImportTargetField(target)]
+            raise _invalid(
+                ("columns",), f"{label} is mapped from both {claimed[target]!r} and {header!r}; set one to Ignore."
+            )
+        claimed[target] = header
+    return merged
+
+
+def set_mapping(*, actor: User, job_id: int, update: MappingUpdate, clock: Clock = SYSTEM_CLOCK) -> None:
+    """Save the admin's column, status-value, and value mappings."""
     require_role(actor, Role.ADMIN)
     with transaction.atomic():
         job = _job_for_update(job_id)
         if ImportStatus(job.status) not in _EDITABLE:
             raise Conflict(f"This import is {job.status}; its mapping can't change.")
         workbook = job_workbook(job)
-        headers = set(workbook.tracker.headers)
-        for i, header in enumerate(mapping.columns):
-            if header not in headers:
-                raise InvalidInput.for_field(f"columns.{i}.source", f"The sheet has no column {header!r}.")
-        directory = partner_directory(workbook)
-        statuses = [_check_status_override(o, i) for i, o in enumerate(mapping.statuses)]
-        values = [_check_value_override(o, i, directory) for i, o in enumerate(mapping.values)]
-        job.column_mapping = {**job.column_mapping, **{h: t.value for h, t in mapping.columns.items()}}
-        job.status_mapping = [
-            {
-                "source_value": s.source_value,
-                "status": s.status.value,
-                "outcome": s.outcome.value if s.outcome else None,
-            }
-            for s in statuses
-        ]
-        job.value_mapping = [{"field": v.field.value, "source_value": v.source_value, "value": v.value} for v in values]
+        job.column_mapping = _check_columns(workbook.tracker.headers, job.column_mapping, update.columns)
+        if update.statuses is not None:
+            job.status_mapping = [
+                {
+                    "source_value": o.source_value,
+                    "status": o.status.value,
+                    "outcome": o.outcome.value if o.outcome else None,
+                }
+                for o in (_check_status_override(o, i) for i, o in enumerate(update.statuses))
+            ]
+        if update.values is not None:
+            directory = partner_directory(workbook)
+            job.value_mapping = [
+                {"field": o.field.value, "source_value": o.source_value, "value": o.value}
+                for o in (_check_value_override(o, i, directory) for i, o in enumerate(update.values))
+            ]
         job.status = ImportStatus.MAPPED.value
         job.error = ""
         job.updated_at = clock.now()
@@ -229,6 +264,10 @@ def set_mapping(*, actor: User, job_id: int, mapping: ImportMapping, clock: Cloc
 
 
 # --- commit ---------------------------------------------------------------------------------------------------
+
+
+def _blocked_message(n: int) -> str:
+    return f"{n} {'row has' if n == 1 else 'rows have'} problems. Fix the mapping or skip them."
 
 
 def _enqueue_commit(job_id: int) -> None:
@@ -251,8 +290,7 @@ def request_commit(*, actor: User, job_id: int, skip_blocked: bool = True, clock
             if result.problems:
                 raise Conflict(result.problems[0].message)
             if result.counts.blocked and not skip_blocked:
-                rows = "row has" if result.counts.blocked == 1 else "rows have"
-                raise Conflict(f"{result.counts.blocked} {rows} problems. Fix the mapping or skip them.")
+                raise Conflict(_blocked_message(result.counts.blocked))
             job.status = ImportStatus.COMMITTING.value
             job.skip_blocked_rows = skip_blocked
             job.commit_requested_by = actor
@@ -287,16 +325,17 @@ class _PartnerIds:
     by_key: dict[str, int]
 
     def get(self, name: str | None) -> int | None:
-        return self.by_key.get(name.casefold()) if name else None
+        return self.by_key.get(partner_key(name)) if name else None
 
 
 def _ensure_partners(workbook: RawWorkbook, *, actor: User | None, at: datetime) -> tuple[_PartnerIds, int]:
-    """Create every Partners-sheet partner the app doesn't have (by case-insensitive name), with an event each.
+    """Create every Partners-sheet partner the app doesn't have, with an event each. "Doesn't have" uses the key
+    rows resolve with (`partner_key`), so an app "Lend Compare" isn't duplicated by a sheet "LendCompare".
     Not via `partners.services.create_partner`: that action is the Lead's, and an import runs as an admin."""
-    existing = {name.casefold(): pk for pk, name in Partner.objects.values_list("pk", "name")}
+    existing = {partner_key(name): pk for pk, name in Partner.objects.values_list("pk", "name")}
     created = 0
     for row in workbook.partners:
-        if row.name.casefold() in existing:
+        if partner_key(row.name) in existing:
             continue
         type_ = PARTNER_TYPE_MAP.get(value_key(row.type or ""), PartnerType.AFFILIATE)
         status = PARTNER_STATUS_MAP.get(value_key(row.status or ""), PartnerStatus.ACTIVE)
@@ -319,7 +358,7 @@ def _ensure_partners(workbook: RawWorkbook, *, actor: User | None, at: datetime)
             actor=actor,
             at=at,
         )
-        existing[row.name.casefold()] = partner.pk
+        existing[partner_key(row.name)] = partner.pk
         created += 1
     return _PartnerIds(existing), created
 
@@ -372,7 +411,7 @@ def commit_import(*, job_id: int, clock: Clock = SYSTEM_CLOCK) -> None:
         if result.problems:
             raise Conflict(result.problems[0].message)
         if result.counts.blocked and not job.skip_blocked_rows:
-            raise Conflict(f"{result.counts.blocked} rows have problems.")
+            raise Conflict(_blocked_message(result.counts.blocked))
 
         workbook = job_workbook(job)
         partners, partners_created = _ensure_partners(workbook, actor=actor, at=now)

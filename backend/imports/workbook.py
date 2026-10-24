@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import IO, Final
+from xml.etree.ElementTree import ParseError
 
 import openpyxl
 from openpyxl.cell.cell import Cell, MergedCell
@@ -24,8 +25,12 @@ from imports.mapping import guess_column_mapping
 # is backend/, so the repo-root copy isn't in the image). test_sample_copy keeps the two identical.
 SAMPLE_TRACKER_PATH: Final = Path(__file__).resolve().parent / "sample" / "clearpath_review_tracker.xlsx"
 
-MAX_BYTES: Final = 10 * 1024 * 1024
+# Trackers are well under 1 MB. openpyxl parses the whole file at upload (in the request), so the cap keeps that
+# inside CloudFront's 60 s origin timeout.
+MAX_BYTES: Final = 5 * 1024 * 1024
 MAX_DATA_ROWS: Final = 5000
+MAX_SCAN_ROWS: Final = 10_000  # the used range below the header we'll read; sparse rows are skipped
+MAX_COLUMNS: Final = 100
 _HEADER_SCAN_ROWS: Final = 10
 _MIN_HEADER_CELLS: Final = 3
 _MIN_TRACKER_TARGETS: Final = 3
@@ -113,17 +118,16 @@ def _cell(cell: Cell | MergedCell) -> RawCell:
     return RawCell(text=text or None, hyperlink=link)
 
 
-def _rows(ws: Worksheet) -> list[tuple[int, list[RawCell]]]:
-    return [(cells[0].row or 0, [_cell(c) for c in cells]) for cells in ws.iter_rows() if cells]
-
-
-def _header(rows: Sequence[tuple[int, list[RawCell]]]) -> tuple[int, list[str]] | None:
-    for row_number, cells in rows[:_HEADER_SCAN_ROWS]:
-        if sum(1 for c in cells if c.text is not None) >= _MIN_HEADER_CELLS:
-            names = [c.display or f"Column {i + 1}" for i, c in enumerate(cells)]
+def _header(ws: Worksheet) -> tuple[int, list[str]] | None:
+    """The first of the top rows with enough text cells. Bounded: a stray cell far right doesn't widen it."""
+    rows = ws.iter_rows(max_row=min(ws.max_row, _HEADER_SCAN_ROWS), max_col=min(ws.max_column, MAX_COLUMNS))
+    for cells in rows:
+        raw = [_cell(c) for c in cells]
+        if sum(1 for c in raw if c.text is not None) >= _MIN_HEADER_CELLS:
+            names = [c.display or f"Column {i + 1}" for i, c in enumerate(raw)]
             while names and names[-1].startswith("Column "):  # trailing blank header cells
                 names.pop()
-            return row_number, names
+            return cells[0].row or 0, names
     return None
 
 
@@ -131,21 +135,29 @@ def _score(headers: Sequence[str]) -> int:
     return sum(1 for t in guess_column_mapping(headers).values() if t is not ImportTargetField.IGNORE)
 
 
-def _sheet(name: str, rows: Sequence[tuple[int, list[RawCell]]], header_row: int, headers: list[str]) -> RawSheet:
+def _sheet(ws: Worksheet, header_row: int, headers: list[str], *, strict: bool) -> RawSheet:
+    """Rows below the header, only as wide as the header. openpyxl materializes every cell in the range it's
+    asked for, so the range is bounded: one stray cell at row 60000 would otherwise cost minutes. `strict`
+    (the tracker) refuses an oversized used range instead of reading part of it."""
     width = len(headers)
+    last = ws.max_row
+    if last - header_row > MAX_SCAN_ROWS:
+        if strict:
+            raise UnreadableWorkbookError(
+                f"Sheet {ws.title!r} has cells down to row {last}; delete what's below your data and retry."
+            )
+        last = header_row + MAX_SCAN_ROWS
     body = []
-    for row_number, cells in rows:
-        if row_number <= header_row:
-            continue
-        padded = (cells + [EMPTY] * width)[:width]
+    for cells in ws.iter_rows(min_row=header_row + 1, max_row=last, max_col=width):
+        padded = ([_cell(c) for c in cells] + [EMPTY] * width)[:width]
         if all(c.is_empty for c in padded):
             continue
-        body.append(RawRow(row_number=row_number, cells=tuple(padded)))
-    if len(body) > MAX_DATA_ROWS:
+        body.append(RawRow(row_number=cells[0].row or 0, cells=tuple(padded)))
+    if strict and len(body) > MAX_DATA_ROWS:
         raise UnreadableWorkbookError(
             f"The sheet has {len(body)} rows; split it into files of {MAX_DATA_ROWS} or fewer."
         )
-    return RawSheet(name=name, header_row=header_row, headers=tuple(headers), rows=tuple(body))
+    return RawSheet(name=ws.title, header_row=header_row, headers=tuple(headers), rows=tuple(body))
 
 
 def _column(headers: Sequence[str], *names: str) -> int | None:
@@ -207,34 +219,33 @@ def read_workbook(source: IO[bytes]) -> RawWorkbook:
     a sheet with "Partner Name" + "Type" supplies the partner directory; a "Reviewer" column supplies names."""
     data = source.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
-        raise UnreadableWorkbookError("The file is over 10 MB; remove unused sheets or split it.")
+        raise UnreadableWorkbookError("The file is over 5 MB; remove unused sheets or split it.")
     try:
         wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
-    except (zipfile.BadZipFile, InvalidFileException, KeyError, OSError, ValueError) as exc:
+    except (zipfile.BadZipFile, InvalidFileException, KeyError, OSError, ValueError, ParseError) as exc:
         raise UnreadableWorkbookError(
             "This file isn't an .xlsx workbook. Save it from Excel as .xlsx and retry."
         ) from exc
 
-    sheets: list[tuple[str, list[tuple[int, list[RawCell]]], int, list[str]]] = []
+    sheets: list[tuple[Worksheet, int, list[str]]] = []
     for ws in wb.worksheets:
-        rows = _rows(ws)
-        header = _header(rows)
+        header = _header(ws)
         if header is not None:
-            sheets.append((ws.title, rows, header[0], header[1]))
-    scored = sorted(((_score(s[3]), i) for i, s in enumerate(sheets)), key=lambda p: (-p[0], p[1]))
+            sheets.append((ws, header[0], header[1]))
+    scored = sorted(((_score(s[2]), i) for i, s in enumerate(sheets)), key=lambda p: (-p[0], p[1]))
     if not scored or scored[0][0] < _MIN_TRACKER_TARGETS:
         raise UnreadableWorkbookError("No sheet has tracker columns (Request ID, Status, Product, ...) in its header.")
     tracker_i = scored[0][1]
-    tracker = _sheet(*sheets[tracker_i])
+    tracker = _sheet(*sheets[tracker_i], strict=True)
 
     partners: tuple[PartnerSheetRow, ...] = ()
     reviewers: tuple[str, ...] = ()
-    for i, (name, rows, header_row, headers) in enumerate(sheets):
+    for i, (ws, header_row, headers) in enumerate(sheets):
         if i == tracker_i:
             continue
         folded = {h.casefold() for h in headers}
         if not partners and "type" in folded and folded & {"partner name", "name"}:
-            partners = _partners(_sheet(name, rows, header_row, headers))
+            partners = _partners(_sheet(ws, header_row, headers, strict=False))
         elif not reviewers and folded & {"reviewer", "reviewers"}:
-            reviewers = _reviewers(_sheet(name, rows, header_row, headers))
+            reviewers = _reviewers(_sheet(ws, header_row, headers, strict=False))
     return RawWorkbook(tracker=tracker, partners=partners, reviewers=reviewers)

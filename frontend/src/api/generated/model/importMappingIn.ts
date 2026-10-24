@@ -9,11 +9,11 @@ import type { StatusMappingIn } from './statusMappingIn';
 import type { ValueMappingIn } from './valueMappingIn';
 
 /**
- * `columns` are merged into the current mapping (headers left out keep theirs); `status_values` and
- * `value_mappings` replace the saved lists.
+ * `columns` are merged into the current mapping (headers left out keep theirs). `status_values` and
+ * `value_mappings` replace the saved lists when sent; leave them out (or null) to keep what's saved.
  */
 export interface ImportMappingIn {
   columns?: ColumnMappingIn[];
-  status_values?: StatusMappingIn[];
-  value_mappings?: ValueMappingIn[];
+  status_values?: StatusMappingIn[] | null;
+  value_mappings?: ValueMappingIn[] | null;
 }

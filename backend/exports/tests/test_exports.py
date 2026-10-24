@@ -6,25 +6,28 @@ import json
 import zipfile
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from datetime import timedelta
 from typing import Any
 
 import openpyxl
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
 from accounts.models import User
 from audit.models import Event
 from conftest import UserFactory
 from core.clock import FixedClock
-from core.domain import EventType, ItemStatus, Role
+from core.domain import AttachmentKind, EventType, ItemStatus, Role
 from core.errors import Conflict, InvalidInput, NotPermitted
 from exports import evidence, services
 from exports.domain import ExportStatus
 from exports.models import ExportJob
 from exports.tests.conftest import APPROVED_TEXT, Approved
 from reviews.filters import ItemFilter, ItemSort
-from reviews.models import Attachment
-from reviews.tests.factories import make_item
+from reviews.models import Attachment, DecisionEvidence
+from reviews.services import AttachmentOwner, add_attachment
+from reviews.tests.factories import make_item, make_partner
 
 pytestmark = pytest.mark.django_db
 
@@ -132,7 +135,7 @@ def test_a_failed_build_is_recorded_on_the_job(
 
     job = ExportJob.objects.get(pk=job_id)
     assert job.status == ExportStatus.FAILED.value
-    assert "storage unavailable" in job.error
+    assert job.error == f"The export failed. Request it again; if it fails again, report export {job_id}."
     assert not Event.objects.filter(type=EventType.EXPORT_CREATED.value).exists()
 
 
@@ -309,3 +312,47 @@ def test_evidence_pack_for_an_unapproved_item_is_409(marketer: User) -> None:
     assert client.get(f"/api/items/{item.pk}/evidence-pack").status_code == 409
     assert client.post(f"/api/items/{item.pk}/evidence-pack").json()["code"] == "conflict"
     assert client.get("/api/items/999999/evidence-pack").status_code == 404
+
+
+def test_partner_documents_are_withheld_from_a_marketers_pack(
+    approved: Approved, lead: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    partner = make_partner("LendCompare")
+    agreement = add_attachment(
+        actor=lead,
+        owner=AttachmentOwner(kind="partner", id=partner.pk),
+        kind=AttachmentKind.AGREEMENT,
+        file=SimpleUploadedFile("agreement.pdf", b"%PDF agreement", content_type="application/pdf"),
+        clock=clock,
+    )
+    DecisionEvidence.objects.create(decision=approved.decision, attachment_id=agreement.id, sha256=agreement.sha256)
+
+    def pack_for(user: User) -> zipfile.ZipFile:
+        with django_capture_on_commit_callbacks(execute=True):
+            job_id = services.request_evidence_pack(actor=user, item_id=approved.item.pk, clock=clock)
+        return zipfile.ZipFile(io.BytesIO(_file(job_id)))
+
+    marketers = pack_for(approved.marketer)
+    rows = {e["attachment_id"]: e for e in json.loads(marketers.read("manifest.json"))["evidence"]}
+    assert rows[agreement.id]["withheld"]
+    assert rows[agreement.id]["sha256_at_decision"] == agreement.sha256
+    assert not [n for n in marketers.namelist() if "agreement" in n]
+    assert rows[approved.attachment_id]["withheld"] is None  # the item's own evidence is still there
+    _verify_sha256sums(marketers)
+
+    reviewers = pack_for(approved.reviewer)
+    assert f"evidence/{agreement.id}-agreement.pdf" in reviewers.namelist()
+
+
+def test_a_running_export_whose_worker_died_is_reclaimed(
+    lead: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    job_id = services.request_export(actor=lead, filters=ItemFilter(), clock=clock)  # enqueue never runs
+    ExportJob.objects.filter(pk=job_id).update(status=ExportStatus.RUNNING.value, started_at=clock.now())
+
+    services.run_export(job_id=job_id, clock=clock)  # a fresh run: someone else is on it
+    assert ExportJob.objects.get(pk=job_id).status == ExportStatus.RUNNING.value
+
+    clock.advance(timedelta(minutes=10))
+    services.run_export(job_id=job_id, clock=clock)  # the redelivered message after the worker died
+    assert ExportJob.objects.get(pk=job_id).status == ExportStatus.READY.value

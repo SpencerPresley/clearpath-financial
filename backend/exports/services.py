@@ -11,8 +11,10 @@ import tempfile
 import uuid
 import zipfile
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import IO, Final
 
+from django.conf import settings
 from django.core.files import File
 from django.db import transaction
 
@@ -24,7 +26,7 @@ from core.domain import EntityType, EventType, Role
 from core.errors import InvalidInput, NotFound
 from core.permissions import require_role
 from exports.domain import ExportKind, ExportStatus
-from exports.evidence import evidence_pack, latest_approval, write_evidence_pack
+from exports.evidence import can_read_partner_files, evidence_pack, latest_approval, write_evidence_pack
 from exports.models import ExportJob
 from exports.selectors import approved_item_ids, export_rows
 from exports.xlsx import write_items_xlsx
@@ -37,6 +39,8 @@ EXPORT_ROLES: Final = (Role.REVIEWER, Role.ADMIN)  # a lead is a reviewer (core.
 ANY_ROLE: Final = tuple(Role)  # evidence packs: anyone who can read the item, which today is every role
 MAX_EVIDENCE_PACKS: Final = 200
 _SPOOL_BYTES: Final = 16 * 1024 * 1024
+# A running job older than this lost its worker: the task can't outlive CELERY_TASK_TIME_LIMIT.
+_STALE_AFTER: Final = timedelta(seconds=settings.CELERY_TASK_TIME_LIMIT + 60)
 
 
 def _enqueue(job_id: int) -> None:
@@ -102,7 +106,7 @@ def _build(job: ExportJob, out: IO[bytes], clock: Clock) -> _Built:
     if job.kind == ExportKind.EVIDENCE_PACK.value:
         pack = evidence_pack(item_id=job.item_id, clock=clock)  # pyrefly: ignore[missing-attribute, bad-argument-type]
         with zipfile.ZipFile(out, "w") as zf:
-            write_evidence_pack(pack, zf)
+            write_evidence_pack(pack, zf, partner_files=can_read_partner_files(job.created_by))
         return _Built(f"{pack.item.key}-evidence-pack-{today}.zip", "zip", 1)
 
     viewer: User = job.created_by
@@ -115,17 +119,26 @@ def _build(job: ExportJob, out: IO[bytes], clock: Clock) -> _Built:
             count = write_items_xlsx(rows, sheet)
         for item_id in approved_item_ids(viewer=viewer, filters=filters, sort=sort, clock=clock):
             pack = evidence_pack(item_id=item_id, clock=clock)
-            write_evidence_pack(pack, zf, prefix=f"evidence-packs/{pack.item.key}/")
+            write_evidence_pack(
+                pack, zf, prefix=f"evidence-packs/{pack.item.key}/", partner_files=can_read_partner_files(viewer)
+            )
     return _Built(f"clearpath-items-{today}.zip", "zip", count)
 
 
 def run_export(*, job_id: int, clock: Clock = SYSTEM_CLOCK) -> None:
     """The export job. Claims the job in one short transaction, builds the file outside any transaction (a long
-    one would hold back the outbox), and finishes in another. A job that isn't pending is left alone."""
+    one would hold back the outbox), and finishes in another. Runs a pending job, or a running one whose worker
+    must have died (started longer ago than the task hard limit); anything else is left alone."""
     with transaction.atomic():
         job = ExportJob.objects.select_for_update().filter(pk=job_id).first()
-        if job is None or job.status != ExportStatus.PENDING.value:
-            logger.info("export skipped job_id=%d status=%s", job_id, job.status if job else None)
+        if job is None:
+            logger.info("export skipped job_id=%d: no such job", job_id)
+            return
+        started = job.started_at
+        stale = job.status == ExportStatus.RUNNING.value and started is not None
+        stale = stale and started is not None and started < clock.now() - _STALE_AFTER
+        if not (job.status == ExportStatus.PENDING.value or stale):
+            logger.info("export skipped job_id=%d status=%s", job_id, job.status)
             return
         job.status = ExportStatus.RUNNING.value
         job.started_at = clock.now()

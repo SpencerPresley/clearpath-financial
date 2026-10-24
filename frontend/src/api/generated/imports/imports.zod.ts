@@ -236,11 +236,11 @@ export const SetImportMappingParams = zod.object({
   "job_id": zod.int()
 })
 
-export const setImportMappingBodyStatusValuesItemSourceValueMax = 200;
+export const setImportMappingBodyStatusValuesOneItemSourceValueMax = 200;
 
-export const setImportMappingBodyValueMappingsItemSourceValueMax = 200;
+export const setImportMappingBodyValueMappingsOneItemSourceValueMax = 200;
 
-export const setImportMappingBodyValueMappingsItemValueMax = 200;
+export const setImportMappingBodyValueMappingsOneItemValueMax = 200;
 
 
 
@@ -249,17 +249,17 @@ export const SetImportMappingBody = zod.object({
   "source": zod.string().describe('A header from the sheet.'),
   "target": zod.enum(['legacy_ref', 'submitted_on', 'submitter', 'product', 'channel', 'title', 'partner', 'risk_tier', 'trigger_terms', 'reviewer', 'version_number', 'rounds', 'status', 'comments', 'approval', 'expires_on', 'placement', 'notes', 'ignore']).describe('What a tracker column maps onto.')
 })).optional(),
-  "status_values": zod.array(zod.object({
+  "status_values": zod.union([zod.array(zod.object({
   "outcome": zod.union([zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected']),zod.null()]).optional().describe('Defaults to the decision the status implies.'),
-  "source_value": zod.string().min(1).max(setImportMappingBodyStatusValuesItemSourceValueMax),
+  "source_value": zod.string().min(1).max(setImportMappingBodyStatusValuesOneItemSourceValueMax),
   "status": zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn'])
-})).optional(),
-  "value_mappings": zod.array(zod.object({
+})),zod.null()]).optional(),
+  "value_mappings": zod.union([zod.array(zod.object({
   "field": zod.enum(['product', 'channel', 'risk_tier', 'partner', 'trigger_terms']).describe('Columns whose raw values map onto app values; unknown ones are listed for the admin to map.'),
-  "source_value": zod.string().min(1).max(setImportMappingBodyValueMappingsItemSourceValueMax),
-  "value": zod.string().min(1).max(setImportMappingBodyValueMappingsItemValueMax).describe('product/channel/risk_tier: the app value; partner: a partner name; trigger_terms: yes or no.')
-})).optional()
-}).describe('`columns` are merged into the current mapping (headers left out keep theirs); `status_values` and\n`value_mappings` replace the saved lists.')
+  "source_value": zod.string().min(1).max(setImportMappingBodyValueMappingsOneItemSourceValueMax),
+  "value": zod.string().min(1).max(setImportMappingBodyValueMappingsOneItemValueMax).describe('product/channel/risk_tier: the app value; partner: a partner name; trigger_terms: yes or no.')
+})),zod.null()]).optional()
+}).describe('`columns` are merged into the current mapping (headers left out keep theirs). `status_values` and\n`value_mappings` replace the saved lists when sent; leave them out (or null) to keep what\'s saved.')
 
 export const SetImportMappingResponse = zod.object({
   "counts": zod.object({

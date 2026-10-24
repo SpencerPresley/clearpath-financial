@@ -3385,7 +3385,7 @@
         "type": "object"
       },
       "ImportMappingIn": {
-        "description": "`columns` are merged into the current mapping (headers left out keep theirs); `status_values` and\n`value_mappings` replace the saved lists.",
+        "description": "`columns` are merged into the current mapping (headers left out keep theirs). `status_values` and\n`value_mappings` replace the saved lists when sent; leave them out (or null) to keep what's saved.",
         "properties": {
           "columns": {
             "items": {
@@ -3395,18 +3395,32 @@
             "type": "array"
           },
           "status_values": {
-            "items": {
-              "$ref": "#/components/schemas/StatusMappingIn"
-            },
-            "title": "Status Values",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StatusMappingIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Values"
           },
           "value_mappings": {
-            "items": {
-              "$ref": "#/components/schemas/ValueMappingIn"
-            },
-            "title": "Value Mappings",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValueMappingIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Mappings"
           }
         },
         "title": "ImportMappingIn",

@@ -16,9 +16,12 @@ from typing import Final
 
 from pydantic import TypeAdapter
 
+from accounts.models import User
 from checks.selectors import FindingRow, list_findings
 from core.clock import SYSTEM_CLOCK, Clock
+from core.domain import Role
 from core.errors import Conflict
+from core.permissions import has_role, require_role
 from exports.labels import LANE_LABELS, OUTCOME_LABELS, STATUS_LABELS
 from reviews.models import APPROVED_OUTCOMES, Attachment, Decision, ReviewItem
 from reviews.records import DecisionRow, Evidence, ItemHistory, VersionDetail, get_version, item_history, list_decisions
@@ -39,6 +42,11 @@ class EvidencePack:
     generated_at: datetime
 
 
+def can_read_partner_files(user: User) -> bool:
+    """Ledger ruling: partner attachments (agreements) are for reviewers, leads, and admins, not marketers."""
+    return has_role(user, Role.REVIEWER, Role.ADMIN)
+
+
 def latest_approval(item: ReviewItem) -> Decision:
     """The decision a pack records. Raises Conflict when there is none (never approved, or a legacy import)."""
     decision = Decision.objects.filter(item=item, outcome__in=APPROVED_OUTCOMES).order_by("-decided_at", "-pk").first()
@@ -49,6 +57,12 @@ def latest_approval(item: ReviewItem) -> Decision:
             f"{item.key} is a legacy import with no decision record; its approval is in the tracker history."
         )
     raise Conflict(f"{item.key} has no approval yet; an evidence pack records one.")
+
+
+def evidence_record(*, viewer: User, item_id: int, clock: Clock = SYSTEM_CLOCK) -> EvidencePack:
+    """The pack's record for the API: anyone who can read the item, which today is every role."""
+    require_role(viewer, *Role)
+    return evidence_pack(item_id=item_id, clock=clock)
 
 
 def evidence_pack(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> EvidencePack:
@@ -105,7 +119,8 @@ def _history(history: ItemHistory) -> list[dict[str, object]]:
 def _summary(pack: EvidencePack, evidence_rows: list[dict[str, object]]) -> str:
     d, v, item = pack.decision, pack.approved_version, pack.item
     terms = ", ".join(f"{t.product.value} v{t.version}" for t in pack.offer_terms) or "none"
-    mismatched = [e for e in evidence_rows if not e["matches_decision"]]
+    mismatched = [e for e in evidence_rows if e["matches_decision"] is False]
+    withheld = [e for e in evidence_rows if e["withheld"]]
     lines = [
         f"Evidence pack: {item.key} {item.title}",
         f"Generated {pack.generated_at.isoformat()}",
@@ -120,7 +135,8 @@ def _summary(pack: EvidencePack, evidence_rows: list[dict[str, object]]) -> str:
         f"Offer terms:      {terms}",
         f"Findings:         {len(pack.findings)} on v{v.n} with how each was triaged (decision.json)",
         f"Evidence files:   {len(evidence_rows)}"
-        + (f"; {len(mismatched)} no longer match the hash recorded at decision" if mismatched else ""),
+        + (f"; {len(mismatched)} no longer match the hash recorded at decision" if mismatched else "")
+        + (f"; {len(withheld)} partner documents listed by hash only" if withheld else ""),
     ]
     if d.llm_override_reason:
         lines.append(f"AI check override: {d.llm_override_reason}")
@@ -130,8 +146,10 @@ def _summary(pack: EvidencePack, evidence_rows: list[dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
-def write_evidence_pack(pack: EvidencePack, zf: zipfile.ZipFile, *, prefix: str = "") -> None:
-    """Write the pack under `prefix` (e.g. "evidence-packs/CP-12/"). Paths in SHA256SUMS are relative to it."""
+def write_evidence_pack(pack: EvidencePack, zf: zipfile.ZipFile, *, partner_files: bool, prefix: str = "") -> None:
+    """Write the pack under `prefix` (e.g. "evidence-packs/CP-12/"). Paths in SHA256SUMS are relative to it.
+    Without `partner_files`, evidence owned by a partner (an agreement) is listed with its recorded hash but its
+    file is left out, so a marketer's pack doesn't hand out what the attachment endpoints wouldn't."""
     files: dict[str, bytes] = {}
     v = pack.approved_version
 
@@ -167,8 +185,23 @@ def write_evidence_pack(pack: EvidencePack, zf: zipfile.ZipFile, *, prefix: str 
     attachments = {a.pk: a for a in Attachment.objects.filter(pk__in=[e.attachment_id for e in pack.evidence])}
     evidence_rows: list[dict[str, object]] = []
     for e in pack.evidence:
+        attachment = attachments[e.attachment_id]
+        if attachment.partner_id is not None and not partner_files:  # pyrefly: ignore[missing-attribute]
+            evidence_rows.append(
+                {
+                    "attachment_id": e.attachment_id,
+                    "kind": e.kind.value,
+                    "original_name": e.original_name,
+                    "path": None,
+                    "sha256_at_decision": e.sha256,
+                    "sha256": None,
+                    "matches_decision": None,
+                    "withheld": "Partner document; a reviewer can download it.",
+                }
+            )
+            continue
         path = f"evidence/{e.attachment_id}-{_SAFE_NAME.sub('_', e.original_name)[:120]}"
-        with attachments[e.attachment_id].file.open("rb") as f:
+        with attachment.file.open("rb") as f:
             data = f.read()
         files[path] = data
         now = _sha(data)
@@ -181,6 +214,7 @@ def write_evidence_pack(pack: EvidencePack, zf: zipfile.ZipFile, *, prefix: str 
                 "sha256_at_decision": e.sha256,
                 "sha256": now,
                 "matches_decision": now == e.sha256,
+                "withheld": None,
             }
         )
 

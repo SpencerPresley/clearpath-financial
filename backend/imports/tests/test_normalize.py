@@ -15,6 +15,7 @@ from imports.normalize import (
     NormalizedImport,
     ParsedRow,
     PartnerDirectory,
+    PartnerMatch,
     StatusOverride,
     ValueOverride,
     normalize,
@@ -581,3 +582,36 @@ def test_partner_directory_prefers_app_spelling_and_needs_a_unique_prefix() -> N
     assert directory.resolve("CardPerks").name == "CardPerks Weekly"  # pyrefly: ignore[missing-attribute]
     assert directory.resolve("Card") is None  # two partners start with "card"
     assert directory.resolve("LendCompare").fuzzy is True  # pyrefly: ignore[missing-attribute]  # app spelling differs
+
+
+def test_partner_prefix_needs_four_characters() -> None:
+    directory = PartnerDirectory.build(existing=[], sheet=["RateRadar", "LendCompare"])
+
+    assert directory.resolve("R") is None
+    assert directory.resolve("Rat") is None
+    assert directory.resolve("Rate") == PartnerMatch(name="RateRadar", fuzzy=True)
+
+
+def test_a_date_serial_in_a_general_cell_is_a_date() -> None:
+    parsed = parse_date(RawCell(number=46023), year_hint=None)
+
+    assert (parsed.on, parsed.coerced) == (date(2026, 1, 1), True)
+    assert parse_date(RawCell(number=3), year_hint=None).failed
+
+
+def test_only_web_links_are_kept() -> None:
+    assert split_asset(RawCell(text="memo.pdf", hyperlink="file:///C:/memo.pdf")) == ("memo.pdf", None)
+    assert split_asset(RawCell(text="memo.pdf", hyperlink="javascript:alert(1)")) == ("memo.pdf", None)
+
+
+def test_a_ref_shaped_cell_on_an_otherwise_blank_row_is_not_data(sample_workbook: RawWorkbook) -> None:
+    wb = _with_cell(sample_workbook, 19, "Request ID", RawCell(text="179"))
+
+    assert _by_row(_run(wb))[19].action is RowAction.SKIP_NOT_DATA
+
+
+def test_approvers_resolve_from_the_reviewer_column_without_a_lists_sheet(sample_workbook: RawWorkbook) -> None:
+    out = _run(sample_workbook.model_copy(update={"reviewers": ()}))
+
+    assert not [p for p in out.all_problems if p.kind is K.UNRESOLVED_APPROVER]
+    assert _by_row(out)[13].approver == "Leah Brandt"

@@ -261,11 +261,14 @@ def list_items(
     """One page of items in `sort` order, one query. `next_cursor` is None on the last page.
 
     The queue sort with no status filter means the review queue (submitted, in_review, needs_rereview), which
-    is what that order is for and what the partial queue index covers. Any explicit status filter wins.
+    is what that order is for and what the partial queue index covers. Any explicit status filter wins. That
+    queue leaves out legacy imports unless `is_legacy` is set: an imported open tracker row has no version to
+    review (spec §4.2 ruling 7), and `queue_stats` doesn't count them either.
     """
     descending, keys = _SORTS[sort]
     if sort is ItemSort.QUEUE and not filters.status:
-        filters = filters.model_copy(update={"status": [ItemStatus(s) for s in QUEUE_STATUSES]})
+        queue = {"status": [ItemStatus(s) for s in QUEUE_STATUSES]}
+        filters = filters.model_copy(update=queue if filters.is_legacy is not None else {**queue, "is_legacy": False})
     qs = row_queryset(filter_items(viewer=viewer, filters=filters, clock=clock))
     if cursor is not None:
         values = _decode_cursor(sort, cursor)

@@ -95,12 +95,12 @@ class ValueMappingIn(Schema):
 
 
 class ImportMappingIn(Schema):
-    """`columns` are merged into the current mapping (headers left out keep theirs); `status_values` and
-    `value_mappings` replace the saved lists."""
+    """`columns` are merged into the current mapping (headers left out keep theirs). `status_values` and
+    `value_mappings` replace the saved lists when sent; leave them out (or null) to keep what's saved."""
 
     columns: list[ColumnMappingIn] = Field(default_factory=list)
-    status_values: list[StatusMappingIn] = Field(default_factory=list)
-    value_mappings: list[ValueMappingIn] = Field(default_factory=list)
+    status_values: list[StatusMappingIn] | None = None
+    value_mappings: list[ValueMappingIn] | None = None
 
 
 class ImportProblemOut(Schema):

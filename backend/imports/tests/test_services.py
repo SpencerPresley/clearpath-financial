@@ -17,7 +17,7 @@ from core.errors import Conflict, InvalidInput, NotPermitted
 from imports import selectors, services
 from imports.domain import ImportStatus, ImportTargetField, ImportValueField, RowAction
 from imports.models import ImportJob, ImportRow
-from imports.normalize import ImportMapping, StatusOverride, ValueOverride
+from imports.normalize import StatusOverride, ValueOverride
 from partners.models import Partner
 from reviews.models import ReviewItem
 from reviews.tests.factories import make_partner
@@ -162,18 +162,58 @@ def test_committed_preview_shows_what_commit_did(committed: int, admin_user: Use
     }
 
 
+@pytest.mark.parametrize("app_spelling", ["lendcompare", "Lend Compare", "Lend-Compare"])
 def test_existing_partners_are_reused_not_duplicated(
-    admin_user: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit
+    admin_user: User, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit, app_spelling: str
 ) -> None:
-    existing = make_partner("lendcompare")
+    existing = make_partner(app_spelling)
     job_id = services.create_sample_import(actor=admin_user, clock=clock)
 
     _commit(admin_user, job_id, django_capture_on_commit_callbacks, clock)
 
     assert Partner.objects.count() == 8
-    partner = _item("MCR-26-022").partner  # "Lend Compare"
-    assert partner is not None
-    assert partner.pk == existing.pk
+    assert ImportJob.objects.get(pk=job_id).partners_created_count == 7
+    for ref in ("MCR-26-022", "MCR-26-136"):  # "Lend Compare" in the sheet
+        partner = _item(ref).partner
+        assert partner is not None
+        assert partner.pk == existing.pk
+
+
+def test_a_columns_only_update_keeps_saved_status_and_value_mappings(admin_user: User, clock: FixedClock) -> None:
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+    services.set_mapping(
+        actor=admin_user,
+        job_id=job_id,
+        update=services.MappingUpdate(
+            statuses=(StatusOverride("Done", ItemStatus.APPROVED, None),),
+            values=(ValueOverride(ImportValueField.PRODUCT, "Auto", "personal_loan"),),
+        ),
+        clock=clock,
+    )
+
+    services.set_mapping(
+        actor=admin_user,
+        job_id=job_id,
+        update=services.MappingUpdate(columns={"Live URL / Placement & Screenshot Link": ImportTargetField.IGNORE}),
+        clock=clock,
+    )
+
+    job = ImportJob.objects.get(pk=job_id)
+    assert [s["source_value"] for s in job.status_mapping] == ["Done"]
+    assert [v["source_value"] for v in job.value_mapping] == ["Auto"]
+    assert job.column_mapping["Live URL / Placement & Screenshot Link"] == "ignore"
+
+
+def test_two_columns_can_not_map_to_one_field(admin_user: User, clock: FixedClock) -> None:
+    job_id = services.create_sample_import(actor=admin_user, clock=clock)
+
+    with pytest.raises(InvalidInput, match="Status is mapped from both 'Revision Round' and 'Status'"):
+        services.set_mapping(
+            actor=admin_user,
+            job_id=job_id,
+            update=services.MappingUpdate(columns={"Revision Round": ImportTargetField.STATUS}),
+            clock=clock,
+        )
 
 
 def test_only_admins_import(user_factory: Callable[..., User], clock: FixedClock) -> None:
@@ -191,7 +231,7 @@ def test_mapping_is_validated(admin_user: User, clock: FixedClock) -> None:
     job_id = services.create_sample_import(actor=admin_user, clock=clock)
 
     def set_(**kwargs: Any) -> None:
-        services.set_mapping(actor=admin_user, job_id=job_id, mapping=ImportMapping(**kwargs), clock=clock)
+        services.set_mapping(actor=admin_user, job_id=job_id, update=services.MappingUpdate(**kwargs), clock=clock)
 
     with pytest.raises(InvalidInput, match="no column 'Nope'"):
         set_(columns={"Nope": ImportTargetField.STATUS})
@@ -223,7 +263,7 @@ def test_status_values_list_every_distinct_value_with_its_mapping(admin_user: Us
 
 def test_mapping_can_not_change_after_commit(committed: int, admin_user: User, clock: FixedClock) -> None:
     with pytest.raises(Conflict, match="committed"):
-        services.set_mapping(actor=admin_user, job_id=committed, mapping=ImportMapping(columns={}), clock=clock)
+        services.set_mapping(actor=admin_user, job_id=committed, update=services.MappingUpdate(), clock=clock)
 
 
 def test_commit_refuses_a_missing_required_mapping(admin_user: User, clock: FixedClock) -> None:
@@ -231,7 +271,7 @@ def test_commit_refuses_a_missing_required_mapping(admin_user: User, clock: Fixe
     services.set_mapping(
         actor=admin_user,
         job_id=job_id,
-        mapping=ImportMapping(columns={"Request ID": ImportTargetField.IGNORE}),
+        update=services.MappingUpdate(columns={"Request ID": ImportTargetField.IGNORE}),
         clock=clock,
     )
 
@@ -277,7 +317,11 @@ def test_a_failed_commit_rolls_back_and_can_be_retried(
 
     job = ImportJob.objects.get(pk=job_id)
     assert job.status == ImportStatus.FAILED.value
-    assert "disk full" in job.error
+    assert (
+        job.error
+        == f"The commit failed and nothing was imported. Try again; if it fails again, report import {job_id}."
+    )
+    assert "disk full" not in job.error  # internals stay in the log
     assert ReviewItem.objects.count() == 0
     assert Partner.objects.count() == 0
 

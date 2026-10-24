@@ -4,7 +4,7 @@ from ninja import File, Router, Status, UploadedFile
 from accounts.api import current_user
 from core.schemas import ERRORS
 from imports import selectors, services
-from imports.normalize import ImportMapping, StatusOverride, ValueOverride
+from imports.normalize import StatusOverride, ValueOverride
 from imports.schemas import (
     ImportCommitIn,
     ImportJobOut,
@@ -50,12 +50,15 @@ def get_import(request: HttpRequest, job_id: int) -> selectors.ImportJobDetail:
 def set_mapping(request: HttpRequest, job_id: int, body: ImportMappingIn) -> selectors.ImportPreview:
     """Save the column, status-value, and value mappings; returns the refreshed preview."""
     actor = current_user(request)
-    mapping = ImportMapping(
+    statuses, values = body.status_values, body.value_mappings
+    update = services.MappingUpdate(
         columns={c.source: c.target for c in body.columns},
-        statuses=tuple(StatusOverride(s.source_value, s.status, s.outcome) for s in body.status_values),
-        values=tuple(ValueOverride(v.field, v.source_value, v.value) for v in body.value_mappings),
+        statuses=None
+        if statuses is None
+        else tuple(StatusOverride(s.source_value, s.status, s.outcome) for s in statuses),
+        values=None if values is None else tuple(ValueOverride(v.field, v.source_value, v.value) for v in values),
     )
-    services.set_mapping(actor=actor, job_id=job_id, mapping=mapping)
+    services.set_mapping(actor=actor, job_id=job_id, update=update)
     return selectors.get_preview(viewer=actor, job_id=job_id)
 
 

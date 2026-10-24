@@ -64,8 +64,7 @@ def download_export(request: HttpRequest, export_id: int) -> FileResponse:
 )
 def get_evidence_pack(request: HttpRequest, item_id: int) -> evidence.EvidencePack:
     """The latest approval's record. 409 if the item was never approved (or is a legacy import)."""
-    current_user(request)
-    return evidence.evidence_pack(item_id=item_id)
+    return evidence.evidence_record(viewer=current_user(request), item_id=item_id)
 
 
 @router.post(

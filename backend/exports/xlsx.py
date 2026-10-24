@@ -7,6 +7,7 @@ from typing import IO, Final
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
@@ -107,8 +108,14 @@ def write_items_xlsx(rows: Iterable[ExportRow], out: IO[bytes]) -> int:
     for row in rows:
         cells = []
         for name, value in zip(HEADERS, _values(row), strict=True):
+            if isinstance(value, str):
+                value = ILLEGAL_CHARACTERS_RE.sub("", value)  # noqa: PLW2901  # control chars make openpyxl raise
             # openpyxl writes dates as dates; its stubs list only datetime.
             cell = WriteOnlyCell(ws, value=value)  # pyrefly: ignore[bad-argument-type]
+            if isinstance(value, str):
+                # openpyxl turns any string starting with "=" into a formula. Titles and tags are user text
+                # (affiliate copy included): `=HYPERLINK(...)` must arrive as text, not a live formula.
+                cell.data_type = "s"
             if name in _DATE_COLUMNS and value is not None:
                 cell.number_format = DATE_FORMAT
             cells.append(cell)

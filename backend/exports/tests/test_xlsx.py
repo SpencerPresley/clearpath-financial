@@ -1,5 +1,6 @@
 import io
 import re
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -101,3 +102,21 @@ def test_status_labels_match_the_ui() -> None:
     ui = dict(re.findall(r"(\w+): \{ label: '([^']+)'", block))
 
     assert ui == {s.value: label for s, label in STATUS_LABELS.items()}
+
+
+def test_user_text_that_looks_like_a_formula_is_written_as_text() -> None:
+    title = '=HYPERLINK("https://evil.example","Open")'
+    buf = io.BytesIO()
+    write_items_xlsx([_row(title=title, tags=("=1+1",), partner="@SUM(A1)")], buf)
+
+    sheet_xml = zipfile.ZipFile(io.BytesIO(buf.getvalue())).read("xl/worksheets/sheet1.xml").decode()
+    assert "<f>" not in sheet_xml
+    buf.seek(0)
+    ws = openpyxl.load_workbook(buf)["Items"]
+    assert (ws["B2"].value, ws["B2"].data_type) == (title, "s")
+
+
+def test_control_characters_are_dropped_not_fatal() -> None:
+    (_, row) = _read([_row(title="Spring\x0b PL\x00 email")])
+
+    assert row[1] == "Spring PL email"

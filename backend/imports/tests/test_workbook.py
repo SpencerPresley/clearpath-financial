@@ -1,6 +1,9 @@
 import io
+import time
+import zipfile
 from datetime import UTC, datetime
 
+import openpyxl
 import pytest
 
 from imports.workbook import RawWorkbook, UnreadableWorkbookError, read_workbook
@@ -53,17 +56,53 @@ def test_rejects_files_that_are_not_xlsx(data: bytes) -> None:
         read_workbook(io.BytesIO(data))
 
 
-def test_rejects_a_workbook_without_tracker_columns() -> None:
-    import openpyxl
-
+def _xlsx(rows: list[list[object]], stray: tuple[int, int] | None = None) -> io.BytesIO:
     wb = openpyxl.Workbook()
     ws = wb.active
     assert ws is not None
-    ws.append(["Fruit", "Colour", "Weight"])
-    ws.append(["Apple", "Red", 1])
+    for row in rows:
+        ws.append(row)
+    if stray is not None:
+        ws.cell(row=stray[0], column=stray[1], value=" ")
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    return buf
 
+
+_TRACKER: list[list[object]] = [
+    ["Request ID", "Date Submitted", "Status", "Product"],
+    ["MCR-26-001", "2026-01-05", "Approved", "PL"],
+]
+
+
+def test_rejects_a_workbook_without_tracker_columns() -> None:
     with pytest.raises(UnreadableWorkbookError, match="No sheet has tracker columns"):
-        read_workbook(buf)
+        read_workbook(_xlsx([["Fruit", "Colour", "Weight"], ["Apple", "Red", 1]]))
+
+
+def test_a_stray_cell_far_right_and_below_is_not_read() -> None:
+    started = time.monotonic()
+    wb = read_workbook(_xlsx(_TRACKER, stray=(9000, 300)))
+
+    assert time.monotonic() - started < 3  # read unbounded, this range is 2.7M cells (minutes)
+    assert wb.tracker.headers == tuple(_TRACKER[0])
+    assert [r.row_number for r in wb.tracker.rows] == [2]
+
+
+def test_a_used_range_far_below_the_data_is_refused() -> None:
+    with pytest.raises(UnreadableWorkbookError, match="has cells down to row 60000"):
+        read_workbook(_xlsx(_TRACKER, stray=(60000, 1)))
+
+
+@pytest.mark.parametrize("part", ["xl/workbook.xml", "xl/worksheets/sheet1.xml", "[Content_Types].xml"])
+def test_a_zip_with_broken_xml_is_not_a_workbook(part: str) -> None:
+    good = _xlsx(_TRACKER)
+    broken = io.BytesIO()
+    with zipfile.ZipFile(good) as src, zipfile.ZipFile(broken, "w") as dst:
+        for info in src.infolist():
+            dst.writestr(info, b"<<<" if info.filename == part else src.read(info))
+    broken.seek(0)
+
+    with pytest.raises(UnreadableWorkbookError, match=r"isn't an \.xlsx workbook"):
+        read_workbook(broken)
