@@ -21,11 +21,16 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 merged `9f4d228` | done; logins + guided paths in docs/demo.md |
 | Walkthrough review 1 | fresh reviewer | PR #45 merged | done: 4 blockers, 18 should-fix, 17 nits; no permission leaks | docs/plan/reviews/walkthrough-1.md |
-| Fixes: correctness | agent (worktree) | PR #50 | final: S20 relink, Board/drawer age, explicit fix_kind/replacement_text for Apply, fast_track_eligible flag | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
+| Fixes: correctness | agent (worktree) | PR #50 merged | done | B1 fast-track over drift, B2, S4 queue age, S12, S19, S20, nits 1/9/10/12 |
 | Fixes: review screen | agent (worktree) | PR #51 merged | done | B3, B4, S3 decision record, S5 drift naming, S6, S8 keyboard loop, S9, S11 Apply, S14, S17, nits |
 | Fixes: shell/global | agent (worktree) | PR #52 merged | done |
-| Docs: README + ARCHITECTURE | agent (worktree `docs/readme-architecture`) | — | in progress | public-facing; stack rationale, AWS with tf links, AI constraints, process, limitations, cost, teardown | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
-| Fixes: import + users | agent (worktree) | PR #49 | final: deactivation releases items; reset restores seeded people | S15 import demo, S16 users screen + availability + workload |
+| Product guide | agent | PR #62 merged | done (5 screens text-only → #63) |
+| Favicon | orchestrator | PR #65 merged | done |
+| Placements UI (#64) | sonnet agent | PR #66 merged | done (rebased by orchestrator; CI green incl. E2E) |
+| SUBMITTED 2026-10-24 | Spencer | — | email sent | demo reset at 22:27 UTC (44 items); site https://clearpath.spencerpresley.com |
+| Walkthrough review 2 | fresh reviewer | — | in progress | hosted READ-ONLY (evaluators active) + local for mutations; findings → GitHub issues label walkthrough-2 |
+| Docs: README + ARCHITECTURE | agent | PR #61 merged | done | S1 role landing, S7 4xx retries, S10, S18, dates, layout, nits |
+| Fixes: import + users | agent (worktree) | PR #49 merged | done | S15 import demo, S16 users screen + availability + workload |
 | Deploy prep | agent (worktree) | PR #43 merged `4843651` | done; runbook in reports/deploy-prep.md |
 | Deploy (apply + first deploy) | orchestrator | live | https://clearpath.spencerpresley.com (and d1qhgfjuad1hh0.cloudfront.net) — smoke 10/10; CloudFront overwrites spoofed viewer IP (verified); max_connections 79; seed 44 items + 178 tracker + 11 people. First deploy failed on a first-boot NAT race (compose download), box fixed via SSM, PR #46 prevents it on rebuild | AI key guard, ASGI DB pooling, S3 storage, hosts, CloudFront client IP, processes, smoke.sh, runbook; no apply | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
