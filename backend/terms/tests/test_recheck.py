@@ -13,7 +13,7 @@ from audit.models import Event
 from audit.outbox import EventRecord
 from checks.models import CheckRun, Finding
 from core.clock import FixedClock
-from core.domain import DecisionOutcome, EventType, FindingSource, FindingState, ItemStatus
+from core.domain import DecisionOutcome, EventType, FindingSource, FindingState, ItemStatus, Product
 from reviews.decisions import DecisionInput, record_decision
 from reviews.models import ReviewItem
 from reviews.services import SubmitItemResult
@@ -62,7 +62,7 @@ def test_publish_rechecks_an_in_review_item_quoting_the_old_floor(
     assert _open(item) == []
     _publish_later(lead, clock)  # floor 7.49% -> 12.99%
 
-    assert in_flight_quoting_superseded(product=item.product, clock=clock) == (item.pk,)
+    assert in_flight_quoting_superseded(product=Product(item.product), clock=clock) == (item.pk,)
     assert recheck_in_flight_item(item_id=item.pk, clock=clock) is RecheckOutcome.RECHECKED
 
     item.refresh_from_db()
@@ -96,7 +96,7 @@ def test_changes_requested_and_submitted_items_are_rechecked_too(
     )
     _publish_later(lead, clock)
 
-    assert set(in_flight_quoting_superseded(product=waiting.product, clock=clock)) == {waiting.pk, returned.pk}
+    assert set(in_flight_quoting_superseded(product=Product(waiting.product), clock=clock)) == {waiting.pk, returned.pk}
     for item in (waiting, returned):
         assert recheck_in_flight_item(item_id=item.pk, clock=clock) is RecheckOutcome.RECHECKED
 
@@ -110,7 +110,7 @@ def test_approved_legacy_and_current_terms_items_are_left_alone(
     _publish_later(lead, clock)
     current = _in_review(submit, reviewer, clock)  # submitted after the publish: quotes the new terms
 
-    assert in_flight_quoting_superseded(product=current.product, clock=clock) == ()
+    assert in_flight_quoting_superseded(product=Product(current.product), clock=clock) == ()
     for item_id in (approved_id, legacy.pk, current.pk):
         assert recheck_in_flight_item(item_id=item_id, clock=clock) is RecheckOutcome.SKIPPED
 
