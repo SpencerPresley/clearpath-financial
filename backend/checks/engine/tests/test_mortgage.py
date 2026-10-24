@@ -1,7 +1,7 @@
 import pytest
 
 from checks.engine import run_code_checks
-from core.domain import Channel, Product
+from core.domain import Channel, Product, Severity
 
 from .conftest import codes, make_ctx, quotes
 
@@ -105,3 +105,45 @@ def test_counselor() -> None:
 def test_mortgage_rules_do_not_run_on_personal_loans() -> None:
     result = run_code_checks(make_ctx("Wipe out your debts with an FHA-style loan. Talk to a counselor."))
     assert not {c for c in codes(result) if c.startswith("mortgage.")}
+
+
+@pytest.mark.parametrize(
+    ("text", "quote"),
+    [
+        ("Get pre-approved for a mortgage in minutes.", "Get pre-approved"),
+        ("Get preapproved today.", "Get preapproved"),
+        ("Be pre approved before you house-hunt.", "Be pre approved"),
+        ("Start your mortgage pre-approval online.", "pre-approval"),
+    ],
+)
+def test_preapproval_invitation_on_a_prequal_product_is_a_warning(text: str, quote: str) -> None:
+    result = run_code_checks(make_ctx(text, product=MTG))
+    (finding,) = [f for f in result.findings if f.rule_id == "mortgage.preapproval_offer"]
+    assert finding.quote == quote
+    assert finding.severity == Severity.WARNING
+    assert finding.suggested_fix == '"Get prequalified"'
+    assert "claims.preapproved" not in codes(result)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Get prequalified in minutes.",
+        "See what you qualify for in minutes.",
+        "Find out how much home you qualify for.",
+        "Prequalification is not a commitment to lend.",
+    ],
+)
+def test_prequalification_and_qualify_ctas_are_not_flagged(text: str) -> None:
+    assert not mtg(text) & {"mortgage.preapproval_offer", "claims.preapproved"}
+
+
+def test_preapproval_assertion_stays_a_blocking_claim_not_this_warning() -> None:
+    found = mtg("You're pre-approved for a mortgage!")
+    assert "claims.preapproved" in found
+    assert "mortgage.preapproval_offer" not in found
+
+
+def test_preapproval_invitation_is_not_flagged_for_personal_loans() -> None:
+    result = run_code_checks(make_ctx("Get pre-approved in minutes."))
+    assert not codes(result) & {"mortgage.preapproval_offer", "claims.preapproved"}

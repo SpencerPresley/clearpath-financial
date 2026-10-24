@@ -9,7 +9,7 @@ from collections.abc import Iterable
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
-from checks.engine.rule import REGZ_1026_24, URL_1026_24, Hit, Rule, make_spec
+from checks.engine.rule import REGN_1014, REGZ_1026_24, URL_1014, URL_1026_24, Hit, Rule, make_spec
 from checks.engine.text import APOS, compile_i, window_after, window_before
 from checks.engine.types import RuleContext, Span
 from core.domain import Product, Severity
@@ -61,6 +61,20 @@ COUNSELOR = make_spec(
     products=MORTGAGE,
     effective_from=REGZ_1026_24,
 )
+PREAPPROVAL_OFFER = make_spec(
+    "mortgage.preapproval_offer",
+    title="Mortgage ads offer prequalification, not preapproval",
+    citation="Reg N 12 CFR 1014.3(q), (i); 12 U.S.C. 5536",
+    url=URL_1014,
+    severity=Severity.WARNING,
+    products=MORTGAGE,
+    effective_from=REGN_1014,
+)
+
+# ClearPath's mortgage product is prequalification; preapproval is a different, underwritten product, so inviting
+# a "pre-approval" can misdescribe what's offered (coordinator ruling, docs/plan/ledger.md). Assertions that the
+# reader *is* pre-approved are claims.preapproved (blocking); this catches the invitation and the noun.
+_PREAPPROVAL_OFFER = compile_i(r"\b(?:get|getting|be|become)\s+pre[-\s]?approved\b|\bpre[-\s]?approvals?\b")
 
 # "ARM" is matched case-sensitively ("arm" is an ordinary word); everything else ignores case.
 _ARM_CONTEXT = re.compile(r"\bARM\b|(?i:\b(?:adjustable|variable)[-\s]rate\b|\brate\s+(?:may\s+)?adjusts?\b)")
@@ -183,10 +197,16 @@ def _counselor(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit
         return
 
 
+def _preapproval_offer(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
+    for m in _PREAPPROVAL_OFFER.finditer(a.text):
+        yield Hit(Span(m.start(), m.end()), "ClearPath offers prequalification, not preapproval.", '"Get prequalified"')
+
+
 RULES: tuple[Rule, ...] = (
     Rule(ARM_FIXED, _arm_fixed),
     Rule(PAYMENT_TAXES_INSURANCE, _payment_taxes_insurance),
     Rule(GOVERNMENT, _government),
     Rule(DEBT_ELIMINATION, _debt_elimination),
     Rule(COUNSELOR, _counselor),
+    Rule(PREAPPROVAL_OFFER, _preapproval_offer),
 )

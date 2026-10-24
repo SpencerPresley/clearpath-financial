@@ -23,7 +23,7 @@ is only 20–60 lines.
 ## Rules implemented
 
 `RULESET_VERSION = 2026-07-21`, defined as `max(effective_from)` and asserted by a test. `ENGINE_VERSION = "2026-10-24.2"`.
-41 code rules and 4 human checklist items. The table below is generated from `RULES`.
+42 code rules and 4 human checklist items. The table below is generated from `RULES`.
 
 | id | kind | severity | products | channels | markets | effective_from | citation |
 |---|---|---|---|---|---|---|---|
@@ -54,6 +54,7 @@ is only 20–60 lines.
 | `mortgage.government` | code | blocking | MTG | all | federal | 2017-01-01 | Reg Z 12 CFR 1026.24(i)(3); Reg N 12 CFR 1014.3(n) |
 | `mortgage.debt_elimination` | code | blocking | MTG | all | federal | 2017-01-01 | Reg Z 12 CFR 1026.24(i)(5), comment 24(i)-3; Reg N 12 CFR 1014.3(m) |
 | `mortgage.counselor` | code | blocking | MTG | all | federal | 2017-01-01 | Reg Z 12 CFR 1026.24(i)(6); Reg N 12 CFR 1014.3(s) |
+| `mortgage.preapproval_offer` | code | warning | MTG | all | federal | 2017-01-01 | Reg N 12 CFR 1014.3(q), (i); 12 U.S.C. 5536 |
 | `claims.preapproved` | code | blocking | all | all | federal | 2017-01-01 | 12 U.S.C. 5536; Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3(q), CFPB v. Prime Choice Funding (2020) |
 | `claims.guaranteed` | code | blocking | all | all | federal | 2017-01-01 | 12 U.S.C. 5536; Reg Z 12 CFR 1026.24(a), 1026.16(a); mortgages: Reg N 12 CFR 1014.3(q) |
 | `claims.credit_impact` | code | blocking | all | all | federal | 2017-01-01 | CFPB Supervisory Highlights Issue 24 §2.8.2; 12 U.S.C. 5536 |
@@ -161,7 +162,7 @@ database is touched:
 
 ```
 $ CLEARPATH_ENV_FILE="" DJANGO_SECRET_KEY=t POSTGRES_PASSWORD=x uv run pytest checks/engine -q
-316 passed in 0.28s
+326 passed in 0.28s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group typecheck pyrefly check
@@ -190,3 +191,24 @@ actual label.
 **Spans.** `test_spans_shift_exactly_with_unicode_prefixes` runs each sample 25 times with random prefixes of en
 and em dashes, curly quotes, NBSP and emoji. Every quote must equal `text[span]`. Every finding must equal the
 base finding shifted by the prefix length.
+
+## Change after coordinator rulings
+
+The coordinator's rulings are recorded in `docs/plan/ledger.md`.
+
+- **Prescreen notices: no change.** The blocking code checks for whether the notices are present stay, alongside
+  the human item for layout.
+- **Issuer line, §22162 scope, and the two extra human items: no change.** All accepted as built.
+- **"Get pre-approved" on mortgage items: new warning rule `mortgage.preapproval_offer`.**
+  - **Why:** ClearPath's mortgage product is prequalification. Preapproval is a different, underwritten product,
+    so inviting a "pre-approval" can misdescribe what's offered.
+  - **What it flags:** invitations ("get / getting / be / become pre-approved") and the noun "pre-approval".
+  - **Finding:** message "ClearPath offers prequalification, not preapproval."; citation Reg N 12 CFR
+    1014.3(q), (i) and 12 U.S.C. 5536; suggested fix "Get prequalified".
+  - **What it doesn't flag:**
+    - Assertions that the reader *is* pre-approved. Those stay blocking `claims.preapproved`, and the two rules
+      never both fire on the same phrase.
+    - "Get prequalified", "see what you qualify for" and "how much home you qualify for".
+    - Personal loan items.
+  - **Tests:** should-flag and shouldn't-flag fixtures are in `tests/test_mortgage.py`.
+  - **Version:** `ENGINE_VERSION` is bumped to `2026-10-24.3`.

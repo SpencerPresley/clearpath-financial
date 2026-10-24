@@ -51,3 +51,8 @@ for every case.
    - Conflict: ruling 7 calls row 12 a human checklist item. The workstream brief asked for "both notice headings" as a code check.
    - I kept both: code checks what's in the text, a human checks typography. Tell me if row 12 should be human-only.
 2. **"Get pre-approved for a mortgage"** is treated as a call to action, not a 1014.3(q) representation, so it doesn't flag. If ClearPath only offers prequalification, inviting a "pre-approval" may misdescribe the product. That's a product and legal call. It's easy to make it a warning.
+
+**Coordinator rulings** (`docs/plan/ledger.md`):
+1. Keep both, as built.
+2. Make it a warning on mortgage_prequal items. This is now `mortgage.preapproval_offer`; see the report's
+   "Change after coordinator rulings".
