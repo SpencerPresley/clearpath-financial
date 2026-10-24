@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     "partners",
     "terms",
     "reviews",
+    "checks",
 ]
 
 MIDDLEWARE = [
