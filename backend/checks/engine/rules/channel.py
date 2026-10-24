@@ -110,8 +110,12 @@ _STREET = compile_i(
 _PO_BOX = compile_i(r"\bP\.?\s?O\.?\s+Box\s+\d+|\bPost\s+Office\s+Box\s+\d+")
 _ZIP = re.compile(r"\b\d{5}(?:-\d{4})?\b")
 _ZIP_REACH = 120
-_AD_ID = compile_i(
-    r"\badvertisement\b|\bad\b|\bsponsored\b|\bsolicitation\b|\b(?:promotional|marketing)\s+(?:email|message|offer)\b"
+# A clear label, not any prose containing the word "ad" ("this ad was pre-approved" identifies nothing).
+_AD_ID = re.compile(
+    r"\badvertisement\b|\bsolicitation\b|\b(?:this|it)\s+is\s+an\s+ad\b"
+    r"|\b(?:promotional|marketing)\s+(?:email|message|offer)\b|#ad\b"
+    r"|^[ \t]*[\[(]?(?:ad|sponsored)[\])]?[ \t]*(?:[.:|\u2013\u2014-]|$)",
+    re.IGNORECASE | re.MULTILINE,
 )
 _REPLY_SUBJECT = re.compile(r"^[ \t]*Subject:[ \t]*(?P<prefix>(?:RE|FWD?)[ \t]*:)", re.IGNORECASE | re.MULTILINE)
 _DISCLOSURE = compile_i(

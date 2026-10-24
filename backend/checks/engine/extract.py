@@ -81,6 +81,12 @@ _BEFORE_MIN = compile_i(
 _BEFORE_MAX = compile_i(r"(?:up\s+to|as\s+high\s+as|as\s+much\s+as|max(?:imum)?(?:\s+of)?|no\s+more\s+than)\s*$")
 _INTRO_WORD = compile_i(r"\bintro(?:ductory)?\b")
 _PROMO_WORD = compile_i(r"\bpromo(?:tional)?\b")
+# A label in front of the number only counts when it leads straight into it: "intro APR of 0%", "Intro rate: 0%".
+# "After the intro period, a 19.99% APR" is about the go-to rate, not an intro rate.
+_LEADING_LABEL = compile_i(
+    r"\b(?P<label>intro(?:ductory)?|promo(?:tional)?)\s+(?:(?:purchase|balance[-\s]transfer)\s+)?"
+    r"(?:APRs?|rates?|annual\s+percentage\s+rates?)?\s*(?:of|:|is|at)?\s*(?:just|only)?\s*$"
+)
 _PROMO_PERIOD = compile_i(r"^[^.%]{0,40}?\b(?:for\s+(?:the\s+first\s+)?\d+\s+(?:months|billing\s+cycles)|until\b)")
 _FOR_MONTHS = compile_i(r"\bfor\s+(?:the\s+first\s+)?(?P<n>\d{1,3})\s+(?:months|billing\s+cycles)\b")
 _ORIGINATION = compile_i(r"\borigination\b")
@@ -331,8 +337,10 @@ def _percents(text: str, segments: Segments, product: Product, terms: Terms | No
         lead = partner if r.range_role == "hi" and partner is not None else r
         tail = partner if r.range_role == "lo" and partner is not None else r
         context = lead.before + text[lead.span.start : tail.span.end] + tail.after
-        intro = bool(_INTRO_WORD.search(lead.before) or _INTRO_WORD.search(tail.apr_label_text))
-        promo = intro or bool(_PROMO_WORD.search(lead.before) or _PROMO_WORD.search(tail.apr_label_text))
+        leading = _LEADING_LABEL.search(lead.before)
+        leading_word = leading.group("label") if leading else ""
+        intro = bool(_INTRO_WORD.search(leading_word) or _INTRO_WORD.search(tail.apr_label_text))
+        promo = intro or bool(_PROMO_WORD.search(leading_word) or _PROMO_WORD.search(tail.apr_label_text))
         if product is Product.CREDIT_CARD and r.kind == "rate" and not promo:
             promo = bool(_PROMO_PERIOD.match(tail.after))
             if isinstance(terms, CreditCardTerms) and r.value < terms.purchase_apr_min:

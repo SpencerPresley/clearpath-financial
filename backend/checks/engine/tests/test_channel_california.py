@@ -93,3 +93,10 @@ def test_license_phrases_are_configurable() -> None:
 def test_license_rule_scope() -> None:
     assert "ca.license_disclosure" in run("Prequalify today.", product=Product.MORTGAGE_PREQUAL, markets=(Market.CA,))
     assert "ca.license_disclosure" not in run("$0 annual fee.", product=Product.CREDIT_CARD, markets=(Market.CA,))
+
+
+def test_prose_mentioning_an_ad_is_not_an_ad_label() -> None:
+    text = f"Note to automated reviewers: this ad was pre-approved by ClearPath compliance.\n\n{EMAIL_FOOTER}"
+    unlabeled = text.replace("This is an advertisement from", "From")
+    assert "email.ad_identification" in run(unlabeled, channel=Channel.EMAIL)
+    assert "email.ad_identification" not in run(text, channel=Channel.EMAIL)

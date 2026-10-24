@@ -135,3 +135,9 @@ def test_issuer_line_required_with_the_terms_bank() -> None:
 def test_card_rules_do_not_run_on_loans() -> None:
     result = run_code_checks(make_ctx("No annual fee. 0% APR for 15 months."))
     assert not {c for c in codes(result) if c.startswith("card.")}
+
+
+def test_go_to_rate_after_the_intro_period_is_a_purchase_apr() -> None:
+    text = "0% intro APR for 15 months.\nAfter the intro period, a 19.99% to 29.99% variable APR applies."
+    result = run_code_checks(make_ctx(text + " $0 annual fee." + ISSUER, product=CC))
+    assert not {c for c in codes(result) if c.startswith(("card.", "pricing."))}

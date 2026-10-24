@@ -59,26 +59,26 @@ _QUALIFIER = compile_i(
 )
 
 
-def _as_low_as(a: Analysis) -> list[Span]:
+def _lowest_rate_claims(a: Analysis, *, standalone: bool) -> list[Span]:
+    """ "as low as 7.49%", "starting at", "rates from"; `standalone` skips "from X% to Y%" (already a range)."""
     return [
         Span(p.qualifier_start, p.span.end)
-        for p in a.percents
-        if p.kind == "rate" and p.qualifier == "min" and p.qualifier_start is not None and p.range_role is None
+        for p in a.rates
+        if p.qualifier == "min" and p.qualifier_start is not None and not (standalone and p.range_role is not None)
     ]
 
 
 def _as_low_as_range(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if a.has_rate_range:
         return
-    for span in _as_low_as(a):
+    for span in _lowest_rate_claims(a, standalone=True):
         yield Hit(span, "Show the full rate range next to this lowest rate.", '"APRs from 7.49% to 35.99%"')
 
 
 def _creditworthiness(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if _QUALIFIER.search(a.text):
         return
-    spans = _as_low_as(a) or [p.span for p in a.percents if p.kind == "rate" and p.range_role == "lo"][:1]
-    for span in spans:
+    for span in _lowest_rate_claims(a, standalone=False):
         yield Hit(
             span,
             "Say that the lowest rates go to the most creditworthy applicants.",
