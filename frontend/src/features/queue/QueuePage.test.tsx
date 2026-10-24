@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getListFindingsMockHandler } from '../../api/generated/findings/findings.msw';
 import {
@@ -139,7 +139,13 @@ describe('QueuePage', () => {
     expect(screen.getByRole('group', { name: 'Filters' })).toBeInTheDocument();
   });
 
-  it('steps Risk, Partner, Assignee, and Round aside while the preview is open', async () => {
+  it('fits the columns to the table region: beside the preview, Risk and Assignee stay', async () => {
+    // jsdom lays nothing out; give the region the width it has at 1440 with the drawer open.
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('app-queue-region') ? 762 : 0;
+    });
     const rows = queueRows();
     serveItems(rows);
     const [first] = rows;
@@ -147,9 +153,11 @@ describe('QueuePage', () => {
     server.use(getGetItemMockHandler(makeDetail(first)));
     renderApp(`/queue?item=${String(first.id)}`);
     await screen.findByRole('complementary', { name: `Preview ${first.key}` });
-    expect(await screen.findByRole('columnheader', { name: 'Findings' })).toBeInTheDocument();
-    for (const name of ['Risk', 'Partner', 'Assignee', 'Round']) {
+    expect(await screen.findByRole('columnheader', { name: 'Risk' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Assignee' })).toBeInTheDocument();
+    for (const name of ['Partner', 'Round', 'Findings']) {
       expect(screen.queryByRole('columnheader', { name })).toBeNull();
     }
+    clientWidth.mockRestore();
   });
 });

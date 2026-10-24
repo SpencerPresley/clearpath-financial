@@ -19,7 +19,7 @@ import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { useViewer } from '../../ui/layout/Viewer';
-import { useMainNarrowerThan } from '../../ui/layout/useMainWidth';
+import { useElementWidth } from '../../ui/layout/useMainWidth';
 import { rememberQueueTrail } from '../../ui/queueTrail';
 import { Board } from './Board';
 import { BulkBar } from './BulkBar';
@@ -47,8 +47,6 @@ import { SavedViewsError, ViewBar } from './ViewBar';
 const NO_VIEWS: SavedViewOut[] = [];
 
 /** The drawer shows these, so they step aside while it's open and the triage columns keep their width. */
-const DRAWER_HIDDEN: ColumnVisibility = { partner: false, assignee: false, round: false, risk_tier: false };
-
 function EmptyQueue({
   view,
   search,
@@ -263,20 +261,17 @@ export function QueuePage() {
 
   const visibleIds = useMemo(() => visibleColumnIds(columns), [columns]);
   const showBulk = search.layout === 'table' && selectedIds.length > 0;
-  // The same columns step aside when the page itself is narrow (e.g. beside the assistant panel).
-  const narrowMain = useMainNarrowerThan(1000);
-  const tableColumns = useMemo(
-    () => (search.item === undefined && !narrowMain ? columns : { ...columns, ...DRAWER_HIDDEN }),
-    [columns, search.item, narrowMain],
-  );
+  // The table fits its columns to the region's width (fit.ts), which the drawer, the assistant panel and a
+  // 1280px window all narrow.
+  const [regionRef, regionWidth] = useElementWidth();
 
   let region;
   if (search.layout === 'board') {
     region = <Board search={search} viewer={viewer} onOpen={openItem} />;
   } else if (query.isPending) {
     region = (
-      <div className="app-queue-region">
-        <QueueSkeleton columnVisibility={tableColumns} />
+      <div className="app-queue-region" ref={regionRef}>
+        <QueueSkeleton columnVisibility={columns} available={regionWidth} />
       </div>
     );
   } else if (query.isError && rows.length === 0) {
@@ -316,7 +311,11 @@ export function QueuePage() {
     );
   } else {
     region = (
-      <div className="app-queue-region" aria-busy={query.isPlaceholderData ? 'true' : undefined}>
+      <div
+        className="app-queue-region"
+        ref={regionRef}
+        aria-busy={query.isPlaceholderData ? 'true' : undefined}
+      >
         <QueueTable
           rows={rows}
           sort={search.sort}
@@ -331,7 +330,8 @@ export function QueuePage() {
             const next = typeof updater === 'function' ? updater(rowSelection) : updater;
             setSelectionState({ key: listKey, rows: next });
           }}
-          columnVisibility={tableColumns}
+          columnVisibility={columns}
+          available={regionWidth}
           cells={cells}
         />
         <QueueFooter query={query} count={rows.length} />
@@ -376,6 +376,7 @@ export function QueuePage() {
           <IconButton
             icon="action.shortcuts"
             size="sm"
+            className="app-hit-40 app-queue-shortcuts"
             aria-label="Keyboard shortcuts (?)"
             onPress={() => {
               setHelpOpen(true);

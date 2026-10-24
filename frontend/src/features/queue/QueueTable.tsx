@@ -21,6 +21,7 @@ import {
   TITLE_MIN_WIDTH,
 } from './columns';
 import type { ColumnId, ColumnSizing, ColumnVisibility, RowSelection } from './columns';
+import { fitColumns } from './fit';
 
 export const SIZES_KEY = 'clearpath.queue.columnSizes';
 
@@ -45,15 +46,21 @@ function writeSizes(sizes: ColumnSizing) {
   }
 }
 
-/** Widths the table will use: the user's resized widths over the column defaults. Title flexes. */
-function columnWidths(visibility: ColumnVisibility): { id: ColumnId; width: number | undefined }[] {
-  const sizes = readSizes();
+/**
+ * Widths the table will use: the user's resized widths over the fitted layout (fit.ts) over the column
+ * defaults. Title flexes.
+ */
+function columnWidths(
+  visibility: ColumnVisibility,
+  available: number | null,
+): { id: ColumnId; width: number | undefined }[] {
+  const fit = fitColumns(available, visibility, readSizes());
   return queueColumns
     .map((c) => c.id as ColumnId)
-    .filter((id) => visibility[id] !== false)
+    .filter((id) => fit.visibility[id] !== false)
     .map((id) => {
       const size = queueColumns.find((c) => c.id === id)?.size ?? 120;
-      return { id, width: id === 'title' ? undefined : (sizes[id] ?? size) };
+      return { id, width: id === 'title' ? undefined : (fit.sizing[id] ?? size) };
     });
 }
 
@@ -63,12 +70,15 @@ function columnWidths(visibility: ColumnVisibility): { id: ColumnId; width: numb
  */
 export function QueueSkeleton({
   columnVisibility,
+  available = null,
   rows = 10,
 }: {
   columnVisibility: ColumnVisibility;
+  /** The region's inner width (fit.ts); null uses the designed widths. */
+  available?: number | null;
   rows?: number;
 }) {
-  const cols = columnWidths(columnVisibility);
+  const cols = columnWidths(columnVisibility, available);
   const minWidth = cols.reduce((sum, c) => sum + (c.width ?? TITLE_MIN_WIDTH), 0);
   return (
     <div role="status" aria-label="Loading the queue" aria-busy="true">
@@ -123,6 +133,8 @@ export interface QueueTableProps {
   rowSelection: RowSelection;
   onRowSelectionChange: OnChangeFn<RowSelection>;
   columnVisibility: ColumnVisibility;
+  /** The region's inner width, for fitting columns to it (fit.ts); null uses the designed widths. */
+  available?: number | null;
   /** Shared clock for ages; defaults to render time. */
   now?: Date;
   cells?: Omit<QueueCellContextValue, 'now' | 'activeId'>;
@@ -140,16 +152,22 @@ export function QueueTable({
   rowSelection,
   onRowSelectionChange,
   columnVisibility,
+  available = null,
   now,
   cells = READ_ONLY_CELLS,
 }: QueueTableProps) {
-  const [columnSizing, setColumnSizing] = useState<ColumnSizing>(readSizes);
+  // Only widths someone dragged are state (and stored); the fitted layout is derived from the region's width.
+  const [userSizing, setUserSizing] = useState<ColumnSizing>(readSizes);
+  const fit = fitColumns(available, columnVisibility, userSizing);
 
   const onColumnSizingChange: OnChangeFn<ColumnSizing> = (updater) => {
-    setColumnSizing((old) => {
-      const next = typeof updater === 'function' ? updater(old) : updater;
-      writeSizes(next);
-      return next;
+    setUserSizing((old) => {
+      const shown = fitColumns(available, columnVisibility, old).sizing;
+      const next = typeof updater === 'function' ? updater(shown) : updater;
+      // Keep what the person set: their earlier widths and any width that differs from the fitted one.
+      const user = Object.fromEntries(Object.entries(next).filter(([id, w]) => id in old || shown[id] !== w));
+      writeSizes(user);
+      return user;
     });
   };
 
@@ -158,7 +176,7 @@ export function QueueTable({
     columns: queueColumns,
     data: rows,
     getRowId: (row) => String(row.id),
-    state: { rowSelection, columnVisibility, columnSizing },
+    state: { rowSelection, columnVisibility: fit.visibility, columnSizing: fit.sizing },
     onRowSelectionChange,
     onColumnVisibilityChange: noop,
     onColumnSizingChange,
