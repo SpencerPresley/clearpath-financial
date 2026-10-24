@@ -225,7 +225,7 @@ def upload_item_attachment(
     response={200: None, **ERRORS},
     openapi_extra={
         "responses": {
-            "200": {
+            200: {
                 "description": "The file, as uploaded.",
                 "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
             }

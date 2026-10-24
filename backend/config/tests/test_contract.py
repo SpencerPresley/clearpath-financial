@@ -31,6 +31,15 @@ def _operations() -> list[tuple[str, str, dict[str, Any]]]:
     return [(path, method, op) for path, ops in schema["paths"].items() for method, op in ops.items()]
 
 
+def test_schema_exports_as_sorted_json() -> None:
+    # `make schema` exports with --sorted; mixed int/str keys (e.g. a "200" in openapi_extra) break it.
+    import json
+
+    from django.core.serializers.json import DjangoJSONEncoder
+
+    assert json.dumps(api.get_openapi_schema(), sort_keys=True, cls=DjangoJSONEncoder)
+
+
 def test_every_operation_has_an_id_and_one_known_tag() -> None:
     for path, method, op in _operations():
         assert op.get("operationId"), (method, path)
