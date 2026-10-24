@@ -9,15 +9,17 @@ approved.
 """
 
 from collections.abc import Iterable, Mapping
+from typing import Final
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import DecisionLane, DecisionOutcome, Role
-from core.errors import NotFound
+from core.errors import InvalidInput
 from core.permissions import require_role
 from reviews.assignment import BulkResult, run_bulk
 from reviews.decisions import DecisionInput, DecisionResult, record_decision
-from reviews.models import ReviewItem
+
+_NAMED: Final = 5  # items named in the missing-seen-version message
 
 
 def fast_track_approve(
@@ -35,38 +37,31 @@ def fast_track_approve(
     )
 
 
-def _current_n(item_id: int) -> int:
-    row = ReviewItem.objects.filter(pk=item_id).values_list("current_version__n", flat=True).first()
-    if row is None:
-        if not ReviewItem.objects.filter(pk=item_id).exists():
-            raise NotFound.entity("item", item_id)
-        return 0  # no version at all (legacy): record_decision answers stale_version
-    return row
-
-
 def bulk_fast_track_approve(
     *,
     actor: User,
     item_ids: Iterable[int],
     reason: str,
-    seen_versions: Mapping[int, int] | None = None,
+    seen_versions: Mapping[int, int],
     clock: Clock = SYSTEM_CLOCK,
 ) -> BulkResult:
     """Leads only. Each item is the single fast-track in its own transaction, with its checks. Anything that can't be
     fast-tracked is a skip with its error code, never an exception.
 
-    `seen_versions` maps an item to the version the lead saw; that item is approved only at that version (else
-    `stale_version`). An item without an entry is approved at its current version.
+    `seen_versions` maps each item to the version the lead saw; the item is approved only at that version (else
+    `stale_version`). Every item needs an entry (else InvalidInput, and nothing is approved): approving "whatever is
+    current" could record a decision on a version a later terms change generated after the page loaded.
     """
     require_role(actor, Role.LEAD)
-    seen = dict(seen_versions or {})
+    ids = list(dict.fromkeys(item_ids))
+    missing = [item_id for item_id in ids if item_id not in seen_versions]
+    if missing:
+        more = f" and {len(missing) - _NAMED} more" if len(missing) > _NAMED else ""
+        keys = ", ".join(f"CP-{item_id}" for item_id in missing[:_NAMED]) + more
+        raise InvalidInput.for_field("seen_versions", f"Send the version you saw for every item; missing for {keys}.")
     return run_bulk(
-        item_ids,
+        ids,
         lambda item_id: fast_track_approve(
-            actor=actor,
-            item_id=item_id,
-            version_n=seen[item_id] if item_id in seen else _current_n(item_id),
-            reason=reason,
-            clock=clock,
+            actor=actor, item_id=item_id, version_n=seen_versions[item_id], reason=reason, clock=clock
         ),
     )

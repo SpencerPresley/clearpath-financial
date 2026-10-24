@@ -12,7 +12,7 @@ from accounts.models import User
 from checks.models import Finding
 from core.clock import FixedClock
 from core.domain import DecisionLane, ItemStatus, PersonalLoanTerms, ReopenReason, Role
-from core.errors import Conflict, NotPermitted
+from core.errors import Conflict, InvalidInput, NotPermitted
 from reviews.assignment import assign_item
 from reviews.models import Decision, ReviewItem
 from reviews.records import get_item_detail, version_diff
@@ -98,7 +98,11 @@ def test_bulk_approves_clean_items_and_skips_the_rest(
     assert flagged.open_findings_count == 1  # the qualifier warning quotes a rewritten number
 
     result = bulk_fast_track_approve(
-        actor=lead, item_ids=[clean.pk, flagged.pk, normal, 999_999], reason=REASON, clock=clock
+        actor=lead,
+        item_ids=[clean.pk, flagged.pk, normal, 999_999],
+        reason=REASON,
+        seen_versions={clean.pk: 2, flagged.pk: 2, normal: 1, 999_999: 1},
+        clock=clock,
     )
 
     assert result.succeeded == (clean.pk,)
@@ -133,7 +137,9 @@ def test_bulk_is_lead_only(
 
     for actor in (reviewer, marketer, user_factory(roles=[Role.ADMIN])):
         with pytest.raises(NotPermitted):
-            bulk_fast_track_approve(actor=actor, item_ids=[mine.pk], reason=REASON, clock=clock)
+            bulk_fast_track_approve(
+                actor=actor, item_ids=[mine.pk], reason=REASON, seen_versions={mine.pk: 2}, clock=clock
+            )
     assert ReviewItem.objects.get(pk=mine.pk).status == ItemStatus.NEEDS_REREVIEW
 
     result = bulk_fast_track_approve(
@@ -141,6 +147,30 @@ def test_bulk_is_lead_only(
     )
 
     assert (result.succeeded, result.skipped) == ((mine.pk, theirs.pk), ())
+
+
+@pytest.mark.django_db
+def test_bulk_needs_the_seen_version_of_every_item(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    """Without the version the lead saw, an item would be approved at whatever is current, possibly a version a later
+    terms change generated after the page loaded. So every item needs one, and nothing is approved otherwise."""
+    seen = _reopened(submit, reviewer, marketer, lead, clock)
+    unseen = _reopened(submit, reviewer, marketer, lead, clock)
+    publish(lead, clock)
+    _fan_out_all(seen, unseen, clock=clock)
+
+    with pytest.raises(InvalidInput) as caught:
+        bulk_fast_track_approve(
+            actor=lead, item_ids=[seen.pk, unseen.pk], reason=REASON, seen_versions={seen.pk: 2}, clock=clock
+        )
+
+    assert caught.value.fields[0].loc == ("body", "seen_versions")
+    assert f"CP-{unseen.pk}" in caught.value.message
+    assert f"CP-{seen.pk}" not in caught.value.message
+    assert set(ReviewItem.objects.filter(pk__in=[seen.pk, unseen.pk]).values_list("status", flat=True)) == {
+        ItemStatus.NEEDS_REREVIEW
+    }
 
 
 @pytest.mark.django_db
@@ -180,7 +210,7 @@ def test_fast_track_api(
 
     bulk_refused = client.post(
         "/api/items/bulk/fast-track-approve",
-        {"item_ids": [second.pk], "reason": REASON},
+        {"item_ids": [second.pk], "reason": REASON, "seen_versions": [{"item_id": second.pk, "version_n": 2}]},
         content_type="application/json",
     )
     stale = client.post(
@@ -193,6 +223,16 @@ def test_fast_track_api(
         f"/api/items/{item.pk}/fast-track-approve", {"version_n": 2, "reason": REASON}, content_type="application/json"
     )
     client.force_login(lead)
+    bulk_without_seen = client.post(
+        "/api/items/bulk/fast-track-approve",
+        {"item_ids": [second.pk], "reason": REASON},
+        content_type="application/json",
+    )
+    bulk_partly_seen = client.post(
+        "/api/items/bulk/fast-track-approve",
+        {"item_ids": [second.pk, item.pk], "reason": REASON, "seen_versions": [{"item_id": item.pk, "version_n": 2}]},
+        content_type="application/json",
+    )
     bulk = client.post(
         "/api/items/bulk/fast-track-approve",
         {"item_ids": [second.pk], "reason": REASON, "seen_versions": [{"item_id": second.pk, "version_n": 2}]},
@@ -210,6 +250,9 @@ def test_fast_track_api(
         2,
         1,
     )
+    assert bulk_without_seen.status_code == 422
+    assert bulk_partly_seen.status_code == 422
+    assert bulk_partly_seen.json()["fields"][0]["loc"] == ["body", "seen_versions"]
     assert bulk.status_code == 200
     assert bulk.json() == {"succeeded": [second.pk], "skipped": []}
 

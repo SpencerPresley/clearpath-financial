@@ -18,8 +18,9 @@ export interface BulkFastTrackIn {
      */
   reason: string;
   /**
-     * The generated version each item showed when the lead chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.
+     * The generated version each item showed when the lead chose it, one entry per item in item_ids (else 422 on seen_versions, nothing approved). An item is approved only at that version, else skipped as stale_version.
+     * @minItems 1
      * @maxItems 500
      */
-  seen_versions?: SeenVersionIn[];
+  seen_versions: SeenVersionIn[];
 }

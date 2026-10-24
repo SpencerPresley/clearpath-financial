@@ -90,24 +90,24 @@ Body: `FastTrackIn {version_n, reason}`. Send the generated version's `n`, the o
 - `conflict`: the current version isn't generated.
 - `open_findings_block_decision`, `accepted_findings_block_approval`, `stale_offer_terms`.
 
-### `POST /api/items/bulk/fast-track-approve` (`bulkFastTrackApprove`). Reviewers and leads.
+### `POST /api/items/bulk/fast-track-approve` (`bulkFastTrackApprove`). Lead only.
 
-Body: `{item_ids (1–500), reason, seen_versions?: [{item_id, version_n}]}`. Returns 200
+> Updated by the fast-track polish follow-up (PR #33), superseding ruling 6 below.
+
+Body: `{item_ids (1–500), reason, seen_versions: [{item_id, version_n}] (1–500)}`. Returns 200
 `BulkResultOut {succeeded[], skipped[{item_id, code, message}]}`.
 
-**Send `seen_versions`** with the `current_version_n` each row or screen showed. An item listed there is approved
-only at that version, else it is skipped as `stale_version`. An item without an entry is approved at its current
-version. That version may be one a later terms change generated after the page loaded, so the reviewer would be
-recorded approving copy they never saw.
-
-**Action for I/J:** two merged callers send bulk without `seen_versions`. Neither is broken, but both are exposed
-to the unseen-version case:
-- The review screen's Fast-track button (`features/review/DecisionPanel.tsx`): add
-  `seen_versions: [{item_id, version_n: currentN}]`, or switch to `fastTrackApprove`.
-- The queue's bulk bar (`features/queue/BulkBar.tsx`): send each selected row's `current_version_n`.
-Each item gets the single endpoint's checks, so a reviewer's bulk skips other reviewers' items with
-`not_permitted`. Other skip codes: `open_findings_block_decision` (send these to the normal lane),
-`invalid_transition`, `stale_version`, `not_found`. The single endpoint gives a cleaner 409 on one item.
+- **Lead only:** anyone else gets 403 `not_permitted` (product-spec Roles: bulk actions are Lead). A reviewer
+  fast-tracks one item at a time with `fastTrackApprove`, at the version on screen.
+- **`seen_versions` is required, with one entry per item**: the `current_version_n` each row showed. If any item in
+  `item_ids` has no entry, the request is a 422 `invalid_input` on `["body", "seen_versions"]` naming the items
+  ("Send the version you saw for every item; missing for CP-12."), and nothing is approved. Each item is approved
+  only at its listed version, else skipped as `stale_version`. A version that a later terms change generated after
+  the page loaded is never approved unseen.
+- Callers: the queue's bulk bar (`features/queue/BulkBar.tsx`) sends `seen_versions` from each selected row. The
+  review screen uses the single endpoint.
+- Skip codes: `open_findings_block_decision` (send these to the normal lane), `invalid_transition`,
+  `stale_version`, `not_found`, `stale_offer_terms`, `accepted_findings_block_approval`.
 
 ### Diff
 
@@ -133,7 +133,7 @@ terms.selectors.affected_approvals(*, product, clock, item_ids=None, if_publishe
 terms.fanout.fan_out_item(*, item_id, clock) -> FanOutOutcome
   # reopened_fast_track | reopened_normal_lane | expired | expired_normal_lane | regenerated | regenerate_failed | skipped
 terms.fast_track.fast_track_approve(*, actor, item_id, version_n, reason, clock) -> DecisionResult
-terms.fast_track.bulk_fast_track_approve(*, actor, item_ids, reason, seen_versions=None, clock) -> BulkResult
+terms.fast_track.bulk_fast_track_approve(*, actor, item_ids, reason, seen_versions, clock) -> BulkResult  # lead only
 terms.impact.impact_preview(*, viewer, product, values, clock) -> ImpactPreview
 Celery: terms.fan_out_item(item_id) (autoretry), terms.reconcile_fan_out (beat, 900 s)
 Outbox handler: terms.fan_out (TERMS_PUBLISHED)
@@ -157,7 +157,7 @@ Outbox handler: terms.fan_out (TERMS_PUBLISHED)
    isn't approved, and once fast-tracked it quotes current terms. Cost if wrong: none found.
 5. Ruling: the generated version's author and the reopen/expire events' actor are the lead who published the
    terms in effect (`Version.author` is non-null). Cost if wrong: a system user.
-6. Ruling: bulk fast-track is open to reviewers, scoped per item to their own. The merged review screen calls
+6. **Superseded (PR #33): bulk is Lead-only and `seen_versions` is required.** Ruling: bulk fast-track is open to reviewers, scoped per item to their own. The merged review screen calls
    bulk as the assignee. product-spec Roles lists bulk actions under Lead, but each item gets the same check as a
    single fast-track. Cost if wrong: `require_role(LEAD)` in one place, plus I switching to `fastTrackApprove`.
 7. Ruling: items already in needs_rereview whose copy quotes superseded terms get a fresh generated version and

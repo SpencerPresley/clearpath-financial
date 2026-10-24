@@ -80,9 +80,9 @@ def fast_track_approve(request: HttpRequest, item_id: int, body: FastTrackIn) ->
 )
 def bulk_fast_track(request: HttpRequest, body: BulkFastTrackIn) -> assignment.BulkResult:
     """Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the
-    single fast-track's checks, at the version in `seen_versions` (send it). Anything that can't be fast-tracked
-    (open findings, not in needs_rereview, a newer version than the one seen) is listed in `skipped` with its error
-    code and stays in the normal lane (ruling 4)."""
+    single fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything
+    that can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in
+    `skipped` with its error code and stays in the normal lane (ruling 4)."""
     return fast_track.bulk_fast_track_approve(
         actor=current_user(request),
         item_ids=body.item_ids,

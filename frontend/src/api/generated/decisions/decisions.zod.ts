@@ -9,9 +9,9 @@ import * as zod from 'zod';
 
 /**
  * Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the
- * single fast-track's checks, at the version in `seen_versions` (send it). Anything that can't be fast-tracked
- * (open findings, not in needs_rereview, a newer version than the one seen) is listed in `skipped` with its error
- * code and stays in the normal lane (ruling 4).
+ * single fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything
+ * that can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in
+ * `skipped` with its error code and stays in the normal lane (ruling 4).
  * @summary Bulk Fast Track
  */
 export const bulkFastTrackApproveBodyItemIdsMax = 500;
@@ -28,7 +28,7 @@ export const BulkFastTrackApproveBody = zod.object({
   "seen_versions": zod.array(zod.object({
   "item_id": zod.int(),
   "version_n": zod.int()
-})).max(bulkFastTrackApproveBodySeenVersionsMax).optional().describe('The generated version each item showed when the lead chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.')
+})).min(1).max(bulkFastTrackApproveBodySeenVersionsMax).describe('The generated version each item showed when the lead chose it, one entry per item in item_ids (else 422 on seen_versions, nothing approved). An item is approved only at that version, else skipped as stale_version.')
 })
 
 export const BulkFastTrackApproveResponse = zod.object({

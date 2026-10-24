@@ -630,18 +630,20 @@
             "type": "string"
           },
           "seen_versions": {
-            "description": "The generated version each item showed when the lead chose it. Send it: an item listed here is approved only at that version (else skipped as stale_version); an item without an entry is approved at whatever version is current, which a later terms change may have replaced unseen.",
+            "description": "The generated version each item showed when the lead chose it, one entry per item in item_ids (else 422 on seen_versions, nothing approved). An item is approved only at that version, else skipped as stale_version.",
             "items": {
               "$ref": "#/components/schemas/SeenVersionIn"
             },
             "maxItems": 500,
+            "minItems": 1,
             "title": "Seen Versions",
             "type": "array"
           }
         },
         "required": [
           "item_ids",
-          "reason"
+          "reason",
+          "seen_versions"
         ],
         "title": "BulkFastTrackIn",
         "type": "object"
@@ -13477,7 +13479,7 @@
     },
     "/api/items/bulk/fast-track-approve": {
       "post": {
-        "description": "Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the\nsingle fast-track's checks, at the version in `seen_versions` (send it). Anything that can't be fast-tracked\n(open findings, not in needs_rereview, a newer version than the one seen) is listed in `skipped` with its error\ncode and stays in the normal lane (ruling 4).",
+        "description": "Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the\nsingle fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything\nthat can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in\n`skipped` with its error code and stays in the normal lane (ruling 4).",
         "operationId": "bulkFastTrackApprove",
         "parameters": [],
         "requestBody": {
