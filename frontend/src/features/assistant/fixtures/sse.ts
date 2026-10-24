@@ -44,6 +44,15 @@ export function aiText(id: string, chunks: readonly string[]): WireEvent[] {
   ];
 }
 
+/** A run answering whatever message was POSTed (keeping its id, as the checkpoint does) with `text`. */
+export function echoRun(text: string, replyId = 'a1') {
+  return (body: unknown) => {
+    const { message } = body as { message: { id: string; content: string } };
+    const run = textRun(message, { id: replyId, text });
+    return { events: run.events, state: { ...EMPTY_STATE, values: { messages: run.messages } } };
+  };
+}
+
 /** A whole run that answers `human` with `reply` and completes. */
 export function textRun(
   human: { id: string; content: string },

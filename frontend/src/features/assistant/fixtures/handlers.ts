@@ -58,12 +58,15 @@ export function threadFixture(overrides: Partial<AssistantThreadOut> = {}): Assi
   };
 }
 
+/** A scripted run, or one built from the POSTed body (to echo the client's message id, as the server does). */
+export type RunScript = ScriptedRun | ((body: unknown) => ScriptedRun);
+
 export function assistantHandlers({
   runs,
   state = EMPTY_STATE,
   threads = [],
 }: {
-  runs: ScriptedRun[];
+  runs: RunScript[];
   state?: unknown;
   threads?: AssistantThreadOut[];
 }) {
@@ -71,8 +74,10 @@ export function assistantHandlers({
   const fake: FakeAssistant = { posted: [], state, threads };
   const startRun = async ({ request }: { request: Request }) => {
     const path = new URL(request.url).pathname;
-    fake.posted.push({ path, body: await request.json() });
-    const run = queue.shift();
+    const body: unknown = await request.json();
+    fake.posted.push({ path, body });
+    const script = queue.shift();
+    const run = typeof script === 'function' ? script(body) : script;
     if (run === undefined) {
       return HttpResponse.json({ code: 'conflict', message: 'No scripted run left.' }, { status: 409 });
     }
@@ -90,6 +95,10 @@ export function assistantHandlers({
     http.get('*/api/assistant/threads/:threadId/state', () => HttpResponse.json(fake.state as object)),
     http.post('*/api/assistant/threads/:threadId/runs', startRun),
     http.post('*/api/assistant/threads/:threadId/interrupts/:interruptId', startRun),
+    // The SDK's own history read (see AssistantTransport.apiUrl); the backend has no such route.
+    http.post('*/api/assistant/threads/:threadId/history', () =>
+      HttpResponse.json({ code: 'not_found', message: 'Not found.' }, { status: 404 }),
+    ),
   ];
   return { fake, handlers };
 }

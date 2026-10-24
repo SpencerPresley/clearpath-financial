@@ -1,9 +1,12 @@
 import { Link, Outlet } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button as AriaButton, Focusable } from 'react-aria-components';
 
+import { ASSISTANT_PANEL_ID, AssistantPanel } from '../../features/assistant/AssistantPanel';
+import { readAssistantOpen, writeAssistantOpen } from '../../features/assistant/storage';
 import { ApiStatusBadge } from '../../features/system/ApiStatusBadge';
 import { Icon } from '../Icon';
+import { Kbd } from '../Kbd';
 import { ToastHost } from '../toast';
 import { Tooltip } from '../Tooltip';
 import { navGroupsFor } from './nav';
@@ -87,6 +90,29 @@ export function AppShell() {
   };
   const toggleLabel = collapsed ? 'Expand navigation' : 'Collapse navigation';
 
+  // The assistant panel: open state persists; opened by the user (not restored on load) means focus moves in.
+  const [assistant, setAssistant] = useState(() => ({ open: readAssistantOpen(), byUser: false }));
+  const assistantButton = useRef<HTMLButtonElement>(null);
+  const toggleAssistant = () => {
+    setAssistant((value) => {
+      writeAssistantOpen(!value.open);
+      return { open: !value.open, byUser: true };
+    });
+  };
+  useEffect(() => {
+    // ⌘. / Ctrl+. from anywhere, typing included (useHotkeys skips modified keys by design).
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key === '.') {
+        event.preventDefault();
+        toggleAssistant();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <a href="#main" className="app-skip-link">
@@ -114,6 +140,26 @@ export function AppShell() {
         <SearchField />
         <div className="app-topbar-end">
           <ApiStatusBadge />
+          <Tooltip
+            content={
+              <>
+                Assistant <Kbd keys={[/Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl', '.']} />
+              </>
+            }
+            placement="bottom"
+          >
+            <AriaButton
+              ref={assistantButton}
+              className="app-topbar-btn"
+              aria-label="Assistant"
+              aria-expanded={assistant.open}
+              aria-controls={assistant.open ? ASSISTANT_PANEL_ID : undefined}
+              aria-keyshortcuts="Meta+. Control+."
+              onPress={toggleAssistant}
+            >
+              <Icon name="nav.assistant" size={18} />
+            </AriaButton>
+          </Tooltip>
           <UserMenu />
         </div>
       </header>
@@ -141,6 +187,15 @@ export function AppShell() {
       <main id="main" className="app-main" tabIndex={-1}>
         <Outlet />
       </main>
+      {assistant.open && (
+        <AssistantPanel
+          autoFocus={assistant.byUser}
+          onClose={() => {
+            toggleAssistant();
+            assistantButton.current?.focus(); // the close button is about to unmount
+          }}
+        />
+      )}
       <ToastHost />
     </div>
   );

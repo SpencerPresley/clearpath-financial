@@ -56,4 +56,25 @@ describe('readSse', () => {
     for await (const data of readSse(stream)) out.push(data);
     expect(out).toEqual([{ t: 'é' }]);
   });
+
+  it('cancels the body when the signal aborts', async () => {
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"a":1}\n\n'));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const abort = new AbortController();
+    const out: unknown[] = [];
+    for await (const data of readSse(body, abort.signal)) {
+      out.push(data);
+      abort.abort();
+    }
+    expect(out).toEqual([{ a: 1 }]);
+    expect(cancelled).toBe(true);
+  });
 });

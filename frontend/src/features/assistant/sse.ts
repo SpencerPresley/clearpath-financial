@@ -14,8 +14,14 @@ function frameData(frame: string): string | undefined {
   return data.length > 0 ? data.join('\n') : undefined;
 }
 
-export async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator {
+/** `signal` cancels the body explicitly on abort, so the connection closes even where fetch's abort doesn't reach it. */
+export async function* readSse(body: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator {
   const reader = body.getReader();
+  const cancel = () => {
+    reader.cancel().catch(() => undefined);
+  };
+  if (signal?.aborted === true) cancel();
+  signal?.addEventListener('abort', cancel, { once: true });
   const decoder = new TextDecoder();
   let buffer = '';
   let pendingCr = '';
@@ -40,6 +46,7 @@ export async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator
     const data = frameData(buffer.trim());
     if (data !== undefined) yield JSON.parse(data) as unknown;
   } finally {
+    signal?.removeEventListener('abort', cancel);
     reader.releaseLock();
   }
 }

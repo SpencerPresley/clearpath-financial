@@ -30,11 +30,13 @@ import {
   CaretDownIcon,
   ChartLineIcon,
   ChatCircleIcon,
+  ChatTeardropTextIcon,
   CheckCircleIcon,
   CheckFatIcon,
   CheckIcon,
   CheckSquareIcon,
   CircleDashedIcon,
+  CircleNotchIcon,
   ColumnsIcon,
   CopyIcon,
   CpuIcon,
@@ -56,6 +58,7 @@ import {
   GitDiffIcon,
   HandshakeIcon,
   HourglassMediumIcon,
+  HourglassSimpleIcon,
   InfoIcon,
   KanbanIcon,
   KeyboardIcon,
@@ -68,6 +71,7 @@ import {
   PencilSimpleIcon,
   PercentIcon,
   PlugsIcon,
+  PlusIcon,
   ProhibitIcon,
   RulerIcon,
   SealCheckIcon,
@@ -76,6 +80,7 @@ import {
   SignOutIcon,
   SortAscendingIcon,
   StackIcon,
+  StopIcon,
   TableIcon,
   TagIcon,
   TrayArrowDownIcon,
@@ -179,6 +184,10 @@ export const icons = {
   'job.running': regular(HourglassMediumIcon),
   'job.done': regular(CheckSquareIcon),
   'job.failed': regular(XSquareIcon),
+  /** Start something new in place (a new assistant thread). */
+  'action.new': regular(PlusIcon),
+  /** Stop a running operation (the assistant's reply). */
+  'action.stop': fill(StopIcon),
   // Column sort state (server-sorted columns only).
   'sort.ascending': regular(ArrowUpIcon),
   'sort.descending': regular(ArrowDownIcon),
@@ -204,11 +213,17 @@ export const icons = {
   'nav.import': regular(TrayArrowDownIcon),
   'nav.outbox': regular(EnvelopeSimpleIcon),
   'nav.user': regular(UserCircleIcon),
+  // The assistant panel: a speech bubble with text, not a sparkle or wand (spec §5.6); ChatCircle is comments.
+  'nav.assistant': regular(ChatTeardropTextIcon),
 
   // System and feedback.
   'system.api_offline': bold(PlugsIcon),
   'feedback.error': regular(WarningCircleIcon),
   'feedback.info': regular(InfoIcon),
+  /** In progress, for steps that finish on their own (an assistant tool call); spun by .app-spin. */
+  'feedback.running': bold(CircleNotchIcon),
+  /** Paused on a person (an email draft waiting for approval). */
+  'feedback.awaiting': regular(HourglassSimpleIcon),
 } as const satisfies Record<string, IconDef>;
 
 export type IconKey = keyof typeof icons;

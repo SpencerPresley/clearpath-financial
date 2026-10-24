@@ -1400,10 +1400,11 @@
 
   /* ---- App shell ------------------------------------------------------------------------------- */
   .app-shell {
-    @apply grid h-screen grid-cols-[auto_minmax(0,1fr)] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
+    /* nav | page | assistant panel (an empty auto track when the panel is closed) */
+    @apply grid h-screen grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
   }
   .app-topbar {
-    @apply col-span-2 flex h-topbar items-center gap-3 bg-primary pr-3 pl-2 text-primary-content;
+    @apply col-span-full flex h-topbar items-center gap-3 bg-primary pr-3 pl-2 text-primary-content;
   }
   .app-topbar [data-focus-visible],
   .app-topbar :focus-visible {
@@ -3415,5 +3416,200 @@
   }
   .app-tp-citation {
     @apply whitespace-nowrap;
+  }
+}
+
+/* ---- Assistant panel (workstream K): a flat column beside the page, same surface as the nav. ------- */
+@keyframes app-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@layer components {
+  .app-spin {
+    animation: app-spin 900ms linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-spin {
+      animation: none;
+    }
+  }
+  .app-assistant {
+    @apply flex min-h-0 w-100 flex-col border-l border-base-300 bg-base-100;
+  }
+  .app-assistant-head {
+    @apply flex h-10 shrink-0 items-center gap-1 border-b border-base-300 pr-1.5 pl-3;
+  }
+  .app-assistant-title {
+    @apply min-w-0 flex-1 truncate text-ui font-semibold text-base-content;
+  }
+  .app-assistant-threads-btn {
+    @apply gap-1;
+  }
+  .app-assistant-thread-item {
+    @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5;
+  }
+  .app-assistant-thread-title {
+    @apply truncate;
+  }
+  .app-assistant-thread-item .app-age {
+    @apply col-start-2 row-start-1 text-meta text-muted;
+  }
+  .app-assistant-thread-pending {
+    @apply col-span-2 inline-flex items-center gap-1 text-meta font-medium text-status-warning-soft-content;
+  }
+  .app-assistant-body {
+    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3;
+  }
+  .app-assistant-empty {
+    @apply flex flex-col gap-2 text-ui;
+  }
+  .app-assistant-empty-title {
+    @apply font-medium text-base-content;
+  }
+  .app-assistant-asks {
+    @apply mt-1 flex flex-col gap-1;
+  }
+  .app-assistant-ask {
+    @apply w-full cursor-default rounded-md border border-base-300 px-2.5 py-1.5 text-left text-ui text-base-content;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-assistant-ask:hover {
+    @apply bg-hover;
+  }
+  .app-assistant-log {
+    @apply flex flex-col gap-4;
+  }
+  .app-assistant-msg {
+    @apply flex flex-col gap-1.5 text-sm leading-6;
+  }
+  .app-assistant-msg[data-role='user'] {
+    @apply self-end rounded-md bg-base-200 px-2.5 py-1.5;
+    max-width: 85%;
+  }
+  .app-assistant-user-text {
+    @apply whitespace-pre-wrap text-base-content;
+  }
+  .app-assistant-markdown {
+    @apply flex flex-col gap-2 text-base-content;
+  }
+  .app-assistant-markdown :where(ul, ol) {
+    @apply flex flex-col gap-0.5 pl-5;
+  }
+  .app-assistant-markdown ul {
+    @apply list-disc;
+  }
+  .app-assistant-markdown ol {
+    @apply list-decimal;
+  }
+  .app-assistant-markdown :where(h1, h2, h3, h4) {
+    @apply text-sm font-semibold;
+  }
+  .app-assistant-markdown code {
+    @apply rounded-xs bg-base-200 px-1 font-mono text-meta;
+  }
+  .app-assistant-markdown pre {
+    @apply overflow-x-auto rounded-md bg-base-200 p-2 font-mono text-meta;
+  }
+  .app-assistant-markdown table {
+    @apply w-full border-collapse text-ui;
+  }
+  .app-assistant-markdown :where(th, td) {
+    @apply border border-base-300 px-1.5 py-0.5 text-left;
+  }
+  .app-assistant-markdown blockquote {
+    @apply border-l-2 border-base-300 pl-2 text-muted;
+  }
+  .app-assistant-item-link {
+    @apply rounded-xs font-mono text-[0.92em] font-medium text-primary underline-offset-2 hover:underline;
+  }
+  .app-assistant-caret {
+    @apply inline-block h-4 w-1.5 bg-muted;
+    animation: app-indeterminate-blink 1s steps(2, start) infinite;
+  }
+  .app-assistant-tools {
+    @apply flex flex-col gap-1;
+  }
+  .app-assistant-tool {
+    @apply inline-flex flex-wrap items-center gap-1.5 text-ui text-muted;
+  }
+  .app-assistant-tool[data-status='finished']::before {
+    content: '';
+    @apply size-1.5 rounded-full bg-muted;
+  }
+  .app-assistant-tool[data-status='error'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-assistant-tool[data-status='awaiting'] {
+    @apply font-medium text-status-warning-soft-content;
+  }
+  .app-assistant-thinking {
+    @apply flex flex-col gap-1.5 py-1;
+  }
+  .app-assistant-error {
+    @apply mx-3 mb-2 rounded-sm border border-status-error-line bg-status-error-soft px-2 py-1 text-ui text-status-error-soft-content;
+  }
+  .app-assistant-composer {
+    @apply flex shrink-0 flex-col gap-1.5 border-t border-base-300 px-3 py-2;
+  }
+  .app-assistant-composer-field {
+    @apply flex flex-col;
+  }
+  .app-assistant-composer-input {
+    @apply w-full resize-none rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 text-sm leading-6 text-base-content outline-none placeholder:text-muted;
+  }
+  .app-assistant-composer-input[data-focused] {
+    @apply border-focus;
+  }
+  .app-assistant-composer-input[data-disabled] {
+    @apply cursor-not-allowed bg-base-200;
+  }
+  .app-assistant-composer-bar {
+    @apply flex items-center justify-between gap-2;
+  }
+  .app-assistant-context {
+    @apply truncate text-meta text-muted;
+  }
+  .app-assistant-approval {
+    @apply flex flex-col gap-2.5 rounded-md border border-status-warning-line px-3 py-2.5;
+  }
+  .app-assistant-approval-head {
+    @apply flex items-center gap-1.5 text-status-warning-soft-content;
+  }
+  .app-assistant-approval-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-assistant-approval-note {
+    @apply text-meta text-muted;
+  }
+  .app-assistant-draft {
+    @apply flex flex-col gap-1.5 text-ui;
+  }
+  .app-assistant-draft-row {
+    @apply grid grid-cols-[4rem_minmax(0,1fr)] gap-2;
+  }
+  .app-assistant-draft-row dt {
+    @apply text-muted;
+  }
+  .app-assistant-draft-body dd {
+    @apply max-h-64 overflow-y-auto rounded-sm border border-base-300 bg-base-200 px-2 py-1.5 text-sm whitespace-pre-wrap text-base-content;
+  }
+  .app-assistant-recipients {
+    @apply flex flex-wrap gap-1;
+  }
+  .app-assistant-recipient {
+    @apply rounded-sm border border-base-300 px-1.5 font-mono text-meta leading-5 break-all;
+  }
+  .app-assistant-approval-actions {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .app-assistant-edit {
+    @apply flex flex-col gap-2.5;
+  }
+}
+@keyframes app-indeterminate-blink {
+  to {
+    visibility: hidden;
   }
 }

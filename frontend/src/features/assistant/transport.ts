@@ -133,6 +133,13 @@ function lastHumanMessage(input: unknown): { id: string; content: string } | und
 }
 
 export class AssistantTransport implements AgentServerAdapter {
+  /**
+   * Read by useStream to build its fallback SDK Client (resolveClientApiUrl). The controller calls
+   * `client.threads.getHistory` directly on hydrate, bypassing this adapter; without a URL that's a POST to
+   * http://localhost:8123. Here it stays same-origin under our owner-checked thread routes
+   * (POST /api/assistant/threads/{id}/history), and the controller ignores its failure.
+   */
+  readonly apiUrl = `${window.location.origin}/api/assistant`;
   #threadId: string;
   #seq = 0;
   #buffer: ProtocolEvent[] = [];
@@ -223,7 +230,7 @@ export class AssistantTransport implements AgentServerAdapter {
   async #pump(body: ReadableStream<Uint8Array>, run: AbortController, threadId: string): Promise<void> {
     let ended = false;
     try {
-      for await (const data of readSse(body)) {
+      for await (const data of readSse(body, run.signal)) {
         if (run.signal.aborted) return;
         if (!isProtocolEvent(data)) continue;
         this.#emit(data);
