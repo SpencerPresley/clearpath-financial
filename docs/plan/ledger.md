@@ -18,7 +18,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | D2 llm wiring (#5) | agent (worktree `wsD/llm-wiring`) | — | in progress | outbox handler → task → findings; failed/skipped/retry; stuck-running reconciliation. Unblocks Approve |
 | F offer terms (#7) | agent (worktree `wsF/offer-terms`) | — | in progress | publish, impact preview, per-item fan-out, fast-track (single + bulk) |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
-| H2 queue (#9, part 2) | agent (worktree) | PR #29 | rebasing (conflict with #28 in theme.css/icons.ts) | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
+| H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | API gaps (queue/mine) | agent (worktree `api/queue-gaps`) | — | in progress | sorts, row fields (notes, decision reason, expiry), totals, stats↔view parity, PATCH /views, dev CSRF origins |
 | I review + intake (#10) | agent (worktree) | PR #27 merged `08308a4` | done | UI review: 1 blocker + 11 should-fix, 17 fixed; UTF-16 span conversion tested |
 | I follow-ups | agent (resumed I) | PR #28 merged | done | re-review actions by reopen reason; fetch-URL removed; Pull = EyeSlash |
