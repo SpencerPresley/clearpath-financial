@@ -1053,7 +1053,7 @@ export const getItemHistoryResponseEntriesItemThreezeroPayloadErrorCodeDefault =
 export const getItemHistoryResponseEntriesItemThreezeroPayloadFindingsCountDefault = 0;
 export const getItemHistoryResponseEntriesItemThreezeroPayloadNewFindingsCountDefault = 0;
 export const getItemHistoryResponseEntriesItemThreethreePayloadAffectedItemIdsDefault = [];
-export const getItemHistoryResponseEntriesItemFourthreePayloadSeededItemsDefault = 0;
+export const getItemHistoryResponseEntriesItemFourfourPayloadSeededItemsDefault = 0;
 
 export const GetItemHistoryResponse = zod.object({
   "entries": zod.array(zod.union([zod.object({
@@ -1686,6 +1686,25 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "offer_terms_id": zod.int(),
+  "previous_offer_terms_ids": zod.array(zod.int()),
+  "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
+  "terms_version": zod.int(),
+  "version_id": zod.int()
+}).describe('The version\'s quotes were re-checked against `terms_version` of `product` and every number still holds, so\nits terms refs moved from `previous_offer_terms_ids` to `offer_terms_id`.'),
+  "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "type": zod.literal("terms.refs_relinked").meta({ title: 'Type' })
+}),zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Null for system actions (sweeps, fan-out).'),
+  "at": zod.iso.datetime({"offset":true}),
+  "entity": zod.enum(['item', 'version', 'finding', 'comment', 'decision', 'placement', 'attachment', 'offer_terms', 'partner', 'user', 'import', 'export', 'email', 'system']).describe('What an Event is about.'),
+  "entity_id": zod.int(),
+  "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "id": zod.int(),
+  "payload": zod.object({
   "name": zod.string(),
   "partner_id": zod.int(),
   "type": zod.enum(['affiliate', 'lead_gen', 'marketplace', 'influencer'])
@@ -1840,7 +1859,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourthreePayloadSeededItemsDefault)
+  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourfourPayloadSeededItemsDefault)
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("demo.reset").meta({ title: 'Type' })

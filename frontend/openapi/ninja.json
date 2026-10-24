@@ -5609,6 +5609,7 @@
                   "placement.takedown_requested": "#/components/schemas/TakedownRequestedEventOut",
                   "placement.updated": "#/components/schemas/PlacementUpdatedEventOut",
                   "terms.published": "#/components/schemas/TermsPublishedEventOut",
+                  "terms.refs_relinked": "#/components/schemas/TermsRefsRelinkedEventOut",
                   "user.active_changed": "#/components/schemas/UserActiveChangedEventOut",
                   "user.availability_changed": "#/components/schemas/UserAvailabilityChangedEventOut",
                   "user.created": "#/components/schemas/UserCreatedEventOut",
@@ -5716,6 +5717,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/TermsPublishedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/TermsRefsRelinkedEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/PartnerCreatedEventOut"
@@ -11434,6 +11438,115 @@
           "offer_terms"
         ],
         "title": "TermsRefOut",
+        "type": "object"
+      },
+      "TermsRefsRelinkedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TermsRefsRelinkedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "terms.refs_relinked",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "TermsRefsRelinkedEventOut",
+        "type": "object"
+      },
+      "TermsRefsRelinkedPayload": {
+        "additionalProperties": false,
+        "description": "The version's quotes were re-checked against `terms_version` of `product` and every number still holds, so\nits terms refs moved from `previous_offer_terms_ids` to `offer_terms_id`.",
+        "properties": {
+          "offer_terms_id": {
+            "title": "Offer Terms Id",
+            "type": "integer"
+          },
+          "previous_offer_terms_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Previous Offer Terms Ids",
+            "type": "array"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "terms_version": {
+            "title": "Terms Version",
+            "type": "integer"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "product",
+          "offer_terms_id",
+          "terms_version",
+          "previous_offer_terms_ids"
+        ],
+        "title": "TermsRefsRelinkedPayload",
         "type": "object"
       },
       "ThroughputOut": {

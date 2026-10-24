@@ -32,9 +32,10 @@ def fan_out_terms_change(event: EventRecord) -> None:
 
 @handles(EventType.TERMS_PUBLISHED, name="terms.recheck_in_flight")
 def recheck_in_flight(event: EventRecord) -> None:
-    """Enqueue one code re-check per in-flight item (submitted, in review, changes requested) whose current version
+    """Enqueue one re-check per in-flight item (submitted, in review, changes requested) whose current version
     quotes the superseded terms, after this delivery's receipt commits (walkthrough S20: the stale-rate finding
-    appears now, not as a refusal at Approve). One task per item, for the same lock-order reason as the fan-out."""
+    appears now, not as a refusal at Approve; a version whose numbers all still hold is re-linked to the new terms
+    instead). One task per item, for the same lock-order reason as the fan-out."""
     payload = event.payload
     if not isinstance(payload, TermsPublishedPayload):
         raise TypeError(f"expected TermsPublishedPayload, got {type(payload).__name__}")

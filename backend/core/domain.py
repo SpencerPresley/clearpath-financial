@@ -295,6 +295,9 @@ class EventType(StrEnum):
     PAGE_FINDINGS_FLAGGED = "placement.page_findings_flagged"
     ATTACHMENT_ADDED = "attachment.added"
     TERMS_PUBLISHED = "terms.published"
+    # An in-flight version's quoted numbers all still hold under a newly published terms version: its terms refs
+    # now point at that version (the S20 re-check; approved versions are never re-linked).
+    TERMS_REFS_RELINKED = "terms.refs_relinked"
     PARTNER_CREATED = "partner.created"
     PARTNER_UPDATED = "partner.updated"
     USER_AVAILABILITY_CHANGED = "user.availability_changed"

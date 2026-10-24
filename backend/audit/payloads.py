@@ -337,6 +337,17 @@ class TermsPublishedPayload(EventPayload):
     affected_item_ids: tuple[int, ...] = ()
 
 
+class TermsRefsRelinkedPayload(EventPayload):
+    """The version's quotes were re-checked against `terms_version` of `product` and every number still holds, so
+    its terms refs moved from `previous_offer_terms_ids` to `offer_terms_id`."""
+
+    version_id: int
+    product: Product
+    offer_terms_id: int
+    terms_version: int
+    previous_offer_terms_ids: tuple[int, ...]
+
+
 class PartnerCreatedPayload(EventPayload):
     partner_id: int
     name: str
@@ -426,6 +437,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.PAGE_FINDINGS_FLAGGED: PageFindingsFlaggedPayload,
     EventType.ATTACHMENT_ADDED: AttachmentAddedPayload,
     EventType.TERMS_PUBLISHED: TermsPublishedPayload,
+    EventType.TERMS_REFS_RELINKED: TermsRefsRelinkedPayload,
     EventType.PARTNER_CREATED: PartnerCreatedPayload,
     EventType.PARTNER_UPDATED: PartnerUpdatedPayload,
     EventType.USER_AVAILABILITY_CHANGED: UserAvailabilityChangedPayload,

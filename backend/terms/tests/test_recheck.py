@@ -4,6 +4,7 @@ requested) whose current version quotes the superseded terms, so the stale-rate 
 
 from collections.abc import Callable
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -11,10 +12,11 @@ import pytest
 from accounts.models import User
 from audit.models import Event
 from audit.outbox import EventRecord
-from checks.models import CheckRun, Finding
+from checks.models import CheckRun, Finding, TermsRef
 from core.clock import FixedClock
 from core.domain import DecisionOutcome, EventType, FindingSource, FindingState, ItemStatus, Product
 from reviews.decisions import DecisionInput, record_decision
+from reviews.errors import StaleOfferTerms
 from reviews.models import ReviewItem
 from reviews.services import SubmitItemResult
 from reviews.tests.conftest import RATE_COPY, ai_done, dismiss_all
@@ -24,7 +26,7 @@ from terms import handlers
 from terms.fanout import RecheckOutcome, recheck_in_flight_item
 from terms.models import OfferTerms
 from terms.selectors import in_flight_quoting_superseded
-from terms.tests.conftest import approve, publish
+from terms.tests.conftest import PL_VALUES, approve, publish
 
 type Submit = Callable[..., SubmitItemResult]
 type OnCommit = Any  # pytest-django's django_capture_on_commit_callbacks
@@ -137,3 +139,77 @@ def test_the_publish_handler_enqueues_one_recheck_per_item_after_commit(
         callback()
 
     assert enqueued == [first.pk, second.pk]
+
+
+# --- numbers unchanged: re-link instead of a finding (orchestrator ruling on the S20 gap) ------------------------
+
+# RATE_COPY quotes only the APR range; a new version that moves only the loan amounts leaves every quoted number
+# true, so there is nothing for a reviewer to fix and the copy now quotes the new version.
+AMOUNTS_ONLY = PL_VALUES.model_copy(update={"amount_max": Decimal(45000)})
+
+
+def _refs(item: ReviewItem) -> set[int]:
+    return set(TermsRef.objects.filter(version_id=item.current_version_id).values_list("offer_terms_id", flat=True))  # pyrefly: ignore[missing-attribute]
+
+
+def _approve(item: ReviewItem, reviewer: User, clock: FixedClock) -> None:
+    record_decision(
+        actor=reviewer,
+        item_id=item.pk,
+        data=DecisionInput(outcome=DecisionOutcome.APPROVED, version_n=1, reason="Meets policy"),
+        clock=clock,
+    )
+
+
+def test_an_item_whose_quoted_numbers_still_hold_is_relinked_and_can_be_approved(
+    pl_terms: OfferTerms, submit: Submit, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item = _in_review(submit, reviewer, clock)
+    clock.at += timedelta(hours=1)
+    new_terms_id = publish(lead, clock, AMOUNTS_ONLY)
+
+    assert recheck_in_flight_item(item_id=item.pk, clock=clock) is RecheckOutcome.RELINKED
+
+    assert _refs(item) == {new_terms_id}
+    assert _open(item) == []
+    event = Event.objects.get(item_id=item.pk, type=EventType.TERMS_REFS_RELINKED)
+    assert event.payload == {
+        "version_id": item.current_version_id,  # pyrefly: ignore[missing-attribute]
+        "product": "personal_loan",
+        "offer_terms_id": new_terms_id,
+        "terms_version": 2,
+        "previous_offer_terms_ids": [pl_terms.pk],
+    }
+    assert event.actor is None
+    assert in_flight_quoting_superseded(product=Product(item.product), clock=clock) == ()
+    assert recheck_in_flight_item(item_id=item.pk, clock=clock) is RecheckOutcome.SKIPPED
+    _approve(item, reviewer, clock)  # no stale_offer_terms: the copy quotes the terms in effect
+    assert ReviewItem.objects.get(pk=item.pk).status == ItemStatus.APPROVED
+
+
+def test_changed_numbers_keep_the_old_refs_and_the_refusal(
+    pl_terms: OfferTerms, submit: Submit, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item = _in_review(submit, reviewer, clock)
+    _publish_later(lead, clock)  # the floor moves: 7.49% is no longer offered
+
+    assert recheck_in_flight_item(item_id=item.pk, clock=clock) is RecheckOutcome.RECHECKED
+
+    assert _refs(item) == {pl_terms.pk}
+    assert not Event.objects.filter(item_id=item.pk, type=EventType.TERMS_REFS_RELINKED).exists()
+    dismiss_all(item.pk, reviewer, clock)
+    with pytest.raises(StaleOfferTerms):
+        _approve(item, reviewer, clock)
+
+
+def test_approved_items_are_never_relinked(
+    pl_terms: OfferTerms, submit: Submit, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item_id = submit(content_text=RATE_COPY).item_id
+    approve(item_id, reviewer, clock)
+    item = ReviewItem.objects.get(pk=item_id)
+    clock.at += timedelta(hours=1)
+    publish(lead, clock, AMOUNTS_ONLY)
+
+    assert recheck_in_flight_item(item_id=item_id, clock=clock) is RecheckOutcome.SKIPPED
+    assert _refs(item) == {pl_terms.pk}  # the decision's record of what it approved stays as it was

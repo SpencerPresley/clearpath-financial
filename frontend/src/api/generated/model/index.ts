@@ -308,6 +308,8 @@ export * from './termsPublishedEventOut';
 export * from './termsPublishedPayload';
 export * from './termsRefDraftOut';
 export * from './termsRefOut';
+export * from './termsRefsRelinkedEventOut';
+export * from './termsRefsRelinkedPayload';
 export * from './throughputOut';
 export * from './toolApprovalOut';
 export * from './unmappedValueOut';

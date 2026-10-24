@@ -24,9 +24,9 @@ from enum import StrEnum
 
 from django.db import transaction
 
-from checks.engine import StaleTermsRef, render_fast_track
-from checks.models import CheckRun
-from checks.services import recount_open_findings, run_code_checks
+from checks.engine import Span, StaleTermsRef, TermsRefDraft, render_fast_track
+from checks.models import CheckRun, TermsRef
+from checks.services import recount_open_findings, relink_terms_refs, run_code_checks
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import FindingSource, ItemStatus, Product, ReopenReason, VersionOrigin
 from reviews.assignment import locked_item
@@ -34,6 +34,7 @@ from reviews.models import Version
 from reviews.rereview import send_back
 from reviews.selectors import is_item_live
 from reviews.versions import create_version
+from terms.models import OfferTerms
 from terms.selectors import (
     AFFECTED_STATUSES,
     IN_FLIGHT_STATUSES,
@@ -104,20 +105,40 @@ def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
 
 class RecheckOutcome(StrEnum):
     RECHECKED = "rechecked"  # code checks re-ran against the terms in effect; new findings are open
+    RELINKED = "relinked"  # every quoted number still holds; the refs now point at the terms in effect
     SKIPPED = "skipped"  # not in flight, not quoting superseded terms, or already re-checked since they took effect
 
 
+def _numbers_hold(version: Version, terms: OfferTerms) -> bool:
+    """Whether every number the version quotes is unchanged under `terms`: re-rendering it the way fast-track would
+    gives the same text (terms.impact's `numbers_change`, negated). Refs that no longer fit the text count as
+    changed."""
+    refs = [
+        TermsRefDraft(field=r.field, span=Span(r.span_start, r.span_end), quoted_value=r.quoted_value)
+        for r in TermsRef.objects.filter(version=version).order_by("span_start", "span_end")
+    ]
+    try:
+        return render_fast_track(version.content_text, refs, terms.typed_values) == version.content_text
+    except StaleTermsRef:
+        return False
+
+
 def recheck_in_flight_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> RecheckOutcome:
-    """Re-run the code checks on an in-flight item's current version after a terms change (walkthrough S20).
+    """Bring an in-flight item's quotes up to date after a terms change (walkthrough S20).
 
     In-flight items (submitted, in review, changes requested) aren't regenerated (ledger ruling): the reviewer
-    requests changes or approves with edits. But until the checks re-run, a stale rate shows up only as a 409 when
-    Approve is pressed. Re-running adds the findings for the new terms (`pricing.terms_available` and
-    `pricing.terms_current`) as open findings and updates the open count. The version's terms refs stay as recorded,
-    so it still "quotes" the superseded version and approval stays refused until the copy changes.
+    requests changes or approves with edits. But left alone, a version quoting superseded terms shows up only as a
+    409 (`stale_offer_terms`) when Approve is pressed. So, for the item's current version:
 
-    One item per transaction (lock order, as `fan_out_item`). Idempotent: skipped once a code check has run on the
-    version since the terms in effect took effect, so a redelivered event or a retry adds nothing.
+    - every quoted number still holds under the terms in effect (same rendering, the fast-track definition): its
+      terms refs are re-linked to those terms and TERMS_REFS_RELINKED is recorded. Nothing to fix, and Approve
+      passes (orchestrator ruling). Only in-flight versions: an approved version's refs are its decision's record.
+    - a number changed: the code checks re-run, adding the stale-rate findings (`pricing.terms_available`,
+      `pricing.terms_current`) as open findings. The refs stay on the superseded version, so approval stays refused
+      until the copy changes.
+
+    One item per transaction (lock order, as `fan_out_item`). Idempotent: a re-linked version no longer quotes
+    superseded terms, and a re-checked one is skipped once a code check has run since the terms took effect.
     """
     with transaction.atomic():
         item = locked_item(item_id)
@@ -126,10 +147,14 @@ def recheck_in_flight_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> Rech
         if not in_flight_quoting_superseded(product=Product(item.product), clock=clock, item_ids=[item_id]):
             return RecheckOutcome.SKIPPED
         terms = terms_in_effect(product=Product(item.product), clock=clock)
-        since = terms.effective_range.lower if terms is not None else None  # pyrefly: ignore[missing-attribute]
+        if terms is None:
+            return RecheckOutcome.SKIPPED
         version = Version.objects.select_related("item__partner").get(pk=item.current_version_id)  # pyrefly: ignore[missing-attribute]
-        already = CheckRun.objects.filter(version=version, source=FindingSource.CODE.value, started_at__gte=since)
-        if since is None or already.exists():
+        if _numbers_hold(version, terms):
+            relink_terms_refs(version=version, terms=terms, clock=clock)
+            return RecheckOutcome.RELINKED
+        since = terms.effective_range.lower  # pyrefly: ignore[missing-attribute]
+        if CheckRun.objects.filter(version=version, source=FindingSource.CODE.value, started_at__gte=since).exists():
             return RecheckOutcome.SKIPPED
         run_code_checks(version=version, clock=clock)
         recount_open_findings(item_id=item_id)
