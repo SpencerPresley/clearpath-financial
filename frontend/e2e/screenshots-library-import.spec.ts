@@ -6,7 +6,13 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { CUSTOM_PROBLEMS, CUSTOM_UNMAPPED, importJob, importPreview } from '../src/test/fixtures/imports';
+import {
+  CUSTOM_PROBLEMS,
+  CUSTOM_ROWS,
+  CUSTOM_UNMAPPED,
+  importJob,
+  importPreview,
+} from '../src/test/fixtures/imports';
 import {
   APPROVED_ROWS,
   libraryRow,
@@ -146,8 +152,8 @@ const shots: Shot[] = [
     act: async (page) => {
       await page.getByRole('button', { name: 'Export' }).click();
       await page.getByRole('menuitem', { name: /Export view \(\.xlsx\)/ }).click();
-      await page.getByRole('button', { name: 'Evidence pack for CP-1088' }).click();
-      await page.getByRole('button', { name: 'Evidence pack for CP-1081' }).click();
+      await page.getByRole('button', { name: 'Build pack for CP-1088' }).click();
+      await page.getByRole('button', { name: 'Build pack for CP-1081' }).click();
     },
     ready: async (page) => {
       await expect(page.getByRole('link', { name: 'Download', exact: true })).toBeVisible();
@@ -183,7 +189,7 @@ const shots: Shot[] = [
     path: '/library?tab=precedents',
     stub: { me: ME_LIBRARY_REVIEWER },
     ready: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Search past approvals' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Search precedents' })).toBeVisible();
     },
   },
   {
@@ -300,6 +306,8 @@ const shots: Shot[] = [
       job: importJob({ status: 'mapped', filename: 'partner-tracker-2025.xlsx', row_count: 42 }),
       preview: importPreview({
         problems: CUSTOM_PROBLEMS,
+        rows: CUSTOM_ROWS,
+        unmapped: CUSTOM_UNMAPPED,
         counts: { rows_total: 42, ready: 36, duplicates: 0, already_imported: 2, not_data: 0, blocked: 4 },
       }),
     },
