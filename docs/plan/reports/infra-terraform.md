@@ -121,6 +121,8 @@ sub=repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/
 ```
 
 This confirms the format `<sub_claim_prefix>:ref:refs/heads/<branch>` for a non-environment job.
+Only the `push` case was decoded. That `workflow_dispatch` from main yields the same `sub` comes from
+GitHub's OIDC reference; the first `gh workflow run deploy.yaml --ref main` will test it.
 The trust policy therefore pins `…@1431827457:ref:refs/heads/main`, which the plan output confirms.
 The probe workflow was deleted in the next commit.
 
@@ -132,7 +134,7 @@ The probe workflow was deleted in the next commit.
 | `terraform -chdir=infra/main validate`, `-chdir=infra/bootstrap validate` | `Success! The configuration is valid.` (both) |
 | `terraform plan` (main, defaults) | **`Plan: 74 to add, 0 to change, 0 to destroy.`** (was 67; +7 for WAF logging: bucket, ownership, PAB, SSE, lifecycle, policy, logging config). No warnings. |
 | Plan details checked | Trust `sub` = `repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/main`. `anthropic_api_key` has `value = null`, `value_wo_version = 1`. RDS `availability_zone = us-east-1a`, `skip_final_snapshot = false`, `final_snapshot_identifier = clearpath-prod-final`. `is_ipv6_enabled = false`. Prefix-list permission on `arn:aws:ec2:us-east-1:aws:prefix-list/pl-3b927c52`. |
-| `terraform plan -var custom_domain=… -var attach_custom_domain=true` (before review) | `Plan: 69 to add` |
+| `terraform plan -var custom_domain=clearpath.spencerpresley.com -var attach_custom_domain=true` | `Plan: 76 to add` (74 + ACM cert + validation) |
 | `shellcheck deploy/*.sh` | clean |
 | `actionlint` (rhysd/actionlint container) on all workflows | clean |
 | render-env.sh against stubbed `aws`/`curl` (re-run this round) | good case writes 5 keys, mode 0600, with `$ # \` and spaces literal. Values containing `'` or a newline: exit 1, no file written. |

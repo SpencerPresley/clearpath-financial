@@ -58,8 +58,8 @@ Until `DEPLOY_ROLE_ARN` is set, the deploy workflow skips its jobs instead of fa
 **What gates a deploy.** The deploy role trusts only OIDC tokens whose `sub` is
 `repo:SpencerPresley@153392395/clearpath-financial@1431827457:ref:refs/heads/main`. That's the
 immutable subject format GitHub uses for repos created after July 2026; the value was confirmed by
-decoding a real token from this repo. So only workflow runs on `main` can deploy. That covers pushes
-and `workflow_dispatch` from main, and the workflow also skips itself on any other ref. There is **no**
+decoding a real token from a push run in this repo. So only workflow runs on `main` can deploy. That covers pushes
+and `workflow_dispatch` from main (the dispatch case per GitHub docs, not yet observed), and the workflow also skips itself on any other ref. There is **no**
 GitHub environment, required reviewer or branch protection behind it: on the Free plan a private repo
 gets none of those. Anyone who can push to `main` can deploy. If the repo moves to a paid plan, the
 `environment:` + required-reviewer route becomes available.
