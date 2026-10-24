@@ -1,6 +1,7 @@
 """The per-item fan-out after a terms change: generate v+1, then re-review (live) or expire (not live)."""
 
 from collections.abc import Callable
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -9,7 +10,7 @@ from accounts.models import User
 from audit.models import Event
 from checks.models import TermsRef
 from core.clock import FixedClock
-from core.domain import CheckStatus, EventType, ItemStatus, Product, VersionOrigin
+from core.domain import CheckStatus, EventType, ItemStatus, Product, ReopenReason, VersionOrigin
 from reviews.models import ReviewItem, Version
 from reviews.rereview import send_back
 from reviews.services import SubmitItemResult
@@ -17,7 +18,7 @@ from reviews.tests.factories import make_item
 from reviews.versions import start_new_round
 from terms.fanout import FanOutOutcome, fan_out_item
 from terms.models import OfferTerms
-from terms.tests.conftest import WORKED_EXAMPLE, approve, go_live, publish
+from terms.tests.conftest import NEW_FLOOR, WORKED_EXAMPLE, approve, go_live, publish
 
 type Submit = Callable[..., SubmitItemResult]
 
@@ -128,7 +129,7 @@ def test_item_no_longer_approved_is_skipped(
 ) -> None:
     item = _approved(submit, reviewer, clock)
     publish(lead, clock)
-    send_back(item_id=item.pk, reason="approval_expired", clock=clock)  # the sweep got there first
+    send_back(item_id=item.pk, reason=ReopenReason.APPROVAL_EXPIRED, clock=clock)  # the sweep got there first
 
     outcome = _fan_out(item, lead, clock)
 
@@ -188,3 +189,45 @@ def test_other_products_are_not_touched(
 
     assert [a.item_id for a in affected_approvals(product=Product.PERSONAL_LOAN, clock=clock)] == [item.pk]
     assert affected_approvals(product=Product.CREDIT_CARD, clock=clock) == ()
+
+
+@pytest.mark.django_db
+def test_item_already_in_rereview_gets_a_generated_version(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    """Live content re-reviewed for expiry when the terms change: it can't be reaffirmed on the old numbers, so it
+    gets a generated version (status and reason unchanged) and the fast-track lane opens."""
+    item = _approved(submit, reviewer, clock)
+    go_live(item, marketer, clock)
+    send_back(item_id=item.pk, reason=ReopenReason.APPROVAL_EXPIRED, clock=clock)
+    publish(lead, clock)
+
+    first = _fan_out(item, lead, clock)
+    again = _fan_out(item, lead, clock)
+
+    item.refresh_from_db()
+    assert (first, again) == (FanOutOutcome.REGENERATED, FanOutOutcome.SKIPPED)
+    assert (item.status, item.reopen_reason) == (ItemStatus.NEEDS_REREVIEW, "approval_expired")
+    assert item.current_version is not None
+    assert item.current_version.origin == VersionOrigin.FAST_TRACK
+    assert "$337" in item.current_version.content_text
+
+
+@pytest.mark.django_db
+def test_second_terms_change_regenerates_from_the_approved_text(
+    pl_terms: OfferTerms, submit: Submit, marketer: User, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    item = _approved(submit, reviewer, clock)
+    go_live(item, marketer, clock)
+    publish(lead, clock)
+    _fan_out(item, lead, clock)
+    clock.advance(timedelta(days=1))
+    publish(lead, clock, NEW_FLOOR.model_copy(update={"apr_min": Decimal("9.99")}))
+
+    outcome = _fan_out(item, lead, clock)
+
+    v1, _v2, v3 = Version.objects.filter(item=item).order_by("n")
+    assert outcome is FanOutOutcome.REGENERATED
+    assert (v3.origin, v3.based_on) == (VersionOrigin.FAST_TRACK, v1)
+    assert v3.content_text == WORKED_EXAMPLE.replace("7.49%", "9.99%").replace("$311", "$323")
+    assert Event.objects.filter(type=EventType.ITEM_REOPENED, item_id=item.pk).count() == 1

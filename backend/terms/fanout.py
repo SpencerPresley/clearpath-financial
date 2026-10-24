@@ -9,6 +9,10 @@ For each approved, non-legacy item whose approved version quotes a superseded te
 If the stored refs no longer fit the text (`StaleTermsRef`), no version is generated and the item takes the
 normal review lane.
 
+Items already in needs_rereview whose copy quotes superseded terms (re-review for another reason, or a second terms
+change before the first was fast-tracked) get a fresh generated version from their approved text and stay where
+they are: the content is live on the old numbers either way.
+
 One item per transaction, always: `send_back` takes the assignment advisory lock after the item's row lock, so a
 transaction spanning several items could deadlock against a concurrent claim or the expiry sweep (E's lock-order
 contract). Idempotent: an item that was already sent back isn't approved any more, and one that was fast-tracked
@@ -28,7 +32,7 @@ from reviews.models import Version
 from reviews.rereview import send_back
 from reviews.selectors import is_item_live
 from reviews.versions import create_version
-from terms.selectors import affected_approvals, terms_in_effect
+from terms.selectors import AFFECTED_STATUSES, affected_approvals, terms_in_effect
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,9 @@ class FanOutOutcome(StrEnum):
     REOPENED_NORMAL_LANE = "reopened_normal_lane"  # live; refs didn't fit the text, no generated version
     EXPIRED = "expired"  # not live; generated version offered for the next round
     EXPIRED_NORMAL_LANE = "expired_normal_lane"  # not live; no generated version
-    SKIPPED = "skipped"  # not (or no longer) an approval quoting superseded terms
+    REGENERATED = "regenerated"  # already in needs_rereview; a fresh generated version replaces the stale copy
+    REGENERATE_FAILED = "regenerate_failed"  # already in needs_rereview; refs didn't fit, left to the normal lane
+    SKIPPED = "skipped"  # not (or no longer) quoting superseded terms
 
 
 def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
@@ -50,7 +56,7 @@ def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
     """
     with transaction.atomic():
         item = locked_item(item_id)  # row lock first; send_back takes the assignment lock after it
-        if item.status != ItemStatus.APPROVED or item.is_legacy:
+        if ItemStatus(item.status) not in AFFECTED_STATUSES or item.is_legacy:
             return FanOutOutcome.SKIPPED
         product = Product(item.product)
         found = affected_approvals(product=product, clock=clock, item_ids=[item_id])
@@ -69,6 +75,8 @@ def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
             generated = create_version(
                 item=item, text=text, author=lead, origin=VersionOrigin.FAST_TRACK, based_on=based_on, clock=clock
             ).version
+        if approval.status is ItemStatus.NEEDS_REREVIEW:
+            return FanOutOutcome.REGENERATED if generated is not None else FanOutOutcome.REGENERATE_FAILED
         live = is_item_live(item_id=item_id, today=clock.today())
         send_back(
             item_id=item_id,
