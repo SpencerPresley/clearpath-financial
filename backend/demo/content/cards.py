@@ -318,6 +318,7 @@ CC_STORIES: Final = (
                 "Bureau: Experian prescreen file EX-PS-2611. FICO 8 >= 680; utilization <= 70%; no 90+ day "
                 "delinquency in 24 months. Firm offer of the ClearPath Card at the published terms.",
             ),
+            Assign(day(5, "10:10"), "rachel", "Card prescreen needs Harborview's sign-off; I'll take it."),
             Claim(day(4, "09:15")),
             Comment(
                 day(4, "09:40"),
@@ -456,7 +457,7 @@ CC_STORIES: Final = (
     ),
     Story(
         key="cc-social-no-fees",
-        owner="marcus",
+        owner="priya",
         title="Paid social: no fees, no surprises",
         product=P.CREDIT_CARD,
         channel=Channel.PAID_SOCIAL,

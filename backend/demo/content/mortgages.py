@@ -10,6 +10,7 @@ from demo.story import (
     Accept,
     AiFinding,
     AiResult,
+    Assign,
     Checklist,
     Claim,
     Comment,
@@ -319,6 +320,7 @@ MTG_STORIES: Final = (
         steps=(
             Submit(day(3, "11:05")),
             EditFields(day(3, "11:40"), by="rachel", notes="Elena asked for a quick turn; mail house deadline Friday."),
+            Assign(day(3, "11:42"), "rachel", "Rush for the mail house deadline; I'll review it."),
             Claim(day(2, "09:05")),
             Accept(day(2, "09:12"), "claims.preapproved", "Not a prescreened list; it can't say pre-approved."),
             Comment(

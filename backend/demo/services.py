@@ -25,8 +25,14 @@ from demo.reset import SeedResult
 
 logger = logging.getLogger(__name__)
 
-# A queued or running reset older than this lost its worker; a new request starts a fresh one.
+# A queued or running reset older than this lost its worker or its message: the task's hard limit is 300 s
+# (CELERY_TASK_TIME_LIMIT), so a live one can't still be going. Reading or requesting marks it failed, so the UI's
+# poll ends and a new request starts a fresh job. The reset is one transaction, so a dead one changed nothing.
 STALE_AFTER: Final = timedelta(minutes=15)
+STALE_MESSAGE: Final = (
+    "The reset didn't finish within 15 minutes, so it was abandoned and nothing changed. "
+    "Check that a worker is running, then try again."
+)
 REQUEST_LOCK_KEY: Final = 0x4445_4D52  # "DEMR"
 
 
@@ -73,6 +79,12 @@ def _enqueue_task(reset_id: int) -> None:
 enqueue: Callable[[int], None] = _enqueue_task
 
 
+def _abandon_stale(now: datetime) -> None:
+    DemoReset.objects.filter(status__in=IN_FLIGHT, requested_at__lt=now - STALE_AFTER).update(
+        status=ResetStatus.FAILED.value, finished_at=now, error=STALE_MESSAGE
+    )
+
+
 def request_reset(*, actor: User, clock: Clock = SYSTEM_CLOCK) -> DemoResetJob:
     """Admins only. Returns the new job, or the one already in flight."""
     require_role(actor, Role.ADMIN)
@@ -80,9 +92,8 @@ def request_reset(*, actor: User, clock: Clock = SYSTEM_CLOCK) -> DemoResetJob:
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", [REQUEST_LOCK_KEY])
-        in_flight = (
-            DemoReset.objects.filter(status__in=IN_FLIGHT, requested_at__gte=now - STALE_AFTER).order_by("-pk").first()
-        )
+        _abandon_stale(now)
+        in_flight = DemoReset.objects.filter(status__in=IN_FLIGHT).order_by("-pk").first()
         if in_flight is not None:
             return _job(in_flight)
         row = DemoReset.objects.create(status=ResetStatus.QUEUED.value, requested_by=actor, requested_at=now)
@@ -91,8 +102,9 @@ def request_reset(*, actor: User, clock: Clock = SYSTEM_CLOCK) -> DemoResetJob:
     return _job(row)
 
 
-def get_reset(*, viewer: User, reset_id: int) -> DemoResetJob:
+def get_reset(*, viewer: User, reset_id: int, clock: Clock = SYSTEM_CLOCK) -> DemoResetJob:
     require_role(viewer, Role.ADMIN)
+    _abandon_stale(clock.now())
     row = DemoReset.objects.filter(pk=reset_id).first()
     if row is None:
         raise NotFound.entity("demo reset", reset_id)

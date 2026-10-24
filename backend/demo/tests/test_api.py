@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from typing import Any
 
@@ -10,8 +11,10 @@ from django.core.management import call_command
 from django.test import Client
 
 from accounts.models import User
+from core.clock import FixedClock
 from demo import tasks
 from demo.content.people import PERSONAS
+from demo.services import STALE_AFTER, STALE_MESSAGE, ResetStatus, get_reset, request_reset
 from demo.users import demo_password, upsert_personas
 from reviews.models import ReviewItem
 
@@ -94,3 +97,36 @@ def test_a_failed_reset_is_reported_on_the_job(
     failed = client.get(f"/api/admin/demo/resets/{job['id']}").json()
     assert failed["status"] == "failed"
     assert failed["error"] == tasks.FAILED_MESSAGE
+
+
+def test_a_reset_whose_worker_vanished_reads_as_failed_and_a_new_request_starts_fresh(
+    personas: dict[str, User], django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    """The message was lost (a worker crash after taking it): the row stays queued and nothing will run it."""
+    admin = personas["admin"]
+    asked = datetime(2026, 10, 24, 22, 0, tzinfo=UTC)
+    with django_capture_on_commit_callbacks(execute=False):
+        lost = request_reset(actor=admin, clock=FixedClock(asked))
+    later = FixedClock(asked + STALE_AFTER + timedelta(seconds=1))
+
+    seen = get_reset(viewer=admin, reset_id=lost.id, clock=later)
+    with django_capture_on_commit_callbacks(execute=False) as callbacks:
+        fresh = request_reset(actor=admin, clock=later)
+
+    assert (seen.status, seen.error) == (ResetStatus.FAILED, STALE_MESSAGE)
+    assert fresh.id != lost.id
+    assert fresh.status == ResetStatus.QUEUED
+    assert len(callbacks) == 1
+
+
+def test_a_reset_within_the_window_is_still_in_flight(
+    personas: dict[str, User], django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    admin = personas["admin"]
+    asked = datetime(2026, 10, 24, 22, 0, tzinfo=UTC)
+    with django_capture_on_commit_callbacks(execute=False):
+        job = request_reset(actor=admin, clock=FixedClock(asked))
+
+    seen = get_reset(viewer=admin, reset_id=job.id, clock=FixedClock(asked + STALE_AFTER - timedelta(seconds=1)))
+
+    assert seen.status == ResetStatus.QUEUED

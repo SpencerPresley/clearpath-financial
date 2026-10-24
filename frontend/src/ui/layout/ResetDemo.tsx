@@ -1,18 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
-import { useGetDemoReset, useResetDemo } from '../../api/generated/admin/admin';
+import { getDemoReset, useResetDemo } from '../../api/generated/admin/admin';
+import type { DemoResetOut } from '../../api/generated/model';
 import { Button } from '../Button';
 import { ModalDialog } from '../Dialog';
 import { apiErrorMessage } from '../forms/apiErrors';
 import { showToast } from '../toast';
 
-const POLL_MS = 1000;
+export const RESET_POLL_MS = 1000;
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 /**
  * Admin-only "Reset demo" confirmation: start the job, poll it, then refetch everything. The backend runs the
  * reset as a background job (it can outlast a request) and keeps people and sessions, so the admin stays signed
- * in. Rendered outside the account popover so closing the popover doesn't unmount a running reset.
+ * in. Rendered outside the account popover so closing the popover doesn't unmount a running reset; closing this
+ * dialog only stops showing it, so polling continues and the outcome still arrives as a toast.
  */
 export function ResetDemoDialog({
   isOpen,
@@ -22,36 +29,51 @@ export function ResetDemoDialog({
   onOpenChange: (isOpen: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const [jobId, setJobId] = useState<number | null>(null);
   const start = useResetDemo();
-  const job = useGetDemoReset(jobId ?? 0, {
-    query: {
-      enabled: jobId !== null,
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        return status === 'done' || status === 'failed' ? false : POLL_MS;
-      },
-    },
-  });
-  const status = jobId === null ? null : (job.data?.status ?? 'queued');
-  const running = start.isPending || status === 'queued' || status === 'running';
-  const finished = useRef<number | null>(null);
+  const [job, setJob] = useState<DemoResetOut | null>(null);
+  const [pollError, setPollError] = useState<unknown>(null);
+  const running = start.isPending || job?.status === 'queued' || job?.status === 'running';
 
-  useEffect(() => {
-    if (jobId === null || status !== 'done' || finished.current === jobId) return;
-    finished.current = jobId;
-    onOpenChange(false);
-    setJobId(null);
-    showToast({ title: 'Demo reset', description: `${String(job.data?.seeded_items ?? 0)} items seeded.` });
-    void qc.invalidateQueries();
-  }, [jobId, status, job.data?.seeded_items, qc, onOpenChange]);
+  const watch = async (first: DemoResetOut) => {
+    let current = first;
+    while (current.status === 'queued' || current.status === 'running') {
+      await wait(RESET_POLL_MS);
+      try {
+        current = await getDemoReset(first.id);
+      } catch (error) {
+        // Transient (a dev server restart, a dropped connection): keep watching; the job runs regardless.
+        setPollError(error);
+        continue;
+      }
+      setPollError(null);
+      setJob(current);
+    }
+    if (current.status === 'done') {
+      setJob(null);
+      onOpenChange(false);
+      showToast({ title: 'Demo reset', description: `${String(current.seeded_items)} items seeded.` });
+      await qc.invalidateQueries();
+    } else {
+      showToast({ title: "The demo reset didn't finish", description: current.error, tone: 'error' });
+    }
+  };
 
   const confirm = () => {
+    setJob(null);
     start.mutate(undefined, {
       onSuccess: (started) => {
-        setJobId(started.id);
+        setJob(started);
+        void watch(started);
       },
     });
+  };
+
+  const close = () => {
+    if (!running) {
+      setJob(null);
+      start.reset();
+    }
+    onOpenChange(false);
   };
 
   return (
@@ -60,18 +82,25 @@ export function ResetDemoDialog({
       role="alertdialog"
       isOpen={isOpen}
       onOpenChange={(open) => {
-        if (running) return;
-        if (!open) setJobId(null);
-        onOpenChange(open);
+        if (open) onOpenChange(true);
+        else close();
       }}
     >
       <p>
         Replaces every item, partner, offer-terms version, import, and notification with the seeded demo data.
         People and sign-ins stay. Takes up to a minute.
       </p>
-      {status === 'failed' && (
+      {running && job !== null && (
+        <p>Resetting. You can close this; you&apos;ll get a notice when it&apos;s done.</p>
+      )}
+      {running && pollError !== null && (
+        <p className="app-field-error">
+          Can&apos;t check on the reset right now: {apiErrorMessage(pollError)}
+        </p>
+      )}
+      {job?.status === 'failed' && (
         <p role="alert" className="app-field-error">
-          {job.data?.error}
+          {job.error}
         </p>
       )}
       {start.isError && (
@@ -80,15 +109,8 @@ export function ResetDemoDialog({
         </p>
       )}
       <div className="app-dialog-actions">
-        <Button
-          variant="ghost"
-          isDisabled={running}
-          onPress={() => {
-            setJobId(null);
-            onOpenChange(false);
-          }}
-        >
-          Cancel
+        <Button variant="ghost" onPress={close}>
+          {running ? 'Run in background' : 'Cancel'}
         </Button>
         <Button variant="danger" icon="action.reset_demo" isDisabled={running} onPress={confirm}>
           {running ? 'Resetting…' : 'Reset demo'}

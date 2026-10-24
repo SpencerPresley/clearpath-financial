@@ -55,6 +55,40 @@ describe('ResetDemoDialog', () => {
     expect(polls).toBeGreaterThanOrEqual(2);
   });
 
+  it('can be closed while the reset runs, and keeps watching it', async () => {
+    const user = userEvent.setup();
+    let polls = 0;
+    const changes: boolean[] = [];
+    server.use(
+      http.post('*/api/admin/demo/reset', () => HttpResponse.json(job('queued'), { status: 202 })),
+      http.get('*/api/admin/demo/resets/7', () => {
+        polls += 1;
+        return HttpResponse.json(polls < 3 ? job('queued') : job('done', { seeded_items: 42 }));
+      }),
+    );
+    renderWithQuery(
+      <ResetDemoDialog
+        isOpen
+        onOpenChange={(open) => {
+          changes.push(open);
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reset demo' }));
+    const close = await screen.findByRole('button', { name: 'Run in background' });
+    expect(close).toBeEnabled();
+    await user.click(close);
+    expect(changes).toEqual([false]);
+
+    await waitFor(
+      () => {
+        expect(polls).toBeGreaterThanOrEqual(3);
+      },
+      { timeout: 5000 },
+    );
+  });
+
   it('shows why a reset failed and lets the admin try again', async () => {
     const user = userEvent.setup();
     server.use(
@@ -67,7 +101,9 @@ describe('ResetDemoDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset demo' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('The reset failed and nothing changed.');
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent(
+      'The reset failed and nothing changed.',
+    );
     expect(screen.getByRole('button', { name: 'Reset demo' })).toBeEnabled();
   });
 });

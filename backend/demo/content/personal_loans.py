@@ -188,6 +188,7 @@ PL_STORIES: Final = (
             Checklist(day(39, "09:36")),
             Decide(day(39, "09:40"), O.APPROVED, "No rate or payment quoted; the amount range matches the rate sheet."),
             Place(day(38, "15:00"), "The Trade Desk retargeting: 300x250 and 728x90", first_run=-38),
+            Assign(day(5, "08:35"), "rachel", "Numbers-unchanged confirm after the rate sheet; I'll clear it."),
         ),
         expect=ItemStatus.NEEDS_REREVIEW,
         expect_reason=ReopenReason.TERMS_CHANGED,
