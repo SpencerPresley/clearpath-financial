@@ -278,7 +278,9 @@ the demo seed create users directly, so they're unaffected (accounts and demo te
 | `pytest -q` (full backend) | 1829 passed, 3 deselected |
 | `ruff check .`, `ruff format --check .`, `pyrefly check` | clean, `0 errors` |
 | `makemigrations --check`, `check --fail-level WARNING` (dev) | no changes, no issues |
-| `collectstatic --noinput` on prod settings with only CI's two env vars | 144 files, exit 0 |
+| deploy.yaml's collectstatic step, verbatim, in the locally built prod image | `144 static files copied to '/app/staticfiles'.` |
+| Prod image resolves `default_storage` with `DOCUMENTS_BUCKET` set | `storages.backends.s3 S3Storage <bucket> False None` (boto3 1.43.118) |
+| `grep -rn signup frontend/src` (non-generated) | only a comment in SignIn.tsx ("no ... signup"), so closing signup changes no UI |
 | `shellcheck deploy/*.sh` | clean |
 | `terraform fmt -check -recursive`, `validate` | exit 0, valid |
 | `AWS_PROFILE=clearpath terraform plan -lock=false` | **`Plan: 76 to add, 0 to change, 0 to destroy.`** |
