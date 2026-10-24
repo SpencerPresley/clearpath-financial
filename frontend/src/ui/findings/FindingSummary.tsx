@@ -52,7 +52,6 @@ export function FindingSummary({
           {onApply !== undefined && (
             <Button
               size="sm"
-              variant="ghost"
               className="app-finding-apply"
               aria-label={`Apply suggestion: ${suggestedFix}`}
               onPress={onApply}

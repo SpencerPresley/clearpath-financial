@@ -124,6 +124,59 @@ const DRIFT: ItemDriftOut = {
   ],
 };
 
+/** The drift placement plus two more pages: one where the copy is missing, one unchanged. */
+const DRIFT_ALL_RESULTS: ItemDriftOut = {
+  item_id: 1042,
+  placements: [
+    ...DRIFT.placements,
+    ...DRIFT.placements.map((p) =>
+      p.latest === null
+        ? p
+        : {
+            ...p,
+            placement_id: 4,
+            location: 'RateRadar: personal loan rates',
+            url: 'https://rateradar.example/personal-loans',
+            latest: {
+              ...p.latest,
+              id: 8,
+              placement_id: 4,
+              url: 'https://rateradar.example/personal-loans',
+              final_url: 'https://rateradar.example/personal-loans',
+              result: 'missing' as const,
+              score: 31,
+              diff: [],
+              findings: [],
+              new_blocking_count: 0,
+              reopened_item: false,
+            },
+          },
+    ),
+    ...DRIFT.placements.map((p) =>
+      p.latest === null
+        ? p
+        : {
+            ...p,
+            placement_id: 5,
+            location: 'ClearPath: personal loans landing page',
+            url: 'https://clearpath.example/personal-loans',
+            latest: {
+              ...p.latest,
+              id: 9,
+              placement_id: 5,
+              url: 'https://clearpath.example/personal-loans',
+              final_url: 'https://clearpath.example/personal-loans',
+              result: 'unchanged' as const,
+              score: 100,
+              diff: [],
+              new_blocking_count: 0,
+              reopened_item: false,
+            },
+          },
+    ),
+  ],
+};
+
 const HISTORY_WORDS: ItemHistoryOut = {
   entries: [
     ...HISTORY.entries,
@@ -198,7 +251,10 @@ const HISTORY_WORDS: ItemHistoryOut = {
 };
 
 /** Live checks with one literal fix (a figure) and one instruction, wherever "5.99%" stands alone. */
-function literalPreview(body: CheckPreviewIn): CheckPreviewOut {
+function literalPreview(
+  body: CheckPreviewIn,
+  message = 'This APR isn’t offered; current APRs are 9.99%–35.99%.',
+): CheckPreviewOut {
   const text = body.content_text;
   const findings = text.includes(' 5.99% APR')
     ? [
@@ -207,7 +263,7 @@ function literalPreview(body: CheckPreviewIn): CheckPreviewOut {
           citation: 'Reg Z 12 CFR 1026.24(a)',
           source: 'code' as const,
           severity: 'blocking' as const,
-          message: 'This APR isn’t offered; current APRs are 9.99%–35.99%.',
+          message,
           suggested_fix: '9.99%',
           span: spanOf(text, '5.99%'),
           quote: '5.99%',
@@ -317,7 +373,7 @@ const shots: Shot[] = [
       const toggles = page.locator('summary', { hasText: 'Decision record' });
       await expect(toggles.first()).toBeVisible();
       await toggles.first().click();
-      await expect(page.getByText('Overridden: Provider outage; read the copy line by line.')).toBeVisible();
+      await expect(page.getByText('Provider outage; read the copy line by line.')).toBeVisible();
     },
   },
   {
@@ -335,7 +391,8 @@ const shots: Shot[] = [
       findings: [],
     },
     routes: (page) => page.route('**/api/items/1042/drift', (route) => json(route, DRIFT)),
-    ready: (page) => expect(page.getByText(/Live page vs approved v2 · LendCompare/)).toBeVisible(),
+    ready: (page) =>
+      expect(page.getByText(/LendCompare: best debt consolidation loans · checked/)).toBeVisible(),
   },
   {
     name: 's14-s5-nit14-details-check-metadata',
@@ -351,9 +408,15 @@ const shots: Shot[] = [
       },
       findings: [],
     },
-    routes: (page) => page.route('**/api/items/1042/drift', (route) => json(route, DRIFT)),
-    ready: (page) =>
-      expect(page.getByRole('button', { name: 'Show live page vs approved v2' })).toBeVisible(),
+    routes: (page) => page.route('**/api/items/1042/drift', (route) => json(route, DRIFT_ALL_RESULTS)),
+    ready: async (page) => {
+      const show = page.getByRole('button', { name: 'Show live page vs approved v2' });
+      await expect(show).toBeVisible();
+      await page.getByRole('heading', { name: 'Where it runs' }).scrollIntoViewIfNeeded();
+      await page.getByRole('heading', { name: 'Where it runs' }).evaluate((el) => {
+        el.scrollIntoView({ block: 'start' });
+      });
+    },
   },
   {
     name: 's5-queue-drawer-live-copy-changed',
@@ -372,17 +435,16 @@ const shots: Shot[] = [
         llm_check_failure_code: 'not_configured',
         llm_check_failure_reason: "The AI check didn't run: no Anthropic API key is configured here.",
       },
+      findings: [FINDING_RATE, FINDING_CREDIT],
     },
     ready: (page) =>
-      expect(
-        page.getByText('AI pre-review didn’t run; your reviewer will check this by hand.'),
-      ).toBeVisible(),
+      expect(page.getByText('AI review didn’t run; your reviewer will check this by hand.')).toBeVisible(),
   },
   {
     name: 's6-marketer-ai-queued',
     path: '/items/1042',
     stub: { roles: ['marketer'], item: { status: 'submitted', llm_check_status: 'pending' } },
-    ready: (page) => expect(page.getByText(/AI pre-review queued\./)).toBeVisible(),
+    ready: (page) => expect(page.getByText(/AI review queued\./)).toBeVisible(),
   },
   {
     name: 's17-last-round-header',
@@ -455,7 +517,7 @@ const shots: Shot[] = [
     },
     routes: (page) =>
       page.route('**/api/checks/preview', (route) =>
-        json(route, literalPreview(route.request().postDataJSON() as CheckPreviewIn)),
+        json(route, literalPreview(route.request().postDataJSON() as CheckPreviewIn, FINDING_RATE.message)),
       ),
     ready: (page) => expect(page.getByRole('button', { name: 'Apply suggestion: 9.99%' })).toBeVisible(),
   },

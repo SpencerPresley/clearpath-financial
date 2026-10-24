@@ -801,7 +801,8 @@ describe('ReviewPage after the walkthrough', () => {
     if (section === null) throw new Error('no decision record section');
     const record = within(section);
     expect(record.getByText('Approved v2')).toBeInTheDocument();
-    expect(record.getByText('Overridden: Provider outage; read by hand')).toBeInTheDocument();
+    expect(record.getByText('Overridden after the AI check failed')).toBeInTheDocument();
+    expect(record.getByText('Provider outage; read by hand')).toBeInTheDocument();
     expect(record.getByText('Personal loan v12')).toBeInTheDocument();
     expect(record.getByText('sha256 4f9c2a1be07d…')).toBeInTheDocument();
   });
@@ -882,7 +883,7 @@ describe('ReviewPage after the walkthrough', () => {
         llm_check_failure_reason: "The AI check didn't run: no Anthropic API key is configured here.",
       }),
     });
-    const line = await screen.findByText('AI pre-review didn’t run; your reviewer will check this by hand.');
+    const line = await screen.findByText('AI review didn’t run; your reviewer will check this by hand.');
     const status = line.closest('.app-llm-status');
     expect(status).toHaveAttribute('data-state', 'neutral');
     expect(status).toHaveAttribute('role', 'status');
@@ -892,7 +893,7 @@ describe('ReviewPage after the walkthrough', () => {
 
   it('tells a marketer a queued AI check goes to their reviewer, not that approving waits (S6)', async () => {
     renderReview({ roles: ['marketer'], item: itemFixture({ llm_check_status: 'pending' }) });
-    expect(await screen.findByText(/AI pre-review queued\./)).toBeInTheDocument();
+    expect(await screen.findByText(/AI review queued\./)).toBeInTheDocument();
     expect(screen.getByText(/Its suggestions go to your reviewer\./)).toBeInTheDocument();
     expect(screen.queryByText(/Approving waits/)).not.toBeInTheDocument();
   });
@@ -1034,9 +1035,7 @@ describe('ReviewPage after the walkthrough', () => {
     server.use(http.get('*/api/items/:id/drift', () => HttpResponse.json(drift)));
 
     await userEvent.click(await screen.findByRole('radio', { name: 'Live page vs approved v2' }));
-    expect(
-      await screen.findByText(/Live page vs approved v2 · LendCompare: best personal loans/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/LendCompare: best personal loans · checked/)).toBeInTheDocument();
     expect(screen.getByText('Guaranteed approval for most applicants.').closest('ins')).not.toBeNull();
     expect(router.state.location.search).toMatchObject({ live: true });
 

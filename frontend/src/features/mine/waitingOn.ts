@@ -33,7 +33,7 @@ function firstLine(text: string): string {
 /** Why an approval ended, from the row's reopen reason (the review screen's Start new round says when). */
 function expiredWhy(row: ItemRowOut): string {
   if (row.reopen_reason === 'terms_changed') {
-    return 'Expired: offer terms changed. Check the new numbers and start a new round.';
+    return 'Offer terms changed. Check the new numbers and start a new round.';
   }
   if (row.reopen_reason === 'approval_expired' && row.approval_expires_at !== null) {
     return `Approval expired ${formatDate(row.approval_expires_at)}. Start a new round to run it again.`;

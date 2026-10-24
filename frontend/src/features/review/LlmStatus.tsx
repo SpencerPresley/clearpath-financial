@@ -65,7 +65,7 @@ export function LlmStatus({
           <div className="app-llm-status" data-state="running" role="status">
             <Icon name="source.ai" />
             <span>
-              {item.llm_check_status === 'pending' ? 'AI pre-review queued.' : 'AI pre-review running…'}
+              {item.llm_check_status === 'pending' ? 'AI review queued.' : 'AI review running…'}
               <span className="app-llm-status-note"> Its suggestions go to {reviewer}.</span>
             </span>
             <span className="app-llm-progress" aria-hidden="true" />
@@ -87,7 +87,7 @@ export function LlmStatus({
         return (
           <div className="app-llm-status" data-state="neutral" role="status">
             <Icon name="source.ai" />
-            <span>AI pre-review didn’t run; {reviewer} will check this by hand.</span>
+            <span>AI review didn’t run; {reviewer} will check this by hand.</span>
           </div>
         );
       }

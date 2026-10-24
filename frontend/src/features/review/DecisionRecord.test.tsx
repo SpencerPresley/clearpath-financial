@@ -54,7 +54,7 @@ describe('DecisionRecord', () => {
 
   it('words the AI status from the record', () => {
     expect(aiReviewLine({ ...DECISION_APPROVED, llm_override_reason: 'Provider outage; read by hand' })).toBe(
-      'Overridden: Provider outage; read by hand',
+      'Overridden after the AI check failed',
     );
     expect(aiReviewLine({ ...DECISION_APPROVED, ai_review_carried_from_n: 1 })).toBe('Carried from v1');
     expect(aiReviewLine(DECISION_APPROVED)).toBe('Ran on v2');

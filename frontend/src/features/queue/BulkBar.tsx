@@ -48,7 +48,7 @@ export function canFastTrackRow(row: ItemRowOut): boolean {
   return row.status === 'needs_rereview' && row.reopen_reason === 'terms_changed';
 }
 
-const NO_FAST_TRACK = 'Fast-track only applies to offer-terms re-reviews. None of the selected items is one.';
+const NO_FAST_TRACK = 'Only offer-terms re-reviews can be fast-tracked, and none is selected.';
 
 function items(n: number) {
   return `${String(n)} item${n === 1 ? '' : 's'}`;
@@ -219,7 +219,9 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
               setReasonOpen(true);
             }}
           >
-            {`Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`}
+            {fastTrackable
+              ? `Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`
+              : 'Fast-track'}
           </Button>
           {!fastTrackable && (
             <>

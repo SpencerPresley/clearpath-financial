@@ -29,7 +29,7 @@ export function aiReviewLine(d: DecisionOut): string | null {
   if (d.llm_override_reason !== null && d.llm_override_reason !== '') {
     const carried =
       d.ai_review_carried_from_n === null ? '' : ` (carried from v${String(d.ai_review_carried_from_n)})`;
-    return `Overridden${carried}: ${d.llm_override_reason}`;
+    return `Overridden after the AI check failed${carried}`;
   }
   if (d.ai_review_carried_from_n !== null) return `Carried from v${String(d.ai_review_carried_from_n)}`;
   return `Ran on v${String(d.version_n)}`;
@@ -83,6 +83,11 @@ export function DecisionRecord({ decision: d }: { decision: DecisionOut }) {
         <span className="app-figure">{d.engine_version === '' ? 'Not recorded' : d.engine_version}</span>
       </Row>
       {ai !== null && <Row label="AI review">{ai}</Row>}
+      {approval && d.llm_override_reason !== null && d.llm_override_reason !== '' && (
+        <Row label="Override reason">
+          <span className="app-decision-record-reason">{d.llm_override_reason}</span>
+        </Row>
+      )}
       {approval && d.expires_at !== null && <Row label="Expires">{formatDate(d.expires_at)}</Row>}
       {approval && (
         <Row label="Evidence">

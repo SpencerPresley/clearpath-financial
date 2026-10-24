@@ -113,9 +113,6 @@ describe('ResubmitPage', () => {
     const live = screen.getByRole('region', { name: 'Code checks' });
     expect(await within(live).findByText(FINDING_RATE.message)).toBeInTheDocument();
     expect(within(requested).queryByText(FINDING_RATE.message)).toBeNull();
-    expect(
-      within(requested).getByText('The accepted code finding is under Code checks while it still applies.'),
-    ).toBeInTheDocument();
     expect(screen.getAllByText(FINDING_RATE.message)).toHaveLength(1);
   });
 

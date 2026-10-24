@@ -1452,7 +1452,7 @@
     @apply flex flex-col gap-1.5;
   }
   .app-shortcut {
-    @apply grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3 text-ui;
+    @apply grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 text-ui;
   }
 
   /* ---- App shell ------------------------------------------------------------------------------- */

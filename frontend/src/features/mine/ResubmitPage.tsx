@@ -88,7 +88,6 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
   // Code findings are re-run live beside the editor (with Apply where the fix is literal), so each shows once:
   // here only the AI suggestions and checklist items the reviewer accepted.
   const accepted = allAccepted.filter((finding) => finding.source !== 'code');
-  const codeCount = allAccepted.length - accepted.length;
 
   return (
     <section aria-labelledby="requested-title" className="app-requested">
@@ -121,13 +120,6 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
             </li>
           ))}
         </ul>
-      )}
-      {codeCount > 0 && (
-        <p className="app-muted">
-          {codeCount === 1
-            ? 'The accepted code finding is under Code checks while it still applies.'
-            : `The ${String(codeCount)} accepted code findings are under Code checks while they still apply.`}
-        </p>
       )}
     </section>
   );

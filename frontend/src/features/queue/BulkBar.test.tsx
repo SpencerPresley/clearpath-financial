@@ -42,10 +42,10 @@ describe('BulkBar', () => {
   it('turns fast-track off, and says why, when no selected re-review can take it (nit 16)', () => {
     const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
     setup(LEAD, [1, 16], [ROWS[0] ?? expiry, expiry]);
-    const button = screen.getByRole('button', { name: 'Fast-track 1 re-review…' });
+    const button = screen.getByRole('button', { name: 'Fast-track' });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(
-      'Fast-track only applies to offer-terms re-reviews. None of the selected items is one.',
+      'Only offer-terms re-reviews can be fast-tracked, and none is selected.',
     );
     // The reason is also on a trigger of its own (a disabled button gets no hover).
     expect(screen.getByRole('button', { name: 'Why fast-track is off' })).toBeInTheDocument();

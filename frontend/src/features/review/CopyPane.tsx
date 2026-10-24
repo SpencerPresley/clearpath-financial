@@ -116,7 +116,7 @@ function LiveDiffView({ diff }: { diff: LiveDiff }) {
   return (
     <div className="app-copy-sheet">
       <p className="app-copy-caption">
-        {liveLabel(diff)} · {diff.location} · checked {formatDate(diff.checkedAt)} ·{' '}
+        {diff.location} · checked {formatDate(diff.checkedAt)} ·{' '}
         {changes === 0 ? 'no changes' : plural(changes, 'change')}
       </p>
       <DiffText segments={diff.segments} />
@@ -298,18 +298,20 @@ export function CopyPane({
               </ToggleButton>
             </ToggleButtonGroup>
           )}
-          <SelectField
-            label="Version"
-            hideLabel
-            size="sm"
-            className="app-version-select"
-            value={String(shownN)}
-            onChange={(value) => {
-              if (value !== null) onVersionChange(Number(value));
-            }}
-            options={versionOptions}
-          />
-          {item.versions.length > 1 && (
+          {!live && (
+            <SelectField
+              label="Version"
+              hideLabel
+              size="sm"
+              className="app-version-select"
+              value={String(shownN)}
+              onChange={(value) => {
+                if (value !== null) onVersionChange(Number(value));
+              }}
+              options={versionOptions}
+            />
+          )}
+          {!live && item.versions.length > 1 && (
             <SelectField
               label="Compare"
               hideLabel

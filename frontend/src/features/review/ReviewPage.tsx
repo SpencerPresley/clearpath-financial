@@ -459,6 +459,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
               viewingCurrent={data.viewingCurrent}
               canTriage={canTriage}
               isDecider={isDecider}
+              canDecide={deciding && data.viewingCurrent}
               isMarketer={isMarketer}
               editor={editing ? { text: editText, onChange: setEditText } : undefined}
               activeId={activeId}

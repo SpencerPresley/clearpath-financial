@@ -18,6 +18,8 @@ export interface FindingsPanelProps {
   canTriage: boolean;
   /** Reviewer or lead: gets the copy about approving. */
   isDecider: boolean;
+  /** The decision bar offers Approve / Request changes / Reject on this version. */
+  canDecide: boolean;
   isMarketer: boolean;
   /** Approve with edits is open: findings with a literal fix offer Apply into the reviewer's edit. */
   editor?: LiveEditor;
@@ -97,7 +99,7 @@ export function FindingsPanel(props: FindingsPanelProps) {
         <EmptyState icon="entity.finding" title={`No findings on v${String(shownN)}`}>
           Code checks found nothing to flag
           {item.llm_check_status === 'succeeded' ? ' and the AI check had no suggestions' : ''}.
-          {props.isDecider ? ' Review the copy and decide.' : ''}
+          {props.canDecide ? ' Review the copy and decide.' : ''}
         </EmptyState>
       ) : (
         <div className="app-findings">

@@ -36,7 +36,7 @@ describe('waitingOn', () => {
 
   it('expired: says why, from the reopen reason (B3)', () => {
     expect(waitingOn(itemRowFixture({ status: 'expired', reopen_reason: 'terms_changed' })).why).toBe(
-      'Expired: offer terms changed. Check the new numbers and start a new round.',
+      'Offer terms changed. Check the new numbers and start a new round.',
     );
     expect(
       waitingOn(
