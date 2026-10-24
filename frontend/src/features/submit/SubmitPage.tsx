@@ -209,13 +209,16 @@ export function SubmitPage() {
         </form.Field>
         <form.Field name="partner_id">
           {(field) =>
+            // The slot stays when empty so the fields after it don't shift as the channel changes.
             isPartnerChannel(values.channel) ? (
               <PartnerField
                 value={field.state.value}
                 onChange={field.handleChange}
                 errorMessage={fieldErrorText(field.state.meta.errors)}
               />
-            ) : null
+            ) : (
+              <div className="app-submit-slot" aria-hidden="true" />
+            )
           }
         </form.Field>
         <form.Field name="planned_first_run">
