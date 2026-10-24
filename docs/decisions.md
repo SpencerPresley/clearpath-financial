@@ -161,6 +161,12 @@ Friction only where compliance requires it, which means only at the decision.
 ### Metrics come from the event log
 Time-in-queue and time-per-round are queries over the events, and the imported tracker's dates supply real history, so there's no placeholder data. They're built into the data model early and surfaced late, as a stats strip and an age column.
 
+### Drift monitor
+- **The checker identifies itself honestly** (`ClearPathComplianceBot/1.0`), not as a browser. Copy hidden by a stylesheet counts as visible: the check reads the page's text, not its rendering. Cloaking (serving the bot different content than people see) is out of scope for text-level checks; catching it would take browser-like fetching from unattributed addresses, which is a different product.
+- **Approved copy intact, partner text beside it = unchanged.** The item doesn't reopen, but new blocking findings on the page (rules that don't fire on the approved copy) notify the assignee and the active leads in-app, once per new set of rules, and the placement shows an attention state on the review screen. That added text is exactly the risk, so it can't be silent.
+- **A page that's gone is a failed check, three in a row is missing copy.** 404/410 are failed checks (a moved URL or an outage shouldn't reopen anything), but 3 consecutive ones on a live placement reopen the item (drift_detected) with the failed checks linked. A success, or any other kind of failure, ends the streak.
+- **Reaffirm after drift only once the copy is back.** A drift_detected re-review offers Reaffirm only when the placement's latest check found the approved copy unchanged (the partner restored it); otherwise Check now or Pull. The reaffirm service enforces the same rule (409 `drift_not_restored`).
+
 ## Workflow policies
 
 ### Approval expiry

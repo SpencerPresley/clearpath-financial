@@ -40,8 +40,11 @@ export function describeEvent(entry: Entry, { versions, users }: HistoryLookups)
       return `Updated ${entry.payload.changes.map((c) => c.field).join(', ')}`;
     case 'item.risk_tier_overridden':
       return `Risk tier changed from ${entry.payload.before} to ${entry.payload.after}`;
-    case 'item.reopened':
-      return `Sent to re-review: ${REOPEN_REASON_LABELS[entry.payload.reason]}`;
+    case 'item.reopened': {
+      const gone = entry.payload.failed_snapshot_ids ?? [];
+      const why = gone.length > 0 ? ` (page not found on ${plural(gone.length, 'check')} in a row)` : '';
+      return `Sent to re-review: ${REOPEN_REASON_LABELS[entry.payload.reason]}${why}`;
+    }
     case 'item.expired':
       return `Expired: ${REOPEN_REASON_LABELS[entry.payload.reason]}`;
     case 'item.withdrawn':
@@ -103,6 +106,8 @@ export function describeEvent(entry: Entry, { versions, users }: HistoryLookups)
       if (entry.payload.result === 'modified') return `Placement checked${against}: copy changed on the page`;
       return `Placement checked${against}: approved copy missing from the page`;
     }
+    case 'placement.page_findings_flagged':
+      return `Placement checked: copy unchanged, ${plural(entry.payload.rule_ids.length, 'new blocking finding')} beside it`;
     case 'attachment.added':
       return 'Evidence added';
     case 'terms.published':

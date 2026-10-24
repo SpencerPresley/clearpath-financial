@@ -397,6 +397,7 @@ export function makeDetail(row: ItemRowOut, overrides: Partial<ItemDetailOut> = 
     numbers_change: null,
     llm_check_failure_code: null,
     llm_check_failure_reason: null,
+    drift_rereview: null,
     notes: '',
     retention_until: null,
     risk_tier_overridden: false,

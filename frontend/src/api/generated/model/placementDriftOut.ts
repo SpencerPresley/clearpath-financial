@@ -10,6 +10,8 @@ import type { SnapshotOut } from './snapshotOut';
 export interface PlacementDriftOut {
   /** Set when the URL is one of this site's demo pages. */
   demo_page: DemoPageRefOut | null;
+  /** How many of the latest checks in a row found the page gone (HTTP 404/410), up to 3; at 3 on a live placement the approved copy counts as missing and the item is reopened. */
+  gone_streak: number;
   is_live: boolean;
   latest: SnapshotOut | null;
   location: string;

@@ -210,6 +210,11 @@ class DecisionOut(DecisionSummaryOut):
     evidence: list[EvidenceOut]
 
 
+class DriftRereviewOut(Schema):
+    placement_id: int
+    restored: bool = Field(description="The placement's latest finished check found the approved copy unchanged.")
+
+
 class ItemDetailOut(ItemRowOut):
     is_prescreen: bool
     risk_tier_overridden: bool
@@ -235,6 +240,10 @@ class ItemDetailOut(ItemRowOut):
     )
     llm_check_failure_reason: str | None = Field(
         description="The failure as a plain sentence; null unless llm_check_status is failed."
+    )
+    drift_rereview: DriftRereviewOut | None = Field(
+        description="needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether "
+        "its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has."
     )
 
 

@@ -1,7 +1,9 @@
 /*
  * Where the approved content runs, and what the drift monitor last saw there (product-spec "Drift monitoring").
  * Each placement with a web address shows its latest check: unchanged, changed (with the diff against the approved
- * version), copy missing, or a failed check with its reason, plus the code checks run on the whole page. "Check
+ * version), copy missing, or a failed check with its reason, plus the code checks run on the whole page. Unchanged
+ * copy with new blocking findings beside it is flagged (attention; the item stays approved), and a page not found on
+ * repeated checks counts as copy missing once it sends the item to re-review. "Check
  * now" queues a check and the panel polls until it lands; a check that sends the item to re-review refreshes the
  * item. On the demo partner pages a lead or admin can simulate the partner's edit (demo only).
  */
@@ -23,6 +25,7 @@ import { DiffText } from '../../ui/copy/DiffText';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
 import type { IconKey } from '../../ui/icons';
+import { plural } from '../../ui/labels';
 import { useViewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
@@ -45,6 +48,10 @@ interface Outcome {
 
 export function checkOutcome(snapshot: SnapshotOut): Outcome {
   if (isInFlight(snapshot)) return { label: 'Checking the page…', tone: 'info', icon: 'action.reload' };
+  // A failed check that reopened the item: the page was gone on consecutive checks, so the copy counts as missing.
+  if (snapshot.status === 'failed' && snapshot.reopened_item) {
+    return { label: 'Page not found', tone: 'alert', icon: 'drift.missing' };
+  }
   if (snapshot.status === 'failed') return { label: 'Check failed', tone: 'error', icon: 'feedback.error' };
   switch (snapshot.result) {
     case 'unchanged':
@@ -74,8 +81,32 @@ export function displayUrl(url: string): string {
   }
 }
 
-function LastCheck({ snapshot }: { snapshot: SnapshotOut }) {
+/** Partner text beside intact approved copy that trips blocking rules: nothing reopens, so it's flagged here. */
+export function needsAttention(snapshot: SnapshotOut): boolean {
+  return snapshot.result === 'unchanged' && snapshot.new_blocking_count > 0;
+}
+
+function FailedNote({ snapshot, goneStreak }: { snapshot: SnapshotOut; goneStreak: number }) {
+  if (snapshot.reopened_item) {
+    return (
+      <p className="app-drift-note">
+        The page wasn’t found on {plural(goneStreak, 'check')} in a row, so the approved copy counts as
+        missing.
+      </p>
+    );
+  }
+  const streak = goneStreak > 1 ? ` Not found on ${plural(goneStreak, 'check')} in a row.` : '';
+  return (
+    <p className="app-drift-note">
+      {snapshot.error_message ?? 'The page could not be checked.'}
+      {streak} Nothing changed on the item.
+    </p>
+  );
+}
+
+function LastCheck({ snapshot, goneStreak }: { snapshot: SnapshotOut; goneStreak: number }) {
   const outcome = checkOutcome(snapshot);
+  const attention = needsAttention(snapshot);
   const against =
     snapshot.compared_version_n === null ? '' : ` against v${String(snapshot.compared_version_n)}`;
   const who = snapshot.requested_by === null ? 'Daily check' : `Checked by ${snapshot.requested_by.name}`;
@@ -86,6 +117,12 @@ function LastCheck({ snapshot }: { snapshot: SnapshotOut }) {
           <Icon name={outcome.icon} size={14} />
           <span>{outcome.label}</span>
         </span>
+        {attention && (
+          <span className="app-badge" data-tone="alert">
+            <Icon name="severity.blocking" size={14} />
+            <span>New blocking findings</span>
+          </span>
+        )}
         {!isInFlight(snapshot) && (
           <span className="app-timeline-meta">
             {who}
@@ -94,9 +131,11 @@ function LastCheck({ snapshot }: { snapshot: SnapshotOut }) {
         )}
       </p>
       {snapshot.reopened_item && <p className="app-drift-note">This check sent the item to re-review.</p>}
-      {snapshot.status === 'failed' && (
+      {snapshot.status === 'failed' && <FailedNote snapshot={snapshot} goneStreak={goneStreak} />}
+      {attention && (
         <p className="app-drift-note">
-          {snapshot.error_message ?? 'The page could not be checked.'} Nothing changed on the item.
+          The approved copy is intact, but text beside it has{' '}
+          {plural(snapshot.new_blocking_count, 'new blocking finding')}. The item stays approved.
         </p>
       )}
       {snapshot.result === 'missing' && (
@@ -197,7 +236,7 @@ function PlacementRow({
       {placement.latest === null ? (
         <p className="app-muted">Not checked yet.</p>
       ) : (
-        <LastCheck snapshot={placement.latest} />
+        <LastCheck snapshot={placement.latest} goneStreak={placement.gone_streak} />
       )}
       {error !== null && (
         <p className="app-field-error" role="alert">

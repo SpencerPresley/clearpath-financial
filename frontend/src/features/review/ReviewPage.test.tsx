@@ -561,6 +561,57 @@ describe('ReviewPage', () => {
     expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
   });
 
+  it('offers Check now, not reaffirm, while the partner page still differs', async () => {
+    const { posted, router } = renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'drift_detected',
+        latest_decision: DECISION_APPROVED,
+        drift_rereview: { placement_id: 3, restored: false },
+      }),
+      findings: [],
+    });
+    server.use(
+      http.post('*/api/placements/:id/drift-checks', ({ request }) => {
+        posted.push({ path: new URL(request.url).pathname, body: null });
+        return HttpResponse.json({}, { status: 202 });
+      }),
+    );
+    const label = await screen.findByText(/Re-review: Live copy changed\./);
+    expect(label.closest('.app-note')).toHaveTextContent(
+      'The partner page doesn’t show approved v2. Check it again once the partner restores it, or pull it.',
+    );
+    expect(screen.queryByRole('button', { name: /Reaffirm/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pull' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check now' }));
+
+    await waitFor(() => {
+      expect(posted.map((p) => p.path)).toContain('/api/placements/3/drift-checks');
+    });
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ tab: 'details' });
+    });
+  });
+
+  it('offers reaffirm once a check found the copy restored', async () => {
+    renderReview({
+      item: itemFixture({
+        status: 'needs_rereview',
+        reopen_reason: 'drift_detected',
+        latest_decision: DECISION_APPROVED,
+        drift_rereview: { placement_id: 3, restored: true },
+      }),
+      findings: [],
+    });
+    const label = await screen.findByText(/Re-review: Live copy changed\./);
+    expect(label.closest('.app-note')).toHaveTextContent(
+      'A check found approved v2 on the partner page again.',
+    );
+    expect(screen.getByRole('button', { name: 'Reaffirm v2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check now' })).not.toBeInTheDocument();
+  });
+
   it('sends a terms change with no generated version to the normal lane', async () => {
     const { posted } = renderReview({
       item: itemFixture({

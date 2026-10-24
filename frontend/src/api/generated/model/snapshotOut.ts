@@ -27,6 +27,8 @@ export interface SnapshotOut {
   finished_at: string | null;
   http_status: number | null;
   id: number;
+  /** Blocking findings on the page whose rule doesn't fire on the approved copy. On an unchanged result this is the attention state: partner text beside intact approved copy. */
+  new_blocking_count: number;
   placement_id: number;
   /** This check sent the item to re-review. */
   reopened_item: boolean;

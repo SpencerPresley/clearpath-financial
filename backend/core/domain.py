@@ -199,6 +199,7 @@ class NotificationKind(StrEnum):
     REREVIEW = "rereview"
     MENTION = "mention"
     EXPIRY_WARNING = "expiry_warning"
+    PAGE_FINDINGS = "page_findings"  # new blocking findings on a partner page beside intact approved copy
 
 
 class TermsField(StrEnum):
@@ -282,6 +283,8 @@ class EventType(StrEnum):
     TAKEDOWN_CONFIRMED = "placement.takedown_confirmed"
     DRIFT_CHECK_REQUESTED = "placement.drift_check_requested"
     DRIFT_CHECKED = "placement.drift_checked"  # succeeded (with a result) or failed (with an error code)
+    # The approved copy is intact but blocking findings appeared beside it on the page (assignee and leads hear).
+    PAGE_FINDINGS_FLAGGED = "placement.page_findings_flagged"
     ATTACHMENT_ADDED = "attachment.added"
     TERMS_PUBLISHED = "terms.published"
     PARTNER_CREATED = "partner.created"

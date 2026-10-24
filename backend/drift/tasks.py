@@ -53,14 +53,14 @@ def run_check(self: Task, snapshot_id: int) -> str:
     try:
         page = fetch(claim.url)
         result = services.complete(claim=claim, page=page, clock=clock)
-        outcome = f"{result.result}{' reopened' if result.reopened else ''}"
+        outcome = f"{result.result}{' reopened' if result.reopened else ''}{' flagged' if result.flagged else ''}"
     except FetchError as error:
         if services.should_retry(claim=claim, error=error):
             services.release(claim=claim, clock=clock)
             retry, outcome = True, f"retry {error.detail}"
         else:
-            services.fail(claim=claim, error=error, clock=clock)
-            outcome = f"failed {error.detail}"
+            reopened = services.fail(claim=claim, error=error, clock=clock)
+            outcome = f"failed {error.detail}{' reopened' if reopened else ''}"
     except SoftTimeLimitExceeded:
         services.fail(claim=claim, code="timeout", message="The check took too long.", clock=clock)
     except Exception:

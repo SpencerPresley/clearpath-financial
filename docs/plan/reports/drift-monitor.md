@@ -148,3 +148,7 @@ found; one Critical and two Important, all fixed with tests:
    `PAGES[slug].copy`.
 6. **`terraform apply`** of the `/demo-partners/*` CloudFront route at the deploy wave.
 7. Reaffirm stays available for `drift_detected` re-reviews (I's existing behaviour); confirm that's wanted.
+
+Ruled and implemented in the follow-up (`wsM/drift-followups`): 1 and 2 (no reopen; notify assignee + leads,
+attention state), 3 (missing after 3 consecutive 404/410), 4 (`docs/decisions.md` "Drift monitor"), 7 (Reaffirm
+only once restored, enforced as 409 `drift_not_restored`).

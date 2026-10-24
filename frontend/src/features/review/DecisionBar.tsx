@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 
+import { getGetItemDriftQueryKey, useCheckPlacementDrift } from '../../api/generated/drift/drift';
 import { getGetItemHistoryQueryKey, getGetItemQueryKey, useClaimItem } from '../../api/generated/items/items';
 import type { ItemDetailOut } from '../../api/generated/model';
 import { RiskTierBadge, StatusBadge } from '../../ui/badges';
@@ -22,6 +23,8 @@ export interface DecisionBarProps {
   mode: DecisionMode | null;
   onMode: (mode: DecisionMode) => void;
   onShortcuts: () => void;
+  /** A drift re-review's Check now was queued: show where the result lands (the Details tab's placements). */
+  onCheckQueued: () => void;
 }
 
 function LatestDecision({ item }: { item: ItemDetailOut }) {
@@ -56,7 +59,15 @@ export function approveNote(gate: DecisionGate): string | null {
  * The sticky bar (spec §5.3): which item, its state, and the decisions. Approve stays visible but disabled
  * with the reason under the buttons, so "why can't I approve" is never a mystery.
  */
-export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }: DecisionBarProps) {
+export function DecisionBar({
+  item,
+  gate,
+  isDecider,
+  mode,
+  onMode,
+  onShortcuts,
+  onCheckQueued,
+}: DecisionBarProps) {
   const pressed = (m: DecisionMode) => (mode === m ? true : undefined);
   const showDecisions = isDecider && gate.canDecide;
   const rereview = isDecider ? rereviewActions(item) : [];
@@ -78,6 +89,20 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
       },
       onError: (error) => {
         showToast({ title: 'Not claimed', description: apiErrorMessage(error), tone: 'error' });
+      },
+    },
+  });
+  // Drift re-review: re-check the placement that sent the item back. The Details tab polls until the check
+  // lands and then refreshes the item, which is when Reaffirm appears (if the partner restored the copy).
+  const driftPlacementId = item.drift_rereview?.placement_id;
+  const checkNow = useCheckPlacementDrift({
+    mutation: {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getGetItemDriftQueryKey(item.id) });
+        onCheckQueued();
+      },
+      onError: (error) => {
+        showToast({ title: 'Not checked', description: apiErrorMessage(error), tone: 'error' });
       },
     },
   });
@@ -179,6 +204,18 @@ export function DecisionBar({ item, gate, isDecider, mode, onMode, onShortcuts }
                   }}
                 >
                   Review
+                </Button>
+              )}
+              {rereview.includes('check_now') && driftPlacementId !== undefined && (
+                <Button
+                  variant="primary"
+                  icon="action.reload"
+                  isPending={checkNow.isPending}
+                  onPress={() => {
+                    checkNow.mutate({ placementId: driftPlacementId });
+                  }}
+                >
+                  Check now
                 </Button>
               )}
               {rereview.includes('reaffirm') && (

@@ -185,6 +185,10 @@ export const SubmitItemResponse = zod.object({
 }))
 }),zod.null()]),
   "current_version_n": zod.union([zod.int(),zod.null()]),
+  "drift_rereview": zod.union([zod.object({
+  "placement_id": zod.int(),
+  "restored": zod.boolean().describe('The placement\'s latest finished check found the approved copy unchanged.')
+}),zod.null()]).describe('needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has.'),
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "is_prescreen": zod.boolean(),
@@ -586,6 +590,10 @@ export const GetItemResponse = zod.object({
 }))
 }),zod.null()]),
   "current_version_n": zod.union([zod.int(),zod.null()]),
+  "drift_rereview": zod.union([zod.object({
+  "placement_id": zod.int(),
+  "restored": zod.boolean().describe('The placement\'s latest finished check found the approved copy unchanged.')
+}),zod.null()]).describe('needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has.'),
   "id": zod.int(),
   "is_legacy": zod.boolean(),
   "is_prescreen": zod.boolean(),
@@ -1034,8 +1042,8 @@ export const getItemHistoryResponseEntriesItemTwofourPayloadTermsVersionIdsDefau
 export const getItemHistoryResponseEntriesItemThreezeroPayloadErrorCodeDefault = ``;
 export const getItemHistoryResponseEntriesItemThreezeroPayloadFindingsCountDefault = 0;
 export const getItemHistoryResponseEntriesItemThreezeroPayloadNewFindingsCountDefault = 0;
-export const getItemHistoryResponseEntriesItemThreetwoPayloadAffectedItemIdsDefault = [];
-export const getItemHistoryResponseEntriesItemFourtwoPayloadSeededItemsDefault = 0;
+export const getItemHistoryResponseEntriesItemThreethreePayloadAffectedItemIdsDefault = [];
+export const getItemHistoryResponseEntriesItemFourthreePayloadSeededItemsDefault = 0;
 
 export const GetItemHistoryResponse = zod.object({
   "entries": zod.array(zod.union([zod.object({
@@ -1155,6 +1163,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "failed_snapshot_ids": zod.union([zod.array(zod.int()),zod.null()]).optional(),
   "generated_version_id": zod.union([zod.int(),zod.null()]).optional(),
   "offer_terms_id": zod.union([zod.int(),zod.null()]).optional(),
   "reason": zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.'),
@@ -1611,6 +1620,23 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
+  "placement_id": zod.int(),
+  "rule_ids": zod.array(zod.string()),
+  "snapshot_id": zod.int()
+}).describe('A drift check found the approved copy unchanged, but blocking findings on the page that don\'t fire on the\ncopy itself (partner text added beside it). Nothing transitions; the assignee and the leads are told.'),
+  "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "type": zod.literal("placement.page_findings_flagged").meta({ title: 'Type' })
+}),zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Null for system actions (sweeps, fan-out).'),
+  "at": zod.iso.datetime({"offset":true}),
+  "entity": zod.enum(['item', 'version', 'finding', 'comment', 'decision', 'placement', 'attachment', 'offer_terms', 'partner', 'user', 'import', 'export', 'email', 'system']).describe('What an Event is about.'),
+  "entity_id": zod.int(),
+  "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
+  "id": zod.int(),
+  "payload": zod.object({
   "attachment_id": zod.int(),
   "kind": zod.enum(['creative', 'substantiation', 'agreement', 'rate_sheet', 'prescreen_criteria', 'consent_record', 'screenshot', 'other']),
   "owner_id": zod.int(),
@@ -1630,7 +1656,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemThreetwoPayloadAffectedItemIdsDefault),
+  "affected_item_ids": zod.array(zod.int()).default(getItemHistoryResponseEntriesItemThreethreePayloadAffectedItemIdsDefault),
   "offer_terms_id": zod.int(),
   "previous_offer_terms_id": zod.union([zod.int(),zod.null()]),
   "product": zod.enum(['personal_loan', 'credit_card', 'mortgage_prequal']),
@@ -1803,7 +1829,7 @@ export const GetItemHistoryResponse = zod.object({
   "from_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "id": zod.int(),
   "payload": zod.object({
-  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourtwoPayloadSeededItemsDefault)
+  "seeded_items": zod.int().default(getItemHistoryResponseEntriesItemFourthreePayloadSeededItemsDefault)
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("demo.reset").meta({ title: 'Type' })

@@ -1,4 +1,5 @@
-"""Outbox handlers that turn events into in-app notifications (assignment, decision, re-review, mention)."""
+"""Outbox handlers that turn events into in-app notifications (assignment, decision, re-review, mention, and new
+blocking findings on a partner page)."""
 
 from collections.abc import Iterable
 
@@ -9,6 +10,7 @@ from audit.payloads import (
     CommentAddedPayload,
     DecisionRecordedPayload,
     ItemAssignedPayload,
+    PageFindingsFlaggedPayload,
 )
 from core.domain import AssignmentMode, DecisionOutcome, EventType, NotificationKind, Role
 from notifications.models import Notification
@@ -35,6 +37,10 @@ def _notify(event: EventRecord, kind: NotificationKind, user_ids: Iterable[int |
     )
 
 
+def _active_leads() -> list[int]:
+    return list(User.objects.filter(is_active=True, roles__contains=[Role.LEAD.value]).values_list("pk", flat=True))
+
+
 def _item(event: EventRecord) -> ReviewItem:
     return ReviewItem.objects.only("id", "title", "owner_id", "assignee_id").get(pk=event.item_id)
 
@@ -52,8 +58,9 @@ def notify_assignee(event: EventRecord) -> None:
         if payload.mode is not AssignmentMode.POOL:
             return
         item = _item(event)
-        leads = User.objects.filter(is_active=True, roles__contains=[Role.LEAD.value]).values_list("pk", flat=True)
-        _notify(event, NotificationKind.ASSIGNMENT, leads, f"{item.key} {item.title} is in the unassigned pool")
+        _notify(
+            event, NotificationKind.ASSIGNMENT, _active_leads(), f"{item.key} {item.title} is in the unassigned pool"
+        )
         return
     item = _item(event)
     if payload.mode is AssignmentMode.STICKY:
@@ -108,4 +115,19 @@ def notify_rereview(event: EventRecord) -> None:
         NotificationKind.REREVIEW,
         [item.owner_id, item.assignee_id],  # pyrefly: ignore[missing-attribute]
         f"{item.key} {item.title} needs re-review",
+    )
+
+
+@handles(EventType.PAGE_FINDINGS_FLAGGED, name="notifications.page_findings")
+def notify_page_findings(event: EventRecord) -> None:
+    """The approved copy is intact but partner text beside it trips blocking rules: nothing reopens, so the
+    assignee and the active leads have to hear about it here."""
+    payload = event.payload
+    assert isinstance(payload, PageFindingsFlaggedPayload)  # noqa: S101
+    item = _item(event)
+    _notify(
+        event,
+        NotificationKind.PAGE_FINDINGS,
+        [item.assignee_id, *_active_leads()],  # pyrefly: ignore[missing-attribute]
+        f"New blocking findings on a partner page that carries {item.key}",
     )

@@ -419,7 +419,8 @@ def record_decision(request: HttpRequest, item_id: int, body: DecisionIn) -> Sta
 )
 def reaffirm(request: HttpRequest, item_id: int, body: ReaffirmIn) -> Status[records.DecisionRow]:
     """needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new
-    findings come back as 409 findings_need_triage."""
+    findings come back as 409 findings_need_triage. A drift_detected re-review is 409 drift_not_restored until the
+    placement's latest check finds the approved copy again."""
     result = decisions.reaffirm(
         actor=current_user(request), item_id=item_id, reason=body.reason, llm_override_reason=body.llm_override_reason
     )

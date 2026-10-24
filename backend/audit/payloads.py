@@ -90,6 +90,9 @@ class ItemReopenedPayload(EventPayload):
     # The drift check that found the change, for drift_detected. Left out when unset, so other reopen events keep
     # the shape they were recorded with.
     snapshot_id: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    # When the page was gone (HTTP 404/410) on consecutive checks: those failed checks, newest first. Left out
+    # when unset, like `snapshot_id`.
+    failed_snapshot_ids: list[int] | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ItemExpiredPayload(EventPayload):
@@ -303,6 +306,15 @@ class DriftCheckedPayload(EventPayload):
     http_status: int | None = None  # the page's status when the failure was an HTTP error
 
 
+class PageFindingsFlaggedPayload(EventPayload):
+    """A drift check found the approved copy unchanged, but blocking findings on the page that don't fire on the
+    copy itself (partner text added beside it). Nothing transitions; the assignee and the leads are told."""
+
+    placement_id: int
+    snapshot_id: int
+    rule_ids: list[str]  # the page's new blocking rules, sorted
+
+
 class AttachmentAddedPayload(EventPayload):
     attachment_id: int
     kind: AttachmentKind
@@ -408,6 +420,7 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.TAKEDOWN_CONFIRMED: TakedownConfirmedPayload,
     EventType.DRIFT_CHECK_REQUESTED: DriftCheckRequestedPayload,
     EventType.DRIFT_CHECKED: DriftCheckedPayload,
+    EventType.PAGE_FINDINGS_FLAGGED: PageFindingsFlaggedPayload,
     EventType.ATTACHMENT_ADDED: AttachmentAddedPayload,
     EventType.TERMS_PUBLISHED: TermsPublishedPayload,
     EventType.PARTNER_CREATED: PartnerCreatedPayload,

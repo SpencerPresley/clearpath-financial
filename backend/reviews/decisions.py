@@ -44,6 +44,7 @@ from core.errors import AiCheckPending, Conflict, InvalidInput, OpenFindingsBloc
 from reviews.assignment import locked_item, require_reviewer_of
 from reviews.errors import (
     AcceptedFindingsBlockApproval,
+    DriftNotRestored,
     FindingsNeedTriage,
     FindingSummary,
     StaleOfferTerms,
@@ -61,7 +62,7 @@ from reviews.models import (
     Version,
 )
 from reviews.months import add_months
-from reviews.selectors import live_placements_q
+from reviews.selectors import drift_rereview, live_placements_q
 from reviews.transitions import Action, apply_transition, require_transition, start_review
 from reviews.versions import create_version
 
@@ -404,7 +405,9 @@ def reaffirm(
     The code checks re-run first against today's rules and terms: catching rule changes is what expiry is for.
     New findings are kept and the reaffirm refused (`findings_need_triage`) until they're triaged; the usual
     approval gates then apply, so copy quoting superseded terms can't be reaffirmed (fast-track or pull it). If
-    the version's AI check failed, `llm_override_reason` is required again: a reaffirm is a new approval.
+    the version's AI check failed, `llm_override_reason` is required again: a reaffirm is a new approval. A
+    drift_detected re-review is refused (`drift_not_restored`) until the placement's latest check finds the
+    approved copy again: otherwise Check now or Pull.
     """
     reason = reason.strip()
     if not reason:
@@ -414,6 +417,9 @@ def reaffirm(
         item = locked_item(item_id)
         require_reviewer_of(actor, item)
         require_transition(item, Action.REAFFIRM)
+        drift = drift_rereview(item_id=item.pk)
+        if drift is not None and not drift.restored:
+            raise DriftNotRestored(placement_id=drift.placement_id)
         version = item.current_version
         if version is None or _approved_version_n(item) != version.n:
             raise Conflict(

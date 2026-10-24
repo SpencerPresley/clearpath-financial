@@ -38,6 +38,10 @@ class SnapshotOut(Schema):
     score: float | None = Field(description="0-100: how much of the approved copy the page keeps.")
     diff: list[DiffSegmentOut] = Field(description="Approved copy -> page, for a modified result.")
     findings: list[PageFindingOut]
+    new_blocking_count: int = Field(
+        description="Blocking findings on the page whose rule doesn't fire on the approved copy. On an unchanged "
+        "result this is the attention state: partner text beside intact approved copy."
+    )
     error_code: str | None = Field(description="Why a failed check failed (e.g. timeout, address_not_allowed).")
     error_message: str | None
     reopened_item: bool = Field(description="This check sent the item to re-review.")
@@ -58,6 +62,10 @@ class PlacementDriftOut(Schema):
     monitored: bool
     is_live: bool
     latest: SnapshotOut | None
+    gone_streak: int = Field(
+        description="How many of the latest checks in a row found the page gone (HTTP 404/410), up to 3; at 3 on a "
+        "live placement the approved copy counts as missing and the item is reopened."
+    )
     demo_page: DemoPageRefOut | None = Field(description="Set when the URL is one of this site's demo pages.")
 
 
