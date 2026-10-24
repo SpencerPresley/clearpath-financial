@@ -2361,6 +2361,9 @@
   }
   .app-metric-table tbody tr:last-child > * {
     @apply border-b-0;
+  }
+}
+
 /* ---- Outbox (workstream K): sent demo mail, a dense table beside the selected message. ----------- */
 @layer components {
   .app-outbox {

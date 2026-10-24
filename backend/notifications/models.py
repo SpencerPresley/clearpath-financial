@@ -3,6 +3,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
 
+from core.domain import OutboxSource
+
 
 class Notification(models.Model):
     """In-app only (spec §4.3 Notifications). Created by outbox handlers from events."""
@@ -32,17 +34,23 @@ class Notification(models.Model):
 
 
 class OutboxEmail(models.Model):
-    """An email the assistant sent after a human approved it. The demo's stand-in for real mail; the
-    recipient allowlist is enforced in the send tool's code (workstream K), not here."""
+    """The demo's stand-in for real mail. Mostly emails the assistant sent after a person approved them (the
+    recipient allowlist is enforced in the send tool's code, not here); also the app's own mail, such as
+    allauth password resets (`source=system`: no requester, approver or thread; shown only to admins)."""
 
+    source = models.CharField(max_length=20, default=OutboxSource.ASSISTANT.value)
     to = ArrayField(models.EmailField())
     subject = models.CharField(max_length=300)
     body = models.TextField()
     # The rendered HTML alternative (autoescaped template); "" for rows written before it existed.
     html_body = models.TextField(blank=True)
     item = models.ForeignKey("reviews.ReviewItem", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
-    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
-    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     thread_id = models.CharField(max_length=100, blank=True)
     # The approved send_email call that produced it: one email per (thread, tool call), however often it runs.
     tool_call_id = models.CharField(max_length=100, blank=True)
@@ -51,6 +59,23 @@ class OutboxEmail(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(condition=Q(to__len__gte=1), name="outbox_email_has_recipient"),
+            # An assistant email always records who asked and who approved; system mail has neither.
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        source=OutboxSource.ASSISTANT.value,
+                        requested_by__isnull=False,
+                        approved_by__isnull=False,
+                    )
+                    | Q(
+                        source=OutboxSource.SYSTEM.value,
+                        requested_by__isnull=True,
+                        approved_by__isnull=True,
+                        thread_id="",
+                    )
+                ),
+                name="outbox_email_source_parties",
+            ),
             models.UniqueConstraint(
                 fields=["thread_id", "tool_call_id"],
                 condition=~Q(tool_call_id=""),

@@ -16,6 +16,7 @@ const VIEWER = { id: 3, name: 'Dana Reviewer' };
 function email(overrides: Partial<OutboxEmailOut> = {}): OutboxEmailOut {
   return {
     id: 1,
+    source: 'assistant',
     to: ['compliance@clearpath.demo', 'dana.reviewer@clearpath.demo'],
     subject: 'CP-1042 findings summary',
     body: 'Two blocking findings on CP-1042.',
@@ -153,6 +154,36 @@ describe('OutboxPage', () => {
   it("doesn't offer someone else's thread", async () => {
     renderOutbox([email({ requested_by: { id: 4, name: 'Sam Okafor' } })], '/outbox?email=1');
     const detail = await screen.findByRole('region', { name: 'CP-1042 findings summary' });
+    expect(within(detail).queryByRole('button', { name: 'Open thread' })).toBeNull();
+  });
+
+  it('marks system mail (password resets, admins only) and shows its recipient, with no requester or approver', async () => {
+    const user = userEvent.setup();
+    renderOutbox([
+      email({
+        id: 9,
+        source: 'system',
+        subject: 'Reset your password',
+        to: ['sam.okafor@clearpath.demo'],
+        item_id: null,
+        thread_id: '',
+        requested_by: null,
+        approved_by: null,
+      }),
+    ]);
+
+    const table = await screen.findByRole('table', { name: 'Sent emails' });
+    const [, row] = within(table).getAllByRole('row');
+    if (row === undefined) throw new Error('expected an email row');
+    expect(within(row).getByText('sam.okafor@clearpath.demo')).toBeInTheDocument();
+    expect(within(row).getByText('System')).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: 'Reset your password' }));
+    const detail = screen.getByRole('region', { name: 'Reset your password' });
+    expect(within(detail).getByText('Sent')).toBeInTheDocument();
+    expect(within(detail).getByText('System mail, not drafted by the assistant')).toBeInTheDocument();
+    expect(within(detail).getByText('sam.okafor@clearpath.demo')).toBeInTheDocument();
+    expect(within(detail).queryByText('Approved by')).toBeNull();
     expect(within(detail).queryByRole('button', { name: 'Open thread' })).toBeNull();
   });
 

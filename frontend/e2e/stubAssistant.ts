@@ -117,6 +117,7 @@ export async function stubAssistant(page: Page): Promise<AssistantStub> {
       const messages = [human, draftTurn, toolMessage, done];
       stub.outbox.push({
         id: 1,
+        source: 'assistant',
         to: APPROVAL.args.to,
         subject: APPROVAL.args.subject,
         body: APPROVAL.args.body,

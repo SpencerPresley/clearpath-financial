@@ -2,7 +2,7 @@ import pytest
 from django.test import Client
 
 from accounts.models import User
-from core.domain import NotificationKind
+from core.domain import NotificationKind, OutboxSource
 from notifications.models import Notification, OutboxEmail
 from reviews.tests.factories import AT, make_item
 
@@ -58,3 +58,40 @@ def test_outbox_lists_sent_emails(reviewer: User, lead: User) -> None:
     detail = client.get(f"/api/outbox/{email.pk}").json()
     assert detail["to"] == ["dana@clearpath.demo"]
     assert detail["html_body"] == "<p>3 items waiting</p>"
+
+
+@pytest.mark.django_db
+def test_system_mail_is_only_visible_to_admins(reviewer: User, admin_user: User) -> None:
+    system = OutboxEmail.objects.create(
+        source=OutboxSource.SYSTEM, to=["dana@clearpath.demo"], subject="Reset your password", body="link", sent_at=AT
+    )
+    assistant = OutboxEmail.objects.create(
+        to=["compliance@clearpath.demo"],
+        subject="Queue summary",
+        body="3 items",
+        requested_by=reviewer,
+        approved_by=reviewer,
+        sent_at=AT,
+    )
+
+    staff = _client(reviewer)
+    assert [e["id"] for e in staff.get("/api/outbox").json()] == [assistant.pk]
+    assert staff.get(f"/api/outbox/{system.pk}").status_code == 404
+
+    admin = _client(admin_user)
+    rows = {e["id"]: e for e in admin.get("/api/outbox").json()}
+    assert set(rows) == {system.pk, assistant.pk}
+    assert rows[system.pk]["source"] == "system"
+    assert rows[system.pk]["requested_by"] is None
+    assert rows[system.pk]["approved_by"] is None
+    assert rows[system.pk]["to"] == ["dana@clearpath.demo"]
+    assert rows[assistant.pk]["source"] == "assistant"
+    assert admin.get(f"/api/outbox/{system.pk}").json()["subject"] == "Reset your password"
+
+
+@pytest.mark.django_db
+def test_assistant_mail_needs_who_asked_and_who_approved() -> None:
+    from django.db import IntegrityError
+
+    with pytest.raises(IntegrityError):
+        OutboxEmail.objects.create(to=["dana@clearpath.demo"], subject="x", body="y", sent_at=AT)

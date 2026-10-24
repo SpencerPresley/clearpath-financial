@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from django.db.models import QuerySet
+
 from accounts.models import User
-from core.domain import NotificationKind
+from core.domain import NotificationKind, OutboxSource, Role
 from core.errors import NotFound
+from core.permissions import has_role
 from notifications.models import Notification, OutboxEmail
 from reviews.selectors import PartyRef
 
@@ -54,14 +57,15 @@ class OutboxEmailRow:
     body: str
     html_body: str
     item_id: int | None
-    requested_by: PartyRef
-    approved_by: PartyRef
+    source: OutboxSource
+    requested_by: PartyRef | None
+    approved_by: PartyRef | None
     thread_id: str
     sent_at: datetime
 
 
-def _party(user: User) -> PartyRef:
-    return PartyRef(id=user.pk, name=user.display_name or user.email)
+def _party(user: User | None) -> PartyRef | None:
+    return None if user is None else PartyRef(id=user.pk, name=user.display_name or user.email)
 
 
 def _email_row(e: OutboxEmail) -> OutboxEmailRow:
@@ -72,6 +76,7 @@ def _email_row(e: OutboxEmail) -> OutboxEmailRow:
         body=e.body,
         html_body=e.html_body,
         item_id=e.item_id,  # pyrefly: ignore[missing-attribute]
+        source=OutboxSource(e.source),
         requested_by=_party(e.requested_by),
         approved_by=_party(e.approved_by),
         thread_id=e.thread_id,
@@ -79,13 +84,18 @@ def _email_row(e: OutboxEmail) -> OutboxEmailRow:
     )
 
 
-def list_outbox_emails(*, limit: int = 100) -> tuple[OutboxEmailRow, ...]:
-    qs = OutboxEmail.objects.select_related("requested_by", "approved_by").order_by("-sent_at", "-pk")[:limit]
-    return tuple(_email_row(e) for e in qs)
+def _visible(viewer: User) -> QuerySet[OutboxEmail]:
+    """System mail (password resets) is for admins; everyone sees what the assistant sent."""
+    qs = OutboxEmail.objects.select_related("requested_by", "approved_by")
+    return qs if has_role(viewer, Role.ADMIN) else qs.filter(source=OutboxSource.ASSISTANT.value)
 
 
-def get_outbox_email(*, email_id: int) -> OutboxEmailRow:
-    email = OutboxEmail.objects.select_related("requested_by", "approved_by").filter(pk=email_id).first()
+def list_outbox_emails(*, viewer: User, limit: int = 100) -> tuple[OutboxEmailRow, ...]:
+    return tuple(_email_row(e) for e in _visible(viewer).order_by("-sent_at", "-pk")[:limit])
+
+
+def get_outbox_email(*, viewer: User, email_id: int) -> OutboxEmailRow:
+    email = _visible(viewer).filter(pk=email_id).first()
     if email is None:
         raise NotFound.entity("email", email_id)
     return _email_row(email)

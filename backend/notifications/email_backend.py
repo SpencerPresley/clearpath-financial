@@ -1,8 +1,11 @@
-"""`EMAIL_BACKEND` for the demo: an approved assistant email becomes an `OutboxEmail` row instead of mail.
+"""`EMAIL_BACKEND` for the demo: every email becomes an `OutboxEmail` row instead of mail.
 
-Only `assistant.email.send_approved_email` attaches the `clearpath` metadata (who asked, who approved, which
-thread), after the recipient allowlist and the human approval. A message without it is refused, so nothing
-else (password resets, a stray `send_mail`) can write the Outbox by accident.
+- An approved assistant email carries `clearpath` metadata (who asked, who approved, which thread, which tool
+  call), attached only by `assistant.email.send_approved_email` after the recipient allowlist and the human
+  approval. It becomes an `assistant` row, shown to everyone.
+- Anything else is the app's own mail, such as allauth's password reset (allauth renders it and sends it through
+  `django.core.mail` and this backend like any Django email). It becomes a `system` row with every recipient,
+  shown only to admins. Refusing it would turn the public reset endpoint into a 500.
 """
 
 from collections.abc import Sequence
@@ -11,7 +14,9 @@ from datetime import datetime
 
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.mail.backends.base import BaseEmailBackend
+from django.utils import timezone
 
+from core.domain import OutboxSource
 from notifications.models import OutboxEmail
 
 
@@ -38,22 +43,29 @@ class OutboxEmailBackend(BaseEmailBackend):
         sent = 0
         for message in email_messages:
             meta = getattr(message, "clearpath", None)
-            if not isinstance(meta, OutboxMeta):
-                raise ValueError(  # noqa: TRY004  # a refused message, not a programming-type error
-                    "The Outbox backend only sends approved assistant email (no clearpath metadata)."
+            if isinstance(meta, OutboxMeta):
+                row = OutboxEmail.objects.create(
+                    source=OutboxSource.ASSISTANT.value,
+                    to=list(message.to),
+                    subject=message.subject,
+                    body=str(message.body),
+                    html_body=_html(message),
+                    item_id=meta.item_id,
+                    requested_by_id=meta.requested_by_id,
+                    approved_by_id=meta.approved_by_id,
+                    thread_id=meta.thread_id,
+                    tool_call_id=meta.tool_call_id,
+                    sent_at=meta.sent_at,
                 )
-            row = OutboxEmail.objects.create(
-                to=list(message.to),
-                subject=message.subject,
-                body=str(message.body),
-                html_body=_html(message),
-                item_id=meta.item_id,
-                requested_by_id=meta.requested_by_id,
-                approved_by_id=meta.approved_by_id,
-                thread_id=meta.thread_id,
-                tool_call_id=meta.tool_call_id,
-                sent_at=meta.sent_at,
-            )
+            else:
+                row = OutboxEmail.objects.create(
+                    source=OutboxSource.SYSTEM.value,
+                    to=list(message.recipients()),
+                    subject=message.subject,
+                    body=str(message.body),
+                    html_body=_html(message),
+                    sent_at=timezone.now(),
+                )
             message.outbox_id = row.pk  # pyrefly: ignore[missing-attribute]  # read back by the sender
             sent += 1
         return sent

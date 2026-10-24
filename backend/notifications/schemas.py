@@ -3,7 +3,7 @@ from datetime import datetime
 from ninja import Schema
 from pydantic import Field
 
-from core.domain import NotificationKind
+from core.domain import NotificationKind, OutboxSource
 from reviews.schemas import PartyRefOut
 
 
@@ -33,7 +33,10 @@ class OutboxEmailOut(Schema):
     body: str
     html_body: str = Field(description="HTML alternative; render only in a sandboxed iframe.")
     item_id: int | None
-    requested_by: PartyRefOut
-    approved_by: PartyRefOut
+    source: OutboxSource = Field(
+        description="assistant: approved by a person. system: the app's own mail (admins only)."
+    )
+    requested_by: PartyRefOut | None = Field(description="null for system mail.")
+    approved_by: PartyRefOut | None = Field(description="null for system mail.")
     thread_id: str
     sent_at: datetime

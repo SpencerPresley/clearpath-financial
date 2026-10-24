@@ -1,6 +1,7 @@
 /*
- * Outbox (decisions.md "Assistant"): the demo's stand-in for real mail. Every row is an email the assistant
- * drafted and a person approved. The HTML part is rendered only inside a sandboxed iframe: `sandbox=""` turns
+ * Outbox (decisions.md "Assistant"): the demo's stand-in for real mail. Rows are emails the assistant drafted
+ * and a person approved, plus, for admins only, the app's own mail (`source: 'system'`, e.g. password resets),
+ * which has a recipient but no requester, approver or thread. The HTML part is rendered only inside a sandboxed iframe: `sandbox=""` turns
  * off scripts, forms, popups and same-origin access, so the message can't reach the app or the session.
  *
  * The open email is in the URL (`?email=<id>`), so the assistant's "Open in Outbox" lands on it. Columns are
@@ -96,9 +97,9 @@ function OutboxRow({
       case 'item':
         return <ItemLink id={email.item_id} />;
       case 'requested':
-        return email.requested_by.name;
+        return email.requested_by?.name ?? <span className="app-muted">System</span>;
       case 'approved':
-        return email.approved_by.name;
+        return email.approved_by?.name ?? <span className="app-muted">—</span>;
     }
   };
   // The whole row opens the email for the mouse; the Subject button stays the keyboard target.
@@ -119,6 +120,7 @@ function OutboxRow({
 function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () => void }) {
   const viewer = useViewer();
   const headingId = `outbox-email-${String(email.id)}`;
+  const system = email.source === 'system';
   return (
     <section className="app-outbox-detail" aria-labelledby={headingId}>
       <header className="app-drawer-head">
@@ -130,7 +132,7 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
       <div className="app-outbox-detail-body">
         <dl className="app-drawer-facts app-outbox-facts">
           <div className="app-drawer-fact">
-            <dt>Approved and sent</dt>
+            <dt>{system ? 'Sent' : 'Approved and sent'}</dt>
             <dd>{sentFormat.format(new Date(email.sent_at))}</dd>
           </div>
           <div className="app-drawer-fact">
@@ -147,16 +149,25 @@ function OutboxDetail({ email, onClose }: { email: OutboxEmailOut; onClose: () =
               <ItemLink id={email.item_id} />
             </dd>
           </div>
-          <div className="app-drawer-fact">
-            <dt>Requested by</dt>
-            <dd>{email.requested_by.name}</dd>
-          </div>
-          <div className="app-drawer-fact">
-            <dt>Approved by</dt>
-            <dd>{email.approved_by.name}</dd>
-          </div>
+          {email.requested_by === null || email.approved_by === null ? (
+            <div className="app-drawer-fact">
+              <dt>From</dt>
+              <dd>System mail, not drafted by the assistant</dd>
+            </div>
+          ) : (
+            <>
+              <div className="app-drawer-fact">
+                <dt>Requested by</dt>
+                <dd>{email.requested_by.name}</dd>
+              </div>
+              <div className="app-drawer-fact">
+                <dt>Approved by</dt>
+                <dd>{email.approved_by.name}</dd>
+              </div>
+            </>
+          )}
         </dl>
-        {email.requested_by.id === viewer.id && (
+        {!system && email.requested_by?.id === viewer.id && (
           <Button
             size="sm"
             icon="nav.assistant"

@@ -51,23 +51,25 @@ export const MarkNotificationReadParams = zod.object({
 export const MarkNotificationReadResponse = zod.void()
 
 /**
- * Emails the assistant sent after a human approved them (the demo's stand-in for real mail).
+ * The demo's stand-in for real mail: emails the assistant sent after a person approved them, and, for admins,
+ * the app's own mail (`source=system`, e.g. password resets).
  * @summary List Outbox
  */
 export const ListOutboxEmailsResponseItem = zod.object({
-  "approved_by": zod.object({
+  "approved_by": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
-}).describe('A person or partner shown in a cell.'),
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('null for system mail.'),
   "body": zod.string(),
   "html_body": zod.string().describe('HTML alternative; render only in a sandboxed iframe.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
-  "requested_by": zod.object({
+  "requested_by": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
-}).describe('A person or partner shown in a cell.'),
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('null for system mail.'),
   "sent_at": zod.iso.datetime({"offset":true}),
+  "source": zod.enum(['assistant', 'system']).describe('assistant: approved by a person. system: the app\'s own mail (admins only).'),
   "subject": zod.string(),
   "thread_id": zod.string(),
   "to": zod.array(zod.string())
@@ -82,19 +84,20 @@ export const GetOutboxEmailParams = zod.object({
 })
 
 export const GetOutboxEmailResponse = zod.object({
-  "approved_by": zod.object({
+  "approved_by": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
-}).describe('A person or partner shown in a cell.'),
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('null for system mail.'),
   "body": zod.string(),
   "html_body": zod.string().describe('HTML alternative; render only in a sandboxed iframe.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
-  "requested_by": zod.object({
+  "requested_by": zod.union([zod.object({
   "id": zod.int(),
   "name": zod.string()
-}).describe('A person or partner shown in a cell.'),
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('null for system mail.'),
   "sent_at": zod.iso.datetime({"offset":true}),
+  "source": zod.enum(['assistant', 'system']).describe('assistant: approved by a person. system: the app\'s own mail (admins only).'),
   "subject": zod.string(),
   "thread_id": zod.string(),
   "to": zod.array(zod.string())

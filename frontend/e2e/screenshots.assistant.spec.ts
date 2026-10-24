@@ -238,6 +238,7 @@ const SAM = { id: 3, name: 'Sam Okafor' };
 const OUTBOX: OutboxEmailOut[] = [
   {
     id: 4,
+    source: 'assistant',
     to: ['compliance@clearpath.demo', 'priya.raman@clearpath.demo'],
     subject: 'CP-1047 findings summary',
     body: PENDING_APPROVAL.args.body,
@@ -250,6 +251,7 @@ const OUTBOX: OutboxEmailOut[] = [
   },
   {
     id: 3,
+    source: 'assistant',
     to: ['priya.raman@clearpath.demo', 'sam.okafor@clearpath.demo', 'compliance-leads@clearpath.demo'],
     subject: 'Weekly re-review digest: 6 waiting on review, 2 re-reviews after the October rate change',
     body: 'Six items are waiting on review…',
@@ -269,6 +271,7 @@ const OUTBOX: OutboxEmailOut[] = [
   },
   {
     id: 2,
+    source: 'assistant',
     to: ['sam.okafor@clearpath.demo'],
     subject: 'CP-1031 needs the full APR range before re-approval',
     body: 'Sam, CP-1031 still shows only the lowest APR…',
@@ -286,6 +289,7 @@ const OUTBOX: OutboxEmailOut[] = [
   },
   {
     id: 1,
+    source: 'assistant',
     to: ['compliance@clearpath.demo'],
     subject: 'Plain-text note: offer terms updated',
     body: 'Offer terms for personal loans changed on October 20.\n\nTwo approved items reference the old APR range.',

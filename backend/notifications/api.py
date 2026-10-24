@@ -33,10 +33,11 @@ def mark_all_read(request: HttpRequest) -> MarkAllReadOut:
 
 @router.get("/outbox", response={200: list[OutboxEmailOut], **ERRORS}, operation_id="listOutboxEmails")
 def list_outbox(request: HttpRequest) -> list[selectors.OutboxEmailRow]:
-    """Emails the assistant sent after a human approved them (the demo's stand-in for real mail)."""
-    return list(selectors.list_outbox_emails())
+    """The demo's stand-in for real mail: emails the assistant sent after a person approved them, and, for admins,
+    the app's own mail (`source=system`, e.g. password resets)."""
+    return list(selectors.list_outbox_emails(viewer=current_user(request)))
 
 
 @router.get("/outbox/{int:email_id}", response={200: OutboxEmailOut, **ERRORS}, operation_id="getOutboxEmail")
 def get_outbox_email(request: HttpRequest, email_id: int) -> selectors.OutboxEmailRow:
-    return selectors.get_outbox_email(email_id=email_id)
+    return selectors.get_outbox_email(viewer=current_user(request), email_id=email_id)
