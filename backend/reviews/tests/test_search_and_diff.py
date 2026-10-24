@@ -59,9 +59,41 @@ def test_find_phrase_matches_case_insensitively_and_returns_latest_decision(
 
     assert [h.item_id for h in hits] == [approved.pk]
     hit = hits[0]
-    assert (hit.version_n, hit.latest_outcome, hit.key) == (1, DecisionOutcome.APPROVED, f"CP-{approved.pk}")
+    assert (hit.version_n, hit.version_outcome, hit.key) == (1, DecisionOutcome.APPROVED, f"CP-{approved.pk}")
     assert [p.text for p in hit.snippet if p.highlighted] == ["WON'T AFFECT YOUR CREDIT SCORE"]
     assert "".join(p.text for p in hit.snippet) == "Checking your rate WON'T AFFECT YOUR CREDIT SCORE."
+
+
+def _decide(item_version: tuple, reviewer: User, outcome: DecisionOutcome, hour: int) -> None:
+    item, version = item_version
+    Decision.objects.create(
+        item=item,
+        version=version,
+        outcome=outcome,
+        lane=DecisionLane.STANDARD,
+        approver=reviewer,
+        reason="Decided.",
+        ruleset_date=AT.date(),
+        expires_at=AT,
+        decided_at=AT.replace(hour=hour),
+    )
+
+
+@pytest.mark.django_db
+def test_hit_outcome_is_the_matched_versions_decision_not_the_items_latest(
+    marketer: User, reviewer: User, clock: FixedClock
+) -> None:
+    # "Was this phrase approved before?" is a question about the version that contains it.
+    item = make_item(marketer, status=ItemStatus.REJECTED)
+    v1 = make_version(item, "No hard credit pull to check your rate.", n=1)
+    v2 = make_version(item, "Guaranteed approval for everyone.", n=2)
+    _decide((item, v1), reviewer, DecisionOutcome.APPROVED, hour=9)
+    _decide((item, v2), reviewer, DecisionOutcome.REJECTED, hour=10)
+
+    hits = find_phrase(viewer=reviewer, phrase="no hard credit pull", filters=ItemFilter(), clock=clock)
+
+    assert [(h.version_n, h.version_outcome) for h in hits] == [(1, DecisionOutcome.APPROVED)]
+    assert hits[0].version_decided_at == AT.replace(hour=9)
 
 
 @pytest.mark.django_db

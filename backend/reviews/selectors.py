@@ -247,8 +247,14 @@ def list_items(
     limit: int = 50,
     clock: Clock = SYSTEM_CLOCK,
 ) -> ItemPage:
-    """One page of items in `sort` order, one query. `next_cursor` is None on the last page."""
+    """One page of items in `sort` order, one query. `next_cursor` is None on the last page.
+
+    The queue sort with no status filter means the review queue (submitted, in_review, needs_rereview), which
+    is what that order is for and what the partial queue index covers. Any explicit status filter wins.
+    """
     descending, keys = _SORTS[sort]
+    if sort is ItemSort.QUEUE and not filters.status:
+        filters = filters.model_copy(update={"status": [ItemStatus(s) for s in QUEUE_STATUSES]})
     qs = row_queryset(filter_items(viewer=viewer, filters=filters, clock=clock))
     if cursor is not None:
         values = _decode_cursor(sort, cursor)

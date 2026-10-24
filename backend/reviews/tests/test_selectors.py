@@ -21,6 +21,20 @@ def _ids(page_rows: tuple[object, ...]) -> list[int]:
 
 
 @pytest.mark.django_db
+def test_queue_sort_without_status_means_the_queue(marketer: User, reviewer: User, clock: FixedClock) -> None:
+    queued = make_item(marketer, status=ItemStatus.SUBMITTED)
+    make_item(marketer, status=ItemStatus.DRAFT)
+    approved = make_item(marketer, status=ItemStatus.APPROVED)
+
+    default = list_items(viewer=reviewer, filters=ItemFilter(), sort=ItemSort.QUEUE, clock=clock)
+    explicit = list_items(
+        viewer=reviewer, filters=ItemFilter(status=[ItemStatus.APPROVED]), sort=ItemSort.QUEUE, clock=clock
+    )
+
+    assert (_ids(default.rows), _ids(explicit.rows)) == ([queued.pk], [approved.pk])
+
+
+@pytest.mark.django_db
 def test_queue_order_rereview_then_tier_then_age(marketer: User, reviewer: User, clock: FixedClock) -> None:
     old_low = make_item(marketer, risk_tier=RiskTier.LOW, submitted_at=AT - timedelta(days=5))
     new_high = make_item(marketer, risk_tier=RiskTier.HIGH, submitted_at=AT)

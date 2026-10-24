@@ -63,7 +63,11 @@ def list_items(
     cursor: str | None = None,
     limit: PageLimit = 50,
 ) -> selectors.ItemPage:
-    """The queue and every filtered list of items, in `sort` order, one keyset page at a time."""
+    """The queue and every filtered list of items, in `sort` order, one keyset page at a time.
+
+    `sort=queue` (the default) with no `status` filter returns only the review queue: submitted, in_review,
+    and needs_rereview. Pass `status` to sort other items in queue order.
+    """
     return selectors.list_items(viewer=current_user(request), filters=filters, sort=sort, cursor=cursor, limit=limit)
 
 

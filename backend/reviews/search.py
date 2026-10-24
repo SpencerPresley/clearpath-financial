@@ -52,26 +52,27 @@ class SearchHit:
     version_n: int
     snippet: tuple[SnippetPart, ...]
     score: float
-    latest_outcome: DecisionOutcome | None
-    latest_decided_at: datetime | None
+    version_outcome: DecisionOutcome | None
+    version_decided_at: datetime | None
 
 
 def _latest_matching_versions(items: QuerySet[ReviewItem], matching: QuerySet[Version]) -> QuerySet[Version]:
     latest = matching.filter(item__in=items).order_by("item_id", "-n").distinct("item_id").values("pk")
-    decisions = Decision.objects.filter(item=OuterRef("item_id")).order_by("-decided_at", "-pk")
+    # The matched version's own decision: "was this wording approved?" is about the text that contains it.
+    decisions = Decision.objects.filter(version=OuterRef("pk")).order_by("-decided_at", "-pk")
     return (
         Version.objects.filter(pk__in=Subquery(latest))
         .select_related("item", "item__partner")
         .annotate(
-            latest_outcome=Subquery(decisions.values("outcome")[:1]),
-            latest_decided_at=Subquery(decisions.values("decided_at")[:1]),
+            version_outcome=Subquery(decisions.values("outcome")[:1]),
+            version_decided_at=Subquery(decisions.values("decided_at")[:1]),
         )
     )
 
 
 def _hit(version: Version, snippet: tuple[SnippetPart, ...], score: float) -> SearchHit:
     item = version.item
-    outcome = getattr(version, "latest_outcome", None)
+    outcome = getattr(version, "version_outcome", None)
     return SearchHit(
         item_id=item.pk,
         key=item.key,
@@ -84,8 +85,8 @@ def _hit(version: Version, snippet: tuple[SnippetPart, ...], score: float) -> Se
         version_n=version.n,
         snippet=snippet,
         score=score,
-        latest_outcome=DecisionOutcome(outcome) if outcome else None,
-        latest_decided_at=getattr(version, "latest_decided_at", None),
+        version_outcome=DecisionOutcome(outcome) if outcome else None,
+        version_decided_at=getattr(version, "version_decided_at", None),
     )
 
 

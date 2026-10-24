@@ -385,8 +385,10 @@ class SearchHitOut(Schema):
     version_n: int
     snippet: list[SnippetPartOut] = Field(description="Plain-text parts; render highlighted parts with <mark>.")
     score: float
-    latest_outcome: DecisionOutcome | None
-    latest_decided_at: datetime | None
+    version_outcome: DecisionOutcome | None = Field(
+        description="The latest decision on the matched version (not the item's latest), or null if undecided."
+    )
+    version_decided_at: datetime | None
 
 
 class SearchResultsOut(Schema):

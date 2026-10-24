@@ -11,7 +11,9 @@ from core.domain import Channel, ItemStatus, Market, Product, ReopenReason, Risk
 
 
 class ItemSort(StrEnum):
-    QUEUE = "queue"  # re-reviews of live content first, then risk tier, then age (spec §4.3 Review)
+    # Re-reviews of live content first, then risk tier, then age (spec §4.3 Review). With no status filter,
+    # limited to the queue statuses (submitted, in_review, needs_rereview).
+    QUEUE = "queue"
     OLDEST = "oldest"
     NEWEST = "newest"
     UPDATED = "updated"  # most recently changed first
