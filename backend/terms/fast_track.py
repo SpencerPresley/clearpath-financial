@@ -1,7 +1,8 @@
 """Fast-track approval of generated terms-change versions (spec §4.2 ruling 4; decisions.md "Rates are stored once").
 
 Thin over E's decision service: `record_decision(lane=FAST_TRACK)` applies every approval gate (current version,
-current offer terms, no open or accepted findings; the AI check is skipped on generated versions) and records "AI
+current offer terms, no open or accepted findings, and no live page that differs from the approved copy,
+`drift_not_restored`; the AI check is skipped on generated versions) and records "AI
 review carried from vN". The single approve is the assignee's or a lead's and names the version on screen. Bulk is a
 lead's (product-spec Roles: bulk actions are Lead) and runs one item per transaction through `run_bulk`, so an item
 with open findings comes back as a skip (`open_findings_block_decision`) and goes to the normal lane; the others are

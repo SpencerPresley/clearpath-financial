@@ -16215,7 +16215,7 @@
     },
     "/api/items/bulk/fast-track-approve": {
       "post": {
-        "description": "Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the\nsingle fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything\nthat can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in\n`skipped` with its error code and stays in the normal lane (ruling 4).",
+        "description": "Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the\nsingle fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything\nthat can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen, a live page\nthat differs from the approved copy: drift_not_restored) is listed in\n`skipped` with its error code and stays in the normal lane (ruling 4).",
         "operationId": "bulkFastTrackApprove",
         "parameters": [],
         "requestBody": {
@@ -17977,7 +17977,7 @@
     },
     "/api/items/{item_id}/fast-track-approve": {
       "post": {
-        "description": "One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the\nreviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409\nopen_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current\nversion isn't a generated one; 409 invalid_transition unless the item is in needs_rereview.",
+        "description": "One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the\nreviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409\nopen_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current\nversion isn't a generated one; 409 drift_not_restored while a live page doesn't show the approved copy (a\nplacement's latest check modified or missing, or an unrestored drift re-review); 409 invalid_transition unless\nthe item is in needs_rereview.",
         "operationId": "fastTrackApprove",
         "parameters": [
           {

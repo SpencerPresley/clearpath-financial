@@ -10,7 +10,8 @@ import * as zod from 'zod';
 /**
  * Leads only (403 not_permitted otherwise). Approve each item's generated version, one item at a time, with the
  * single fast-track's checks, at the version in `seen_versions`; every item needs an entry (else 422). Anything
- * that can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen) is listed in
+ * that can't be fast-tracked (open findings, not in needs_rereview, a newer version than the one seen, a live page
+ * that differs from the approved copy: drift_not_restored) is listed in
  * `skipped` with its error code and stays in the normal lane (ruling 4).
  * @summary Bulk Fast Track
  */
@@ -141,7 +142,9 @@ export const RecordDecisionResponse = zod.object({
  * One-click approval of a needs_rereview item's generated terms-change version (`version_n`, the version the
  * reviewer saw; else 409 stale_version). The item's assignee or a lead. The usual gates apply: 409
  * open_findings_block_decision, accepted_findings_block_approval, stale_offer_terms; 409 conflict if the current
- * version isn't a generated one; 409 invalid_transition unless the item is in needs_rereview.
+ * version isn't a generated one; 409 drift_not_restored while a live page doesn't show the approved copy (a
+ * placement's latest check modified or missing, or an unrestored drift re-review); 409 invalid_transition unless
+ * the item is in needs_rereview.
  * @summary Fast Track Approve
  */
 export const FastTrackApproveParams = zod.object({
