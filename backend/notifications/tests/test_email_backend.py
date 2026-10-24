@@ -4,8 +4,10 @@ from django.test import Client
 from pytest_django import Settings
 
 from accounts.models import User
+from core.clock import FixedClock
 from core.domain import OutboxSource
 from notifications.models import OutboxEmail
+from reviews.tests.factories import AT
 
 OUTBOX_BACKEND = "notifications.email_backend.OutboxEmailBackend"
 
@@ -18,7 +20,7 @@ def test_mail_without_assistant_metadata_lands_as_system_mail(settings: Settings
         "Use this link.",
         to=["dana@clearpath.demo"],
         cc=["ops@clearpath.demo"],
-        connection=get_connection(),
+        connection=get_connection(OUTBOX_BACKEND, clock=FixedClock(AT)),
     )
     message.attach_alternative("<p>Use this link.</p>", "text/html")
 
@@ -31,6 +33,7 @@ def test_mail_without_assistant_metadata_lands_as_system_mail(settings: Settings
     assert row.requested_by_id is None  # pyrefly: ignore[missing-attribute]
     assert row.approved_by_id is None  # pyrefly: ignore[missing-attribute]
     assert row.thread_id == ""
+    assert row.sent_at == AT
 
 
 @pytest.mark.django_db

@@ -222,6 +222,12 @@ autocommit connections.
 
 - **Resolved by ruling:** app mail lands in the Outbox as admin-only system mail (ruling 1), and the Outbox stays
   with K (ruling 2).
+- **Admins can read live password-reset links.** System mail is stored verbatim, and allauth's reset email holds
+  a working reset link, so an admin opening it in the Outbox could take over that account. That follows from
+  ruling 1; Django admins can already reset passwords, but it's worth knowing.
+- **System mail records no `Event`.** The assistant path records `EMAIL_SENT` in `send_approved_email`. The
+  backend's system branch only writes the Outbox row, because no service calls it (allauth does). The row is the
+  record; adding an event would mean the backend writing audit rows itself.
 - **CI doesn't run e2e.** `frontend-ci` has no Playwright job, so a broken spec on main (`shell.spec.ts`, above)
   stays invisible. That's for whoever owns CI.
 - **v3 streaming is marked experimental** (`LangChainBetaWarning`). The wire translation is pinned by tests in

@@ -11,11 +11,12 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.mail.backends.base import BaseEmailBackend
-from django.utils import timezone
 
+from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import OutboxSource
 from notifications.models import OutboxEmail
 
@@ -39,6 +40,11 @@ def _html(message: EmailMessage) -> str:
 
 
 class OutboxEmailBackend(BaseEmailBackend):
+    # Django's own arguments (fail_silently, alias, ...) pass through untouched; `clock` is ours.
+    def __init__(self, *args: Any, clock: Clock = SYSTEM_CLOCK, **kwargs: Any) -> None:  # noqa: ANN401
+        super().__init__(*args, **kwargs)
+        self.clock = clock  # stamps system mail; assistant mail carries its own sent_at
+
     def send_messages(self, email_messages: Sequence[EmailMessage]) -> int:
         sent = 0
         for message in email_messages:
@@ -64,7 +70,7 @@ class OutboxEmailBackend(BaseEmailBackend):
                     subject=message.subject,
                     body=str(message.body),
                     html_body=_html(message),
-                    sent_at=timezone.now(),
+                    sent_at=self.clock.now(),
                 )
             message.outbox_id = row.pk  # pyrefly: ignore[missing-attribute]  # read back by the sender
             sent += 1
