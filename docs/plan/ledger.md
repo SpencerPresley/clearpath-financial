@@ -43,3 +43,14 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 - Multi-step shell verification must use `set -e`; a failed edit script once let a commit with pyrefly
   errors through (fixed in `2f6681e`).
 - Ruling: deploy role trusts `<immutable-repo-prefix>:ref:refs/heads/main`, not a GitHub environment — environments and branch protection aren't available for this private repo on the Free plan, so an environment pin would trust any branch declaring it — cost if wrong: anyone with push to main can deploy (true of the original design too).
+
+## Questions for Spencer (blocking or decision-needed)
+
+Resurface these when Spencer is back. Each has what I did meanwhile.
+
+- (none yet)
+
+## Orchestrator notes
+
+- Before pulling the PR #16 merge: delete the untracked `docs/plan/reviews/infra-terraform.md` in main's
+  working tree (the PR adds the same path).
