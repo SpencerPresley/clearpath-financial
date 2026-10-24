@@ -44,7 +44,7 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
       }
       if (
         document.querySelector(
-          '[role="dialog"][aria-modal="true"], [role="alertdialog"], .app-modal-overlay',
+          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], .app-modal-overlay',
         ) !== null
       ) {
         return;

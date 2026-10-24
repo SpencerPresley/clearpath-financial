@@ -53,4 +53,16 @@ describe('useHotkeys', () => {
     await userEvent.keyboard('n');
     expect(onN).not.toHaveBeenCalled();
   });
+
+  it('keeps working while a toast is showing (RAC toasts are non-modal alertdialogs)', async () => {
+    const onN = vi.fn();
+    render(
+      <>
+        <Harness onN={onN} />
+        <div role="alertdialog" aria-modal="false" />
+      </>,
+    );
+    await userEvent.keyboard('n');
+    expect(onN).toHaveBeenCalledTimes(1);
+  });
 });
