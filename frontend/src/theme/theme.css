@@ -1844,6 +1844,14 @@
     @apply font-medium;
   }
 
+  /* ---- Bulk bar: replaces the filter row while rows are selected. ------------------------------ */
+  .app-bulk-bar {
+    @apply flex h-9 items-center gap-2 rounded-md border border-primary/30 bg-selected px-2;
+  }
+  .app-bulk-count {
+    @apply pr-1 pl-1 font-medium text-primary;
+  }
+
   /* ---- Modal (shortcuts help, bulk fast-track reason) ------------------------------------------ */
   .app-modal-overlay {
     @apply fixed inset-0 z-40 flex items-start justify-center bg-neutral/20 pt-[12vh];
