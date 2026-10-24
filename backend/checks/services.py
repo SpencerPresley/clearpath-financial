@@ -6,7 +6,7 @@ transaction; `preview_checks` runs the same rules on unsaved text and stores not
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final, Self
 
 from django.db import transaction
@@ -311,6 +311,63 @@ def recount_open_findings(*, item_id: int) -> int:
     )
     ReviewItem.objects.filter(pk=item_id).update(open_findings_count=count)
     return count
+
+
+# --- evidence attached after submit ----------------------------------------------------------------------------
+
+RECHECK_STATUSES: Final = frozenset({ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.NEEDS_REREVIEW})
+
+
+def _fired(ctx: RuleContext) -> set[tuple[str, str]]:
+    return {(str(d.source), d.rule_id) for d in (*run_engine(ctx).findings, *human_checklist(ctx))}
+
+
+def _new_kind(item_id: int, kind: AttachmentKind) -> bool:
+    """Whether the attachment just added is the item's first of its kind (only then can it change a rule)."""
+    of_item = Q(item_id=item_id) | Q(version__item_id=item_id)
+    return Attachment.objects.filter(of_item, kind=kind).count() == 1
+
+
+def recheck_for_evidence(*, item_id: int, kind: AttachmentKind, clock: Clock = SYSTEM_CLOCK) -> int | None:
+    """After an evidence file of `kind` is attached, re-run the code checks on the item's current version, in
+    the caller's transaction. Returns the new open count, or None if the item isn't under review.
+
+    Only while the item is reviewable (submitted, in_review, needs_rereview). New findings are added. An open
+    code or checklist finding whose rule fired without the new evidence and doesn't fire with it is dismissed by
+    the system ("Resolved: <kind> attached", no resolver, FINDING_DISMISSED with no actor). Accepted and
+    reviewer-dismissed findings, and AI findings, are left alone. Records CHECKS_COMPLETED and writes the item's
+    `open_findings_count`.
+    """
+    item = locked_item(item_id)
+    if ItemStatus(item.status) not in RECHECK_STATUSES or item.current_version_id is None:  # pyrefly: ignore[missing-attribute]
+        return None
+    version = Version.objects.select_related("item__partner").get(pk=item.current_version_id)  # pyrefly: ignore[missing-attribute]
+    now = clock.now()
+    answered: set[tuple[str, str]] = set()
+    if _new_kind(item_id, kind):
+        after = rule_context(version=version, clock=clock)
+        before = replace(after, attachment_kinds=after.attachment_kinds - {kind})
+        answered = _fired(before) - _fired(after)
+    reason = f"Resolved: {kind.value.replace('_', ' ').capitalize()} attached"
+    stale = Finding.objects.filter(version=version, state=FindingState.OPEN.value).exclude(source=FindingSource.LLM)
+    for finding in stale:
+        if (finding.source, finding.rule_id) not in answered:
+            continue
+        finding.state, finding.reason, finding.resolved_at = FindingState.DISMISSED, reason, now
+        finding.save(update_fields=["state", "reason", "resolved_at"])
+        record_event(
+            type=EventType.FINDING_DISMISSED,
+            entity=EntityType.FINDING,
+            entity_id=finding.pk,
+            item_id=item_id,
+            payload=FindingDismissedPayload(
+                finding_id=finding.pk, version_id=version.pk, rule_id=finding.rule_id, reason=reason, carried=False
+            ),
+            actor=None,
+            at=now,
+        )
+    run_code_checks(version=version, clock=clock)
+    return recount_open_findings(item_id=item_id)
 
 
 # --- live preview ----------------------------------------------------------------------------------------------
