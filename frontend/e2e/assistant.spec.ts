@@ -35,13 +35,16 @@ test('the assistant drafts an email, a person approves it, and it lands in the O
   ]);
   expect(assistant.posted.find((p) => p.path.includes('/interrupts/'))?.body).toEqual({ type: 'approve' });
 
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Outbox' }).click();
-  await expect(page).toHaveURL(/\/outbox$/);
+  // The app's own record of the send (not the model's words) links straight to the Outbox row.
+  await expect(panel.getByText('Sent to compliance@clearpath.demo · approved by you')).toBeVisible();
+  await panel.getByRole('link', { name: 'Open in Outbox' }).click();
+  await expect(page).toHaveURL(/\/outbox\?email=1$/);
   const row = page
     .getByRole('table', { name: 'Sent emails' })
     .getByRole('row', { name: /CP-1 findings summary/ });
   await expect(row).toBeVisible();
   await expect(row.getByRole('link', { name: 'CP-1' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'CP-1 findings summary' })).toBeVisible();
 
   // The panel stays open beside the Outbox; the conversation is still there.
   await expect(panel.getByText('Sent. It is in the Outbox.')).toBeVisible();

@@ -55,3 +55,87 @@ describe('chipFor', () => {
     expect(chipFor(call, idle)).toMatchObject({ status: 'stopped', label: 'Reading CP-9, stopped' });
   });
 });
+
+describe('send_email outcomes (app text from the tool artifact, never the model)', () => {
+  const call = { id: 'c2', name: 'send_email', args: { to: ['a@clearpath.demo'] } };
+  const result = (artifact: unknown, status: 'success' | 'error' = 'success') => ({
+    ...idle,
+    results: new Map([['c2', { status, artifact }]]),
+  });
+
+  it('sent: who it went to, that you approved it, and where it is', () => {
+    expect(
+      chipFor(
+        call,
+        result({
+          outcome: 'sent',
+          outbox_id: 12,
+          to: ['a@clearpath.demo', 'b@clearpath.demo'],
+          item_keys: [],
+        }),
+      ),
+    ).toMatchObject({
+      outcome: 'sent',
+      tone: 'neutral',
+      icon: 'nav.outbox',
+      label: 'Sent to a@clearpath.demo, b@clearpath.demo · approved by you',
+      outboxId: 12,
+    });
+  });
+
+  it('declined: your choice, neutral', () => {
+    expect(
+      chipFor(call, result({ outcome: 'declined', to: ['a@clearpath.demo'], item_keys: [] }, 'error')),
+    ).toMatchObject({
+      outcome: 'declined',
+      tone: 'neutral',
+      icon: 'action.close',
+      label: 'You declined this email',
+    });
+  });
+
+  it('blocked: names the refused addresses in error tone, or gives the reason', () => {
+    expect(
+      chipFor(
+        call,
+        result(
+          {
+            outcome: 'blocked',
+            refused: ['marketing@lendfast.example'],
+            reason: 'Not an internal address',
+            to: ['marketing@lendfast.example'],
+            item_keys: [],
+          },
+          'error',
+        ),
+      ),
+    ).toMatchObject({
+      outcome: 'blocked',
+      tone: 'error',
+      icon: 'feedback.error',
+      label: "Blocked: marketing@lendfast.example isn't an internal address",
+    });
+    expect(
+      chipFor(
+        call,
+        result(
+          { outcome: 'blocked', refused: ['x@a.example', 'y@b.example'], reason: '', to: [], item_keys: [] },
+          'error',
+        ),
+      ).label,
+    ).toBe("Blocked: x@a.example, y@b.example aren't internal addresses");
+    expect(
+      chipFor(
+        call,
+        result(
+          { outcome: 'blocked', refused: [], reason: 'Too many recipients.', to: [], item_keys: [] },
+          'error',
+        ),
+      ).label,
+    ).toBe('Blocked: Too many recipients.');
+  });
+
+  it('falls back to the plain label without an artifact', () => {
+    expect(chipFor(call, result(null, 'error'))).toMatchObject({ label: 'Email not sent', tone: 'error' });
+  });
+});

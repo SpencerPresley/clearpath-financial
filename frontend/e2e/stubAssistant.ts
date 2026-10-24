@@ -111,7 +111,7 @@ export async function stubAssistant(page: Page): Promise<AssistantStub> {
         tool_call_id: APPROVAL.tool_call_id,
         content: 'Sent to compliance@clearpath.demo.',
         status: 'success',
-        artifact: { item_keys: ['CP-1'] },
+        artifact: { outcome: 'sent', outbox_id: 1, to: APPROVAL.args.to, item_keys: ['CP-1'] },
       };
       const done = { type: 'ai', id: 'a2', content: 'Sent. It is in the Outbox.', tool_calls: [] };
       const messages = [human, draftTurn, toolMessage, done];

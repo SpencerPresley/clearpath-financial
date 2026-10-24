@@ -65,31 +65,56 @@ function itemIdOf(key: string): string {
   return key.replace(/^CP-/, '');
 }
 
-function Chip({ chip }: { chip: ToolChip }) {
-  const icon = STATUS_ICON[chip.status];
+function ItemKeyLink({ itemKey }: { itemKey: string }) {
   return (
-    <li className="app-assistant-tool" data-status={chip.status}>
+    <Link to="/items/$itemId" params={{ itemId: itemIdOf(itemKey) }} className="app-assistant-item-link">
+      {itemKey}
+    </Link>
+  );
+}
+
+/** The label with any CP key in it as a link ("Read CP-1047": the read you most want to follow). */
+function LabelWithKeys({ label }: { label: string }) {
+  const parts = label.split(/(\bCP-\d+\b)/);
+  return (
+    <span>
+      {parts.map((part, index) =>
+        /^CP-\d+$/.test(part) ? <ItemKeyLink key={index} itemKey={part} /> : part,
+      )}
+    </span>
+  );
+}
+
+function Chip({ chip }: { chip: ToolChip }) {
+  const icon = chip.icon ?? STATUS_ICON[chip.status];
+  const extraKeys = chip.itemKeys.filter((key) => !chip.label.includes(key));
+  return (
+    <li
+      className="app-assistant-tool"
+      data-status={chip.status}
+      data-tone={chip.tone}
+      data-outcome={chip.outcome}
+      data-icon={icon === undefined ? undefined : 'true'}
+    >
       {icon !== undefined && (
         <Icon name={icon} size={14} className={chip.status === 'running' ? 'app-spin' : undefined} />
       )}
-      <span>{chip.label}</span>
-      {chip.status !== 'awaiting' && chip.status !== 'stopped' && (
+      <LabelWithKeys label={chip.label} />
+      {chip.outcome === undefined && chip.status !== 'awaiting' && chip.status !== 'stopped' && (
         <span className="sr-only">, {STATUS_TEXT[chip.status]}</span>
       )}
-      {chip.itemKeys
-        .filter((key) => !chip.label.includes(key))
-        .slice(0, 6)
-        .map((key) => (
-          <Link
-            key={key}
-            to="/items/$itemId"
-            params={{ itemId: itemIdOf(key) }}
-            className="app-assistant-item-link"
-          >
-            {key}
+      {chip.outcome === 'sent' && chip.outboxId !== undefined && (
+        <>
+          <span aria-hidden="true">·</span>
+          <Link to="/outbox" search={{ email: chip.outboxId }} className="app-assistant-chip-link">
+            Open in Outbox
           </Link>
-        ))}
-      {chip.itemKeys.length > 6 && <span className="app-muted">+{chip.itemKeys.length - 6}</span>}
+        </>
+      )}
+      {extraKeys.slice(0, 6).map((key) => (
+        <ItemKeyLink key={key} itemKey={key} />
+      ))}
+      {extraKeys.length > 6 && <span className="app-muted">+{extraKeys.length - 6}</span>}
     </li>
   );
 }

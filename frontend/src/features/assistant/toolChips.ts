@@ -4,7 +4,10 @@
  * backend's (backend/assistant/tools.py); an unknown name falls back to the name in words.
  */
 
+import type { IconKey } from '../../ui/icons';
+
 export type ChipStatus = 'running' | 'finished' | 'error' | 'awaiting' | 'stopped';
+export type EmailOutcome = 'sent' | 'declined' | 'blocked';
 
 export interface ToolChip {
   id: string;
@@ -12,6 +15,14 @@ export interface ToolChip {
   status: ChipStatus;
   label: string;
   itemKeys: string[];
+  /** error = failed or blocked; everything else reads neutral (finished, your own choices). */
+  tone: 'neutral' | 'error';
+  /** A glyph that says what happened, when the status glyph doesn't (email outcomes). */
+  icon?: IconKey;
+  /** send_email only: what became of the draft, from the tool's artifact. */
+  outcome?: EmailOutcome;
+  /** sent: the Outbox row. */
+  outboxId?: number;
 }
 
 interface Phrases {
@@ -137,6 +148,45 @@ export interface ChipContext {
   isLoading: boolean;
 }
 
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? (value as unknown[]).filter((v): v is string => typeof v === 'string') : [];
+}
+
+/**
+ * The email outcome from send_email's artifact (backend/assistant/schemas.py), written by the app, not the
+ * model: after an injection the model's own words are the thing we can't trust.
+ */
+function emailOutcome(
+  artifact: unknown,
+): Pick<ToolChip, 'outcome' | 'label' | 'tone' | 'icon' | 'outboxId'> | null {
+  if (typeof artifact !== 'object' || artifact === null) return null;
+  const record = artifact as Record<string, unknown>;
+  const to = strings(record.to);
+  switch (record.outcome) {
+    case 'sent':
+      return {
+        outcome: 'sent',
+        tone: 'neutral',
+        icon: 'nav.outbox',
+        label: `Sent to ${to.join(', ')} · approved by you`,
+        outboxId: typeof record.outbox_id === 'number' ? record.outbox_id : undefined,
+      };
+    case 'declined':
+      return { outcome: 'declined', tone: 'neutral', icon: 'action.close', label: 'You declined this email' };
+    case 'blocked': {
+      const refused = strings(record.refused);
+      const reason = typeof record.reason === 'string' ? record.reason : '';
+      let label: string;
+      if (refused.length === 1) label = `Blocked: ${refused.join('')} isn't an internal address`;
+      else if (refused.length > 1) label = `Blocked: ${refused.join(', ')} aren't internal addresses`;
+      else label = `Blocked: ${reason === '' ? 'not sent' : reason}`;
+      return { outcome: 'blocked', tone: 'error', icon: 'feedback.error', label };
+    }
+    default:
+      return null;
+  }
+}
+
 export function chipFor(call: CallInput, context: ChipContext): ToolChip {
   const result = context.results.get(call.id);
   let status: ChipStatus;
@@ -145,5 +195,14 @@ export function chipFor(call: CallInput, context: ChipContext): ToolChip {
   else status = context.live.get(call.id) ?? (context.isLoading ? 'running' : 'stopped');
   const itemKeys = itemKeysOf(call.args, result?.artifact);
   const argKey = itemKeysOf(call.args, undefined)[0];
-  return { id: call.id, name: call.name, status, label: chipLabel(call.name, status, argKey), itemKeys };
+  const base: ToolChip = {
+    id: call.id,
+    name: call.name,
+    status,
+    label: chipLabel(call.name, status, argKey),
+    itemKeys,
+    tone: status === 'error' ? 'error' : 'neutral',
+  };
+  const outcome = call.name === 'send_email' && result !== undefined ? emailOutcome(result.artifact) : null;
+  return outcome === null ? base : { ...base, ...outcome };
 }

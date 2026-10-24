@@ -3582,12 +3582,22 @@
   .app-assistant-tool {
     @apply inline-flex flex-wrap items-center gap-1.5 text-ui text-muted;
   }
-  .app-assistant-tool[data-status='finished']::before {
+  .app-assistant-tool[data-status='finished']:not([data-icon])::before {
     content: '';
     @apply size-1.5 rounded-full bg-muted;
   }
-  .app-assistant-tool[data-status='error'] {
+  .app-assistant-tool[data-tone='error'] {
     @apply text-status-error-soft-content;
+  }
+  /* What became of an email is the one irreversible thing in the panel: it reads at full weight. */
+  .app-assistant-tool[data-outcome] {
+    @apply text-base-content;
+  }
+  .app-assistant-tool[data-outcome='blocked'] {
+    @apply font-medium text-status-error-soft-content;
+  }
+  .app-assistant-chip-link {
+    @apply rounded-xs font-medium text-primary underline-offset-2 hover:underline;
   }
   .app-assistant-tool[data-status='awaiting'] {
     @apply font-medium text-base-content;

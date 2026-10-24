@@ -2,7 +2,9 @@
  * Protocol events recorded from the real Python agent (create_agent + HITL per_call, astream_events v3,
  * translated to the wire format), trimmed: no additional_kwargs/response_metadata/timestamps. RUN1 searches,
  * drafts an email and ends interrupted on its approval; RUN2 is the approve resume. STATE1/STATE2 are
- * GET /state after each run. Wire events carry no seq/event_id: the transport assigns them.
+ * GET /state after each run. Wire events carry no seq/event_id: the transport assigns them. The send_email
+ * tool message's artifact (`outcome`, `outbox_id`, `to`, `item_keys`) was added after recording, matching the
+ * backend's current shape (backend/assistant/schemas.py).
  */
 import type { AssistantThreadStateOut } from '../../../api/generated/model';
 
@@ -467,7 +469,7 @@ export const RUN2: WireEvent[] = [
           name: 'send_email',
           id: null,
           tool_call_id: 'c2',
-          artifact: null,
+          artifact: { outcome: 'sent', outbox_id: 1, to: ['a@clearpath.demo'], item_keys: [] },
           status: 'success',
         },
       },
@@ -528,7 +530,7 @@ export const RUN2: WireEvent[] = [
             name: 'send_email',
             id: '98594fab-1c2f-4ff5-ab97-a3b16ea20540',
             tool_call_id: 'c2',
-            artifact: null,
+            artifact: { outcome: 'sent', outbox_id: 1, to: ['a@clearpath.demo'], item_keys: [] },
             status: 'success',
           },
         ],
@@ -640,7 +642,7 @@ export const RUN2: WireEvent[] = [
             name: 'send_email',
             id: '98594fab-1c2f-4ff5-ab97-a3b16ea20540',
             tool_call_id: 'c2',
-            artifact: null,
+            artifact: { outcome: 'sent', outbox_id: 1, to: ['a@clearpath.demo'], item_keys: [] },
             status: 'success',
           },
           {
@@ -779,7 +781,7 @@ export const STATE2 = {
         name: 'send_email',
         id: '98594fab-1c2f-4ff5-ab97-a3b16ea20540',
         tool_call_id: 'c2',
-        artifact: null,
+        artifact: { outcome: 'sent', outbox_id: 1, to: ['a@clearpath.demo'], item_keys: [] },
         status: 'success',
       },
       {

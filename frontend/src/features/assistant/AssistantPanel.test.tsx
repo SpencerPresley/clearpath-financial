@@ -252,6 +252,7 @@ describe('assistant conversation', () => {
     const chip = within(tools).getByRole('listitem');
     expect(chip).toHaveTextContent('Read CP-1042');
     expect(chip).toHaveAttribute('data-status', 'finished');
+    expect(within(chip).getByRole('link', { name: 'CP-1042' })).toHaveAttribute('href', '/items/1042');
     const links = within(region).getAllByRole('link', { name: 'CP-1042' });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute('href', '/items/1042');
@@ -355,6 +356,14 @@ describe('email approval', () => {
     await user.click(within(draft).getByRole('button', { name: 'Send email' }));
 
     expect(await within(await panel()).findByText('Sent it.')).toBeInTheDocument();
+    const sent = within(await panel())
+      .getByText('Sent to a@clearpath.demo · approved by you')
+      .closest('li');
+    if (sent === null) throw new Error('expected the sent line');
+    expect(within(sent).getByRole('link', { name: 'Open in Outbox' })).toHaveAttribute(
+      'href',
+      '/outbox?email=1',
+    );
     expect(fake.posted).toEqual([
       { path: `/api/assistant/threads/t-1/interrupts/${INTERRUPT_ID}`, body: { type: 'approve' } },
     ]);
