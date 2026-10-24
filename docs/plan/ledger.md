@@ -16,7 +16,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | E review workflow (#6, +#18) | agent (worktree) | PR #25 merged `d0fffbd` | done | 1201 backend tests; reviewer found 2 critical (carry-forward resurrecting reversed dismissals; approve with accepted findings), fixed |
 | E follow-up: evidence re-check | agent (resumed E) | PR #26 merged | done | adds checks migration 0003 (system dismissal) |
 | D2 llm wiring (#5) | agent (worktree) | PR #30 merged | done | live smoke test passed (orchestrator); AI findings warning-only via DB constraint; reconciler every 2 min |
-| F offer terms (#7) | agent (worktree `wsF/offer-terms`) | — | in progress | publish, impact preview, per-item fan-out, fast-track (single + bulk) |
+| F offer terms (#7) | agent (worktree) | PR #31 merged | done | worked example end to end; per-item transactions (deadlock control test); optimistic publish (based_on_terms_id); seen_versions on bulk |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
@@ -30,6 +30,11 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: bulk fast-track is Lead-only (spec: bulk actions are Lead); single `POST /items/{id}/fast-track-approve` is open to the assignee reviewer or a lead; the review screen uses the single endpoint with the version it showed — F follow-up (one line) + frontend follow-up.
+- Ruling: items whose quoted numbers didn't change still go to re-review (approval must point at terms in effect); the UI labels them "Numbers unchanged" so fast-track is a confirm, not a review.
+- Ruling: in-flight items (submitted/in_review) aren't regenerated on a terms change; the rate-value code check flags stale numbers against current terms, and the reviewer requests changes or approves with edits.
+- Ruling: publish takes effect immediately (no future-dated terms); identical values refused (F's calls, accepted).
 
 - Ruling: no API key → llm check `failed` with reason `not_configured` (not `skipped`) — skipped bypasses the override gate, which fast-track and legacy rely on — cost: dev/CI approvals need an override reason.
 - Ruling: production settings require ANTHROPIC_API_KEY (fail fast at startup) — a prod deploy without AI would silently push every approval through overrides — deploy wave adds it.
@@ -91,7 +96,7 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 ## Orchestrator notes
 
-- Frontend follow-ups queue (next frontend polish agent): poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
+- Frontend follow-ups queue (next frontend polish agent): PRIORITY send `seen_versions`/use single fast-track endpoint from DecisionPanel (approve exactly the shown version) and restrict BulkBar fast-track to leads; label "Numbers unchanged" re-reviews; poll the item while llm_check_status is pending/running; show the AI failure reason on the item (needs a field on item detail); adopt API-gaps contract (sorts, totals, stat filters, notes, expiry) in queue and /mine; "Re-review" vs "Needs re-review" label.
 - Deploy wave: prod settings require ANTHROPIC_API_KEY.
 
 - UI glossary nit for the wave walkthrough: status badge says "Re-review" while lane/view/stat say "Needs re-review"; pick one label (spec §5.4).
