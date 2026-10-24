@@ -8,6 +8,14 @@
 > edge cases decide what the prompt asks for. One fresh reviewer subagent over the whole diff before the PR
 > supplies the independent read.
 
+> **Deviations after review** (detail in `docs/plan/reviews/llm-core.md`):
+> - The eval scores only valid outputs.
+> - The screen also covers `suggested_fix` (`fix_removed`), and same-rule overlapping spans count as `DUPLICATE`.
+> - A report whose every item is malformed is invalid output.
+> - The `auto` tool-choice path binds a strict tool and gets `max_tokens` 8192.
+> - A prompt fingerprint test pins `PROMPT_VERSION`.
+> - `anthropic` and `langchain-core` are declared directly, and `httpx2` is in the dev group.
+
 **Goal:** A pure-Python LLM pre-review: given a `RuleContext` and the code findings, ask the model to judge a
 small set of judgment rules and return span-validated `FindingDraft`s (source=LLM), with dropped findings,
 token usage, model name and latency. No Django, no persistence (that's phase 2).
