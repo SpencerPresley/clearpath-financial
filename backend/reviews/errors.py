@@ -87,3 +87,16 @@ class FindingStateConflict(Conflict):
 
     def __init__(self, *, action: str, state: FindingState) -> None:
         super().__init__(f"Can't {action} a finding that is {state}.", details={"action": action, "state": str(state)})
+
+
+class DriftNotRestored(Conflict):
+    """A drift_detected re-review can be reaffirmed only once the placement's latest check found the approved copy
+    on the page again: until then, what's live isn't what would be re-approved."""
+
+    code = "drift_not_restored"
+
+    def __init__(self, *, placement_id: int) -> None:
+        super().__init__(
+            "The partner page doesn't show the approved copy. Check it again once the partner restores it, or pull it.",
+            details={"placement_id": placement_id},
+        )

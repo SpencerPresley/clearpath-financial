@@ -3,10 +3,14 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from django.db.models import F, Window
+from django.db.models.functions import RowNumber
+
 from core.clock import SYSTEM_CLOCK, Clock
 from core.domain import CheckStatus, DriftResult, DriftTrigger, Severity
 from core.errors import NotFound
 from drift import demo
+from drift.services import MISSING_AFTER, STREAK_CHECKS, CheckRow, failure_streak
 from reviews.diff import DiffOp, DiffSegment
 from reviews.models import Placement, ReviewItem, Snapshot
 from reviews.selectors import PartyRef, live_placements_q
@@ -41,6 +45,7 @@ class SnapshotView:
     score: float | None
     diff: tuple[DiffSegment, ...]
     findings: tuple[PageFinding, ...]
+    new_blocking_count: int  # blocking findings whose rule doesn't fire on the approved copy
     error_code: str | None
     error_message: str | None
     reopened_item: bool
@@ -63,6 +68,7 @@ class PlacementDrift:
     monitored: bool
     is_live: bool
     latest: SnapshotView | None
+    failure_streak: int  # consecutive latest checks that couldn't fetch the page, up to MISSING_AFTER
     demo_page: DemoPageRef | None
 
 
@@ -76,6 +82,18 @@ def snapshot_view(snapshot: Snapshot) -> SnapshotView:
     """Expects `requested_by` and `compared_version` selected (or None)."""
     by = snapshot.requested_by
     version = snapshot.compared_version
+    findings = tuple(
+        PageFinding(
+            rule_id=str(f["rule_id"]),
+            citation=str(f["citation"]),
+            severity=Severity(f["severity"]),
+            message=str(f["message"]),
+            suggested_fix=f.get("suggested_fix"),
+            quote=f.get("quote"),
+            new=bool(f["new"]),
+        )
+        for f in snapshot.findings
+    )
     return SnapshotView(
         id=snapshot.pk,
         placement_id=snapshot.placement_id,  # pyrefly: ignore[missing-attribute]
@@ -92,18 +110,8 @@ def snapshot_view(snapshot: Snapshot) -> SnapshotView:
         result=DriftResult(snapshot.result) if snapshot.result else None,
         score=snapshot.score,
         diff=tuple(DiffSegment(op=DiffOp(d["op"]), text=str(d["text"])) for d in snapshot.diff),
-        findings=tuple(
-            PageFinding(
-                rule_id=str(f["rule_id"]),
-                citation=str(f["citation"]),
-                severity=Severity(f["severity"]),
-                message=str(f["message"]),
-                suggested_fix=f.get("suggested_fix"),
-                quote=f.get("quote"),
-                new=bool(f["new"]),
-            )
-            for f in snapshot.findings
-        ),
+        findings=findings,
+        new_blocking_count=sum(1 for f in findings if f.new and f.severity is Severity.BLOCKING),
         error_code=snapshot.error_code or None,
         error_message=snapshot.error_message or None,
         reopened_item=snapshot.reopen_event_id is not None,  # pyrefly: ignore[missing-attribute]
@@ -136,8 +144,36 @@ def _demo_ref(url: str) -> DemoPageRef | None:
     )
 
 
+def _failure_streaks(placement_ids: list[int]) -> dict[int, int]:
+    """Per placement, how many of its latest scheduled checks in a row couldn't fetch the page, up to MISSING_AFTER
+    (the point where it counts as missing copy). One query: the latest MISSING_AFTER finished checks per placement."""
+    recent = (
+        Snapshot.objects.filter(STREAK_CHECKS, placement_id__in=placement_ids)
+        .annotate(
+            rank=Window(
+                RowNumber(), partition_by=[F("placement_id")], order_by=[F("requested_at").desc(), F("pk").desc()]
+            )
+        )
+        .filter(rank__lte=MISSING_AFTER)
+        .order_by("placement_id", "rank")
+        .values_list("pk", "placement_id", "status", "error_code", "trigger")
+    )
+    rows: dict[int, list[CheckRow]] = {}
+    for pk, placement_id, status, error_code, trigger in recent:
+        rows.setdefault(placement_id, []).append(
+            CheckRow(
+                id=pk,
+                status=CheckStatus(status),
+                error_code=error_code,
+                reopened=False,
+                trigger=DriftTrigger(trigger),
+            )
+        )
+    return {placement_id: len(failure_streak(checks)) for placement_id, checks in rows.items()}
+
+
 def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
-    """Placements with a web address, in recorded order, each with its latest check. Three queries."""
+    """Placements with a web address, in recorded order, each with its latest check. Four queries."""
     if not ReviewItem.objects.filter(pk=item_id).exists():
         raise NotFound.entity("item", item_id)
     placements = list(Placement.objects.filter(item_id=item_id).exclude(url="").order_by("first_run", "pk"))
@@ -151,6 +187,7 @@ def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
         .order_by("placement_id", "-requested_at", "-pk")
         .distinct("placement_id")
     }
+    streaks = _failure_streaks(ids)
     return ItemDrift(
         item_id=item_id,
         placements=tuple(
@@ -161,6 +198,7 @@ def item_drift(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDrift:
                 monitored=p.monitored,
                 is_live=p.pk in live,
                 latest=snapshot_view(latest[p.pk]) if p.pk in latest else None,
+                failure_streak=streaks.get(p.pk, 0),
                 demo_page=_demo_ref(p.url),
             )
             for p in placements

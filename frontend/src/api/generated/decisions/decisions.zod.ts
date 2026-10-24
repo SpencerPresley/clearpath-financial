@@ -251,7 +251,8 @@ export const PullItemResponse = zod.object({
 
 /**
  * needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new
- * findings come back as 409 findings_need_triage.
+ * findings come back as 409 findings_need_triage. A drift_detected re-review is 409 drift_not_restored until the
+ * placement's latest check finds the approved copy again.
  * @summary Reaffirm
  */
 export const ReaffirmApprovalParams = zod.object({

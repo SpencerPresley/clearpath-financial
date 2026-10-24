@@ -31,6 +31,7 @@ function snapshot(overrides: Partial<SnapshotOut> = {}): SnapshotOut {
     score: 100,
     diff: [],
     findings: [],
+    new_blocking_count: 0,
     error_code: null,
     error_message: null,
     reopened_item: false,
@@ -46,6 +47,7 @@ function placement(overrides: Partial<PlacementDriftOut> = {}): PlacementDriftOu
     monitored: true,
     is_live: true,
     latest: snapshot(),
+    failure_streak: 0,
     demo_page: null,
     ...overrides,
   };
@@ -82,6 +84,14 @@ describe('checkOutcome', () => {
     expect(checkOutcome(snapshot({ result: 'missing' })).label).toBe('Copy missing');
     expect(checkOutcome(snapshot({ status: 'failed', result: null })).label).toBe('Check failed');
     expect(checkOutcome(snapshot({ status: 'pending', result: null })).label).toBe('Checking the page…');
+  });
+
+  it('reads a failed check that reopened the item as the copy missing', () => {
+    expect(checkOutcome(snapshot({ status: 'failed', result: null, reopened_item: true }))).toEqual({
+      label: 'Page unreachable',
+      tone: 'alert',
+      icon: 'drift.missing',
+    });
   });
 });
 
@@ -163,6 +173,105 @@ describe('PlacementsSection', () => {
     expect(
       screen.getByText('The site took too long to respond. Nothing changed on the item.'),
     ).toBeInTheDocument();
+  });
+
+  it('flags new blocking findings beside intact approved copy', async () => {
+    serve({
+      item_id: 1042,
+      placements: [
+        placement({
+          latest: snapshot({
+            new_blocking_count: 2,
+            findings: [
+              {
+                rule_id: 'claims.guaranteed',
+                citation: '12 CFR 1026',
+                severity: 'blocking',
+                message: 'Approval depends on underwriting.',
+                suggested_fix: null,
+                quote: 'Guaranteed approval',
+                new: true,
+              },
+              {
+                rule_id: 'claims.credit_impact',
+                citation: '12 CFR 1026',
+                severity: 'blocking',
+                message: 'Credit check claims need support.',
+                suggested_fix: null,
+                quote: 'no credit check',
+                new: true,
+              },
+            ],
+          }),
+        }),
+      ],
+    });
+    renderSection();
+
+    expect(await screen.findByText('Unchanged')).toBeInTheDocument();
+    const attention = screen.getByText('New blocking findings').closest('.app-badge');
+    expect(attention).toHaveAttribute('data-tone', 'alert');
+    expect(
+      screen.getByText(
+        'The approved copy is intact, but text beside it has 2 new blocking findings. The item stays approved.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no attention state for page findings that are on the approved copy too', async () => {
+    serve({ item_id: 1042, placements: [placement({ latest: snapshot({ new_blocking_count: 0 }) })] });
+    renderSection();
+
+    expect(await screen.findByText('Unchanged')).toBeInTheDocument();
+    expect(screen.queryByText('New blocking findings')).not.toBeInTheDocument();
+  });
+
+  it('counts daily checks in a row that could not fetch the page', async () => {
+    const gone = {
+      status: 'failed' as const,
+      result: null,
+      http_status: 404,
+      error_code: 'http_error',
+      error_message: 'The site returned an error. (HTTP 404)',
+    };
+    serve({ item_id: 1042, placements: [placement({ failure_streak: 2, latest: snapshot(gone) })] });
+    renderSection();
+
+    expect(await screen.findByText('Check failed')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The site returned an error. (HTTP 404) 2 daily checks in a row couldn’t fetch the page. Nothing changed on the item.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('says when repeated failed checks sent the item to re-review', async () => {
+    serve({
+      item_id: 1042,
+      placements: [
+        placement({
+          failure_streak: 3,
+          latest: snapshot({
+            status: 'failed',
+            result: null,
+            http_status: 404,
+            error_code: 'http_error',
+            error_message: 'The site returned an error. (HTTP 404)',
+            reopened_item: true,
+          }),
+        }),
+      ],
+    });
+    renderSection();
+
+    expect(await screen.findByText('Page unreachable')).toBeInTheDocument();
+    expect(screen.getByText('This check sent the item to re-review.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '3 daily checks in a row couldn’t fetch the page, so the approved copy counts as missing.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing changed on the item/)).not.toBeInTheDocument();
   });
 
   it('queues a check, shows it running, and polls until it lands', async () => {

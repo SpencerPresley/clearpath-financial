@@ -56,7 +56,8 @@ one worktree would have seen each other's half-edited `theme.css`.
   finished. The item polls every 3 s while the check is in flight and refetches findings when it lands.
 - **needs_rereview**: alert-toned note with the reopen reason and live placements, and actions by reason
   (`rereviewActions`): terms changed → Fast-track approve vN when a version was generated, otherwise Review
-  (claim → normal lane); expired or drifted → Reaffirm vN. Pull (confirm) always. Reaffirm is never offered
+  (claim → normal lane); expired → Reaffirm vN; drifted → Reaffirm vN only once the placement's latest check
+  found the copy restored, otherwise Check now (drift follow-ups, #14). Pull (confirm) always. Reaffirm is never offered
   after a terms change: it re-runs code checks against the new terms (`reviews/decisions.py` `reaffirm`), so
   it could only be refused. "Compare with approved v1" one click away.
 - **withdrawn**: neutral note with takedown state ("Takedown confirmed for 1 placement. The marketer can start

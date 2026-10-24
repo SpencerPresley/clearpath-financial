@@ -7,6 +7,7 @@
 import type { Channel } from './channel';
 import type { CheckStatus } from './checkStatus';
 import type { DecisionOut } from './decisionOut';
+import type { DriftRereviewOut } from './driftRereviewOut';
 import type { ItemStatus } from './itemStatus';
 import type { LlmFailureCode } from './llmFailureCode';
 import type { Market } from './market';
@@ -26,6 +27,8 @@ export interface ItemDetailOut {
   channel: Channel;
   current_version: VersionOut | null;
   current_version_n: number | null;
+  /** needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has. */
+  drift_rereview: DriftRereviewOut | null;
   id: number;
   is_legacy: boolean;
   is_prescreen: boolean;

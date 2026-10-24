@@ -13,13 +13,23 @@ A check is a Snapshot moving pending -> running -> succeeded | failed:
   rules on the whole page, and records DRIFT_CHECKED. If the copy is modified or missing, the item is approved and
   not legacy, and the placement is live, the item goes to needs_rereview(drift_detected) with the snapshot linked.
   Any other status records the check only (an item already in re-review isn't sent back twice).
-- A fetch failure is never `missing`: it ends `failed` with an error code, which the review screen shows.
+- If the copy is unchanged but the page has blocking findings that don't fire on the approved copy (partner text
+  added beside intact copy), nothing transitions: PAGE_FINDINGS_FLAGGED is recorded (the assignee and the active
+  leads are notified) when that set of rules wasn't already on the previous successful check, so a daily sweep
+  doesn't repeat the same alert. The review screen shows the placement's attention state from the snapshot.
+- A fetch failure is never a result: it ends `failed` with an error code, which the review screen shows (one 404
+  or outage doesn't reopen anything). But MISSING_AFTER consecutive fetch failures of a live placement (any
+  `FetchFailure`, HTTP 404/410 included) count as missing copy: the item is reopened (drift_detected) with those
+  failed checks linked. Only scheduled (daily) checks count: a failed manual Check now is recorded and shown but
+  neither counts nor resets, so a partner outage plus impatient clicking can't reopen the item. A success (manual
+  or scheduled) ends the streak, and so does a failure on our side (`stuck`, `error`, `no_approved_version`):
+  those say nothing about the page.
 - `reconcile` (beat) fails checks stuck running and re-enqueues pending ones whose message was lost.
 """
 
 import hashlib
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Final
@@ -28,17 +38,27 @@ from django.db import transaction
 from django.db.models import Q
 
 from accounts.models import User
-from audit.payloads import DriftCheckedPayload, DriftCheckRequestedPayload
+from audit.payloads import DriftCheckedPayload, DriftCheckRequestedPayload, PageFindingsFlaggedPayload
 from audit.services import record_event
 from checks.engine import run_code_checks as run_engine
 from checks.services import rule_context
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import CheckStatus, DriftResult, DriftTrigger, EntityType, EventType, ItemStatus, ReopenReason, Role
+from core.domain import (
+    CheckStatus,
+    DriftResult,
+    DriftTrigger,
+    EntityType,
+    EventType,
+    ItemStatus,
+    ReopenReason,
+    Role,
+    Severity,
+)
 from core.errors import Conflict, NotFound, NotPermitted
 from core.permissions import has_role
 from drift.compare import Comparison, compare
 from drift.extract import MAX_TEXT_CHARS, PageText, visible_text
-from drift.fetcher import FetchedPage, FetchError
+from drift.fetcher import FetchedPage, FetchError, FetchFailure
 from reviews.assignment import locked_item
 from reviews.models import APPROVED_OUTCOMES, Decision, Placement, ReviewItem, Snapshot, Version
 from reviews.rereview import reopen_item
@@ -51,6 +71,12 @@ MAX_SCHEDULED_ATTEMPTS: Final = 3
 STUCK_AFTER: Final = timedelta(minutes=10)
 LOST_AFTER: Final = timedelta(hours=1)  # pending this long: stop re-enqueueing, fail it
 _DRIFTED: Final = frozenset({DriftResult.MODIFIED, DriftResult.MISSING})
+MISSING_AFTER: Final = 3  # consecutive fetch failures of a live placement that count as missing copy
+FETCH_FAILURE_CODES: Final = frozenset(code.value for code in FetchFailure)  # the page couldn't be read
+# The checks the failure streak reads: finished ones, except failed manual checks (they neither count nor reset).
+STREAK_CHECKS: Final = Q(status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)) & ~Q(
+    status=CheckStatus.FAILED.value, trigger=DriftTrigger.MANUAL.value
+)
 
 
 def _enqueue(snapshot_id: int) -> None:
@@ -77,6 +103,7 @@ class CheckOutcome:
     snapshot_id: int
     result: DriftResult | None  # None: nothing recorded (the claim was stale)
     reopened: bool
+    flagged: bool = False  # PAGE_FINDINGS_FLAGGED recorded
 
 
 @dataclass(frozen=True)
@@ -89,6 +116,39 @@ class SweepResult:
 class ReconcileResult:
     failed: tuple[int, ...]  # snapshot ids
     requeued: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class CheckRow:
+    """A finished check, as the failure streak reads it."""
+
+    id: int
+    status: CheckStatus
+    error_code: str
+    reopened: bool  # this check sent the item to re-review
+    trigger: DriftTrigger
+
+
+def failure_streak(rows: Iterable[CheckRow]) -> tuple[int, ...]:
+    """The ids of the consecutive scheduled fetch failures at the head of `rows` (newest first). Failed manual checks
+    are skipped: they neither count nor reset. A success ends it, so does a failure on our side (not a FetchFailure
+    code), and so does a check that already reopened the item: that streak is spent, so a page that stays
+    unreachable doesn't send the item back again on the very next check."""
+    streak: list[int] = []
+    for row in rows:
+        if row.status is CheckStatus.FAILED and row.trigger is DriftTrigger.MANUAL:
+            continue
+        if row.status is not CheckStatus.FAILED or row.error_code not in FETCH_FAILURE_CODES or row.reopened:
+            break
+        streak.append(row.id)
+    return tuple(streak)
+
+
+def new_blocking_rules(findings: Iterable[dict[str, object]]) -> frozenset[str]:
+    """Rules with a blocking finding on the page that don't fire on the approved copy itself."""
+    return frozenset(
+        str(f["rule_id"]) for f in findings if f.get("new") is True and f.get("severity") == Severity.BLOCKING.value
+    )
 
 
 # --- requesting ------------------------------------------------------------------------------------------------
@@ -283,17 +343,51 @@ def complete(*, claim: Claim, page: FetchedPage, clock: Clock = SYSTEM_CLOCK) ->
             actor=None,
             at=now,
         )
-        reopened = comparison.result in _DRIFTED and _may_reopen(item, claim.placement_id, clock)
+        reopened = comparison.result in _DRIFTED and _at_risk(item, claim.placement_id, clock)
         if reopened:
             event_id = reopen_item(
                 item_id=item.pk, reason=ReopenReason.DRIFT_DETECTED, clock=clock, snapshot_id=snapshot.pk
             )
             snapshot.reopen_event_id = event_id  # pyrefly: ignore[missing-attribute]
             snapshot.save(update_fields=["reopen_event"])
-    return CheckOutcome(snapshot_id=claim.snapshot_id, result=comparison.result, reopened=reopened)
+        flagged = comparison.result is DriftResult.UNCHANGED and _flag_page_findings(item, snapshot, clock=clock)
+    return CheckOutcome(snapshot_id=claim.snapshot_id, result=comparison.result, reopened=reopened, flagged=flagged)
 
 
-def _may_reopen(item: ReviewItem, placement_id: int, clock: Clock) -> bool:
+def _flag_page_findings(item: ReviewItem, snapshot: Snapshot, *, clock: Clock) -> bool:
+    """Record PAGE_FINDINGS_FLAGGED if the page has new blocking rules the previous successful check didn't have,
+    and the item is approved and the placement live (otherwise a reviewer already has it, or nothing is at risk)."""
+    rules = new_blocking_rules(snapshot.findings)
+    if not rules:
+        return False
+    previous = (
+        Snapshot.objects.filter(placement_id=snapshot.placement_id, status=CheckStatus.SUCCEEDED.value)  # pyrefly: ignore[missing-attribute]
+        .exclude(pk=snapshot.pk)
+        .order_by("-requested_at", "-pk")
+        .values_list("findings", flat=True)
+        .first()
+    )
+    if rules <= new_blocking_rules(previous or []):
+        return False
+    if not _at_risk(item, snapshot.placement_id, clock):  # pyrefly: ignore[missing-attribute]
+        return False
+    record_event(
+        type=EventType.PAGE_FINDINGS_FLAGGED,
+        entity=EntityType.PLACEMENT,
+        entity_id=snapshot.placement_id,  # pyrefly: ignore[missing-attribute]
+        item_id=item.pk,
+        payload=PageFindingsFlaggedPayload(
+            placement_id=snapshot.placement_id,  # pyrefly: ignore[missing-attribute]
+            snapshot_id=snapshot.pk,
+            rule_ids=sorted(rules),
+        ),
+        actor=None,
+        at=clock.now(),
+    )
+    return True
+
+
+def _at_risk(item: ReviewItem, placement_id: int, clock: Clock) -> bool:
     if item.status != ItemStatus.APPROVED or item.is_legacy:
         return False
     return Placement.objects.filter(live_placements_q(clock.today()), pk=placement_id).exists()
@@ -327,21 +421,51 @@ def _record_failure(
 
 def fail(
     *, claim: Claim, error: FetchError | None = None, code: str = "", message: str = "", clock: Clock = SYSTEM_CLOCK
-) -> None:
-    """running -> failed, visibly: from a FetchError, or a code and message ("error" from the task boundary)."""
+) -> bool:
+    """running -> failed, visibly: from a FetchError, or a code and message ("error" from the task boundary).
+    Returns whether the item was reopened: MISSING_AFTER consecutive fetch failures (module docstring)."""
     with transaction.atomic():
         item = locked_item(claim.item_id)
         snapshot = _locked_running(claim)
         if snapshot is None:
-            return
+            return False
+        error_code = str(error.code) if error is not None else code
         _record_failure(
             snapshot,
             item,
-            code=str(error.code) if error is not None else code,
+            code=error_code,
             message=error.message if error is not None else message,
             http_status=error.http_status if error is not None else None,
             at=clock.now(),
         )
+        if error_code not in FETCH_FAILURE_CODES or claim.trigger is DriftTrigger.MANUAL:
+            return False
+        recent = (
+            Snapshot.objects.filter(STREAK_CHECKS, placement_id=claim.placement_id)
+            .order_by("-requested_at", "-pk")
+            .values_list("pk", "status", "error_code", "reopen_event_id", "trigger")[:MISSING_AFTER]
+        )
+        streak = failure_streak(
+            CheckRow(
+                id=pk,
+                status=CheckStatus(status),
+                error_code=code_,
+                reopened=event_id is not None,
+                trigger=DriftTrigger(trigger),
+            )
+            for pk, status, code_, event_id, trigger in recent
+        )
+        if len(streak) < MISSING_AFTER or not _at_risk(item, claim.placement_id, clock):
+            return False
+        snapshot.reopen_event_id = reopen_item(  # pyrefly: ignore[missing-attribute]
+            item_id=item.pk,
+            reason=ReopenReason.DRIFT_DETECTED,
+            clock=clock,
+            snapshot_id=snapshot.pk,
+            failed_snapshot_ids=streak,
+        )
+        snapshot.save(update_fields=["reopen_event"])
+    return True
 
 
 # --- the daily sweep and the reconciler ------------------------------------------------------------------------

@@ -35,6 +35,7 @@ from core.domain import (
     Channel,
     CheckStatus,
     DecisionOutcome,
+    DriftResult,
     ItemStatus,
     Market,
     Product,
@@ -44,7 +45,7 @@ from core.domain import (
 )
 from core.errors import InvalidInput, NotFound
 from reviews.filters import ItemFilter, ItemSort
-from reviews.models import APPROVED_OUTCOMES, QUEUE_STATUSES, Decision, Placement, ReviewItem
+from reviews.models import APPROVED_OUTCOMES, QUEUE_STATUSES, Decision, Placement, ReviewItem, Snapshot
 
 _KEY = re.compile(r"^\s*CP-(\d+)\s*$", re.IGNORECASE)
 
@@ -66,6 +67,44 @@ def live_placements_q(today: date, prefix: str = "") -> Q:
 def is_item_live(*, item_id: int, today: date) -> bool:
     """Whether the item's content is running today (ruling 2): decides needs_rereview vs expired."""
     return Placement.objects.filter(live_placements_q(today), item_id=item_id).exists()
+
+
+# --- drift re-review -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DriftRereview:
+    """For a drift_detected re-review: the placement whose check sent the item back, and whether its latest
+    finished check found the approved copy again (`unchanged`). Reaffirm is allowed only then: re-approving copy the
+    partner still shows changed (or a page that's gone) would approve something that isn't what's live."""
+
+    placement_id: int
+    restored: bool
+
+
+def drift_rereview(*, item_id: int) -> DriftRereview | None:
+    """The drift state of the item's current reopen; None unless it's needs_rereview(drift_detected) and a check
+    sent it back. Two queries."""
+    item = ReviewItem.objects.filter(pk=item_id).values_list("status", "reopen_reason").first()
+    if item != (ItemStatus.NEEDS_REREVIEW.value, ReopenReason.DRIFT_DETECTED.value):
+        return None
+    reopening = (
+        Snapshot.objects.filter(placement__item_id=item_id, reopen_event__isnull=False)
+        .order_by("-reopen_event_id")
+        .values_list("placement_id", flat=True)
+        .first()
+    )
+    if reopening is None:
+        return None
+    latest = (
+        Snapshot.objects.filter(
+            placement_id=reopening, status__in=(CheckStatus.SUCCEEDED.value, CheckStatus.FAILED.value)
+        )
+        .order_by("-requested_at", "-pk")
+        .values_list("result", flat=True)
+        .first()
+    )
+    return DriftRereview(placement_id=reopening, restored=latest == DriftResult.UNCHANGED.value)
 
 
 # --- filtering -------------------------------------------------------------------------------------------------

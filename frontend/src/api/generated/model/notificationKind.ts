@@ -14,4 +14,5 @@ export const NotificationKind = {
   rereview: 'rereview',
   mention: 'mention',
   expiry_warning: 'expiry_warning',
+  page_findings: 'page_findings',
 } as const;

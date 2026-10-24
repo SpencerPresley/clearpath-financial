@@ -394,3 +394,275 @@ def test_reconcile_fails_stuck_checks_and_requeues_lost_ones(
     assert late == services.ReconcileResult(failed=(running.snapshot_id,), requeued=(pending,))
     assert enqueued == [pending]
     assert Snapshot.objects.get(pk=running.snapshot_id).error_code == "stuck"
+
+
+# --- new blocking findings beside intact copy ------------------------------------------------------------------
+
+BESIDE = f"<p>{CLEAN_COPY}</p><p>Guaranteed approval, no credit check!</p>"
+
+
+def test_new_blocking_rules_are_new_and_blocking_only() -> None:
+    findings: list[dict[str, object]] = [
+        {"rule_id": "a", "severity": "blocking", "new": True},
+        {"rule_id": "b", "severity": "warning", "new": True},
+        {"rule_id": "c", "severity": "blocking", "new": False},
+        {"rule_id": "a", "severity": "blocking", "new": True},
+    ]
+
+    assert services.new_blocking_rules(findings) == frozenset({"a"})
+
+
+def test_unchanged_copy_with_new_blocking_findings_flags_the_page_without_reopening(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    claim = check(placement, clock)
+
+    outcome = services.complete(claim=claim, page=page(BESIDE), clock=clock)
+
+    assert outcome == services.CheckOutcome(
+        snapshot_id=claim.snapshot_id, result=DriftResult.UNCHANGED, reopened=False, flagged=True
+    )
+    assert item_of(placement).status == ItemStatus.APPROVED
+    flagged = Event.objects.get(type=EventType.PAGE_FINDINGS_FLAGGED)
+    assert (flagged.entity_id, flagged.item_id, flagged.actor) == (placement.pk, placement.item_id, None)  # pyrefly: ignore[missing-attribute]
+    assert flagged.payload == {
+        "placement_id": placement.pk,
+        "snapshot_id": claim.snapshot_id,
+        "rule_ids": ["claims.credit_impact", "claims.guaranteed"],
+    }
+
+
+def test_the_same_findings_flag_once_and_a_new_rule_flags_again(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+    again = services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+    fewer = services.complete(
+        claim=check(placement, clock), page=page(f"<p>{CLEAN_COPY}</p><p>Guaranteed approval!</p>"), clock=clock
+    )
+    more = services.complete(
+        claim=check(placement, clock),
+        page=page(f"<p>{CLEAN_COPY}</p><p>Guaranteed approval! Pre-approved offers for you.</p>"),
+        clock=clock,
+    )
+
+    assert (again.flagged, fewer.flagged, more.flagged) == (False, False, True)
+    assert Event.objects.filter(type=EventType.PAGE_FINDINGS_FLAGGED).count() == 2
+
+
+def test_a_clean_check_between_resets_the_flag(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+    services.complete(claim=check(placement, clock), page=page_with(), clock=clock)
+
+    assert services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock).flagged
+
+
+def test_a_failed_check_between_does_not_reset_the_flag(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+    services.fail(claim=check(placement, clock), error=FetchError(FetchFailure.TIMEOUT), clock=clock)
+
+    assert not services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock).flagged
+
+
+def test_page_findings_are_not_flagged_when_nothing_is_at_risk(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    send_back(item_id=placement.item_id, reason=ReopenReason.APPROVAL_EXPIRED, clock=clock)  # pyrefly: ignore[missing-attribute]
+
+    outcome = services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+
+    assert not outcome.flagged
+    assert not Event.objects.filter(type=EventType.PAGE_FINDINGS_FLAGGED).exists()
+
+
+def test_drifted_copy_reopens_instead_of_flagging(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    outcome = services.complete(claim=check(placement, clock), page=page_with(EDITED), clock=clock)
+
+    assert (outcome.reopened, outcome.flagged) == (True, False)
+
+
+# --- a page that can't be fetched: missing after repeated failures --------------------------------------------
+
+
+def _row(
+    pk: int,
+    status: CheckStatus,
+    error_code: str = "",
+    *,
+    reopened: bool = False,
+    trigger: DriftTrigger = DriftTrigger.SCHEDULED,
+) -> services.CheckRow:
+    return services.CheckRow(id=pk, status=status, error_code=error_code, reopened=reopened, trigger=trigger)
+
+
+def test_manual_failures_neither_count_nor_reset_the_streak() -> None:
+    failed, manual = CheckStatus.FAILED, DriftTrigger.MANUAL
+
+    assert services.failure_streak(
+        [
+            _row(5, failed, "timeout", trigger=manual),
+            _row(4, failed, "http_error"),
+            _row(3, failed, "http_error", trigger=manual),
+            _row(2, failed, "timeout"),
+            _row(1, CheckStatus.SUCCEEDED),
+        ]
+    ) == (4, 2)
+    # A manual check that read the page is still a success: it ends the streak.
+    assert services.failure_streak(
+        [_row(3, failed, "http_error"), _row(2, CheckStatus.SUCCEEDED, trigger=manual), _row(1, failed, "http_error")]
+    ) == (3,)
+
+
+def test_failure_streak_counts_consecutive_fetch_failures_newest_first() -> None:
+    failed = CheckStatus.FAILED
+
+    assert services.failure_streak(
+        [
+            _row(5, failed, "http_error"),
+            _row(4, failed, "timeout"),
+            _row(3, CheckStatus.SUCCEEDED),
+            _row(2, failed, "http_error"),
+        ]
+    ) == (5, 4)
+    # Failures on our side say nothing about the page: they end the streak.
+    for ours in ("stuck", "error", "no_approved_version"):
+        rows = [_row(3, failed, "http_error"), _row(2, failed, ours), _row(1, failed, "timeout")]
+        assert services.failure_streak(rows) == (3,)
+    # A streak that already sent the item back is spent: the next one starts from zero.
+    assert services.failure_streak(
+        [_row(3, failed, "http_error"), _row(2, failed, "http_error", reopened=True), _row(1, failed, "http_error")]
+    ) == (3,)
+    assert services.failure_streak([]) == ()
+
+
+def _fail(placement: Placement, clock: FixedClock, error: FetchError | None = None) -> services.Claim:
+    claim = check(placement, clock)
+    services.fail(claim=claim, error=error or FetchError(FetchFailure.HTTP_ERROR, http_status=404), clock=clock)
+    return claim
+
+
+def test_three_failed_fetches_in_a_row_reopen_the_live_item_as_missing(
+    placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    first = _fail(placement, clock)
+    second = _fail(placement, clock, FetchError(FetchFailure.TIMEOUT))
+    assert item_of(placement).status == ItemStatus.APPROVED
+
+    third = _fail(placement, clock, FetchError(FetchFailure.HTTP_ERROR, http_status=410))
+
+    item = item_of(placement)
+    assert (item.status, item.reopen_reason, item.assignee) == (
+        ItemStatus.NEEDS_REREVIEW,
+        ReopenReason.DRIFT_DETECTED,
+        reviewer,
+    )
+    snapshot = Snapshot.objects.get(pk=third.snapshot_id)
+    assert (snapshot.status, snapshot.result, snapshot.error_code) == (CheckStatus.FAILED, None, "http_error")
+    reopened = Event.objects.get(type=EventType.ITEM_REOPENED)
+    assert snapshot.reopen_event == reopened
+    assert reopened.payload == {
+        "reason": "drift_detected",
+        "offer_terms_id": None,
+        "generated_version_id": None,
+        "snapshot_id": third.snapshot_id,
+        "failed_snapshot_ids": [third.snapshot_id, second.snapshot_id, first.snapshot_id],
+    }
+
+
+def test_a_success_resets_the_failure_streak(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    _fail(placement, clock)
+    _fail(placement, clock)
+    services.complete(claim=check(placement, clock), page=page_with(), clock=clock)
+    _fail(placement, clock)
+    _fail(placement, clock)
+
+    assert item_of(placement).status == ItemStatus.APPROVED
+
+
+def test_a_failure_on_our_side_ends_the_streak(placement: Placement, clock: FixedClock, enqueued: list[int]) -> None:
+    _fail(placement, clock)
+    _fail(placement, clock)
+    services.fail(claim=check(placement, clock), code="error", message="The check failed unexpectedly.", clock=clock)
+    _fail(placement, clock)
+    _fail(placement, clock)
+
+    assert item_of(placement).status == ItemStatus.APPROVED
+
+
+def test_impatient_check_now_during_an_outage_cannot_reopen(
+    placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    first = _fail(placement, clock)
+    second = _fail(placement, clock)
+    manual = []
+    for _ in range(3):
+        claim = check(placement, clock, actor=reviewer)
+        assert not services.fail(claim=claim, error=FetchError(FetchFailure.TIMEOUT), clock=clock)
+        manual.append(claim.snapshot_id)
+
+    # Recorded and shown, but no transition; and the scheduled streak (2) is intact.
+    assert Snapshot.objects.filter(pk__in=manual, status=CheckStatus.FAILED).count() == 3
+    assert item_of(placement).status == ItemStatus.APPROVED
+
+    third = _fail(placement, clock)
+
+    assert item_of(placement).reopen_reason == ReopenReason.DRIFT_DETECTED
+    reopened = Event.objects.get(type=EventType.ITEM_REOPENED)
+    assert reopened.payload["failed_snapshot_ids"] == [third.snapshot_id, second.snapshot_id, first.snapshot_id]
+
+
+def test_a_page_that_stays_unreachable_reopens_once(
+    placement: Placement, clock: FixedClock, enqueued: list[int]
+) -> None:
+    for _ in range(6):
+        _fail(placement, clock)  # after the third: already in re-review, recorded with no second transition
+
+    assert Event.objects.filter(type=EventType.ITEM_REOPENED).count() == 1
+
+
+def test_failed_fetches_on_a_placement_that_is_not_live_move_nothing(
+    placement: Placement, marketer: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    update_placement(
+        actor=marketer, placement_id=placement.pk, changes=PlacementChanges(last_run=clock.today()), clock=clock
+    )
+    later = FixedClock(clock.now() + timedelta(days=2))
+    for _ in range(3):
+        _fail(placement, later)
+
+    assert item_of(placement).status == ItemStatus.APPROVED
+    assert not Event.objects.filter(type=EventType.ITEM_REOPENED).exists()
+
+
+# --- what the review screen reads ------------------------------------------------------------------------------
+
+
+def test_the_read_counts_new_blocking_findings_and_the_failure_streak(
+    placement: Placement, reviewer: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    from drift.selectors import item_drift
+
+    services.complete(claim=check(placement, clock), page=page(BESIDE), clock=clock)
+    flagged = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
+    assert flagged.latest is not None
+    assert (flagged.latest.new_blocking_count, flagged.failure_streak) == (2, 0)
+
+    _fail(placement, clock)
+    _fail(placement, clock, FetchError(FetchFailure.TIMEOUT))
+    failing = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
+    assert failing.latest is not None
+    assert (failing.latest.new_blocking_count, failing.failure_streak) == (0, 2)
+
+    for _ in range(3):  # manual failures are shown as the latest check but don't move the streak
+        services.fail(
+            claim=check(placement, clock, actor=reviewer), error=FetchError(FetchFailure.TIMEOUT), clock=clock
+        )
+    clicked = item_drift(item_id=placement.item_id, clock=clock).placements[0]  # pyrefly: ignore[missing-attribute]
+    assert clicked.latest is not None
+    assert (clicked.latest.trigger, clicked.latest.status, clicked.failure_streak) == (
+        DriftTrigger.MANUAL,
+        CheckStatus.FAILED,
+        2,
+    )

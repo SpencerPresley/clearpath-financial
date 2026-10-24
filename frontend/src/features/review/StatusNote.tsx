@@ -62,6 +62,12 @@ export function StatusNote({
             `v${String(item.current_version_n)} quotes the old terms and no updated version could be generated. Review it, or pull it.`
           ) : item.reopen_reason === 'approval_expired' && item.approval_expires_at !== null ? (
             `Approval expired ${formatDate(item.approval_expires_at)}.`
+          ) : item.reopen_reason === 'drift_detected' && item.drift_rereview !== null ? (
+            item.drift_rereview.restored ? (
+              `A check found approved v${String(approvedN ?? '')} on the partner page again.`
+            ) : (
+              `The partner page doesn’t show approved v${String(approvedN ?? '')}. Check it again once the partner restores it, or pull it.`
+            )
           ) : (
             ''
           )}

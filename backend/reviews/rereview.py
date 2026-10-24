@@ -7,6 +7,7 @@ offer-terms fan-out (workstream F) both go through them, usually via `send_back`
 """
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
@@ -44,12 +45,14 @@ def reopen_item(  # the event's fields
     offer_terms_id: int | None = None,
     generated_version_id: int | None = None,
     snapshot_id: int | None = None,
+    failed_snapshot_ids: Sequence[int] | None = None,
 ) -> int:
     """approved -> needs_rereview(reason) for live content, back to the reviewer who approved it (sticky).
     Returns the ITEM_REOPENED event id. Lock-order contract (see reviews.assignment): one item per transaction,
     because it takes the assignment lock after the item's row lock. A fan-out calls it once per item, each in its
     own transaction (optionally after locking only that same item to add its generated version). The drift monitor
-    passes the `snapshot_id` of the check that found the change."""
+    passes the `snapshot_id` of the check that found the change, and for a page that couldn't be fetched on consecutive
+    checks, those checks (`failed_snapshot_ids`, newest first)."""
     with transaction.atomic():
         item = locked_item(item_id)
         _require_current(item)
@@ -64,6 +67,7 @@ def reopen_item(  # the event's fields
                 offer_terms_id=offer_terms_id,
                 generated_version_id=generated_version_id,
                 snapshot_id=snapshot_id,
+                failed_snapshot_ids=list(failed_snapshot_ids) if failed_snapshot_ids is not None else None,
             ),
         )
         auto_assign(item=item, actor=actor, clock=clock, sticky=True)

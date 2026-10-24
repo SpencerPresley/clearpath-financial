@@ -2141,6 +2141,25 @@
         "title": "DriftCheckedPayload",
         "type": "object"
       },
+      "DriftRereviewOut": {
+        "properties": {
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "restored": {
+            "description": "The placement's latest finished check found the approved copy unchanged.",
+            "title": "Restored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "placement_id",
+          "restored"
+        ],
+        "title": "DriftRereviewOut",
+        "type": "object"
+      },
       "DriftResult": {
         "enum": [
           "unchanged",
@@ -4635,6 +4654,17 @@
             ],
             "title": "Current Version N"
           },
+          "drift_rereview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftRereviewOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "needs_rereview(drift_detected) only: the placement whose check sent the item back, and whether its latest check found the approved copy again. Reaffirm is refused (409 drift_not_restored) until it has."
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -4908,7 +4938,8 @@
           "live_placements_count",
           "numbers_change",
           "llm_check_failure_code",
-          "llm_check_failure_reason"
+          "llm_check_failure_reason",
+          "drift_rereview"
         ],
         "title": "ItemDetailOut",
         "type": "object"
@@ -5399,6 +5430,7 @@
                   "partner.updated": "#/components/schemas/PartnerUpdatedEventOut",
                   "placement.drift_check_requested": "#/components/schemas/DriftCheckRequestedEventOut",
                   "placement.drift_checked": "#/components/schemas/DriftCheckedEventOut",
+                  "placement.page_findings_flagged": "#/components/schemas/PageFindingsFlaggedEventOut",
                   "placement.recorded": "#/components/schemas/PlacementRecordedEventOut",
                   "placement.takedown_confirmed": "#/components/schemas/TakedownConfirmedEventOut",
                   "placement.takedown_requested": "#/components/schemas/TakedownRequestedEventOut",
@@ -5502,6 +5534,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/DriftCheckedEventOut"
+                },
+                {
+                  "$ref": "#/components/schemas/PageFindingsFlaggedEventOut"
                 },
                 {
                   "$ref": "#/components/schemas/AttachmentAddedEventOut"
@@ -5868,6 +5903,20 @@
         "additionalProperties": false,
         "description": "approved -> needs_rereview (live content).",
         "properties": {
+          "failed_snapshot_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Snapshot Ids"
+          },
           "generated_version_id": {
             "anyOf": [
               {
@@ -7930,7 +7979,8 @@
           "decision",
           "rereview",
           "mention",
-          "expiry_warning"
+          "expiry_warning",
+          "page_findings"
         ],
         "title": "NotificationKind",
         "type": "string"
@@ -8361,6 +8411,106 @@
           "new"
         ],
         "title": "PageFindingOut",
+        "type": "object"
+      },
+      "PageFindingsFlaggedEventOut": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for system actions (sweeps, fan-out)."
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "integer"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PageFindingsFlaggedPayload"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "placement.page_findings_flagged",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "from_status",
+          "to_status",
+          "type",
+          "payload"
+        ],
+        "title": "PageFindingsFlaggedEventOut",
+        "type": "object"
+      },
+      "PageFindingsFlaggedPayload": {
+        "additionalProperties": false,
+        "description": "A drift check found the approved copy unchanged, but blocking findings on the page that don't fire on the\ncopy itself (partner text added beside it). Nothing transitions; the assignee and the leads are told.",
+        "properties": {
+          "placement_id": {
+            "title": "Placement Id",
+            "type": "integer"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rule Ids",
+            "type": "array"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "placement_id",
+          "snapshot_id",
+          "rule_ids"
+        ],
+        "title": "PageFindingsFlaggedPayload",
         "type": "object"
       },
       "PartnerCreatedEventOut": {
@@ -9089,6 +9239,11 @@
             ],
             "description": "Set when the URL is one of this site's demo pages."
           },
+          "failure_streak": {
+            "description": "How many of the latest daily checks in a row couldn't fetch the page (404, outage, ...), up to 3; at 3 on a live placement the approved copy counts as missing and the item is reopened. Failed manual checks neither count nor reset it.",
+            "title": "Failure Streak",
+            "type": "integer"
+          },
           "is_live": {
             "title": "Is Live",
             "type": "boolean"
@@ -9127,6 +9282,7 @@
           "monitored",
           "is_live",
           "latest",
+          "failure_streak",
           "demo_page"
         ],
         "title": "PlacementDriftOut",
@@ -10192,6 +10348,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "new_blocking_count": {
+            "description": "Blocking findings on the page whose rule doesn't fire on the approved copy. On an unchanged result this is the attention state: partner text beside intact approved copy.",
+            "title": "New Blocking Count",
+            "type": "integer"
+          },
           "placement_id": {
             "title": "Placement Id",
             "type": "integer"
@@ -10279,6 +10440,7 @@
           "score",
           "diff",
           "findings",
+          "new_blocking_count",
           "error_code",
           "error_message",
           "reopened_item"
@@ -18153,7 +18315,7 @@
     },
     "/api/items/{item_id}/reaffirm": {
       "post": {
-        "description": "needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new\nfindings come back as 409 findings_need_triage.",
+        "description": "needs_rereview -> approved on the same version with a fresh expiry. The code checks re-run first; new\nfindings come back as 409 findings_need_triage. A drift_detected re-review is 409 drift_not_restored until the\nplacement's latest check finds the approved copy again.",
         "operationId": "reaffirmApproval",
         "parameters": [
           {

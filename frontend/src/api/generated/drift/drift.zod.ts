@@ -25,6 +25,7 @@ export const GetItemDriftResponse = zod.object({
   "partner": zod.string(),
   "slug": zod.string()
 }),zod.null()]).describe('Set when the URL is one of this site\'s demo pages.'),
+  "failure_streak": zod.int().describe('How many of the latest daily checks in a row couldn\'t fetch the page (404, outage, ...), up to 3; at 3 on a live placement the approved copy counts as missing and the item is reopened. Failed manual checks neither count nor reset it.'),
   "is_live": zod.boolean(),
   "latest": zod.union([zod.object({
   "compared_version_n": zod.union([zod.int(),zod.null()]).describe('The latest approved version the page was compared with.'),
@@ -47,6 +48,7 @@ export const GetItemDriftResponse = zod.object({
   "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "http_status": zod.union([zod.int(),zod.null()]),
   "id": zod.int(),
+  "new_blocking_count": zod.int().describe('Blocking findings on the page whose rule doesn\'t fire on the approved copy. On an unchanged result this is the attention state: partner text beside intact approved copy.'),
   "placement_id": zod.int(),
   "reopened_item": zod.boolean().describe('This check sent the item to re-review.'),
   "requested_at": zod.iso.datetime({"offset":true}),
@@ -97,6 +99,7 @@ export const CheckPlacementDriftResponse = zod.object({
   "finished_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]),
   "http_status": zod.union([zod.int(),zod.null()]),
   "id": zod.int(),
+  "new_blocking_count": zod.int().describe('Blocking findings on the page whose rule doesn\'t fire on the approved copy. On an unchanged result this is the attention state: partner text beside intact approved copy.'),
   "placement_id": zod.int(),
   "reopened_item": zod.boolean().describe('This check sent the item to re-review.'),
   "requested_at": zod.iso.datetime({"offset":true}),

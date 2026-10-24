@@ -242,6 +242,9 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
           onShortcuts={() => {
             setShortcutsOpen(true);
           }}
+          onCheckQueued={() => {
+            onSearchChange({ tab: 'details' });
+          }}
         />
         {mode !== null && (
           <DecisionPanel

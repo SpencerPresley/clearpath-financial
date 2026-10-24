@@ -23,6 +23,7 @@ from core.domain import (
     ItemStatus,
     LlmFailureCode,
     Product,
+    ReopenReason,
     Role,
     TakedownState,
     TermsField,
@@ -33,7 +34,16 @@ from core.permissions import has_role
 from reviews.diff import DiffSegment, diff_texts
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import Attachment, Comment, Decision, Placement, ReviewItem, SavedView, Version
-from reviews.selectors import DecisionSummary, ItemRow, PartyRef, item_row, live_placements_q, row_queryset
+from reviews.selectors import (
+    DecisionSummary,
+    DriftRereview,
+    ItemRow,
+    PartyRef,
+    drift_rereview,
+    item_row,
+    live_placements_q,
+    row_queryset,
+)
 
 
 def _person(user: User) -> PartyRef:
@@ -276,6 +286,7 @@ class ItemDetail(ItemRow):
     numbers_change: bool | None
     llm_check_failure_code: LlmFailureCode | None
     llm_check_failure_reason: str | None
+    drift_rereview: DriftRereview | None
 
 
 def _numbers_change(item_id: int, current: VersionDetail | None) -> bool | None:
@@ -341,6 +352,7 @@ def get_item_detail(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> ItemDetail:
         numbers_change=_numbers_change(item_id, current),
         llm_check_failure_code=failure_code,
         llm_check_failure_reason=failure_reason,
+        drift_rereview=drift_rereview(item_id=item_id) if row.reopen_reason is ReopenReason.DRIFT_DETECTED else None,
     )
 
 

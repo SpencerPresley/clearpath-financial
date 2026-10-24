@@ -27,8 +27,18 @@ describe('rereviewActions', () => {
     expect(rereviewActions(rereview('terms_changed'))).toEqual(['review', 'pull']);
   });
 
-  it('offers reaffirm for an expired approval or live-copy drift', () => {
+  it('offers reaffirm for an expired approval', () => {
     expect(rereviewActions(rereview('approval_expired'))).toEqual(['reaffirm', 'pull']);
+  });
+
+  it('offers reaffirm after drift only once the partner restored the copy', () => {
+    const drifted = (restored: boolean) => ({
+      ...rereview('drift_detected'),
+      drift_rereview: { placement_id: 3, restored },
+    });
+    expect(rereviewActions(drifted(false))).toEqual(['check_now', 'pull']);
+    expect(rereviewActions(drifted(true))).toEqual(['reaffirm', 'pull']);
+    // No check sent it back (nothing to re-check): the backend doesn't gate it either.
     expect(rereviewActions(rereview('drift_detected'))).toEqual(['reaffirm', 'pull']);
   });
 

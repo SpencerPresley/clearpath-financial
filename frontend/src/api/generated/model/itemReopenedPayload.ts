@@ -10,6 +10,7 @@ import type { ReopenReason } from './reopenReason';
  * approved -> needs_rereview (live content).
  */
 export interface ItemReopenedPayload {
+  failed_snapshot_ids?: number[] | null;
   generated_version_id?: number | null;
   offer_terms_id?: number | null;
   reason: ReopenReason;

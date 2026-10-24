@@ -126,6 +126,7 @@ export function itemFixture(overrides: Partial<ItemDetailOut> = {}): ItemDetailO
     numbers_change: null,
     llm_check_failure_code: null,
     llm_check_failure_reason: null,
+    drift_rereview: null,
     ...overrides,
   };
 }

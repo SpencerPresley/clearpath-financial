@@ -5,7 +5,13 @@ from django.db import transaction
 
 from accounts.models import User
 from audit.outbox import REGISTRY, Delivery, deliver
-from audit.payloads import CommentAddedPayload, DecisionRecordedPayload, ItemAssignedPayload, ItemReopenedPayload
+from audit.payloads import (
+    CommentAddedPayload,
+    DecisionRecordedPayload,
+    ItemAssignedPayload,
+    ItemReopenedPayload,
+    PageFindingsFlaggedPayload,
+)
 from audit.services import record_event
 from conftest import UserFactory
 from core.clock import FixedClock
@@ -154,6 +160,28 @@ def test_rereview_notifies_owner_and_assignee(marketer: User, reviewer: User, cl
     assert set(Notification.objects.values_list("user_id", flat=True)) == {marketer.pk, reviewer.pk}
 
 
+@pytest.mark.django_db
+def test_new_blocking_page_findings_notify_the_assignee_and_active_leads(
+    marketer: User, reviewer: User, user_factory: UserFactory, clock: FixedClock
+) -> None:
+    lead = user_factory(roles=[Role.LEAD])
+    away = user_factory(roles=[Role.LEAD])
+    User.objects.filter(pk=away.pk).update(is_active=False)
+    item = make_item(marketer, assignee=reviewer)
+    payload = PageFindingsFlaggedPayload(placement_id=7, snapshot_id=9, rule_ids=["claims.guaranteed"])
+    event_id = _emit(item, None, EventType.PAGE_FINDINGS_FLAGGED, payload, clock)
+
+    outcomes = [deliver(event_id=event_id, handler_name="notifications.page_findings") for _ in range(2)]
+
+    assert outcomes == [Delivery.APPLIED, Delivery.DUPLICATE]
+    rows = set(Notification.objects.values_list("user_id", "kind", "message"))
+    message = f"New blocking findings on a partner page that carries {item.key}"
+    assert rows == {
+        (reviewer.pk, NotificationKind.PAGE_FINDINGS, message),
+        (lead.pk, NotificationKind.PAGE_FINDINGS, message),
+    }
+
+
 def test_notification_handlers_are_registered() -> None:
     names = {spec.name for spec in REGISTRY.all()}
 
@@ -162,4 +190,5 @@ def test_notification_handlers_are_registered() -> None:
         "notifications.mention",
         "notifications.decision",
         "notifications.rereview",
+        "notifications.page_findings",
     } <= names

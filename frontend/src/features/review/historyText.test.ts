@@ -73,6 +73,25 @@ describe('describeEvent', () => {
     expect(describeEvent(reopened, { versions, users })).toBe('Sent to re-review: Offer terms changed');
   });
 
+  it('describes drift attention and repeated failed checks', () => {
+    const flagged: Entry = {
+      ...base('placement.page_findings_flagged'),
+      actor: null,
+      payload: { placement_id: 3, snapshot_id: 9, rule_ids: ['claims.guaranteed', 'claims.credit_impact'] },
+    };
+    const gone: Entry = {
+      ...base('item.reopened'),
+      actor: null,
+      payload: { reason: 'drift_detected', snapshot_id: 9, failed_snapshot_ids: [9, 8, 7] },
+    };
+    expect(describeEvent(flagged, { versions, users })).toBe(
+      'Placement checked: copy unchanged, 2 new blocking findings beside it',
+    );
+    expect(describeEvent(gone, { versions, users })).toBe(
+      'Sent to re-review: Live copy changed (page couldn’t be fetched on 3 daily checks in a row)',
+    );
+  });
+
   it('falls back to the event type', () => {
     const odd: Entry = { ...base('demo.reset'), payload: { seeded_items: 3 } };
     expect(describeEvent(odd, { versions, users })).toBe('demo.reset');
