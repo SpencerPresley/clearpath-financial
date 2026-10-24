@@ -6,6 +6,7 @@ import {
   EMPTY_SUMMARY,
   ITEMS,
   ME_LEAD,
+  OPEN_ITEMS,
   PARTNERS,
   SERIES,
   SUMMARY,
@@ -42,7 +43,9 @@ export async function stubMetrics(page: Page, mode: MetricsStub = 'data'): Promi
       if (mode === 'error') return json(route, FAILURE, 503);
       return json(route, mode === 'empty' ? EMPTY_SERIES : SERIES);
     }
-    if (path === '/metrics/items') return json(route, ITEMS);
+    if (path === '/metrics/items') {
+      return json(route, url.searchParams.get('open_only') === 'true' ? OPEN_ITEMS : ITEMS);
+    }
     return json(route, { code: 'not_found', message: `No stub for ${path}`, details: {}, fields: [] }, 404);
   });
 }

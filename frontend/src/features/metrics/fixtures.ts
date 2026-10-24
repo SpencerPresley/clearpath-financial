@@ -220,3 +220,51 @@ export const PARTNERS: PartnerRowOut[] = [
     last_submitted_at: '2026-10-20T09:00:00Z',
   },
 ];
+
+const NATIVE_ITEM = {
+  id: 1042,
+  key: 'CP-1042',
+  title: 'Spring PL email',
+  status: 'in_review',
+  product: 'personal_loan',
+  channel: 'email',
+  is_legacy: false,
+  legacy_ref: null,
+  partner_name: 'LoanFinder',
+} as const;
+
+/** The still-open fix-live clocks: no end, value = hours open so far. */
+export const OPEN_ITEMS: MetricItemsOut = {
+  metric: 'time_to_fix_live',
+  total: 2,
+  rows: [
+    {
+      item: {
+        ...NATIVE_ITEM,
+        id: 1050,
+        key: 'CP-1050',
+        title: 'Balance transfer display ad',
+        status: 'needs_rereview',
+      },
+      source: 'native',
+      start: '2026-10-21T09:00:00Z',
+      end: null,
+      value: 75,
+      outcome: null,
+    },
+    {
+      item: {
+        ...NATIVE_ITEM,
+        id: 1033,
+        key: 'CP-1033',
+        title: 'Spring PL affiliate page',
+        status: 'withdrawn',
+      },
+      source: 'native',
+      start: '2026-10-23T13:00:00Z',
+      end: null,
+      value: 20,
+      outcome: null,
+    },
+  ],
+};

@@ -1,11 +1,11 @@
 /*
  * One metric over time, per week or month, as bars (TanStack Charts, SVG) or as the same numbers in a table.
- * Throughput stacks native and imported decisions so the imported share is visible; durations show the
- * bucket's median, and a bucket with no measurements is a gap, not a zero. Clicking a bar, or a table row's
- * button, opens that bucket's items.
+ * Throughput stacks native and imported decisions so the imported share is visible; durations and rounds show
+ * each source's median or mean side by side, and a bucket with no measurements is a gap, not a zero. Clicking a
+ * bar, or a table row's button, opens that bucket's items. A bucket the period cuts short says so ("to date").
  */
 import { barY, defineChart, group } from '@tanstack/charts';
-import { Chart } from '@tanstack/charts/react';
+import { Chart } from '@tanstack/charts/react/tooltip';
 import { scaleBand } from '@tanstack/charts/scales/band';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { tooltip } from '@tanstack/charts/tooltip';
@@ -22,7 +22,16 @@ import type {
 import { Button } from '../../ui/Button';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
-import { bucketLabel, formatHours, formatRounds, rangeLabel, sourceSplit } from './format';
+import { isServerError } from './retry';
+import {
+  bucketLabel,
+  formatHours,
+  formatRounds,
+  isoDate,
+  isPartial,
+  rangeLabel,
+  sourceSplit,
+} from './format';
 import { METRIC_META, METRIC_ORDER } from './labels';
 
 const HEIGHT = 240;
@@ -42,6 +51,8 @@ export interface Bar {
   source: Source;
   /** In the chart's unit: hours or days for durations (see `chartRows`), else as served. */
   value: number;
+  /** As served (hours for durations), for the tooltip. */
+  raw: number;
 }
 
 export interface ChartRows {
@@ -75,7 +86,7 @@ export function chartRows(
             ['Imported', point.imported_value],
           ];
     for (const [source, value] of values) {
-      if (value !== null) raw.push({ label, point, source, value });
+      if (value !== null) raw.push({ label, point, source, value, raw: value });
     }
   }
   const present = (source: Source) =>
@@ -103,6 +114,21 @@ export function chartName(metric: MetricName, bucket: MetricBucket, sources: rea
   const split =
     sources.length === 2 ? ', native and imported' : only === undefined ? '' : `, ${only.toLowerCase()} only`;
   return `${METRIC_META[metric].label} by ${per}${stat}${split}`;
+}
+
+/** "to date" for the current bucket, else the dates the period covers. */
+function partialNote(point: MetricPointOut): string {
+  return point.to_date === isoDate(new Date()) && point.from_date === point.period_start
+    ? 'to date'
+    : `${rangeLabel(point.from_date, point.to_date)} only`;
+}
+
+function bucketRange(point: MetricPointOut, bucket: MetricBucket): string {
+  const label =
+    bucket === 'week'
+      ? `Week of ${bucketLabel(point.period_start, bucket)}`
+      : bucketLabel(point.period_start, bucket);
+  return isPartial(point, bucket) ? `${label} (${partialNote(point)})` : label;
 }
 
 interface ViewProps {
@@ -139,10 +165,27 @@ function TrendChart({ metric, bucket, points, rows, onPick }: ViewProps) {
     });
   }, [metric, bucket, points, rows]);
 
+  const meta = METRIC_META[metric];
   return (
     <Chart
       definition={definition}
       height={HEIGHT}
+      renderTooltipBody={({ points: focused }) => {
+        const first = focused[0]?.datum;
+        if (first === undefined) return null;
+        return (
+          <div className="app-metric-tooltip">
+            <p className="app-metric-tooltip-title">{bucketRange(first.point, bucket)}</p>
+            {focused.map(({ datum }) => (
+              <p key={datum.source}>
+                {meta.unit === 'decisions'
+                  ? `${String(datum.raw)} ${datum.source.toLowerCase()} ${datum.raw === 1 ? meta.noun[0] : meta.noun[1]}`
+                  : `${datum.source} ${meta.unit === 'hours' ? 'median' : 'mean'} ${formatValue(metric, datum.raw)}`}
+              </p>
+            ))}
+          </div>
+        );
+      }}
       ariaLabel={chartName(metric, bucket, rows.sources)}
       ariaDescription="Each bar opens the items behind it. The same numbers are in the table view."
       className="app-metric-chart"
@@ -171,7 +214,7 @@ function TrendTable({ metric, bucket, points, rows, onPick }: ViewProps) {
           <th scope="col" className="app-num">
             {meta.noun[1].replace(/^./, (c) => c.toUpperCase())}
           </th>
-          <th scope="col">Source</th>
+          {rows.sources.length > 1 && <th scope="col">Source</th>}
           <th scope="col">
             <span className="sr-only">Items</span>
           </th>
@@ -183,14 +226,17 @@ function TrendTable({ metric, bucket, points, rows, onPick }: ViewProps) {
           const range = rangeLabel(point.from_date, point.to_date);
           return (
             <tr key={point.period_start}>
-              <th scope="row">{label}</th>
+              <th scope="row">
+                {label}
+                {isPartial(point, bucket) && <span className="app-muted"> ({partialNote(point)})</span>}
+              </th>
               {valueColumns.map((source) => (
                 <td key={source} className="app-num">
                   {formatValue(metric, source === 'Native' ? point.native_value : point.imported_value)}
                 </td>
               ))}
               <td className="app-num">{point.count}</td>
-              <td className="app-muted">{sourceSplit(point)}</td>
+              {rows.sources.length > 1 && <td className="app-muted">{sourceSplit(point)}</td>}
               <td className="app-num">
                 {point.count > 0 && (
                   <Button
@@ -218,6 +264,8 @@ export function Trend({
   metric,
   bucket,
   view,
+  importedIncluded,
+  quietError,
   onChange,
   onPick,
 }: {
@@ -225,6 +273,10 @@ export function Trend({
   metric: MetricName;
   bucket: MetricBucket;
   view: 'chart' | 'table';
+  /** Native data only: captions drop what the imported history would contribute. */
+  importedIncluded: boolean;
+  /** The summary already shows the outage and its Retry (which refetches this too). */
+  quietError: boolean;
   onChange: (change: { chart?: MetricName; bucket?: MetricBucket; view?: 'chart' | 'table' }) => void;
   onPick: (point: MetricPointOut) => void;
 }) {
@@ -243,16 +295,18 @@ export function Trend({
     body = (
       <div className="app-metric-chart-error" role="alert">
         <Icon name="feedback.error" size={14} className="app-metric-error-icon" />
-        <span>Couldn&apos;t load the trend. {apiErrorMessage(series.error)}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          onPress={() => {
-            void series.refetch();
-          }}
-        >
-          Retry
-        </Button>
+        <span>Couldn&apos;t load the trend.{quietError ? '' : ` ${apiErrorMessage(series.error)}`}</span>
+        {!quietError && isServerError(series.error) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={() => {
+              void series.refetch();
+            }}
+          >
+            Retry
+          </Button>
+        )}
       </div>
     );
   } else if (empty) {
@@ -324,7 +378,9 @@ export function Trend({
       </div>
       <p className="app-metric-trend-caption">
         {METRIC_META[metric].definition}
-        {METRIC_META[metric].importedNote !== undefined && ` ${METRIC_META[metric].importedNote}`}
+        {importedIncluded &&
+          METRIC_META[metric].importedNote !== undefined &&
+          ` ${METRIC_META[metric].importedNote}`}
         {view === 'chart' && !empty && rows.sources.length > 0 && (
           <span className="app-metric-legend" aria-hidden="true">
             {rows.sources.map((source) => (

@@ -20,8 +20,8 @@ export const metricsSearchSchema = z.object({
   product: z.enum(Object.values(Product)).optional().catch(undefined),
   channel: z.enum(Object.values(Channel)).optional().catch(undefined),
   partner: z.number().int().positive().optional().catch(undefined),
-  /** false: native data only. */
-  legacy: z.boolean().optional().catch(undefined),
+  /** false: native data only (the API's include_legacy). */
+  imported: z.boolean().optional().catch(undefined),
   chart: z.enum(Object.values(MetricName)).default('throughput').catch('throughput'),
   bucket: z.enum(Object.values(MetricBucket)).default('week').catch('week'),
   view: z.enum(['chart', 'table']).default('chart').catch('chart'),
@@ -45,7 +45,7 @@ export function metricsParams(
   if (search.product !== undefined) params.product = [search.product];
   if (search.channel !== undefined) params.channel = [search.channel];
   if (search.partner !== undefined) params.partner_id = [search.partner];
-  if (search.legacy === false) params.include_legacy = false;
+  if (search.imported === false) params.include_legacy = false;
   return params;
 }
 
@@ -54,6 +54,6 @@ export function hasFilters(search: MetricsSearch): boolean {
     search.product !== undefined ||
     search.channel !== undefined ||
     search.partner !== undefined ||
-    search.legacy === false
+    search.imported === false
   );
 }

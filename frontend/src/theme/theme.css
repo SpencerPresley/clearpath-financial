@@ -2105,31 +2105,39 @@
   .app-metrics-date .app-input {
     @apply h-7 w-36;
   }
+  /* Always present (empty or not) so the tiles below never move when it fills in (§5.3). */
   .app-metrics-provenance {
-    @apply flex items-center gap-2 text-meta text-muted;
+    @apply flex min-h-7 items-center gap-2 text-meta text-muted;
+  }
+  .app-metrics-range {
+    @apply flex items-start gap-2;
   }
 
   /* Headline numbers: one row of tiles on rules, no cards (§5.6); figures in tabular nums (§5.3). */
   .app-metric-tiles {
     @apply grid grid-cols-5 rounded-lg border border-base-300 bg-base-100;
   }
+  /* The tile, not its button, holds the minimum height (it includes the fix-live re-review button), so the
+     skeleton and every loaded state are the same height (§5.3). */
   .app-metric-tile {
-    @apply flex min-w-0 flex-col;
+    @apply flex min-h-42 min-w-0 flex-col;
   }
   .app-metric-tile + .app-metric-tile {
     box-shadow: -1px 0 0 var(--color-base-300);
   }
-  /* Fixed minimum so the skeleton and the loaded tiles are the same height (§5.3 stable layout). */
   .app-metric-tile-btn {
-    @apply flex min-h-36 flex-1 cursor-default flex-col items-start gap-1 px-3.5 py-3 text-left;
+    @apply flex flex-1 cursor-default flex-col items-start gap-1 px-3.5 py-3 text-left;
     transition-property: background-color;
     transition-duration: 120ms;
   }
+  /* Concentric with the 1px-bordered row: inner radius = outer - 1px. */
   .app-metric-tile:first-child .app-metric-tile-btn {
-    @apply rounded-l-lg;
+    border-top-left-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-left-radius: calc(var(--radius-lg) - 1px);
   }
   .app-metric-tile:last-child .app-metric-tile-btn {
-    @apply rounded-r-lg;
+    border-top-right-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-right-radius: calc(var(--radius-lg) - 1px);
   }
   .app-metric-tile-btn:hover {
     @apply bg-hover;
@@ -2141,22 +2149,29 @@
   .app-metric-tile-label {
     @apply text-meta font-medium text-muted;
   }
+  /* One figure, or one per source at equal weight (never a blend of two differently measured sources). */
+  .app-metric-figures {
+    @apply flex flex-wrap items-baseline gap-x-4;
+  }
   .app-metric-figure {
-    @apply text-xl leading-7 font-semibold text-base-content tabular-nums;
+    @apply text-xl leading-7 font-semibold whitespace-nowrap text-base-content tabular-nums;
   }
-  /* Its own line in every tile, so all five read in the same order at any width. */
-  .app-metric-figure-detail {
-    @apply block text-meta leading-4 font-normal whitespace-nowrap text-muted;
+  .app-metric-figure-source {
+    @apply text-meta font-normal text-muted;
   }
-  /* Counts wrap rather than truncate: the native/imported split is the honest part of the number. */
+  /* Same four lines in every tile: label, figure, how it's computed, what it rests on. */
+  .app-metric-tile-detail {
+    @apply text-meta text-muted;
+  }
+  /* Counts wrap rather than truncate, a whole segment at a time ("· 151 imported" never splits). */
   .app-metric-tile-meta {
-    @apply text-meta text-pretty text-muted tabular-nums;
+    @apply flex flex-wrap gap-x-1 text-meta text-muted tabular-nums;
   }
-  .app-metric-tile-sources {
-    @apply text-meta font-medium text-pretty text-base-content tabular-nums;
+  .app-metric-segment {
+    @apply whitespace-nowrap;
   }
   .app-metric-open {
-    @apply mx-3.5 -mt-1 mb-3 self-start rounded-sm bg-status-alert-soft px-1.5 py-0.5 text-meta font-medium text-status-alert-soft-content tabular-nums;
+    @apply mx-3.5 mb-3 flex h-7 items-center gap-1.5 self-start rounded-md bg-status-alert-soft px-2 text-meta font-medium text-status-alert-soft-content tabular-nums;
     transition-property: box-shadow;
     transition-duration: 120ms;
   }
@@ -2168,7 +2183,7 @@
     @apply text-status-error-soft-content;
   }
   .app-metric-error {
-    @apply flex min-h-36 items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-3.5 text-ui text-base-content;
+    @apply flex min-h-42 items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-3.5 text-ui text-base-content;
   }
 
   /* Waiting now: each count is its queue view. */
@@ -2199,6 +2214,16 @@
   }
   .app-metric-drill-header {
     @apply flex items-center justify-between gap-4;
+  }
+  /* Takes focus when the list opens (the global ring shows for keyboard users). */
+  .app-metric-drill-heading {
+    @apply rounded-xs;
+  }
+  .app-metric-tooltip {
+    @apply flex flex-col gap-0.5 text-meta tabular-nums;
+  }
+  .app-metric-tooltip-title {
+    @apply font-medium;
   }
   .app-metric-drill-table thead th {
     @apply h-8 border-b border-base-300 px-3 text-left text-meta font-medium text-muted;

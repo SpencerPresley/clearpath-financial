@@ -1,11 +1,18 @@
 /*
  * The items behind a number: GET /metrics/items runs the same computation as the number, so `total` equals
- * it. Imported rows say so and carry their tracker Request ID; every row opens the item.
+ * it. Imported rows say so and carry their tracker Request ID; every row opens the item. The heading takes focus
+ * when the list opens (it renders below the trend), and closing returns focus to whatever opened it.
  */
 import { Link } from '@tanstack/react-router';
+import { useEffect, useRef } from 'react';
 
 import { useListMetricItems } from '../../api/generated/metrics/metrics';
-import type { GetMetricsSummaryParams, MetricItemOut, MetricName } from '../../api/generated/model';
+import type {
+  GetMetricsSummaryParams,
+  ItemStatus,
+  MetricItemOut,
+  MetricName,
+} from '../../api/generated/model';
 import { StatusBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
@@ -15,6 +22,8 @@ import { formatDate, OUTCOME_LABELS, plural } from '../../ui/labels';
 import { SkeletonTable } from '../../ui/Skeleton';
 import { formatHours, formatRounds, rangeLabel } from './format';
 import { METRIC_META } from './labels';
+import { DRILL_ID } from './MetricTiles';
+import { isServerError } from './retry';
 
 const COLUMNS = ['7rem', '1fr', '9.5rem', '11rem', '7rem', '7rem', '6rem'] as const;
 
@@ -25,6 +34,11 @@ function value(metric: MetricName, row: MetricItemOut): string {
   return row.outcome === null ? 'Decision' : OUTCOME_LABELS[row.outcome];
 }
 
+/** Why a fix-live clock is still running: content pulled but not yet confirmed down, or still in re-review. */
+function stillOpen(status: ItemStatus): string {
+  return status === 'withdrawn' || status === 'rejected' ? 'Takedown unconfirmed' : 'In re-review';
+}
+
 function Row({ metric, row }: { metric: MetricName; row: MetricItemOut }) {
   const { item } = row;
   return (
@@ -33,7 +47,12 @@ function Row({ metric, row }: { metric: MetricName; row: MetricItemOut }) {
         <ItemKey value={item.key} />
       </td>
       <td className="app-metric-drill-title">
-        <Link to="/items/$itemId" params={{ itemId: String(item.id) }} className="app-mine-link">
+        <Link
+          to="/items/$itemId"
+          params={{ itemId: String(item.id) }}
+          className="app-mine-link"
+          title={item.title}
+        >
           {item.title}
         </Link>
       </td>
@@ -44,7 +63,7 @@ function Row({ metric, row }: { metric: MetricName; row: MetricItemOut }) {
         {row.source === 'imported' ? `Imported · ${item.legacy_ref ?? 'tracker'}` : 'Native'}
       </td>
       <td className="app-num">{formatDate(row.start)}</td>
-      <td className="app-num">{row.end === null ? 'Open' : formatDate(row.end)}</td>
+      <td className="app-num">{row.end === null ? stillOpen(item.status) : formatDate(row.end)}</td>
       <td className="app-num app-metric-drill-value">{value(metric, row)}</td>
     </tr>
   );
@@ -72,7 +91,14 @@ export function DrillDown({
     metric,
     ...(openOnly && { open_only: true }),
   });
-  const title = openOnly ? `${meta.label} · open now` : `${meta.label} · ${rangeLabel(range.from, range.to)}`;
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.scrollIntoView({ block: 'nearest' });
+    heading.current?.focus({ preventScroll: true });
+  }, [metric, openOnly, range.from, range.to]);
+  const title = openOnly
+    ? `${meta.label} · re-reviews open now`
+    : `${meta.label} · ${rangeLabel(range.from, range.to)}`;
   const data = query.data;
 
   let body: React.ReactNode;
@@ -83,14 +109,16 @@ export function DrillDown({
       <div className="app-mine-error" role="alert">
         <p className="app-mine-error-title">Couldn&apos;t load the items.</p>
         <p className="app-muted">{apiErrorMessage(query.error)}</p>
-        <Button
-          size="sm"
-          onPress={() => {
-            void query.refetch();
-          }}
-        >
-          Retry
-        </Button>
+        {isServerError(query.error) && (
+          <Button
+            size="sm"
+            onPress={() => {
+              void query.refetch();
+            }}
+          >
+            Retry
+          </Button>
+        )}
       </div>
     );
   } else if (query.data.rows.length === 0) {
@@ -130,9 +158,9 @@ export function DrillDown({
   }
 
   return (
-    <section className="app-metric-drill" aria-label={title}>
+    <section id={DRILL_ID} className="app-metric-drill" aria-label={title}>
       <header className="app-metric-drill-header">
-        <h2 className="app-mine-heading">
+        <h2 ref={heading} tabIndex={-1} className="app-mine-heading app-metric-drill-heading">
           {title}
           {data !== undefined && (
             <span className="app-mine-count">
