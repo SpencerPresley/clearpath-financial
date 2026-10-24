@@ -20,6 +20,25 @@ export function fastTrackAvailable(item: ItemDetailOut): boolean {
   );
 }
 
+export type RereviewAction = 'fast_track' | 'reaffirm' | 'review' | 'pull';
+
+/**
+ * What a reviewer can do with a re-review, by why it reopened. Reaffirm re-approves the approved version
+ * after re-running code checks against today's terms (reviews/decisions.py `reaffirm`), so after a terms
+ * change it can only be refused: the approved version quotes the superseded numbers, and once a fast-track
+ * version exists it isn't even current. Terms changes therefore get Fast-track (a version was generated with
+ * the new numbers) or the normal lane (`review`: claim → in_review) when none could be; Pull always.
+ */
+export function rereviewActions(item: ItemDetailOut): RereviewAction[] {
+  if (item.status !== 'needs_rereview') {
+    return [];
+  }
+  if (item.reopen_reason === 'terms_changed') {
+    return fastTrackAvailable(item) ? ['fast_track', 'pull'] : ['review', 'pull'];
+  }
+  return fastTrackAvailable(item) ? ['fast_track', 'reaffirm', 'pull'] : ['reaffirm', 'pull'];
+}
+
 /** The request-changes reason starts from the accepted findings (decisions.md, Ergonomics). */
 export function changesRequestedDraft(findings: readonly FindingOut[]): string {
   return findings

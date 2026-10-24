@@ -369,12 +369,6 @@ export function DecisionPanel({
               isRequired
             />
           )}
-          {mode === 'reaffirm' && item.reopen_reason === 'terms_changed' && (
-            <p className="app-note" data-tone="alert">
-              v{approvedN} quotes the offer terms that changed. Reaffirm only if those numbers are still
-              offered; otherwise fast-track the updated version or pull it.
-            </p>
-          )}
           {mode === 'pull' && (
             <div className="app-field">
               <span className="app-field-label">Live placements to take down</span>

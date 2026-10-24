@@ -78,7 +78,6 @@ describe('toSubmitIn', () => {
       planned_last_run: null,
       is_prescreen: false,
       content_text: 'Personal loans as low as 5.99% APR.',
-      source_url: null,
     });
   });
 

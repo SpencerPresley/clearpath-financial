@@ -7,7 +7,35 @@ import {
   triaged,
   versionFixture,
 } from '../../test/fixtures/review';
-import { changesRequestedDraft, fastTrackAvailable } from './decisionModes';
+import { changesRequestedDraft, fastTrackAvailable, rereviewActions } from './decisionModes';
+
+describe('rereviewActions', () => {
+  const approvedV1 = { ...DECISION_APPROVED, version_n: 1 };
+  const rereview = (
+    reopen_reason: 'terms_changed' | 'approval_expired' | 'drift_detected',
+    generated = false,
+  ) =>
+    itemFixture({
+      status: 'needs_rereview',
+      reopen_reason,
+      latest_decision: generated ? approvedV1 : DECISION_APPROVED,
+      ...(generated ? { current_version: versionFixture(2, { origin: 'fast_track' }) } : {}),
+    });
+
+  it('never offers reaffirm after a terms change', () => {
+    expect(rereviewActions(rereview('terms_changed', true))).toEqual(['fast_track', 'pull']);
+    expect(rereviewActions(rereview('terms_changed'))).toEqual(['review', 'pull']);
+  });
+
+  it('offers reaffirm for an expired approval or live-copy drift', () => {
+    expect(rereviewActions(rereview('approval_expired'))).toEqual(['reaffirm', 'pull']);
+    expect(rereviewActions(rereview('drift_detected'))).toEqual(['reaffirm', 'pull']);
+  });
+
+  it('offers nothing outside re-review', () => {
+    expect(rereviewActions(itemFixture())).toEqual([]);
+  });
+});
 
 describe('fastTrackAvailable', () => {
   const generated = versionFixture(2, { origin: 'fast_track' });

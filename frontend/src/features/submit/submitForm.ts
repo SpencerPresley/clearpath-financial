@@ -45,8 +45,6 @@ export interface SubmitFormValues {
   planned_last_run: string;
   is_prescreen: boolean;
   content_text: string;
-  /** Set when the copy was fetched from a URL. */
-  source_url: string | null;
   mockup: File | null;
   evidence: QueuedEvidence[];
 }
@@ -61,7 +59,6 @@ export const EMPTY_SUBMIT_FORM: SubmitFormValues = {
   planned_last_run: '',
   is_prescreen: false,
   content_text: '',
-  source_url: null,
   mockup: null,
   evidence: [],
 };
@@ -95,10 +92,6 @@ export const submitFormSchema = SubmitItemBody.extend({
   channel: z.enum(api.channel.options, { error: 'Choose a channel.' }),
   partner_id: z.number().int().nullable(),
   is_prescreen: z.boolean(),
-  source_url: z
-    .string()
-    .max(api.source_url.unwrap().options[0].maxLength ?? Infinity)
-    .nullable(),
   markets: z.array(z.enum(['national', 'CA'])).min(1, 'Choose at least one market.'),
   planned_first_run: z.iso.date({ error: 'Enter the first run date.' }),
   planned_last_run: z.union([z.literal(''), z.iso.date()], { error: 'Enter a date or leave it empty.' }),
@@ -147,7 +140,6 @@ export function toSubmitIn(values: SubmitFormValues): SubmitItemIn {
     planned_last_run: values.planned_last_run === '' ? null : values.planned_last_run,
     is_prescreen: values.is_prescreen,
     content_text: values.content_text,
-    source_url: values.source_url,
   };
 }
 
