@@ -2197,11 +2197,12 @@
 
 /* ---- Metrics (workstream J) --------------------------------------------------------------------------- */
 @theme static {
-  /* Chart series. Native = brand navy; imported = a lighter navy (3.6:1 on base-100, WCAG 1.4.11), so the two
-     read as one family that differs in provenance, never as a status (§5.2). The legend and the table view say
-     which is which in words. */
-  --color-chart-native: oklch(30% 0.085 262);
-  --color-chart-imported: oklch(62% 0.07 262);
+  /* Chart series: a data palette, neither brand nor status (§5.2: navy is brand and primary action, and every
+     other hue in use names a status). Teal (hue 200) sits clear of navy 262, info 252, success 152, amber 80 and
+     the reds. Native = dark teal (6.7:1 on base-100), imported = a lighter teal (3.2:1, WCAG 1.4.11), so the two
+     read as one family that differs in provenance. The legend and the table view say which is which in words. */
+  --color-chart-native: oklch(46% 0.07 200);
+  --color-chart-imported: oklch(64% 0.065 200);
 }
 
 @layer components {
