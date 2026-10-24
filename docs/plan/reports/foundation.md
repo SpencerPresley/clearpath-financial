@@ -112,18 +112,21 @@ auto-assigned unless also granted `reviewer`. Inactive users have no effective r
 - `notifications.Notification(user, kind, item, event, message, read_at, created_at)` unique `(event, user)`;
   `notifications.OutboxEmail(to[], subject, body, item, requested_by, approved_by, thread_id, sent_at)`.
 
-### Engine contracts (`checks.contracts`) and the code-check seam
+### The code-check seam (on C's engine types)
 
-`Span(start, end)` (validated, `.of(text)`), `CheckInput(text, product, channel, markets, attachment_kinds,
-is_prescreen, has_partner, offer_terms, offer_terms_id)`, `FindingDraft(rule_id, citation, source, severity,
-message, suggested_fix="", span=None, quote=None)` (quote iff span), `TermsRefDraft(field, span, quote, value)`,
-`CodeCheckResult(findings, terms_refs, ruleset_key, ruleset_date=None)` with `.empty()`.
+The engine's own types (`checks.engine`: `RuleContext`, `CheckResult`, `FindingDraft`, `TermsRefDraft`, `Span`;
+merged with C in #21) are the contract. This branch's earlier `checks.contracts` duplicated them and was removed
+on rebase; nothing merged imported it.
 
-Seam: `checks.services.run_code_checks(*, version, clock) -> PersistedChecks(result: CodeCheckResult,
+Seam: `checks.services.run_code_checks(*, version, clock) -> PersistedChecks(result: checks.engine.CheckResult,
 open_findings_count)` is called inside `submit_item`'s transaction and returns `PersistedChecks.empty()` today.
-C/E: build `CheckInput`, call the engine, persist Findings/TermsRefs/CheckRun, carry dismissals, record
+The integration (C/E; owner still to be named, see Open risks): build a `RuleContext` from the item and the
+current OfferTerms, call `checks.engine.run_code_checks`, persist Findings (`suggested_fix or ""`), TermsRefs
+(`TermsField(draft.field)`) and a CheckRun keyed by `ENGINE_VERSION`, carry dismissals, record
 `CHECKS_COMPLETED`, and return the open count after carry-forward. The calling action (submit, resubmit) writes
-it to `ReviewItem.open_findings_count`, so each action has one writer.
+it to `ReviewItem.open_findings_count`, so each action has one writer. `checks/tests/test_engine_compat.py` fails
+if the engine emits a terms field `TermsField` doesn't know, or a rule id or citation longer than the `Finding`
+columns.
 
 ### Events and the outbox
 
@@ -244,18 +247,20 @@ partners.selectors.list_partners / get_partner_detail / repeat_issues; notificat
 
 ## Verification
 
-Run after the review fix pass, at the head of `ws0/foundation` (test DB suffix `ws0`; private dev DB
-`clearpath_ws0`):
+Run after the review fix pass and a rebase onto `origin/main` (which brought in C's engine, #21, and the design
+system's frontend dependencies), at the head of `ws0/foundation` (test DB suffix `ws0`; private dev DB
+`clearpath_ws0`). The 621 backend tests are this branch's 295 plus the engine's 326; the frontend counts
+include the design system's tests.
 
 ```
 $ uv run pytest -q
-291 passed in 7.12s
+621 passed in 7.66s
 $ uv run --group lint ruff check .
 All checks passed!
 $ uv run --group lint ruff format --check .
-138 files already formatted
+172 files already formatted
 $ uv run --group typecheck pyrefly check
- INFO 0 errors (63 suppressed)
+ INFO 0 errors (93 suppressed, 1 warning not shown, use `--min-severity=warn` to see it)
 $ manage.py makemigrations --check --dry-run
 No changes detected
 $ manage.py check --fail-level WARNING
@@ -265,8 +270,8 @@ $ make schema && git status --porcelain -- frontend/openapi frontend/src/api/gen
 $ npm run typecheck
 tsc -b: ok
 $ npm run test:run
- Test Files  1 passed (1)
-      Tests  3 passed (3)
+ Test Files  12 passed (12)
+      Tests  145 passed (145)
 $ npm run lint
 eslint: ok
 $ npm run format:check

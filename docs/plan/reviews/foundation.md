@@ -46,8 +46,10 @@ On the reviewer's rulings notes:
   `idle_in_transaction_session_timeout`.
 - **Ruling 14**: I11 was the counterexample, and it's now fixed.
 
-After the fixes:
-- 291 backend tests pass.
+After the fixes and a rebase onto `origin/main`:
+- 621 backend tests pass (this branch's 295 plus C's 326 engine tests). The rebase also replaced this branch's
+  `checks.contracts` with C's merged `checks.engine` types (no merged code imported it), and added an
+  engine-compatibility test.
 - ruff, pyrefly, makemigrations --check, manage.py check and the frontend checks are all clean.
 - `make schema` has no drift.
 
