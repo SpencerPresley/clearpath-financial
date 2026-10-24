@@ -11,4 +11,5 @@ export interface ItemAssignedPayload {
   mode: AssignmentMode;
   previous_assignee_id: number | null;
   reason: string;
+  reopen_event_id?: number | null;
 }

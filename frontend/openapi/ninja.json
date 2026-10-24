@@ -4679,6 +4679,17 @@
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "reopen_event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Event Id"
           }
         },
         "required": [

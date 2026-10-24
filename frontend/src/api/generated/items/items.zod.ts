@@ -1102,7 +1102,8 @@ export const GetItemHistoryResponse = zod.object({
   "assignee_id": zod.union([zod.int(),zod.null()]),
   "mode": zod.enum(['sticky', 'lowest_load', 'pool', 'manual', 'claim', 'handoff']).describe('Which assignment rule placed an item (decisions.md "Reviewer assignment"); recorded on the event.'),
   "previous_assignee_id": zod.union([zod.int(),zod.null()]),
-  "reason": zod.string()
+  "reason": zod.string(),
+  "reopen_event_id": zod.union([zod.int(),zod.null()]).optional()
 }),
   "to_status": zod.union([zod.enum(['draft', 'submitted', 'in_review', 'changes_requested', 'approved', 'rejected', 'needs_rereview', 'expired', 'withdrawn']),zod.null()]),
   "type": zod.literal("item.assigned").meta({ title: 'Type' })

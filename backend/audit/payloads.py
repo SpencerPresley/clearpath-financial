@@ -66,6 +66,9 @@ class ItemAssignedPayload(EventPayload):
     previous_assignee_id: int | None
     mode: AssignmentMode
     reason: str  # e.g. "Dana: load 4 vs Sam 7"
+    # The ITEM_REOPENED this assignment is part of (a re-review sends the item back), so the re-review is one
+    # notification, not two. Left out when unset, so other assignments keep the shape they were recorded with.
+    reopen_event_id: int | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ItemReviewStartedPayload(EventPayload):

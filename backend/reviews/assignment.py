@@ -66,7 +66,14 @@ def locked_item(item_id: int) -> ReviewItem:
 
 
 def _set_assignee(  # the event's fields
-    item: ReviewItem, user: User | None, *, actor: User | None, mode: AssignmentMode, reason: str, at: datetime
+    item: ReviewItem,
+    user: User | None,
+    *,
+    actor: User | None,
+    mode: AssignmentMode,
+    reason: str,
+    at: datetime,
+    reopen_event_id: int | None = None,
 ) -> Assignment:
     previous = item.assignee_id  # pyrefly: ignore[missing-attribute]
     item.assignee = user
@@ -81,7 +88,11 @@ def _set_assignee(  # the event's fields
         entity_id=item.pk,
         item_id=item.pk,
         payload=ItemAssignedPayload(
-            assignee_id=user.pk if user is not None else None, previous_assignee_id=previous, mode=mode, reason=reason
+            assignee_id=user.pk if user is not None else None,
+            previous_assignee_id=previous,
+            mode=mode,
+            reason=reason,
+            reopen_event_id=reopen_event_id,
         ),
         actor=actor,
         at=at,
@@ -119,10 +130,16 @@ def _can_review(user: User, item: ReviewItem) -> bool:
 
 
 def auto_assign(
-    *, item: ReviewItem, actor: User | None, clock: Clock = SYSTEM_CLOCK, sticky: bool = False
+    *,
+    item: ReviewItem,
+    actor: User | None,
+    clock: Clock = SYSTEM_CLOCK,
+    sticky: bool = False,
+    reopen_event_id: int | None = None,
 ) -> Assignment:
     """Assign `item` (locked or freshly created by the caller) by the three rules, recording ITEM_ASSIGNED with
-    the reason. `sticky` for resubmissions, new rounds, and re-reviews.
+    the reason. `sticky` for resubmissions, new rounds, and re-reviews; a re-review also passes its ITEM_REOPENED
+    (`reopen_event_id`), which the event records so the re-review notifies once.
 
     The sticky reviewer must still be active, available, a reviewer (a lead who reviewed counts), and not the
     item's owner; otherwise the item falls through to lowest load. The lowest-load pool uses stored roles, so a
@@ -143,6 +160,7 @@ def auto_assign(
                     mode=AssignmentMode.STICKY,
                     reason=f"Back to {_name(previous)}, who reviewed it before",
                     at=now,
+                    reopen_event_id=reopen_event_id,
                 )
             unavailable = f"{_name(previous)} is unavailable. "
     pool = list(
@@ -152,7 +170,13 @@ def auto_assign(
     )
     if not pool:
         return _set_assignee(
-            item, None, actor=actor, mode=AssignmentMode.POOL, reason=f"{unavailable}No reviewer is available", at=now
+            item,
+            None,
+            actor=actor,
+            mode=AssignmentMode.POOL,
+            reason=f"{unavailable}No reviewer is available",
+            at=now,
+            reopen_event_id=reopen_event_id,
         )
     loads = _loads((u.pk for u in pool), excluding_item_id=item.pk)
     ranked = sorted(pool, key=lambda u: (loads.get(u.pk, 0), u.last_assigned_at or _LONG_AGO, u.pk))
@@ -162,7 +186,13 @@ def auto_assign(
         runner_up = ranked[1]
         reason += f" vs {_name(runner_up)} {loads.get(runner_up.pk, 0)}"
     return _set_assignee(
-        item, winner, actor=actor, mode=AssignmentMode.LOWEST_LOAD, reason=f"{unavailable}{reason}", at=now
+        item,
+        winner,
+        actor=actor,
+        mode=AssignmentMode.LOWEST_LOAD,
+        reason=f"{unavailable}{reason}",
+        at=now,
+        reopen_event_id=reopen_event_id,
     )
 
 
