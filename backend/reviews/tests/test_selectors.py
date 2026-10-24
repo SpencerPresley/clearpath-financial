@@ -25,7 +25,14 @@ from core.domain import (
 from core.errors import InvalidInput
 from reviews.filters import ItemFilter, ItemSort
 from reviews.models import APPROVED_OUTCOMES, Decision, Placement, ReviewItem
-from reviews.selectors import filter_items, list_items, live_placements_q, queue_stats
+from reviews.selectors import (
+    LibraryScope,
+    filter_items,
+    library_items,
+    list_items,
+    live_placements_q,
+    queue_stats,
+)
 from reviews.tests.factories import AT, make_item, make_partner, make_version
 
 
@@ -583,3 +590,30 @@ def test_findings_count_column_is_what_filters_use(marketer: User, reviewer: Use
     )
 
     assert ids == set()
+
+
+# --- library -----------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_approved_to_run_leaves_out_lapsed_approvals_legacy_included(
+    marketer: User, reviewer: User, clock: FixedClock
+) -> None:
+    # Walkthrough S19: legacy items skip the expiry sweep, so their status stays approved after the date passes.
+    now = clock.now()
+    current = make_item(marketer, status=ItemStatus.APPROVED, approval_expires_at=now + timedelta(days=30))
+    undated = make_item(None, status=ItemStatus.APPROVED, is_legacy=True, legacy_ref="MCR-1", markets=[])
+    lapsed_legacy = make_item(
+        None,
+        status=ItemStatus.APPROVED,
+        is_legacy=True,
+        legacy_ref="MCR-2",
+        markets=[],
+        approval_expires_at=now - timedelta(days=60),
+    )
+
+    def ids(scope: LibraryScope) -> set[int]:
+        return set(_ids(library_items(viewer=reviewer, filters=ItemFilter(), scope=scope, clock=clock).rows))
+
+    assert ids(LibraryScope.APPROVED_TO_RUN) == {current.pk, undated.pk}
+    assert lapsed_legacy.pk in ids(LibraryScope.EVER_APPROVED)  # precedent value doesn't lapse

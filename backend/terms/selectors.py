@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
 
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import Exists, OuterRef, QuerySet, Subquery
 
 from accounts.models import User
 from checks.engine import Span, TermsRefDraft
@@ -203,3 +203,27 @@ def _in_effect(terms: OfferTerms, at: datetime) -> bool:
     rng = terms.effective_range
     lower, upper = rng.lower, rng.upper  # pyrefly: ignore[missing-attribute]
     return lower <= at and (upper is None or at < upper)
+
+
+# --- in-flight items quoting superseded terms (the publish re-check's work list) --------------------------------
+
+# Under review or about to be (walkthrough S20): their copy isn't regenerated (ledger ruling), but the rate-value
+# code checks must see the new terms before anyone tries to approve. Approved and needs_rereview items are the
+# fan-out's (`AFFECTED_STATUSES`).
+IN_FLIGHT_STATUSES: Final = (ItemStatus.SUBMITTED, ItemStatus.IN_REVIEW, ItemStatus.CHANGES_REQUESTED)
+
+
+def in_flight_quoting_superseded(
+    *, product: Product, clock: Clock = SYSTEM_CLOCK, item_ids: Iterable[int] | None = None
+) -> tuple[int, ...]:
+    """Ids of non-legacy in-flight items of `product` (optionally only `item_ids`) whose current version quotes a
+    terms version not in effect now, ordered by id. One query."""
+    stale_refs = TermsRef.objects.filter(version_id=OuterRef("current_version_id")).exclude(
+        offer_terms__effective_range__contains=clock.now()
+    )
+    items = ReviewItem.objects.filter(
+        status__in=[s.value for s in IN_FLIGHT_STATUSES], is_legacy=False, product=product
+    ).filter(Exists(stale_refs))
+    if item_ids is not None:
+        items = items.filter(pk__in=list(item_ids))
+    return tuple(items.order_by("pk").values_list("pk", flat=True))

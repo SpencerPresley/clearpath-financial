@@ -25,14 +25,22 @@ from enum import StrEnum
 from django.db import transaction
 
 from checks.engine import StaleTermsRef, render_fast_track
+from checks.models import CheckRun
+from checks.services import recount_open_findings, run_code_checks
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import ItemStatus, Product, ReopenReason, VersionOrigin
+from core.domain import FindingSource, ItemStatus, Product, ReopenReason, VersionOrigin
 from reviews.assignment import locked_item
 from reviews.models import Version
 from reviews.rereview import send_back
 from reviews.selectors import is_item_live
 from reviews.versions import create_version
-from terms.selectors import AFFECTED_STATUSES, affected_approvals, terms_in_effect
+from terms.selectors import (
+    AFFECTED_STATUSES,
+    IN_FLIGHT_STATUSES,
+    affected_approvals,
+    in_flight_quoting_superseded,
+    terms_in_effect,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +97,40 @@ def fan_out_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> FanOutOutcome:
     if live:
         return FanOutOutcome.REOPENED_FAST_TRACK if generated is not None else FanOutOutcome.REOPENED_NORMAL_LANE
     return FanOutOutcome.EXPIRED if generated is not None else FanOutOutcome.EXPIRED_NORMAL_LANE
+
+
+# --- in-flight items: re-check, don't regenerate ----------------------------------------------------------------
+
+
+class RecheckOutcome(StrEnum):
+    RECHECKED = "rechecked"  # code checks re-ran against the terms in effect; new findings are open
+    SKIPPED = "skipped"  # not in flight, not quoting superseded terms, or already re-checked since they took effect
+
+
+def recheck_in_flight_item(*, item_id: int, clock: Clock = SYSTEM_CLOCK) -> RecheckOutcome:
+    """Re-run the code checks on an in-flight item's current version after a terms change (walkthrough S20).
+
+    In-flight items (submitted, in review, changes requested) aren't regenerated (ledger ruling): the reviewer
+    requests changes or approves with edits. But until the checks re-run, a stale rate shows up only as a 409 when
+    Approve is pressed. Re-running adds the findings for the new terms (`pricing.terms_available` and
+    `pricing.terms_current`) as open findings and updates the open count. The version's terms refs stay as recorded,
+    so it still "quotes" the superseded version and approval stays refused until the copy changes.
+
+    One item per transaction (lock order, as `fan_out_item`). Idempotent: skipped once a code check has run on the
+    version since the terms in effect took effect, so a redelivered event or a retry adds nothing.
+    """
+    with transaction.atomic():
+        item = locked_item(item_id)
+        if ItemStatus(item.status) not in IN_FLIGHT_STATUSES or item.is_legacy or item.current_version_id is None:  # pyrefly: ignore[missing-attribute]
+            return RecheckOutcome.SKIPPED
+        if not in_flight_quoting_superseded(product=Product(item.product), clock=clock, item_ids=[item_id]):
+            return RecheckOutcome.SKIPPED
+        terms = terms_in_effect(product=Product(item.product), clock=clock)
+        since = terms.effective_range.lower if terms is not None else None  # pyrefly: ignore[missing-attribute]
+        version = Version.objects.select_related("item__partner").get(pk=item.current_version_id)  # pyrefly: ignore[missing-attribute]
+        already = CheckRun.objects.filter(version=version, source=FindingSource.CODE.value, started_at__gte=since)
+        if since is None or already.exists():
+            return RecheckOutcome.SKIPPED
+        run_code_checks(version=version, clock=clock)
+        recount_open_findings(item_id=item_id)
+    return RecheckOutcome.RECHECKED

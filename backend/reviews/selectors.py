@@ -531,7 +531,7 @@ class LibraryScope(StrEnum):
     """The library's two views (ledger ruling): what may run now, and every approval ever given (precedent value
     doesn't lapse; run-permission does)."""
 
-    APPROVED_TO_RUN = "approved_to_run"  # current status approved, legacy included
+    APPROVED_TO_RUN = "approved_to_run"  # current status approved and not past its expiry, legacy included
     EVER_APPROVED = "ever_approved"  # any approving decision, or an imported item the tracker had as approved
 
 
@@ -548,7 +548,11 @@ def library_items(  # list_items' arguments plus the scope
     """The approved archive. `filters.status` narrows within the scope (e.g. ever-approved items now expired)."""
     qs = filter_items(viewer=viewer, filters=filters, clock=clock)
     if scope is LibraryScope.APPROVED_TO_RUN:
-        qs = qs.filter(status=ItemStatus.APPROVED.value)
+        # Not past its expiry, either: legacy items skip the expiry sweep, so their status stays approved after the
+        # date passes, and this tab answers "can I run this?" (walkthrough S19). No expiry recorded: still listed.
+        qs = qs.filter(status=ItemStatus.APPROVED.value).filter(
+            Q(approval_expires_at__isnull=True) | Q(approval_expires_at__gt=clock.now())
+        )
     else:
         approvals = Decision.objects.filter(item=OuterRef("pk"), outcome__in=APPROVED_OUTCOMES)
         qs = qs.filter(Exists(approvals) | Q(is_legacy=True, status=ItemStatus.APPROVED.value))

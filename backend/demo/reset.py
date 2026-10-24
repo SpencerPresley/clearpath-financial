@@ -10,7 +10,8 @@
   trail), except the one who pressed Reset and operator (`is_staff`) accounts (`demo.users.remove_added_people`).
 - **Nothing leaks to the worker.** While the seed's transaction is open, the beat dispatcher can't see its events
   (they're uncommitted) and the runner delivers them in-process, writing their receipts. The handlers that would
-  enqueue Celery work on commit (the AI check, the terms fan-out, the import commit, the drift check) are pointed
+  enqueue Celery work on commit (the AI check, the terms fan-out and in-flight re-check, the import commit, the
+  drift check) are pointed
   at no-ops for the duration, including the commit, so no seeded version gets a live AI call. The one item left
   with a pending AI check is picked up by the reconciler once it's older than its STUCK_AFTER (10 minutes).
 """
@@ -102,12 +103,14 @@ def quiet_side_effects() -> Iterator[None]:
     saved = (
         prereview.enqueue,
         terms_handlers.enqueue_fan_out,
+        terms_handlers.enqueue_recheck,
         import_services._enqueue_commit,  # noqa: SLF001
         drift_services.enqueue,
         check_handlers.clock,
     )
     prereview.enqueue = _noop
     terms_handlers.enqueue_fan_out = _noop
+    terms_handlers.enqueue_recheck = _noop
     import_services._enqueue_commit = _noop  # noqa: SLF001
     drift_services.enqueue = _noop
     try:
@@ -116,6 +119,7 @@ def quiet_side_effects() -> Iterator[None]:
         (
             prereview.enqueue,
             terms_handlers.enqueue_fan_out,
+            terms_handlers.enqueue_recheck,
             import_services._enqueue_commit,  # noqa: SLF001
             drift_services.enqueue,
             check_handlers.clock,

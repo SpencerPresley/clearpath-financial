@@ -100,10 +100,10 @@ from reviews.services import (
     update_item_fields,
 )
 from reviews.versions import resubmit_item, start_new_round
-from terms.fanout import fan_out_item
+from terms.fanout import fan_out_item, recheck_in_flight_item
 from terms.fast_track import fast_track_approve
 from terms.models import OfferTerms
-from terms.selectors import affected_approvals
+from terms.selectors import affected_approvals, in_flight_quoting_superseded
 from terms.services import PublishTermsInput, publish_terms
 
 AI_LATENCY: Final = timedelta(seconds=6)  # an AI check lands this long after the version it reviews
@@ -311,6 +311,9 @@ class Runner:
         # What the terms.fan_out handler's per-item tasks do, one item per transaction.
         for affected in affected_approvals(product=spec.product, clock=self.clock):
             fan_out_item(item_id=affected.item_id, clock=self.clock)
+        # And what the terms.recheck_in_flight handler's tasks do: re-check in-flight items quoting the old terms.
+        for item_id in in_flight_quoting_superseded(product=spec.product, clock=self.clock):
+            recheck_in_flight_item(item_id=item_id, clock=self.clock)
 
     def _global(self, event: GlobalStep) -> None:
         if isinstance(event, SetAvailability):
