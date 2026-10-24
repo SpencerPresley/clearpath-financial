@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from ninja import Schema
+from pydantic import Field
 
 from core.domain import NotificationKind
 from reviews.schemas import PartyRefOut
@@ -30,6 +31,7 @@ class OutboxEmailOut(Schema):
     to: list[str]
     subject: str
     body: str
+    html_body: str = Field(description="HTML alternative; render only in a sandboxed iframe.")
     item_id: int | None
     requested_by: PartyRefOut
     approved_by: PartyRefOut

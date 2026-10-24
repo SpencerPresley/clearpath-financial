@@ -60,6 +60,7 @@ export const ListOutboxEmailsResponseItem = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "body": zod.string(),
+  "html_body": zod.string().describe('HTML alternative; render only in a sandboxed iframe.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
   "requested_by": zod.object({
@@ -86,6 +87,7 @@ export const GetOutboxEmailResponse = zod.object({
   "name": zod.string()
 }).describe('A person or partner shown in a cell.'),
   "body": zod.string(),
+  "html_body": zod.string().describe('HTML alternative; render only in a sandboxed iframe.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
   "requested_by": zod.object({

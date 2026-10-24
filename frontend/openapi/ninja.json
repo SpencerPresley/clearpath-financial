@@ -7482,6 +7482,11 @@
             "title": "Body",
             "type": "string"
           },
+          "html_body": {
+            "description": "HTML alternative; render only in a sandboxed iframe.",
+            "title": "Html Body",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -7526,6 +7531,7 @@
           "to",
           "subject",
           "body",
+          "html_body",
           "item_id",
           "requested_by",
           "approved_by",

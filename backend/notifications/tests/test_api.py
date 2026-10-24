@@ -47,6 +47,7 @@ def test_outbox_lists_sent_emails(reviewer: User, lead: User) -> None:
         to=["dana@clearpath.demo"],
         subject="Queue summary",
         body="3 items waiting",
+        html_body="<p>3 items waiting</p>",
         requested_by=reviewer,
         approved_by=reviewer,
         sent_at=AT,
@@ -54,4 +55,6 @@ def test_outbox_lists_sent_emails(reviewer: User, lead: User) -> None:
     client = _client(lead)
 
     assert [e["subject"] for e in client.get("/api/outbox").json()] == ["Queue summary"]
-    assert client.get(f"/api/outbox/{email.pk}").json()["to"] == ["dana@clearpath.demo"]
+    detail = client.get(f"/api/outbox/{email.pk}").json()
+    assert detail["to"] == ["dana@clearpath.demo"]
+    assert detail["html_body"] == "<p>3 items waiting</p>"

@@ -9,6 +9,8 @@ import type { PartyRefOut } from './partyRefOut';
 export interface OutboxEmailOut {
   approved_by: PartyRefOut;
   body: string;
+  /** HTML alternative; render only in a sandboxed iframe. */
+  html_body: string;
   id: number;
   item_id: number | null;
   requested_by: PartyRefOut;

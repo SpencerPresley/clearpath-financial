@@ -38,6 +38,8 @@ class OutboxEmail(models.Model):
     to = ArrayField(models.EmailField())
     subject = models.CharField(max_length=300)
     body = models.TextField()
+    # The rendered HTML alternative (autoescaped template); "" for rows written before it existed.
+    html_body = models.TextField(blank=True)
     item = models.ForeignKey("reviews.ReviewItem", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")

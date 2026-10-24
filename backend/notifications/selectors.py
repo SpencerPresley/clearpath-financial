@@ -52,6 +52,7 @@ class OutboxEmailRow:
     to: tuple[str, ...]
     subject: str
     body: str
+    html_body: str
     item_id: int | None
     requested_by: PartyRef
     approved_by: PartyRef
@@ -69,6 +70,7 @@ def _email_row(e: OutboxEmail) -> OutboxEmailRow:
         to=tuple(e.to),
         subject=e.subject,
         body=e.body,
+        html_body=e.html_body,
         item_id=e.item_id,  # pyrefly: ignore[missing-attribute]
         requested_by=_party(e.requested_by),
         approved_by=_party(e.approved_by),
