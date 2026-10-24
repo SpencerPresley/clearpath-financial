@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TokenEventOut {
-  text: string;
-  type: 'token';
-}
+export const ApproveInValue = {
+  type: 'approve',
+} as const;
+export type ApproveIn = typeof ApproveInValue;

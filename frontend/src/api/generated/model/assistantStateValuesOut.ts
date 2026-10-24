@@ -4,8 +4,8 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { WireMessageOut } from './wireMessageOut';
 
-export interface DoneEventOut {
-  message_id: string;
-  type: 'done';
+export interface AssistantStateValuesOut {
+  messages: WireMessageOut[];
 }

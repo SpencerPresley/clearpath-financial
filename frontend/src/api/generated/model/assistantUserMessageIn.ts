@@ -5,12 +5,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AssistantMessageIn {
+export interface AssistantUserMessageIn {
   /**
      * @minLength 1
      * @maxLength 8000
      */
   content: string;
-  /** The item open in the review screen, as context. */
-  item_id?: number | null;
+  /**
+     * Client-minted id; the checkpoint keeps it.
+     * @minLength 1
+     * @maxLength 100
+     */
+  id: string;
 }

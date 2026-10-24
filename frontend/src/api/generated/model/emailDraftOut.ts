@@ -7,6 +7,7 @@
 
 export interface EmailDraftOut {
   body: string;
+  item_key?: string | null;
   subject: string;
   to: string[];
 }

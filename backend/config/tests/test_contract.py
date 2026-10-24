@@ -105,11 +105,12 @@ def test_no_operation_returns_a_raw_dict() -> None:
     assert offenders == []
 
 
+_THREAD = "00000000-0000-4000-8000-000000000001"
+
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
-    ("post", "/api/assistant/threads", None),
-    ("get", "/api/assistant/threads/t1", None),
-    ("post", "/api/assistant/threads/t1/messages", {"content": "What's waiting on me?"}),
-    ("post", "/api/assistant/threads/t1/approvals/i1", {"decision": "reject"}),
+    ("get", f"/api/assistant/threads/{_THREAD}/state", None),
+    ("post", f"/api/assistant/threads/{_THREAD}/runs", {"message": {"id": "m1", "content": "What's waiting on me?"}}),
+    ("post", f"/api/assistant/threads/{_THREAD}/interrupts/i1", {"type": "reject"}),
     (
         "post",
         "/api/admin/users",

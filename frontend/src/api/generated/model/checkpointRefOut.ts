@@ -5,8 +5,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ErrorEventOut {
-  code: string;
-  message: string;
-  type: 'error';
+export interface CheckpointRefOut {
+  checkpoint_id: string | null;
 }

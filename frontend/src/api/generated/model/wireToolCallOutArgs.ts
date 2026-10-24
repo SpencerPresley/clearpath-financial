@@ -6,4 +6,4 @@
  */
 import type { JsonValue } from './jsonValue';
 
-export type ToolCallEventOutArgs = {[key: string]: JsonValue};
+export type WireToolCallOutArgs = {[key: string]: JsonValue};

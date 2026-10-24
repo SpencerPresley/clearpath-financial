@@ -24,16 +24,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  ApprovalRequiredEventOut,
-  AssistantApprovalIn,
-  AssistantMessageIn,
+  ApproveIn,
+  AssistantRunIn,
   AssistantThreadOut,
-  DoneEventOut,
-  ErrorEventOut,
+  AssistantThreadStateOut,
+  EditIn,
   ErrorOut,
-  TokenEventOut,
-  ToolCallEventOut,
-  ToolResultEventOut
+  RejectIn
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -58,6 +55,107 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getListAssistantThreadsUrl = () => {
+
+
+
+
+  return `/api/assistant/threads`
+}
+
+/**
+ * Your assistant threads, most recent activity first.
+ * @summary List Threads
+ */
+export const listAssistantThreads = async ( options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadOut[]> => {
+
+  return customFetch<AssistantThreadOut[]>(getListAssistantThreadsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAssistantThreadsQueryKey = () => {
+    return [
+    `/api/assistant/threads`
+    ] as const;
+    }
+
+
+export const getListAssistantThreadsQueryOptions = <TData = Awaited<ReturnType<typeof listAssistantThreads>>, TError = ErrorOut>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAssistantThreadsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAssistantThreads>>> = ({ signal }) => listAssistantThreads({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAssistantThreadsQueryResult = NonNullable<Awaited<ReturnType<typeof listAssistantThreads>>>
+export type ListAssistantThreadsQueryError = ErrorOut
+
+
+export function useListAssistantThreads<TData = Awaited<ReturnType<typeof listAssistantThreads>>, TError = ErrorOut>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistantThreads>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistantThreads>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistantThreads<TData = Awaited<ReturnType<typeof listAssistantThreads>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAssistantThreads>>,
+          TError,
+          Awaited<ReturnType<typeof listAssistantThreads>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAssistantThreads<TData = Awaited<ReturnType<typeof listAssistantThreads>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Threads
+ */
+
+export function useListAssistantThreads<TData = Awaited<ReturnType<typeof listAssistantThreads>>, TError = ErrorOut>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAssistantThreads>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAssistantThreadsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export const getCreateAssistantThreadUrl = () => {
 
 
@@ -67,7 +165,6 @@ export const getCreateAssistantThreadUrl = () => {
 }
 
 /**
- * [workstream K]
  * @summary Create Thread
  */
 export const createAssistantThread = async ( options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadOut> => {
@@ -141,7 +238,6 @@ export const useCreateAssistantThread = <TError = ErrorOut,
 }
 
 /**
- * [workstream K]
  * @summary Get Thread
  */
 export const getAssistantThread = async (threadId: string, options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadOut> => {
@@ -233,22 +329,22 @@ export function useGetAssistantThread<TData = Awaited<ReturnType<typeof getAssis
 
 
 
-export const getResolveAssistantApprovalUrl = (threadId: string,
+export const getRespondToAssistantInterruptUrl = (threadId: string,
     interruptId: string,) => {
 
 
 
 
-  return `/api/assistant/threads/${threadId}/approvals/${interruptId}`
+  return `/api/assistant/threads/${threadId}/interrupts/${interruptId}`
 }
 
 /**
- * Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.
- * @summary Resolve Approval
+ * Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.
+ * @summary Respond To Interrupt
  */
-export const resolveAssistantApproval = async (threadId: string,
+export const respondToAssistantInterrupt = async (threadId: string,
     interruptId: string,
-    assistantApprovalIn: AssistantApprovalIn, options?: Parameters<typeof customFetch>[1]): Promise<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut> => {
+    approveInEditInRejectIn: ApproveIn | EditIn | RejectIn, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -264,12 +360,12 @@ export const resolveAssistantApproval = async (threadId: string,
     }
     return headers;
   };
-return customFetch<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut>(getResolveAssistantApprovalUrl(threadId,interruptId),
+return customFetch<string>(getRespondToAssistantInterruptUrl(threadId,interruptId),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(assistantApprovalIn)
+    body: JSON.stringify(approveInEditInRejectIn)
   }
 );}
 
@@ -277,13 +373,13 @@ return customFetch<TokenEventOut | ToolCallEventOut | ToolResultEventOut | Appro
 
 
 
-export const getResolveAssistantApprovalMutationKey = () => ['resolveAssistantApproval'] as const;
+export const getRespondToAssistantInterruptMutationKey = () => ['respondToAssistantInterrupt'] as const;
 
-export const getResolveAssistantApprovalMutationOptions = <TError = ErrorOut,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAssistantApproval>>, TError,ResolveAssistantApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof resolveAssistantApproval>>, TError,ResolveAssistantApprovalMutationVariables, TContext> => {
+export const getRespondToAssistantInterruptMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToAssistantInterrupt>>, TError,RespondToAssistantInterruptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respondToAssistantInterrupt>>, TError,RespondToAssistantInterruptMutationVariables, TContext> => {
 
-const mutationKey = getResolveAssistantApprovalMutationKey();
+const mutationKey = getRespondToAssistantInterruptMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -293,10 +389,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveAssistantApproval>>, ResolveAssistantApprovalMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respondToAssistantInterrupt>>, RespondToAssistantInterruptMutationVariables> = (props) => {
           const {threadId,interruptId,data} = props ?? {};
 
-          return  resolveAssistantApproval(threadId,interruptId,data,requestOptions)
+          return  respondToAssistantInterrupt(threadId,interruptId,data,requestOptions)
         }
 
 
@@ -306,38 +402,38 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ResolveAssistantApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof resolveAssistantApproval>>>
-    export type ResolveAssistantApprovalMutationBody = AssistantApprovalIn
-    export type ResolveAssistantApprovalMutationError = ErrorOut
-    export type ResolveAssistantApprovalMutationVariables = {threadId: string;interruptId: string;data: AssistantApprovalIn}
+    export type RespondToAssistantInterruptMutationResult = NonNullable<Awaited<ReturnType<typeof respondToAssistantInterrupt>>>
+    export type RespondToAssistantInterruptMutationBody = ApproveIn | EditIn | RejectIn
+    export type RespondToAssistantInterruptMutationError = ErrorOut
+    export type RespondToAssistantInterruptMutationVariables = {threadId: string;interruptId: string;data: ApproveIn | EditIn | RejectIn}
 
     /**
- * @summary Resolve Approval
+ * @summary Respond To Interrupt
  */
-export const useResolveAssistantApproval = <TError = ErrorOut,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAssistantApproval>>, TError,ResolveAssistantApprovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useRespondToAssistantInterrupt = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToAssistantInterrupt>>, TError,RespondToAssistantInterruptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof resolveAssistantApproval>>,
+        Awaited<ReturnType<typeof respondToAssistantInterrupt>>,
         TError,
-        ResolveAssistantApprovalMutationVariables,
+        RespondToAssistantInterruptMutationVariables,
         TContext
       > => {
-      return useMutation(getResolveAssistantApprovalMutationOptions(options), queryClient);
+      return useMutation(getRespondToAssistantInterruptMutationOptions(options), queryClient);
     }
-    export const getStreamAssistantReplyUrl = (threadId: string,) => {
+    export const getStartAssistantRunUrl = (threadId: string,) => {
 
 
 
 
-  return `/api/assistant/threads/${threadId}/messages`
+  return `/api/assistant/threads/${threadId}/runs`
 }
 
 /**
- * Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.
- * @summary Stream Reply
+ * Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.
+ * @summary Start Run
  */
-export const streamAssistantReply = async (threadId: string,
-    assistantMessageIn: AssistantMessageIn, options?: Parameters<typeof customFetch>[1]): Promise<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut> => {
+export const startAssistantRun = async (threadId: string,
+    assistantRunIn: AssistantRunIn, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -353,12 +449,12 @@ export const streamAssistantReply = async (threadId: string,
     }
     return headers;
   };
-return customFetch<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut>(getStreamAssistantReplyUrl(threadId),
+return customFetch<string>(getStartAssistantRunUrl(threadId),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(assistantMessageIn)
+    body: JSON.stringify(assistantRunIn)
   }
 );}
 
@@ -366,13 +462,13 @@ return customFetch<TokenEventOut | ToolCallEventOut | ToolResultEventOut | Appro
 
 
 
-export const getStreamAssistantReplyMutationKey = () => ['streamAssistantReply'] as const;
+export const getStartAssistantRunMutationKey = () => ['startAssistantRun'] as const;
 
-export const getStreamAssistantReplyMutationOptions = <TError = ErrorOut,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof streamAssistantReply>>, TError,StreamAssistantReplyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof streamAssistantReply>>, TError,StreamAssistantReplyMutationVariables, TContext> => {
+export const getStartAssistantRunMutationOptions = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAssistantRun>>, TError,StartAssistantRunMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startAssistantRun>>, TError,StartAssistantRunMutationVariables, TContext> => {
 
-const mutationKey = getStreamAssistantReplyMutationKey();
+const mutationKey = getStartAssistantRunMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -382,10 +478,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof streamAssistantReply>>, StreamAssistantReplyMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startAssistantRun>>, StartAssistantRunMutationVariables> = (props) => {
           const {threadId,data} = props ?? {};
 
-          return  streamAssistantReply(threadId,data,requestOptions)
+          return  startAssistantRun(threadId,data,requestOptions)
         }
 
 
@@ -395,21 +491,122 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type StreamAssistantReplyMutationResult = NonNullable<Awaited<ReturnType<typeof streamAssistantReply>>>
-    export type StreamAssistantReplyMutationBody = AssistantMessageIn
-    export type StreamAssistantReplyMutationError = ErrorOut
-    export type StreamAssistantReplyMutationVariables = {threadId: string;data: AssistantMessageIn}
+    export type StartAssistantRunMutationResult = NonNullable<Awaited<ReturnType<typeof startAssistantRun>>>
+    export type StartAssistantRunMutationBody = AssistantRunIn
+    export type StartAssistantRunMutationError = ErrorOut
+    export type StartAssistantRunMutationVariables = {threadId: string;data: AssistantRunIn}
 
     /**
- * @summary Stream Reply
+ * @summary Start Run
  */
-export const useStreamAssistantReply = <TError = ErrorOut,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof streamAssistantReply>>, TError,StreamAssistantReplyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useStartAssistantRun = <TError = ErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAssistantRun>>, TError,StartAssistantRunMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof streamAssistantReply>>,
+        Awaited<ReturnType<typeof startAssistantRun>>,
         TError,
-        StreamAssistantReplyMutationVariables,
+        StartAssistantRunMutationVariables,
         TContext
       > => {
-      return useMutation(getStreamAssistantReplyMutationOptions(options), queryClient);
+      return useMutation(getStartAssistantRunMutationOptions(options), queryClient);
     }
+    export const getGetAssistantThreadStateUrl = (threadId: string,) => {
+
+
+
+
+  return `/api/assistant/threads/${threadId}/state`
+}
+
+/**
+ * The checkpointed conversation and any pending approval (hydrates the panel). [workstream K]
+ * @summary Get Thread State
+ */
+export const getAssistantThreadState = async (threadId: string, options?: Parameters<typeof customFetch>[1]): Promise<AssistantThreadStateOut> => {
+
+  return customFetch<AssistantThreadStateOut>(getGetAssistantThreadStateUrl(threadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAssistantThreadStateQueryKey = (threadId: string,) => {
+    return [
+    `/api/assistant/threads/${threadId}/state`
+    ] as const;
+    }
+
+
+export const getGetAssistantThreadStateQueryOptions = <TData = Awaited<ReturnType<typeof getAssistantThreadState>>, TError = ErrorOut>(threadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAssistantThreadStateQueryKey(threadId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAssistantThreadState>>> = ({ signal }) => getAssistantThreadState(threadId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: threadId !== null && threadId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAssistantThreadStateQueryResult = NonNullable<Awaited<ReturnType<typeof getAssistantThreadState>>>
+export type GetAssistantThreadStateQueryError = ErrorOut
+
+
+export function useGetAssistantThreadState<TData = Awaited<ReturnType<typeof getAssistantThreadState>>, TError = ErrorOut>(
+ threadId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistantThreadState>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistantThreadState>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistantThreadState<TData = Awaited<ReturnType<typeof getAssistantThreadState>>, TError = ErrorOut>(
+ threadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAssistantThreadState>>,
+          TError,
+          Awaited<ReturnType<typeof getAssistantThreadState>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAssistantThreadState<TData = Awaited<ReturnType<typeof getAssistantThreadState>>, TError = ErrorOut>(
+ threadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Thread State
+ */
+
+export function useGetAssistantThreadState<TData = Awaited<ReturnType<typeof getAssistantThreadState>>, TError = ErrorOut>(
+ threadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssistantThreadState>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAssistantThreadStateQueryOptions(threadId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
