@@ -4,13 +4,14 @@
  * approved items quote v12; 9 will need re-review"), and publishes. Mortgage prequalification has no rate
  * terms (spec §4.2 ruling 1), so it gets a sentence, not a form.
  */
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
 import type { OfferTermsOut } from '../../api/generated/model';
 import { useGetCurrentOfferTerms, useListOfferTerms } from '../../api/generated/terms/terms';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
+import { isRetryable } from '../../ui/errorMessage';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { formatDate, PRODUCT_LABELS } from '../../ui/labels';
 import { useViewer } from '../../ui/layout/Viewer';
@@ -32,9 +33,11 @@ function LoadError({ what, error, onRetry }: { what: string; error: unknown; onR
       <span>
         {what} didn&apos;t load. {apiErrorMessage(error)}
       </span>
-      <Button size="sm" onPress={onRetry}>
-        Retry
-      </Button>
+      {isRetryable(error) && (
+        <Button size="sm" onPress={onRetry}>
+          Retry
+        </Button>
+      )}
     </div>
   );
 }
@@ -42,14 +45,19 @@ function LoadError({ what, error, onRetry }: { what: string; error: unknown; onR
 export function TermsPage({ product, onProductChange }: TermsPageProps) {
   const current = useGetCurrentOfferTerms();
   const byProduct = new Map((current.data ?? []).map((terms) => [terms.product, terms]));
+  // A product with unsaved edits locks the other tabs: switching would unmount (and drop) the form.
+  const [dirtyTab, setDirtyTab] = useState<TermsTab | null>(null);
+  const onDirty = useCallback((tab: TermsTab, dirty: boolean) => {
+    setDirtyTab((prev) => (dirty ? tab : prev === tab ? null : prev));
+  }, []);
 
   return (
     <div className="app-terms">
       <header className="app-terms-header">
         <h1 className="app-page-title">Offer terms</h1>
         <p className="app-muted">
-          The rates and fees approved copy may quote. Publishing a version sends items that quote the old one
-          back for re-review.
+          The rates and fees approved copy may quote. Publishing a version sends live items that quote the old
+          one to Needs re-review; the rest expire.
         </p>
       </header>
       <Tabs
@@ -57,22 +65,38 @@ export function TermsPage({ product, onProductChange }: TermsPageProps) {
         onSelectionChange={(key) => {
           onProductChange(String(key) as TermsTab);
         }}
+        disabledKeys={dirtyTab === null ? [] : TERMS_TABS.filter((tab) => tab !== dirtyTab)}
         className="app-terms-tabs"
       >
-        <TabList aria-label="Products" className="app-tabs app-terms-tablist">
-          {TERMS_TABS.map((tab) => {
-            const terms = tab === 'mortgage_prequal' ? undefined : byProduct.get(tab);
-            return (
-              <Tab key={tab} id={tab} className="app-tab">
-                {PRODUCT_LABELS[tab]}
-                {terms !== undefined && <span className="app-tab-count">v{terms.version}</span>}
-                {current.isPending && tab !== 'mortgage_prequal' && (
-                  <span className="app-tab-count app-terms-tab-pending" aria-hidden="true" />
-                )}
-              </Tab>
-            );
-          })}
-        </TabList>
+        <div className="app-terms-tabrow">
+          <TabList aria-label="Products" className="app-tabs app-terms-tablist">
+            {TERMS_TABS.map((tab) => {
+              const terms = tab === 'mortgage_prequal' ? undefined : byProduct.get(tab);
+              return (
+                <Tab key={tab} id={tab} className="app-tab">
+                  {PRODUCT_LABELS[tab]}
+                  {terms !== undefined ? (
+                    <span className="app-tab-count">v{terms.version}</span>
+                  ) : (
+                    tab !== 'mortgage_prequal' && (
+                      // Holds the count's width in every state, so the tabs never shift.
+                      <span
+                        className="app-tab-count app-terms-tab-slot"
+                        data-loading={current.isPending || undefined}
+                        aria-hidden="true"
+                      />
+                    )
+                  )}
+                </Tab>
+              );
+            })}
+          </TabList>
+          {dirtyTab !== null && (
+            <p className="app-terms-tab-lock" role="status">
+              Publish or cancel your {PRODUCT_LABELS[dirtyTab].toLowerCase()} edits to switch products.
+            </p>
+          )}
+        </div>
         {TERMS_TABS.map((tab) => (
           <TabPanel key={tab} id={tab} className="app-terms-panel">
             {tab === 'mortgage_prequal' ? (
@@ -91,7 +115,7 @@ export function TermsPage({ product, onProductChange }: TermsPageProps) {
                 }}
               />
             ) : (
-              <ProductTerms product={tab} current={byProduct.get(tab) ?? null} />
+              <ProductTerms product={tab} current={byProduct.get(tab) ?? null} onDirty={onDirty} />
             )}
           </TabPanel>
         ))}
@@ -129,10 +153,38 @@ function TermsSkeleton() {
   );
 }
 
-function ProductTerms({ product, current }: { product: TermsProduct; current: OfferTermsOut | null }) {
+function ProductTerms({
+  product,
+  current,
+  onDirty,
+}: {
+  product: TermsProduct;
+  current: OfferTermsOut | null;
+  onDirty: (tab: TermsTab, dirty: boolean) => void;
+}) {
   const isLead = useViewer().roles.includes('lead');
   const [editing, setEditing] = useState(false);
   const label = PRODUCT_LABELS[product];
+  const reportDirty = useCallback(
+    (dirty: boolean) => {
+      onDirty(product, dirty);
+    },
+    [onDirty, product],
+  );
+  // Focus: opening the editor focuses its first field (autoFocus); closing it returns focus to the trigger,
+  // which the editor's unmount would otherwise drop to the page body.
+  const triggerId = `edit-terms-${product}`;
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (!editing && restoreFocus.current) {
+      restoreFocus.current = false;
+      document.getElementById(triggerId)?.focus();
+    }
+  }, [editing, triggerId]);
+  const close = () => {
+    restoreFocus.current = true;
+    setEditing(false);
+  };
 
   if (current === null && !editing) {
     return (
@@ -142,6 +194,7 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
         action={
           isLead ? (
             <Button
+              id={triggerId}
               variant="primary"
               onPress={() => {
                 setEditing(true);
@@ -167,6 +220,7 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
         </h2>
         {isLead && !editing && (
           <Button
+            id={triggerId}
             size="sm"
             icon="action.edit"
             onPress={() => {
@@ -193,7 +247,9 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
           {displayRows(current.values).map((row) => (
             <div key={row.label} className="app-detail-row">
               <dt>{row.label}</dt>
-              <dd className="app-figure">{row.value}</dd>
+              <dd className="app-figure" title={row.value}>
+                {row.value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -205,13 +261,7 @@ function ProductTerms({ product, current }: { product: TermsProduct; current: Of
     return (
       <div className="app-terms-product">
         {meta}
-        <TermsEditor
-          product={product}
-          current={current}
-          onClose={() => {
-            setEditing(false);
-          }}
-        />
+        <TermsEditor product={product} current={current} onClose={close} onDirtyChange={reportDirty} />
       </div>
     );
   }

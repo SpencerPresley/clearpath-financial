@@ -1,7 +1,8 @@
 /*
  * The impact preview for the values in the form. `POST /terms/impact-preview` writes nothing, so it runs as a
  * query keyed on the canonical values (`termsKey`), debounced while the lead types. The previous result stays
- * on screen (marked stale) while the next one loads, so the panel doesn't collapse between keystrokes.
+ * on screen (marked stale) while the next one loads, and while a field is mid-edit (invalid), so the panel doesn't
+ * collapse between keystrokes.
  *
  * `ready` is the Save gate: true only when the result on screen was computed for exactly the values in the
  * form now. A result for 12.9 never unlocks publishing 12.99.
@@ -18,7 +19,11 @@ export const PREVIEW_DEBOUNCE_MS = 300;
 /** Prefix for every preview entry; `invalidateAfterPublish` and a 409 drop them. */
 export const IMPACT_PREVIEW_KEY = '/api/terms/impact-preview';
 
-export function useImpactPreview(product: TermsProduct, values: TermsValues | null) {
+/**
+ * `baseId` is the version the form is based on: a preview computed against v12 never unlocks publishing on top of
+ * v13, so a rebase (another lead published) always waits for a fresh preview.
+ */
+export function useImpactPreview(product: TermsProduct, values: TermsValues | null, baseId: number | null) {
   const key = values === null ? null : termsKey(values);
   // The debounced key, not the values object: the key is stable across renders and decodes to the body.
   const [debounced, setDebounced] = useState<string | null>(null);
@@ -34,7 +39,7 @@ export function useImpactPreview(product: TermsProduct, values: TermsValues | nu
   }, [key]);
 
   const query = useQuery({
-    queryKey: [IMPACT_PREVIEW_KEY, product, debounced],
+    queryKey: [IMPACT_PREVIEW_KEY, product, baseId, debounced],
     queryFn: ({ signal }) => {
       if (debounced === null) throw new Error('No values to preview');
       return previewTermsImpact({ product, values: valuesFromKey(debounced) }, { signal });

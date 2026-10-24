@@ -59,7 +59,7 @@ describe('personal loan form', () => {
     const errors = issues(plFormSchema.safeParse(form));
     expect(errors.apr_min).toBe('Enter an APR above 0% and below 100%.');
     expect(errors.apr_max).toBe('Enter an APR above 0% and below 100%.');
-    expect(errors.origination_fee_max_pct).toBe('Enter a percentage from 0% up to 100%.');
+    expect(errors.origination_fee_max_pct).toBe('Enter a percentage from 0% to below 100%.');
   });
 
   it('puts min > max on the max field, for every range', () => {
@@ -75,7 +75,8 @@ describe('personal loan form', () => {
     const errors = issues(plFormSchema.safeParse(form));
     expect(errors.apr_max).toBe('APR max must be at least APR min.');
     expect(errors.amount_max).toBe('Amount max must be at least amount min.');
-    expect(errors.origination_fee_max_pct).toBe('Origination fee max must be at least the min.');
+    expect(errors.apr_min).toBe('APR min must be at most APR max.');
+    expect(errors.origination_fee_max_pct).toBe('Origination fee max must be at least origination fee min.');
   });
 
   it('needs at least one whole number of months and a positive amount', () => {
@@ -90,7 +91,10 @@ describe('personal loan form', () => {
 
   it('refuses text where a number goes', () => {
     expect(issues(plFormSchema.safeParse({ ...plFormFrom(PL), apr_min: '7,49%' })).apr_min).toBe(
-      'Enter a number, e.g. 7.49.',
+      'Enter the APR as a number, e.g. 7.49.',
+    );
+    expect(issues(plFormSchema.safeParse({ ...plFormFrom(PL), amount_max: '$50k' })).amount_max).toBe(
+      'Enter a dollar amount, e.g. 10000.',
     );
   });
 });
@@ -114,7 +118,7 @@ describe('credit card form', () => {
     const errors = issues(
       ccFormSchema.safeParse({ ...ccFormFrom(CC), purchase_apr_min: '30', issuing_bank: '  ' }),
     );
-    expect(errors.purchase_apr_max).toBe('Purchase APR max must be at least the min.');
+    expect(errors.purchase_apr_max).toBe('Purchase APR max must be at least purchase APR min.');
     expect(errors.issuing_bank).toBe('Name the issuing bank.');
   });
 });
@@ -136,7 +140,7 @@ describe('comparing terms', () => {
   it('lists what changed, with display values', () => {
     expect(termsChanges(PL, { ...PL, apr_min: '12.99', term_months: [36, 60] })).toEqual([
       { field: 'apr_min', label: 'APR min', from: '7.49%', to: '12.99%' },
-      { field: 'term_months', label: 'Terms', from: '24, 36, 60 months', to: '36, 60 months' },
+      { field: 'term_months', label: 'Loan terms (months)', from: '24, 36, 60 months', to: '36, 60 months' },
     ]);
     expect(termsChanges(CC, { ...CC, intro_apr: null, intro_months: null, annual_fee: '95' })).toEqual([
       { field: 'intro_apr', label: 'Intro APR', from: '0%', to: 'None' },

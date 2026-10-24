@@ -13,6 +13,7 @@ import {
 import {
   CC_HISTORY,
   CURRENT_TERMS,
+  PL_V12,
   IMPACT_PL,
   LEAD_ME,
   PL_HISTORY,
@@ -132,8 +133,12 @@ describe('Offer terms', () => {
 
     const impact = await screen.findByRole('region', { name: 'Impact of publishing v13' });
     expect(await within(impact).findByText(IMPACT_PL.summary)).toBeInTheDocument();
-    expect(within(impact).getByRole('group', { name: '9 Will need re-review' })).toBeInTheDocument();
-    expect(within(impact).getByRole('group', { name: '5 Will expire' })).toBeInTheDocument();
+    // The full-review split is a subset of the re-review count (T4).
+    expect(
+      within(impact).getByRole('group', { name: '9 Needs re-review, all fast-track' }),
+    ).toBeInTheDocument();
+    expect(within(impact).getByRole('group', { name: '5 Expire, not live' })).toBeInTheDocument();
+    expect(within(impact).getByRole('button', { name: '14 affected items ↓' })).toBeInTheDocument();
     expect(within(impact).getByRole('link', { name: 'LoanFinder' })).toHaveAttribute('href', '/partners/31');
 
     const table = screen.getByRole('table', { name: 'Affected items' });
@@ -145,7 +150,8 @@ describe('Offer terms', () => {
     expect(within(row).getByText('Live')).toBeInTheDocument();
     expect(within(row).getByText('Fast-track')).toBeInTheDocument();
     expect(within(table).getByRole('row', { name: /CP-1043/ })).toHaveTextContent('No number changes');
-    expect(within(table).getByRole('row', { name: /CP-1051/ })).toHaveTextContent('Full review');
+    // An expired item has no lane (T4).
+    expect(within(table).getByRole('row', { name: /CP-1051/ })).toHaveTextContent('—');
   });
 
   it('validates per product before previewing: max below min goes on the max field', async () => {
@@ -184,7 +190,12 @@ describe('Offer terms', () => {
     const dialog = await screen.findByRole('alertdialog', { name: 'Publish personal loan terms v13?' });
     expect(within(dialog).getByText(IMPACT_PL.summary)).toBeInTheDocument();
     expect(within(dialog).getByText('7.49% → 12.99%')).toBeInTheDocument();
-    expect(within(dialog).getByText(/move to re-review within a few seconds/)).toBeInTheDocument();
+    expect(within(dialog).getByText('9 live items')).toBeInTheDocument();
+    expect(within(dialog).getByText('5 items')).toBeInTheDocument();
+    expect(within(dialog).getByText('2 partners')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Can't be undone: publishing the old values creates v14/),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Publish v13' }));
 
     await waitFor(() => {
@@ -196,6 +207,7 @@ describe('Offer terms', () => {
       });
     });
     expect(await screen.findByText('Published personal loan terms v13')).toBeInTheDocument();
+    expect(screen.getByText('9 live items move to Needs re-review; 5 expire.')).toBeInTheDocument();
     const current = await screen.findByRole('region', { name: 'Personal loan terms in effect' });
     expect(await within(current).findByText('v13')).toBeInTheDocument();
     expect(screen.queryByRole('form', { name: 'Edit personal loan terms' })).not.toBeInTheDocument();
@@ -300,6 +312,131 @@ describe('Offer terms', () => {
     await waitFor(() => {
       expect(within(form).getByRole('button', { name: /Publish v13/ })).toBeEnabled();
     });
+  });
+
+  it('after a 409, rebases untouched fields on the new version before Publish can go out (T1)', async () => {
+    servePreview();
+    const v13: OfferTermsOut = {
+      ...PL_V12,
+      id: 113,
+      version: 13,
+      created_by_name: 'Sam Okafor',
+      values: { ...PL_V12.values, apr_max: '29.99' },
+    };
+    const published: OfferTermsPublishIn[] = [];
+    server.use(
+      http.post('*/api/terms', async ({ request }) => {
+        published.push((await request.json()) as OfferTermsPublishIn);
+        if (published.length === 1) {
+          // Another lead published v13 (APR max 29.99) after this form loaded.
+          server.use(
+            getGetCurrentOfferTermsMockHandler([v13, ...CURRENT_TERMS.slice(1)]),
+            getPreviewTermsImpactMockHandler({ ...IMPACT_PL, current_version: 13, next_version: 14 }),
+          );
+          return HttpResponse.json(
+            {
+              code: 'conflict',
+              message:
+                'The offer terms changed since you opened this (v13 is in effect now). Review the impact again.',
+            },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json({ ...v13, id: 114, version: 14 }, { status: 201 });
+      }),
+    );
+    renderApp('/terms');
+    const form = await openEditor();
+    await setField('APR min', '12.99');
+    const publish = within(form).getByRole('button', { name: /Publish v13/ });
+    await waitFor(() => {
+      expect(publish).toBeEnabled();
+    });
+    await userEvent.click(publish);
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog', { name: 'Publish personal loan terms v13?' })).getByRole(
+        'button',
+        { name: 'Publish v13' },
+      ),
+    );
+
+    expect(await within(form).findByText(/v13 was published since you opened this/)).toBeInTheDocument();
+    // The untouched field moved to v13's value; the lead's own edit stayed.
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'APR max' })).toHaveValue('29.99');
+    });
+    expect(screen.getByRole('textbox', { name: 'APR min' })).toHaveValue('12.99');
+    const again = within(form).getByRole('button', { name: /Publish v14/ });
+    await waitFor(() => {
+      expect(again).toBeEnabled();
+    });
+    await userEvent.click(again);
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog', { name: 'Publish personal loan terms v14?' })).getByRole(
+        'button',
+        { name: 'Publish v14' },
+      ),
+    );
+    await waitFor(() => {
+      expect(published).toHaveLength(2);
+    });
+    expect(published[1]).toMatchObject({
+      based_on_terms_id: 113,
+      values: { apr_min: '12.99', apr_max: '29.99' },
+    });
+  });
+
+  it('shows a min above max on the field just edited and says to fix it (T2)', async () => {
+    const bodies = servePreview();
+    renderApp('/terms');
+    const form = await openEditor();
+    await setField('APR min', '40');
+
+    expect(await within(form).findByText('APR min must be at most APR max.')).toBeInTheDocument();
+    expect(within(form).getByText('Fix the highlighted fields to preview the impact.')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+  });
+
+  it('keeps the last preview on screen, marked stale, while a field is being retyped (T3)', async () => {
+    servePreview();
+    renderApp('/terms');
+    await openEditor();
+    await setField('APR min', '12.99');
+    const impact = await screen.findByRole('region', { name: /Impact of publishing/ });
+    expect(await within(impact).findByText(IMPACT_PL.summary)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole('textbox', { name: 'APR min' }));
+    expect(within(impact).getByText(IMPACT_PL.summary)).toBeInTheDocument();
+    expect(impact).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('table', { name: 'Affected items' })).toBeInTheDocument();
+  });
+
+  it('guards unsaved edits: other products are locked, impact links open a new tab (T7)', async () => {
+    servePreview();
+    renderApp('/terms');
+    await openEditor();
+    await setField('APR min', '12.99');
+    const cc = screen.getByRole('tab', { name: /Credit card/ });
+    expect(cc).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByText('Publish or cancel your personal loan edits to switch products.'),
+    ).toBeInTheDocument();
+
+    const impact = await screen.findByRole('region', { name: /Impact of publishing/ });
+    expect(await within(impact).findByRole('link', { name: 'LoanFinder' })).toHaveAttribute(
+      'target',
+      '_blank',
+    );
+    const table = screen.getByRole('table', { name: 'Affected items' });
+    expect(within(table).getByRole('link', { name: 'Spring personal loan email' })).toHaveAttribute(
+      'target',
+      '_blank',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('tab', { name: /Credit card/ })).not.toHaveAttribute('aria-disabled');
+    // Focus returns to the trigger.
+    expect(screen.getByRole('button', { name: 'Edit terms' })).toHaveFocus();
   });
 
   it('checks the credit card intro offer together', async () => {

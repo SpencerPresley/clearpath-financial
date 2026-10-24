@@ -35,7 +35,7 @@ export const PL_FIELDS: readonly TermsFieldDef<PlKey>[] = [
   { key: 'apr_max', label: 'APR max', kind: 'apr' },
   { key: 'amount_min', label: 'Amount min', kind: 'money' },
   { key: 'amount_max', label: 'Amount max', kind: 'money' },
-  { key: 'term_months', label: 'Terms', kind: 'months_list', hint: 'Months, separated by commas.' },
+  { key: 'term_months', label: 'Loan terms (months)', kind: 'months_list', hint: 'Separated by commas.' },
   { key: 'origination_fee_min_pct', label: 'Origination fee min', kind: 'percent' },
   { key: 'origination_fee_max_pct', label: 'Origination fee max', kind: 'percent' },
 ];
@@ -61,7 +61,7 @@ export const TERMS_FIELD_LABELS: Record<TermsField, string> = {
   apr_max: 'APR max',
   amount_min: 'Amount min',
   amount_max: 'Amount max',
-  term_months: 'Terms',
+  term_months: 'Loan terms (months)',
   origination_fee_min_pct: 'Origination fee min',
   origination_fee_max_pct: 'Origination fee max',
   purchase_apr_min: 'Purchase APR min',
@@ -168,21 +168,33 @@ export interface CcFormValues {
 }
 
 const DECIMAL = /^\d{1,9}(\.\d{1,4})?$/;
-const NUMBER_MESSAGE = 'Enter a number, e.g. 7.49.';
 
-function decimal(check: (n: number) => boolean, message: string) {
+function decimal(check: (n: number) => boolean, format: string, range: string) {
   return z
     .string()
     .trim()
-    .regex(DECIMAL, NUMBER_MESSAGE)
-    .refine((s) => !DECIMAL.test(s) || check(Number(s)), message);
+    .regex(DECIMAL, format)
+    .refine((s) => !DECIMAL.test(s) || check(Number(s)), range);
 }
 
-// Backend core.domain: Apr (0, 100), Percent [0, 100), PositiveMoney > 0, Money >= 0.
-const apr = decimal((n) => n > 0 && n < 100, 'Enter an APR above 0% and below 100%.');
-const percent = decimal((n) => n >= 0 && n < 100, 'Enter a percentage from 0% up to 100%.');
-const positiveMoney = decimal((n) => n > 0, 'Enter an amount above $0.');
-const money = decimal((n) => n >= 0, 'Enter an amount of $0 or more.');
+// Backend core.domain: Apr (0, 100), Percent [0, 100), PositiveMoney > 0, Money >= 0. Each kind says what it
+// wants in its own terms: a rate as a percent, an amount in dollars.
+const apr = decimal(
+  (n) => n > 0 && n < 100,
+  'Enter the APR as a number, e.g. 7.49.',
+  'Enter an APR above 0% and below 100%.',
+);
+const percent = decimal(
+  (n) => n >= 0 && n < 100,
+  'Enter a percentage as a number, e.g. 5.',
+  'Enter a percentage from 0% to below 100%.',
+);
+const positiveMoney = decimal(
+  (n) => n > 0,
+  'Enter a dollar amount, e.g. 10000.',
+  'Enter an amount above $0.',
+);
+const money = decimal((n) => n >= 0, 'Enter a dollar amount, e.g. 95.', 'Enter an amount of $0 or more.');
 
 const MONTHS_MESSAGE = 'List loan terms in whole months, e.g. 24, 36, 60.';
 
@@ -192,14 +204,25 @@ function parseMonths(value: string): number[] | null {
   return [...new Set(parts.map(Number))].sort((a, b) => a - b);
 }
 
+/** min > max is an error on both fields, so it shows on whichever the lead just edited. */
 function ordered(
   ctx: z.RefinementCtx,
   value: { min: string; max: string },
-  path: string,
-  message: string,
+  paths: { min: string; max: string },
+  label: string,
 ): void {
   if (DECIMAL.test(value.min) && DECIMAL.test(value.max) && Number(value.min) > Number(value.max)) {
-    ctx.addIssue({ code: 'custom', path: [path], message });
+    const again = label.startsWith('APR') ? label : label.charAt(0).toLowerCase() + label.slice(1);
+    ctx.addIssue({
+      code: 'custom',
+      path: [paths.max],
+      message: `${label} max must be at least ${again} min.`,
+    });
+    ctx.addIssue({
+      code: 'custom',
+      path: [paths.min],
+      message: `${label} min must be at most ${again} max.`,
+    });
   }
 }
 
@@ -214,18 +237,18 @@ export const plFormSchema = z
     origination_fee_max_pct: percent,
   })
   .superRefine((v, ctx) => {
-    ordered(ctx, { min: v.apr_min, max: v.apr_max }, 'apr_max', 'APR max must be at least APR min.');
+    ordered(ctx, { min: v.apr_min, max: v.apr_max }, { min: 'apr_min', max: 'apr_max' }, 'APR');
     ordered(
       ctx,
       { min: v.amount_min, max: v.amount_max },
-      'amount_max',
-      'Amount max must be at least amount min.',
+      { min: 'amount_min', max: 'amount_max' },
+      'Amount',
     );
     ordered(
       ctx,
       { min: v.origination_fee_min_pct, max: v.origination_fee_max_pct },
-      'origination_fee_max_pct',
-      'Origination fee max must be at least the min.',
+      { min: 'origination_fee_min_pct', max: 'origination_fee_max_pct' },
+      'Origination fee',
     );
   });
 
@@ -250,8 +273,8 @@ export const ccFormSchema = z
     ordered(
       ctx,
       { min: v.purchase_apr_min, max: v.purchase_apr_max },
-      'purchase_apr_max',
-      'Purchase APR max must be at least the min.',
+      { min: 'purchase_apr_min', max: 'purchase_apr_max' },
+      'Purchase APR',
     );
     const hasApr = v.intro_apr.trim() !== '';
     const hasMonths = v.intro_months.trim() !== '';
