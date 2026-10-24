@@ -47,11 +47,13 @@ import {
   EyeIcon,
   EyeSlashIcon,
   FilePlusIcon,
+  FileDashedIcon,
   FileTextIcon,
   FlagIcon,
   FolderSimpleUserIcon,
   FunnelIcon,
   GavelIcon,
+  GitDiffIcon,
   HandshakeIcon,
   HourglassMediumIcon,
   InfoIcon,
@@ -68,6 +70,7 @@ import {
   PlugsIcon,
   ProhibitIcon,
   RulerIcon,
+  SealCheckIcon,
   SidebarSimpleIcon,
   SignInIcon,
   SignOutIcon,
@@ -183,6 +186,12 @@ export const icons = {
   // Queue layouts (table is the default; board is the toggle, decisions.md "Queue views").
   'view.table': regular(TableIcon),
   'view.board': regular(KanbanIcon),
+
+  // Drift monitor: what a check of a live placement's page found. A failed check uses feedback.error; checking
+  // again is action.reload (fetch the page again).
+  'drift.unchanged': regular(SealCheckIcon),
+  'drift.modified': regular(GitDiffIcon),
+  'drift.missing': regular(FileDashedIcon),
 
   // Navigation sections (product-spec Screens). Shares with entities/actions are allowlisted below.
   'nav.queue': regular(TrayIcon),

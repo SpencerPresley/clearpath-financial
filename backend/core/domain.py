@@ -168,6 +168,13 @@ class DriftResult(StrEnum):
     MISSING = "missing"
 
 
+class DriftTrigger(StrEnum):
+    """What started a drift check: the daily sweep, or someone's "Check now"."""
+
+    SCHEDULED = "scheduled"
+    MANUAL = "manual"
+
+
 class ExpiryRule(StrEnum):
     """How an approval's expiry is computed for a channel (decisions.md "Approval expiry")."""
 
@@ -273,6 +280,8 @@ class EventType(StrEnum):
     PLACEMENT_UPDATED = "placement.updated"
     TAKEDOWN_REQUESTED = "placement.takedown_requested"
     TAKEDOWN_CONFIRMED = "placement.takedown_confirmed"
+    DRIFT_CHECK_REQUESTED = "placement.drift_check_requested"
+    DRIFT_CHECKED = "placement.drift_checked"  # succeeded (with a result) or failed (with an error code)
     ATTACHMENT_ADDED = "attachment.added"
     TERMS_PUBLISHED = "terms.published"
     PARTNER_CREATED = "partner.created"

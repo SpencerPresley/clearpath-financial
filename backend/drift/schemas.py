@@ -1,0 +1,79 @@
+from datetime import datetime
+
+from ninja import Schema
+from pydantic import Field
+
+from core.domain import CheckStatus, DriftResult, DriftTrigger, Severity
+from reviews.schemas import DiffSegmentOut, PartyRefOut
+
+
+class PageFindingOut(Schema):
+    """A code finding on the fetched page's text (not stored as a Finding: it belongs to no version)."""
+
+    rule_id: str
+    citation: str
+    severity: Severity
+    message: str
+    suggested_fix: str | None
+    quote: str | None
+    new: bool = Field(description="The rule doesn't fire on the approved copy itself.")
+
+
+class SnapshotOut(Schema):
+    """One drift check of a placement's page."""
+
+    id: int
+    placement_id: int
+    status: CheckStatus
+    trigger: DriftTrigger
+    requested_by: PartyRefOut | None = Field(description="Null for the daily sweep.")
+    requested_at: datetime
+    finished_at: datetime | None
+    url: str
+    final_url: str | None
+    http_status: int | None
+    title: str | None
+    compared_version_n: int | None = Field(description="The latest approved version the page was compared with.")
+    result: DriftResult | None = Field(description="Set when status is succeeded.")
+    score: float | None = Field(description="0-100: how much of the approved copy the page keeps.")
+    diff: list[DiffSegmentOut] = Field(description="Approved copy -> page, for a modified result.")
+    findings: list[PageFindingOut]
+    error_code: str | None = Field(description="Why a failed check failed (e.g. timeout, address_not_allowed).")
+    error_message: str | None
+    reopened_item: bool = Field(description="This check sent the item to re-review.")
+
+
+class DemoPageRefOut(Schema):
+    slug: str
+    partner: str
+    edited: bool
+    edit_summary: str
+    expected: str
+
+
+class PlacementDriftOut(Schema):
+    placement_id: int
+    location: str
+    url: str
+    monitored: bool
+    is_live: bool
+    latest: SnapshotOut | None
+    demo_page: DemoPageRefOut | None = Field(description="Set when the URL is one of this site's demo pages.")
+
+
+class ItemDriftOut(Schema):
+    item_id: int
+    placements: list[PlacementDriftOut]
+
+
+class DemoPageOut(Schema):
+    slug: str
+    partner: str
+    url: str
+    edited: bool
+    edit_summary: str
+    expected: str
+
+
+class DemoPageUpdateIn(Schema):
+    edited: bool

@@ -14,6 +14,8 @@ from checks.api import router as findings_router
 from core.api import router as core_router
 from core.errors import DomainError
 from core.schemas import ErrorOut, FieldErrorOut
+from drift.api import demo_router
+from drift.api import router as drift_router
 from exports.api import router as exports_router
 from imports.api import router as imports_router
 from metrics.api import router as metrics_router
@@ -94,3 +96,5 @@ api.add_router("/", imports_router)
 api.add_router("/", exports_router)
 api.add_router("/", metrics_router)
 api.add_router("/", assistant_router)
+api.add_router("/", drift_router)
+api.add_router("/", demo_router)

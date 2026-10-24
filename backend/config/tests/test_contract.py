@@ -26,6 +26,8 @@ TAGS = {
     "admin",
     "users",
     "me",
+    "drift",
+    "demo",
 }
 
 
@@ -104,7 +106,6 @@ def test_no_operation_returns_a_raw_dict() -> None:
 
 
 STUBS: list[tuple[str, str, dict[str, Any] | None]] = [
-    ("post", "/api/items/fetch-url", {"url": "https://example.com"}),
     ("post", "/api/assistant/threads", None),
     ("get", "/api/assistant/threads/t1", None),
     ("post", "/api/assistant/threads/t1/messages", {"content": "What's waiting on me?"}),
@@ -145,7 +146,7 @@ def test_stub_still_validates_input_first(marketer: User) -> None:
     client = Client()
     client.force_login(marketer)
 
-    response = client.post("/api/items/fetch-url", {"url": "ftp://x"}, content_type="application/json")
+    response = client.post("/api/admin/users", {"email": "new@clearpath.demo"}, content_type="application/json")
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"

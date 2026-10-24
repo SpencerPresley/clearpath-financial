@@ -22,6 +22,7 @@ import { ItemKey } from '../../ui/ItemKey';
 import { CHANNEL_LABELS, MARKET_LABELS, PRODUCT_LABELS, plural } from '../../ui/labels';
 import { showToast } from '../../ui/toast';
 import { EvidenceKindSelect, EvidencePicker, MockupPicker } from './EvidencePicker';
+import { FetchFromUrl } from './FetchFromUrl';
 import {
   EMPTY_SUBMIT_FORM,
   SUBMIT_FIELD_NAMES,
@@ -281,6 +282,15 @@ export function SubmitPage() {
             />
           )}
         </form.Field>
+        <FetchFromUrl
+          onFetched={(fetched) => {
+            form.setFieldValue('content_text', fetched.content_text);
+            form.setFieldValue('source_url', fetched.url);
+            if (form.getFieldValue('title').trim() === '' && fetched.title) {
+              form.setFieldValue('title', fetched.title);
+            }
+          }}
+        />
       </div>
 
       <aside className="app-submit-live">

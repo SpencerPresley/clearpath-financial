@@ -13,8 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from core.domain import (
     AssignmentMode,
     AttachmentKind,
+    CheckStatus,
     DecisionLane,
     DecisionOutcome,
+    DriftResult,
+    DriftTrigger,
     EventType,
     FindingSource,
     LlmFailureCode,
@@ -84,6 +87,9 @@ class ItemReopenedPayload(EventPayload):
     reason: ReopenReason
     offer_terms_id: int | None = None  # the new terms version, for terms_changed
     generated_version_id: int | None = None  # the fast-track v+1, if one was generated
+    # The drift check that found the change, for drift_detected. Left out when unset, so other reopen events keep
+    # the shape they were recorded with.
+    snapshot_id: int | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ItemExpiredPayload(EventPayload):
@@ -278,6 +284,25 @@ class TakedownConfirmedPayload(EventPayload):
     placement_id: int
 
 
+class DriftCheckRequestedPayload(EventPayload):
+    placement_id: int
+    snapshot_id: int
+    trigger: DriftTrigger
+
+
+class DriftCheckedPayload(EventPayload):
+    placement_id: int
+    snapshot_id: int
+    status: Literal[CheckStatus.SUCCEEDED, CheckStatus.FAILED]
+    result: DriftResult | None = None  # set iff succeeded
+    compared_version_id: int | None = None  # the latest approved version the page was compared with
+    score: float | None = None
+    findings_count: int = 0  # code findings on the whole page
+    new_findings_count: int = 0  # ... of rules that don't fire on the approved copy
+    error_code: str = ""  # drift.fetcher.FetchFailure, or "stuck" / "error"
+    http_status: int | None = None  # the page's status when the failure was an HTTP error
+
+
 class AttachmentAddedPayload(EventPayload):
     attachment_id: int
     kind: AttachmentKind
@@ -381,6 +406,8 @@ PAYLOADS: Final[Mapping[EventType, type[EventPayload]]] = {
     EventType.PLACEMENT_UPDATED: PlacementUpdatedPayload,
     EventType.TAKEDOWN_REQUESTED: TakedownRequestedPayload,
     EventType.TAKEDOWN_CONFIRMED: TakedownConfirmedPayload,
+    EventType.DRIFT_CHECK_REQUESTED: DriftCheckRequestedPayload,
+    EventType.DRIFT_CHECKED: DriftCheckedPayload,
     EventType.ATTACHMENT_ADDED: AttachmentAddedPayload,
     EventType.TERMS_PUBLISHED: TermsPublishedPayload,
     EventType.PARTNER_CREATED: PartnerCreatedPayload,

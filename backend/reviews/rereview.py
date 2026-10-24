@@ -43,11 +43,13 @@ def reopen_item(  # the event's fields
     actor: User | None = None,
     offer_terms_id: int | None = None,
     generated_version_id: int | None = None,
+    snapshot_id: int | None = None,
 ) -> int:
     """approved -> needs_rereview(reason) for live content, back to the reviewer who approved it (sticky).
     Returns the ITEM_REOPENED event id. Lock-order contract (see reviews.assignment): one item per transaction,
     because it takes the assignment lock after the item's row lock. A fan-out calls it once per item, each in its
-    own transaction (optionally after locking only that same item to add its generated version)."""
+    own transaction (optionally after locking only that same item to add its generated version). The drift monitor
+    passes the `snapshot_id` of the check that found the change."""
     with transaction.atomic():
         item = locked_item(item_id)
         _require_current(item)
@@ -58,7 +60,10 @@ def reopen_item(  # the event's fields
             at=clock.now(),
             reopen_reason=reason,
             payload=ItemReopenedPayload(
-                reason=reason, offer_terms_id=offer_terms_id, generated_version_id=generated_version_id
+                reason=reason,
+                offer_terms_id=offer_terms_id,
+                generated_version_id=generated_version_id,
+                snapshot_id=snapshot_id,
             ),
         )
         auto_assign(item=item, actor=actor, clock=clock, sticky=True)

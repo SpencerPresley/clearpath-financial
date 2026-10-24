@@ -2,6 +2,8 @@ export * from './admin/admin';
 export * from './assistant/assistant';
 export * from './core/core';
 export * from './decisions/decisions';
+export * from './demo/demo';
+export * from './drift/drift';
 export * from './exports/exports';
 export * from './findings/findings';
 export * from './imports/imports';

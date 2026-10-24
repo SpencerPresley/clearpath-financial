@@ -330,4 +330,80 @@ describe('SubmitPage', () => {
       expect.objectContaining({ title: "rate-sheet.pdf didn't upload", tone: 'error' }),
     );
   });
+
+  it('shows why a URL could not be fetched, and leaves the copy editable', async () => {
+    server.use(
+      http.post('*/api/items/fetch-url', () =>
+        HttpResponse.json(
+          {
+            code: 'invalid_input',
+            message: "That address points to a private or internal network, so it can't be fetched.",
+            details: { reason: 'address_not_allowed' },
+            fields: [{ loc: ['body', 'url'], message: 'x', type: 'invalid' }],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderSubmit();
+
+    await user.type(screen.getByLabelText('Fetch from a URL'), 'http://169.254.169.254/latest');
+    await user.click(screen.getByRole('button', { name: 'Fetch' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "That address points to a private or internal network, so it can't be fetched.",
+    );
+    expect(screen.getByLabelText('Copy')).toBeEnabled();
+  });
+
+  it('asks for a full address before fetching', async () => {
+    const user = userEvent.setup();
+    await renderSubmit();
+
+    await user.type(screen.getByLabelText('Fetch from a URL'), 'lendcompare.example{Enter}');
+
+    expect(await screen.findByText('Enter the full address, starting with https://')).toBeInTheDocument();
+  });
+
+  it('shows that a fetch is in progress', async () => {
+    let release: () => void = () => undefined;
+    server.use(
+      http.post('*/api/items/fetch-url', async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({ url: 'https://lendcompare.example/pl', title: null, content_text: COPY });
+      }),
+    );
+    const user = userEvent.setup();
+    await renderSubmit();
+
+    await user.type(screen.getByLabelText('Fetch from a URL'), 'https://lendcompare.example/pl');
+    await user.click(screen.getByRole('button', { name: 'Fetch' }));
+
+    expect(await screen.findByRole('button', { name: /Fetching/ })).toBeInTheDocument();
+    release();
+    expect(await screen.findByText(/Copy filled from lendcompare\.example/)).toBeInTheDocument();
+  });
+
+  it('fills the copy from a fetched page', async () => {
+    server.use(
+      previewHandler(),
+      http.post('*/api/items/fetch-url', () =>
+        HttpResponse.json({ url: 'https://lendcompare.example/pl', title: 'PL offer', content_text: COPY }),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderSubmit();
+
+    await user.type(screen.getByLabelText('Fetch from a URL'), 'https://lendcompare.example/pl');
+    await user.click(screen.getByRole('button', { name: 'Fetch' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Copy')).toHaveValue(COPY);
+    });
+    expect(screen.getByLabelText('Title')).toHaveValue('PL offer');
+    expect(screen.getByText(/Copy filled from lendcompare\.example/)).toHaveAttribute('role', 'status');
+  });
 });

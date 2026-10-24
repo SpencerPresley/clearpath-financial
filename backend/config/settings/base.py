@@ -52,6 +52,9 @@ class Env(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     frontend_base_url: str = "http://localhost:5173"
+    # Where the demo partner pages are reachable, as the drift worker fetches them. Defaults to the frontend's
+    # origin: in production that is the CloudFront site, which routes /demo-partners/* to the app.
+    demo_partners_base_url: str | None = None
 
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
@@ -98,6 +101,7 @@ INSTALLED_APPS = [
     "exports",
     "metrics",
     "assistant",
+    "drift",
 ]
 
 MIDDLEWARE = [
@@ -220,6 +224,10 @@ CELERY_BEAT_SCHEDULE = {
     "reconcile-llm-checks": {"task": "checks.reconcile_llm_checks", "schedule": 120.0},
     # Offer-terms fan-out safety net: approvals still quoting superseded terms (a lost on-commit enqueue).
     "terms-fan-out-reconcile": {"task": "terms.reconcile_fan_out", "schedule": 900.0},
+    # Drift monitor: check every monitored live placement daily, after the expiry sweep so a lapsed approval is
+    # already in re-review; and fail or re-enqueue checks a dead worker or a lost message left behind.
+    "drift-sweep": {"task": "drift.sweep", "schedule": crontab(hour=7, minute=0)},
+    "drift-reconcile": {"task": "drift.reconcile", "schedule": 300.0},
 }
 
 LOGGING = {
@@ -229,3 +237,9 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# --- Fetching pages (drift.fetcher) ---
+# Exact "host:port" origins exempt from the fetcher's private-address and port rules. Empty everywhere except dev
+# (config/settings/dev.py), where the local stack fetches its own demo partner pages.
+DRIFT_FETCH_PRIVATE_ORIGINS: list[str] = []
+DEMO_PARTNERS_BASE_URL = env.demo_partners_base_url or env.frontend_base_url

@@ -13,4 +13,5 @@ export interface ItemReopenedPayload {
   generated_version_id?: number | null;
   offer_terms_id?: number | null;
   reason: ReopenReason;
+  snapshot_id?: number | null;
 }
