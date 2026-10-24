@@ -13,7 +13,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | 0 foundation (#1) | agent (worktree `ws0/foundation`) | — | in progress | models, migrations, patterns, API contract |
 | C rules engine (#4) | agent (worktree `wsC/rules-engine`) | — | in progress | pure engine in backend/checks/engine |
 | H design system (#9, part 1) | agent (worktree `wsH/design-system`) | — | in progress | tokens, icon registry, components, shell, gallery |
-| infra-terraform | agent (worktree) | — | in progress | write + validate + plan only; apply deferred to deploy wave |
+| infra-terraform (#2) | agent (worktree) | PR #16 | in review | plan: 67 to add; ~$93/mo; state bucket applied; reviewer running |
 | sample-tracker | agent (worktree) | — | in progress | messy xlsx + generator + intended-mess README |
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
