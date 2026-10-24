@@ -129,6 +129,15 @@ The reviewer's edits create v+1 authored by the reviewer, and that's the version
 - **`send_email` always pauses** for approve / edit / reject via LangChain v1 `HumanInTheLoopMiddleware` (requires a checkpointer; [docs](https://docs.langchain.com/oss/python/langchain/human-in-the-loop)).
 - **Export files are built by app code from a filter.** The model chooses which report; it never writes the file contents.
 - **The demo sends to an Outbox page,** not real mail.
+  - `send_email` builds a real message with Django's `EmailMultiAlternatives`: a plain-text body plus an HTML
+    body from Django templates.
+  - A custom `EMAIL_BACKEND` writes the message to an `OutboxEmail` table. The Outbox page renders the HTML in
+    a sandboxed iframe, showing who approved the send and when.
+  - The allowlist and the human approval are enforced before the email layer, so they hold whichever backend
+    is configured.
+  - Real delivery (`django-anymail` with SES or Resend) is a settings change plus DNS (SPF/DKIM). It isn't
+    worth it for the demo: the recipients are fictional `@clearpath` addresses, and loosening the allowlist so
+    evaluators could receive mail would reopen the exfiltration path the allowlist exists to close.
 - **LangChain over the Claude Agent SDK:** the Agent SDK is built for Claude-Code-style agents with filesystem and shell tools. That's more than an in-app assistant with about 7 custom tools needs, and we know LangChain. The model is Claude, through the Anthropic integration.
 
 ### Ergonomics: don't lose to the spreadsheet
