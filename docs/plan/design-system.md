@@ -30,7 +30,7 @@ at the end (Task 9) on screenshots, per §8.4.
   warning findings. Success green = approved. Error red = rejected, blocking findings, destructive actions.
   Alert red-orange = needs re-review, drift.
 - The warm brand accent appears only in the wordmark; it is never a UI state color (it would otherwise sit
-  next to amber and red-orange).
+  next to amber and red-orange). _Revised after UI review: no warm accent at all; see the report._
 - Every badge = icon + label. Color is never the only signal. WCAG 2.2 AA: text pairs >= 4.5:1, focus ring
   and icons-as-sole-signal >= 3:1.
 - Status labels (exact): Draft, Submitted, In review, Changes requested, Approved, Rejected, Re-review,
