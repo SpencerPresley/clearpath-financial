@@ -14,7 +14,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | C rules engine (#4) | agent (worktree) | PR #21 merged | done | 42 code rules + 4 human items; 326 tests; ENGINE_VERSION in cache keys; ~3 ms per 5 KB ad |
 | D llm core (#5, phase 1) | agent (worktree) | PR #23 merged `f126747` | done | 7 LLM rules; live eval: recall 100%, precision 72%, 0/5 clean FPs, injection resisted, $0.00025/review (reports/llm-core-live-eval.md) |
 | E review workflow (#6, +#18) | agent (worktree `wsE/review-workflow`) | — | in progress | checks wiring, assignment, transitions, decisions/gates, placements, expiry, library selector |
-| G import/export (#8) | agent (worktree `wsG/import-export`) | — | in progress | legacy import per samples oracle, xlsx export, evidence pack (Celery jobs) |
+| G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree `wsH/queue`) | — | in progress | table, filters, saved views, board, drawer, /api/me wiring |
 | I review + intake (#10) | agent (worktree `wsI/review-intake`) | — | in progress | review screen, intake with live checks, My submissions |
 | H design system (#9, part 1) | agent (worktree) | PR #19 merged | done | 145 unit tests; contrast-tested tokens; 55-key icon registry; follow-ups in #20 |
@@ -23,6 +23,10 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | spec | orchestrator | main `95871ce`+ | done; builder-check rulings in spec §4.2 | docs/spec.md; builder-check questions go to reviews/spec-builder-check.md |
 
 ## Rulings
+
+- Ruling: import/export/evidence jobs enqueue on transaction commit (`transaction.on_commit`), not through the outbox — the events record results, not requests, and the jobs are idempotent — cost if wrong: a job lost if the process dies between commit and enqueue; user retries. Exception noted against backend/CLAUDE.md.
+- Ruling: legacy items are excluded from the default queue and queue stats — an imported open tracker row has no version to review — cost if wrong: none; `is_legacy` filter still finds them.
+- Ruling: imported approvals have no Decision row; evidence pack for a legacy item returns 409 with a plain explanation — a decision needs a version and legacy items are metadata-only (ruling 7).
 
 - Ruling: attachment reads — partner attachments (agreements) readable by reviewer/lead/admin, not marketers; item, version, and decision evidence readable by anyone who can read the item — reviewers check affiliate copy against the agreement — cost if wrong: one permission check to tighten. Owner: E.
 - Ruling: library has two views — "Approved to run" (current status approved; default) and precedent search across every version that ever received an approval decision, showing its current status as a badge — precedent value doesn't lapse, run-permission does — cost if wrong: a filter default. Owner: E (selector) + J (UI).
@@ -67,6 +71,8 @@ Resurface these when Spencer is back. Each has what I did meanwhile.
 
 
 ## Orchestrator notes
+
+- G follow-ups for J/later: stale running jobs if the worker dies (no redelivery), old export files never deleted, Request-ID reuse across files is skipped as duplicate.
 
 - Next after merges: F offer terms (after E), D phase 2 wiring (after E; note: engine `rule.py` `to_finding` labels every non-code rule HUMAN, so phase 2 must build LLM findings itself or fix that; offsets are Python str indices, frontend I must convert to UTF-16), J secondary screens + metrics, K assistant (useStream spike first; revise the Foundation assistant stub contract), L demo seed, then deploy wave (terraform apply approved), then full UI walkthrough per role.
 
