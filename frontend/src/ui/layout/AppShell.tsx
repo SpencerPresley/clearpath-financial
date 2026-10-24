@@ -10,6 +10,7 @@ import {
   readAssistantOpen,
   writeAssistantOpen,
 } from '../../features/assistant/storage';
+import { NotificationBell } from '../../features/notifications/NotificationBell';
 import { ApiStatusBadge } from '../../features/system/ApiStatusBadge';
 import { Icon } from '../Icon';
 import { ToastHost } from '../toast';
@@ -153,6 +154,7 @@ export function AppShell() {
         <SearchField />
         <div className="app-topbar-end">
           <ApiStatusBadge />
+          <NotificationBell />
           <AssistantToggle buttonRef={assistantButton} open={assistant.open} onPress={toggleAssistant} />
           <UserMenu />
         </div>

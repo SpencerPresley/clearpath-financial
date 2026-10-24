@@ -17,17 +17,35 @@ import type {
 } from 'msw';
 
 import {
+  AssignmentMode,
+  DecisionOutcome,
   NotificationKind,
-  OutboxSource
+  OutboxSource,
+  ReopenReason
 } from '../model';
 import type {
+  AssignmentDetailOut,
+  DecisionDetailOut,
+  ExpiryWarningDetailOut,
   MarkAllReadOut,
+  MentionDetailOut,
   NotificationPageOut,
-  OutboxEmailOut
+  OutboxEmailOut,
+  RereviewDetailOut
 } from '../model';
 
 
-export const getListNotificationsResponseMock = (overrideResponse: Partial<Extract<NotificationPageOut, object>> = {}): NotificationPageOut => ({rows: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.number.int(), item_id: faker.helpers.arrayElement([faker.number.int(),null,]), item_key: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), kind: faker.helpers.arrayElement(Object.values(NotificationKind)), message: faker.string.alpha({length: {min: 10, max: 20}}), read_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,])})), unread_count: faker.number.int(), ...overrideResponse})
+export const getListNotificationsResponseAssignmentDetailOutMock = (overrideResponse: Partial<AssignmentDetailOut> = {}): AssignmentDetailOut => ({...{kind: "assignment", mode: faker.helpers.arrayElement(Object.values(AssignmentMode))}, ...overrideResponse});
+
+export const getListNotificationsResponseDecisionDetailOutMock = (overrideResponse: Partial<DecisionDetailOut> = {}): DecisionDetailOut => ({...{kind: "decision", outcome: faker.helpers.arrayElement(Object.values(DecisionOutcome))}, ...overrideResponse});
+
+export const getListNotificationsResponseRereviewDetailOutMock = (overrideResponse: Partial<RereviewDetailOut> = {}): RereviewDetailOut => ({...{kind: "rereview", reason: faker.helpers.arrayElement(Object.values(ReopenReason))}, ...overrideResponse});
+
+export const getListNotificationsResponseMentionDetailOutMock = (overrideResponse: Partial<MentionDetailOut> = {}): MentionDetailOut => ({...{comment_id: faker.number.int(), kind: "mention", version_n: faker.number.int()}, ...overrideResponse});
+
+export const getListNotificationsResponseExpiryWarningDetailOutMock = (overrideResponse: Partial<ExpiryWarningDetailOut> = {}): ExpiryWarningDetailOut => ({...{expires_at: faker.date.past().toISOString().slice(0, 19) + 'Z', kind: "expiry_warning"}, ...overrideResponse});
+
+export const getListNotificationsResponseMock = (overrideResponse: Partial<Extract<NotificationPageOut, object>> = {}): NotificationPageOut => ({rows: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({actor: faker.helpers.arrayElement([{id: faker.number.int(), name: faker.string.alpha({length: {min: 10, max: 20}})},null,]), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', detail: faker.helpers.arrayElement([faker.helpers.arrayElement([{...getListNotificationsResponseAssignmentDetailOutMock()},{...getListNotificationsResponseDecisionDetailOutMock()},{...getListNotificationsResponseRereviewDetailOutMock()},{...getListNotificationsResponseMentionDetailOutMock()},{...getListNotificationsResponseExpiryWarningDetailOutMock()},]),null,]), id: faker.number.int(), item_id: faker.helpers.arrayElement([faker.number.int(),null,]), item_key: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), item_title: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), kind: faker.helpers.arrayElement(Object.values(NotificationKind)), message: faker.string.alpha({length: {min: 10, max: 20}}), read_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,])})), unread_count: faker.number.int(), ...overrideResponse})
 
 export const getMarkAllNotificationsReadResponseMock = (overrideResponse: Partial<Extract<MarkAllReadOut, object>> = {}): MarkAllReadOut => ({marked: faker.number.int(), ...overrideResponse})
 

@@ -1,10 +1,43 @@
 from datetime import datetime
+from typing import Annotated, Literal
 
 from ninja import Schema
 from pydantic import Field
 
-from core.domain import NotificationKind, OutboxSource
+from core.domain import AssignmentMode, DecisionOutcome, NotificationKind, OutboxSource, ReopenReason
 from reviews.schemas import PartyRefOut
+
+
+class AssignmentDetailOut(Schema):
+    kind: Literal["assignment"]
+    mode: AssignmentMode
+
+
+class DecisionDetailOut(Schema):
+    kind: Literal["decision"]
+    outcome: DecisionOutcome
+
+
+class RereviewDetailOut(Schema):
+    kind: Literal["rereview"]
+    reason: ReopenReason
+
+
+class MentionDetailOut(Schema):
+    kind: Literal["mention"]
+    comment_id: int
+    version_n: int = Field(description="The version the comment is on (the review screen's `v`).")
+
+
+class ExpiryWarningDetailOut(Schema):
+    kind: Literal["expiry_warning"]
+    expires_at: datetime
+
+
+NotificationDetailOut = Annotated[
+    AssignmentDetailOut | DecisionDetailOut | RereviewDetailOut | MentionDetailOut | ExpiryWarningDetailOut,
+    Field(discriminator="kind"),
+]
 
 
 class NotificationOut(Schema):
@@ -12,7 +45,12 @@ class NotificationOut(Schema):
     kind: NotificationKind
     item_id: int | None
     item_key: str | None
-    message: str
+    item_title: str | None
+    actor: PartyRefOut | None = Field(description="Who caused it; null for system actions (sweeps, pool fan-out).")
+    detail: NotificationDetailOut | None = Field(
+        description="What the source event says, for phrasing the row; null when there's no event to read."
+    )
+    message: str = Field(description="The one-liner stored when it was created; the fallback when detail is null.")
     read_at: datetime | None
     created_at: datetime
 

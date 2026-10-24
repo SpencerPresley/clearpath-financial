@@ -1,14 +1,63 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from django.db.models import QuerySet
 
 from accounts.models import User
-from core.domain import NotificationKind, OutboxSource, Role
+from audit.models import Event
+from audit.payloads import (
+    ApprovalExpiringPayload,
+    CommentAddedPayload,
+    DecisionRecordedPayload,
+    EventPayload,
+    ItemAssignedPayload,
+    ItemReopenedPayload,
+    parse_payload,
+)
+from core.domain import AssignmentMode, DecisionOutcome, EventType, NotificationKind, OutboxSource, ReopenReason, Role
 from core.errors import NotFound
 from core.permissions import has_role
 from notifications.models import Notification, OutboxEmail
+from reviews.models import Version
 from reviews.selectors import PartyRef
+
+# What the source event says, per kind, so the inbox can phrase the row ("Dana Reyes requested changes on CP-42").
+# Null on a row with no event or an event type the inbox doesn't phrase; the row's `message` covers those.
+
+
+@dataclass(frozen=True)
+class AssignmentDetail:
+    mode: AssignmentMode
+    kind: Literal["assignment"] = "assignment"
+
+
+@dataclass(frozen=True)
+class DecisionDetail:
+    outcome: DecisionOutcome
+    kind: Literal["decision"] = "decision"
+
+
+@dataclass(frozen=True)
+class RereviewDetail:
+    reason: ReopenReason
+    kind: Literal["rereview"] = "rereview"
+
+
+@dataclass(frozen=True)
+class MentionDetail:
+    comment_id: int
+    version_n: int  # the version the comment is on: the review screen shows comments per version
+    kind: Literal["mention"] = "mention"
+
+
+@dataclass(frozen=True)
+class ExpiryWarningDetail:
+    expires_at: datetime
+    kind: Literal["expiry_warning"] = "expiry_warning"
+
+
+type NotificationDetail = AssignmentDetail | DecisionDetail | RereviewDetail | MentionDetail | ExpiryWarningDetail
 
 
 @dataclass(frozen=True)
@@ -17,7 +66,10 @@ class NotificationRow:
     kind: NotificationKind
     item_id: int | None
     item_key: str | None
-    message: str
+    item_title: str | None
+    actor: PartyRef | None  # who caused it; None for system actions (sweeps, pool fan-out)
+    detail: NotificationDetail | None
+    message: str  # the stored one-liner, written when the notification was created
     read_at: datetime | None
     created_at: datetime
 
@@ -28,22 +80,62 @@ class NotificationPage:
     unread_count: int
 
 
+def _detail(payload: EventPayload | None, version_ns: dict[int, int]) -> NotificationDetail | None:
+    match payload:
+        case ItemAssignedPayload(mode=mode):
+            return AssignmentDetail(mode=mode)
+        case DecisionRecordedPayload(outcome=outcome):
+            return DecisionDetail(outcome=outcome)
+        case ItemReopenedPayload(reason=reason):
+            return RereviewDetail(reason=reason)
+        case CommentAddedPayload(comment_id=comment_id, version_id=version_id) if version_id in version_ns:
+            return MentionDetail(comment_id=comment_id, version_n=version_ns[version_id])
+        case ApprovalExpiringPayload(expires_at=expires_at):
+            return ExpiryWarningDetail(expires_at=expires_at)
+        case _:
+            return None
+
+
+def _payload(event: Event | None) -> EventPayload | None:
+    if event is None or event.type not in EventType:
+        return None
+    return parse_payload(EventType(event.type), event.payload)
+
+
 def list_notifications(*, user: User, unread_only: bool = False, limit: int = 50) -> NotificationPage:
+    """Newest first. Three queries whatever the page size: rows (with item, event and actor joined), the
+    versions mentions point at, and the unread count."""
     qs = Notification.objects.filter(user=user)
     unread = qs.filter(read_at__isnull=True)
-    rows = (unread if unread_only else qs).order_by("-created_at", "-pk")[:limit]
+    notifications = list(
+        (unread if unread_only else qs)
+        .select_related("item", "event__actor")
+        .only(
+            *("id", "kind", "item_id", "message", "read_at", "created_at"),
+            *("item__id", "item__title"),
+            *("event__id", "event__type", "event__payload"),
+            *("event__actor__id", "event__actor__display_name", "event__actor__email"),
+        )
+        .order_by("-created_at", "-pk")[:limit]
+    )
+    payloads = [_payload(n.event) for n in notifications]
+    version_ids = {p.version_id for p in payloads if isinstance(p, CommentAddedPayload)}
+    version_ns = dict(Version.objects.filter(pk__in=version_ids).values_list("pk", "n")) if version_ids else {}
     return NotificationPage(
         rows=tuple(
             NotificationRow(
                 id=n.pk,
                 kind=NotificationKind(n.kind),
                 item_id=n.item_id,  # pyrefly: ignore[missing-attribute]
-                item_key=f"CP-{n.item_id}" if n.item_id else None,  # pyrefly: ignore[missing-attribute]
+                item_key=n.item.key if n.item else None,
+                item_title=n.item.title if n.item else None,
+                actor=_party(n.event.actor if n.event else None),
+                detail=_detail(payload, version_ns),
                 message=n.message,
                 read_at=n.read_at,
                 created_at=n.created_at,
             )
-            for n in rows
+            for n, payload in zip(notifications, payloads, strict=True)
         ),
         unread_count=unread.count(),
     )

@@ -3733,3 +3733,100 @@
     }
   }
 }
+
+/* ---- Notifications: the topbar bell and its popover inbox (features/notifications). ------------------- */
+@layer components {
+  .app-bell {
+    @apply relative;
+  }
+  /* Unread count: inverse brand on the navy bar, not a status color (nothing here is "act now" by default). */
+  .app-bell-count {
+    @apply absolute top-0.5 right-0 h-3.5 min-w-3.5 rounded-full bg-primary-content px-1 text-center text-[10px] leading-3.5 font-semibold text-primary tabular-nums;
+    box-shadow: 0 0 0 1.5px var(--color-primary);
+  }
+  .app-inbox {
+    @apply flex max-h-[min(34rem,calc(100vh-4rem))] w-[27rem] flex-col p-0;
+  }
+  .app-inbox-dialog {
+    @apply flex min-h-0 flex-col outline-none;
+  }
+  .app-inbox-head {
+    @apply flex h-10 shrink-0 items-center gap-2 border-b border-base-300 pr-1 pl-3;
+  }
+  .app-inbox-heading {
+    @apply text-ui font-semibold;
+  }
+  .app-inbox-unread {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-inbox-body {
+    @apply min-h-0 overflow-y-auto p-1 outline-none;
+  }
+  .app-inbox-section + .app-inbox-section {
+    @apply mt-1;
+  }
+  .app-inbox-group {
+    @apply px-2 pt-1.5 pb-1 text-meta font-medium text-muted;
+  }
+  /* dot | icon | message | age. The dot column is always there, so read and unread rows align. */
+  .app-inbox-row {
+    @apply grid h-9 cursor-default grid-cols-[0.375rem_1rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 text-ui outline-none;
+  }
+  .app-inbox-row[data-focused],
+  .app-inbox-row[data-hovered] {
+    @apply bg-hover;
+  }
+  .app-inbox-row[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+  .app-inbox-dot {
+    @apply size-1.5 rounded-full;
+  }
+  .app-inbox-row[data-unread] .app-inbox-dot {
+    @apply bg-primary;
+  }
+  .app-inbox-icon {
+    @apply flex text-muted;
+  }
+  .app-inbox-icon[data-tone='success'] {
+    @apply text-status-success-soft-content;
+  }
+  .app-inbox-icon[data-tone='warning'] {
+    @apply text-status-warning-soft-content;
+  }
+  .app-inbox-icon[data-tone='error'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-inbox-icon[data-tone='alert'] {
+    @apply text-status-alert-soft-content;
+  }
+  /* One line; only the item title gives way, so the verb and anything after the item stay readable. */
+  .app-inbox-line {
+    @apply flex min-w-0 items-baseline whitespace-nowrap text-muted;
+  }
+  .app-inbox-row[data-unread] .app-inbox-line {
+    @apply text-base-content;
+  }
+  .app-inbox-fixed {
+    @apply shrink-0 whitespace-pre;
+  }
+  .app-inbox-key {
+    @apply shrink-0 font-mono text-meta;
+  }
+  .app-inbox-title {
+    @apply min-w-0 truncate;
+  }
+  .app-inbox-row[data-unread] .app-inbox-title {
+    @apply font-medium;
+  }
+  .app-inbox-age {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-inbox-error {
+    @apply m-2 flex items-center gap-3 rounded-md border border-status-error-line bg-status-error-soft px-3 py-2 text-ui text-status-error-soft-content;
+  }
+  .app-inbox-foot {
+    @apply flex shrink-0 items-center gap-1.5 border-t border-base-300 px-3 py-1.5 text-meta text-muted;
+  }
+}

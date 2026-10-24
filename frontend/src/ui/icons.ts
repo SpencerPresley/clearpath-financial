@@ -22,6 +22,8 @@ import {
   ArrowSquareOutIcon,
   ArrowUpIcon,
   ArrowUUpLeftIcon,
+  AtIcon,
+  BellIcon,
   BookmarkSimpleIcon,
   BooksIcon,
   CalendarXIcon,
@@ -35,8 +37,10 @@ import {
   CheckFatIcon,
   CheckIcon,
   CheckSquareIcon,
+  ChecksIcon,
   CircleDashedIcon,
   CircleNotchIcon,
+  ClockCountdownIcon,
   ColumnsIcon,
   CopyIcon,
   CpuIcon,
@@ -221,6 +225,18 @@ export const icons = {
   'nav.user': regular(UserCircleIcon),
   // The assistant panel: a speech bubble with text, not a sparkle or wand (spec §5.6); ChatCircle is comments.
   'nav.assistant': regular(ChatTeardropTextIcon),
+  /** The notifications inbox in the topbar. */
+  'nav.notifications': regular(BellIcon),
+
+  // Notifications whose meaning no status or action already has. The rest reuse their key: an assignment is
+  // action.assign, a decision its outcome's status, a re-review status.needs_rereview, drift's page findings
+  // severity.blocking.
+  /** You were @mentioned in a comment. */
+  'notify.mention': regular(AtIcon),
+  /** An approval runs out soon (30 days ahead); status.expired (CalendarX) is the state after it has. */
+  'notify.expiring': regular(ClockCountdownIcon),
+  /** Mark every notification read. A double check, apart from action.check (a chosen option). */
+  'action.mark_all_read': regular(ChecksIcon),
 
   // System and feedback.
   'system.api_offline': bold(PlugsIcon),

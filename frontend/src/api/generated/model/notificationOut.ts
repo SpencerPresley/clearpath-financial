@@ -4,14 +4,26 @@
  * ClearPath Compliance Review API
  * OpenAPI spec version: 0.1.0
  */
+import type { AssignmentDetailOut } from './assignmentDetailOut';
+import type { DecisionDetailOut } from './decisionDetailOut';
+import type { ExpiryWarningDetailOut } from './expiryWarningDetailOut';
+import type { MentionDetailOut } from './mentionDetailOut';
 import type { NotificationKind } from './notificationKind';
+import type { PartyRefOut } from './partyRefOut';
+import type { RereviewDetailOut } from './rereviewDetailOut';
 
 export interface NotificationOut {
+  /** Who caused it; null for system actions (sweeps, pool fan-out). */
+  actor: PartyRefOut | null;
   created_at: string;
+  /** What the source event says, for phrasing the row; null when there's no event to read. */
+  detail: AssignmentDetailOut | DecisionDetailOut | RereviewDetailOut | MentionDetailOut | ExpiryWarningDetailOut | null;
   id: number;
   item_id: number | null;
   item_key: string | null;
+  item_title: string | null;
   kind: NotificationKind;
+  /** The one-liner stored when it was created; the fallback when detail is null. */
   message: string;
   read_at: string | null;
 }
