@@ -23,11 +23,11 @@ const ROWS = [
   makeRow({ id: 3, status: 'needs_rereview', reopen_reason: 'terms_changed', current_version_n: 4 }),
 ];
 
-function setup(viewer: Viewer, selectedIds = [1, 2, 3]) {
+function setup(viewer: Viewer, selectedIds = [1, 2, 3], rows = ROWS) {
   const onSelectionChange = vi.fn();
   renderWithQuery(
     <>
-      <BulkBar viewer={viewer} selectedIds={selectedIds} rows={ROWS} onSelectionChange={onSelectionChange} />
+      <BulkBar viewer={viewer} selectedIds={selectedIds} rows={rows} onSelectionChange={onSelectionChange} />
       <ToastHost />
     </>,
   );
@@ -39,6 +39,25 @@ beforeEach(() => {
 });
 
 describe('BulkBar', () => {
+  it('turns fast-track off, and says why, when no selected re-review can take it (nit 16)', () => {
+    const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
+    setup(LEAD, [1, 16], [ROWS[0] ?? expiry, expiry]);
+    const button = screen.getByRole('button', { name: 'Fast-track 1 re-review…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      'Fast-track only applies to offer-terms re-reviews. None of the selected items is one.',
+    );
+    // The reason is also on a trigger of its own (a disabled button gets no hover).
+    expect(screen.getByRole('button', { name: 'Why fast-track is off' })).toBeInTheDocument();
+  });
+
+  it('keeps fast-track on when one selected re-review qualifies', () => {
+    const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
+    setup(LEAD, [3, 16], [...ROWS, expiry]);
+    expect(screen.getByRole('button', { name: 'Fast-track 2 re-reviews…' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Why fast-track is off' })).not.toBeInTheDocument();
+  });
+
   it('assigns the selection to a reviewer and clears it', async () => {
     const bodies: BulkAssignIn[] = [];
     server.use(

@@ -69,7 +69,11 @@ export function readQueueTrail(): QueueTrail {
  * the first fresh row that came after it in the trail; rows the reviewer skipped earlier come last.
  * Null when nothing else is left.
  */
-export function nextInQueue(currentId: number, fresh: readonly number[], seen: readonly number[]): number | null {
+export function nextInQueue(
+  currentId: number,
+  fresh: readonly number[],
+  seen: readonly number[],
+): number | null {
   const others = fresh.filter((id) => id !== currentId);
   const at = fresh.indexOf(currentId);
   if (at !== -1) {

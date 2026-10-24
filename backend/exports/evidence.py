@@ -19,10 +19,10 @@ from pydantic import TypeAdapter
 from accounts.models import User
 from checks.selectors import FindingRow, list_findings
 from core.clock import SYSTEM_CLOCK, Clock
-from core.domain import Role
+from core.domain import ItemStatus, Role
 from core.errors import Conflict
 from core.permissions import has_role, require_role
-from exports.labels import LANE_LABELS, OUTCOME_LABELS, STATUS_LABELS
+from exports.labels import LANE_LABELS, OUTCOME_LABELS, REOPEN_REASON_LABELS, STATUS_LABELS
 from reviews.models import APPROVED_OUTCOMES, Attachment, Decision, ReviewItem
 from reviews.records import DecisionRow, Evidence, ItemHistory, VersionDetail, get_version, item_history, list_decisions
 from reviews.selectors import ItemRow, get_item_row
@@ -124,11 +124,14 @@ def _summary(pack: EvidencePack, evidence_rows: list[dict[str, object]]) -> str:
     terms = ", ".join(f"{t.product.value} v{t.version}" for t in pack.offer_terms) or "none"
     mismatched = [e for e in evidence_rows if e["matches_decision"] is False]
     withheld = [e for e in evidence_rows if e["withheld"]]
+    status = STATUS_LABELS[item.status]
+    if item.reopen_reason is not None and item.status in (ItemStatus.NEEDS_REREVIEW, ItemStatus.EXPIRED):
+        status = f"{status} ({REOPEN_REASON_LABELS[item.reopen_reason]})"
     lines = [
         f"Evidence pack: {item.key} {item.title}",
         f"Generated {pack.generated_at.isoformat()}",
         "",
-        f"Status now:       {STATUS_LABELS[item.status]}",
+        f"Status now:       {status}",
         f"Decision:         {OUTCOME_LABELS[d.outcome]} ({LANE_LABELS[d.lane]}) by {d.approver.name}",
         f"Decided at:       {d.decided_at.isoformat()}",
         f"Approval expires: {d.expires_at.isoformat() if d.expires_at else 'not set'}",

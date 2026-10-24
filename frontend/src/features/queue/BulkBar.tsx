@@ -36,6 +36,19 @@ import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
 import type { Viewer } from '../../ui/layout/Viewer';
 import { showToast } from '../../ui/toast';
+import { Tooltip } from '../../ui/Tooltip';
+
+/**
+ * Whether a row can take fast-track at all. Fast-track approves the version the offer-terms fan-out generated, so
+ * only offer-terms re-reviews have one; an approval-expiry re-review never does, and a drift re-review is refused
+ * while the partner page differs (the review screen's `rereviewActions`). Rows don't carry the version's origin or
+ * the drift check, so the server still decides per item and skips the rest with a reason.
+ */
+export function canFastTrackRow(row: ItemRowOut): boolean {
+  return row.status === 'needs_rereview' && row.reopen_reason === 'terms_changed';
+}
+
+const NO_FAST_TRACK = 'Fast-track only applies to offer-terms re-reviews. None of the selected items is one.';
 
 function items(n: number) {
   return `${String(n)} item${n === 1 ? '' : 's'}`;
@@ -76,6 +89,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
       : [],
   );
   const rereviewIds = seenVersions.map((v) => v.item_id);
+  const fastTrackable = rows.some((r) => selected.has(r.id) && canFastTrackRow(r));
 
   const settle = () => {
     void qc.invalidateQueries({ queryKey: getListItemsQueryKey().slice(0, 1) });
@@ -195,15 +209,32 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
         </MenuTrigger>
       )}
       {isLead && rereviewIds.length > 0 && (
-        <Button
-          size="sm"
-          icon="action.approve"
-          onPress={() => {
-            setReasonOpen(true);
-          }}
-        >
-          {`Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`}
-        </Button>
+        <span className="app-bulk-action">
+          <Button
+            size="sm"
+            icon="action.approve"
+            isDisabled={!fastTrackable}
+            aria-describedby={fastTrackable ? undefined : 'bulk-fast-track-why'}
+            onPress={() => {
+              setReasonOpen(true);
+            }}
+          >
+            {`Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`}
+          </Button>
+          {!fastTrackable && (
+            <>
+              {/* A disabled button gets no hover, so the reason sits on its own trigger (and for screen readers). */}
+              <Tooltip content={NO_FAST_TRACK} delay={200}>
+                <AriaButton className="app-pack-why" aria-label="Why fast-track is off">
+                  <Icon name="feedback.info" size={14} />
+                </AriaButton>
+              </Tooltip>
+              <span id="bulk-fast-track-why" className="sr-only">
+                {NO_FAST_TRACK}
+              </span>
+            </>
+          )}
+        </span>
       )}
       <Button
         size="sm"

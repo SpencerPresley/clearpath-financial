@@ -42,7 +42,10 @@ describe('queue trail storage', () => {
     expect(readQueueTrail()).toEqual(DEFAULT_TRAIL);
     sessionStorage.setItem('clearpath.queueTrail', '{"ids":"nope"}');
     expect(readQueueTrail()).toEqual(DEFAULT_TRAIL);
-    sessionStorage.setItem('clearpath.queueTrail', JSON.stringify({ params: {}, ids: [], href: 'https://evil' }));
+    sessionStorage.setItem(
+      'clearpath.queueTrail',
+      JSON.stringify({ params: {}, ids: [], href: 'https://evil' }),
+    );
     expect(readQueueTrail()).toEqual(DEFAULT_TRAIL);
   });
 });

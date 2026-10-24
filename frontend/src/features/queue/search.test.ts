@@ -236,7 +236,7 @@ describe('views', () => {
   });
 });
 
-describe('the review screen\'s default queue order', () => {
+describe("the review screen's default queue order", () => {
   it('is My queue, exactly as the queue defines it', () => {
     expect(DEFAULT_TRAIL.params).toEqual(toListParams(viewSearch('mine')));
   });

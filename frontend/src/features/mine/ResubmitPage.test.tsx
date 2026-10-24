@@ -3,7 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CheckPreviewOut, ItemDetailOut, NewRoundIn, ResubmitIn } from '../../api/generated/model';
+import type {
+  CheckPreviewIn,
+  CheckPreviewOut,
+  ItemDetailOut,
+  ItemHistoryOut,
+  NewRoundIn,
+  ResubmitIn,
+} from '../../api/generated/model';
 import {
   COPY_V2,
   DECISION_APPROVED,
@@ -13,6 +20,7 @@ import {
   FINDING_RATE,
   REVIEWER,
   itemFixture,
+  spanOf,
   versionFixture,
 } from '../../test/fixtures/review';
 import { reviewHandlers } from '../../test/fixtures/reviewHandlers';
@@ -36,18 +44,37 @@ const CHANGES_ITEM = itemFixture({
 const FINDINGS = [
   { ...FINDING_RATE, state: 'accepted' as const, resolved_by: REVIEWER },
   { ...FINDING_CREDIT, state: 'dismissed' as const, reason: 'Limited in the footer.', resolved_by: REVIEWER },
-  FINDING_QUALIFIER,
+  { ...FINDING_QUALIFIER, state: 'accepted' as const, resolved_by: REVIEWER },
 ];
 
+/** Live checks: the accepted code finding fires while "as low as" is in the copy, with a literal fix. */
 function previewHandler() {
-  return http.post('*/api/checks/preview', () => {
-    const out: CheckPreviewOut = { ruleset_key: 'k', terms_refs: [], findings: [] };
+  return http.post('*/api/checks/preview', async ({ request }) => {
+    const body = (await request.json()) as CheckPreviewIn;
+    const out: CheckPreviewOut = {
+      ruleset_key: 'k',
+      terms_refs: [],
+      findings: body.content_text.includes(' 5.99%')
+        ? [
+            {
+              rule_id: 'pricing.terms_current',
+              citation: 'Reg Z 12 CFR 1026.24(a)',
+              source: 'code',
+              severity: 'blocking',
+              message: FINDING_RATE.message,
+              suggested_fix: '9.99%–35.99%',
+              span: spanOf(body.content_text, '5.99%'),
+              quote: '5.99%',
+            },
+          ]
+        : [],
+    };
     return HttpResponse.json(out);
   });
 }
 
-async function renderResubmit(item: ItemDetailOut) {
-  server.use(...reviewHandlers({ item, findings: FINDINGS }), previewHandler());
+async function renderResubmit(item: ItemDetailOut, history?: ItemHistoryOut) {
+  server.use(...reviewHandlers({ item, findings: FINDINGS, history }), previewHandler());
   const rendered = renderAtRoute(() => <ResubmitPage itemId={item.id} />, {
     path: '/mine/$itemId/resubmit',
     url: `/mine/${String(item.id)}/resubmit`,
@@ -75,10 +102,92 @@ describe('ResubmitPage', () => {
     const requested = screen.getByRole('region', { name: 'Requested changes' });
     expect(within(requested).getByText(/Add the California license line\./)).toBeInTheDocument();
     expect(within(requested).getByText(/Dana Reyes/)).toBeInTheDocument();
-    // Accepted findings are the required changes; dismissed and open ones aren't.
-    expect(await within(requested).findByText('Rate claim needs the full APR range')).toBeInTheDocument();
+    // Accepted findings are the required changes; dismissed ones aren't.
+    expect(await within(requested).findByText(FINDING_QUALIFIER.message)).toBeInTheDocument();
     expect(within(requested).queryByText(FINDING_CREDIT.message)).toBeNull();
-    expect(within(requested).queryByText(FINDING_QUALIFIER.message)).toBeNull();
+  });
+
+  it('shows each finding once: accepted code findings live under Code checks (nit 6)', async () => {
+    await renderResubmit(CHANGES_ITEM);
+    const requested = await screen.findByRole('region', { name: 'Requested changes' });
+    const live = screen.getByRole('region', { name: 'Code checks' });
+    expect(await within(live).findByText(FINDING_RATE.message)).toBeInTheDocument();
+    expect(within(requested).queryByText(FINDING_RATE.message)).toBeNull();
+    expect(
+      within(requested).getByText('The accepted code finding is under Code checks while it still applies.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(FINDING_RATE.message)).toHaveLength(1);
+  });
+
+  it('applies a literal suggestion in the editor (S11)', async () => {
+    const user = userEvent.setup();
+    await renderResubmit(CHANGES_ITEM);
+    const live = await screen.findByRole('region', { name: 'Code checks' });
+    await user.click(await within(live).findByRole('button', { name: 'Apply suggestion: 9.99%–35.99%' }));
+    expect(screen.getByLabelText('Copy')).toHaveValue(COPY_V2.replace('5.99%', '9.99%–35.99%'));
+    expect(await within(live).findByText('No code findings.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resubmit' })).toBeEnabled();
+  });
+
+  it('says an approval ended because offer terms changed, with the date it did (B3)', async () => {
+    const [ref] = versionFixture(2).terms_refs;
+    if (ref === undefined) throw new Error('fixture has a terms ref');
+    const generated = versionFixture(2, {
+      n: 3,
+      id: 503,
+      origin: 'fast_track',
+      terms_refs: [{ ...ref, offer_terms: { id: 13, product: 'personal_loan', version: 2 } }],
+    });
+    await renderResubmit(
+      itemFixture({
+        status: 'expired',
+        reopen_reason: 'terms_changed',
+        round: 2,
+        current_version_n: 3,
+        current_version: generated,
+        // The approval would have run to March; it ended when the terms changed.
+        approval_expires_at: '2027-03-19T00:00:00Z',
+        latest_decision: DECISION_APPROVED,
+      }),
+      {
+        entries: [
+          {
+            id: 532,
+            type: 'item.expired',
+            actor: null,
+            at: '2026-10-18T09:00:00Z',
+            entity: 'item',
+            entity_id: 1042,
+            from_status: 'approved',
+            to_status: 'expired',
+            payload: { reason: 'terms_changed', offer_terms_id: 13, generated_version_id: 503 },
+          },
+        ],
+      },
+    );
+    expect(
+      await screen.findByText(
+        'Expired Oct 18, 2026 when personal loan offer terms v2 took effect. v3 has the new numbers; check them and start round 3.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 19, 2027/)).toBeNull();
+  });
+
+  it('gives the date an approval ran out', async () => {
+    await renderResubmit(
+      itemFixture({
+        status: 'expired',
+        reopen_reason: 'approval_expired',
+        approval_expires_at: '2026-10-01T00:00:00Z',
+        latest_decision: DECISION_APPROVED,
+      }),
+      { entries: [] },
+    );
+    expect(
+      await screen.findByText(
+        /Approval expired (Sep 30|Oct 1), 2026\. Start round 3 to have it reviewed again\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('holds submit until the copy changes, then shows the edit in the diff', async () => {

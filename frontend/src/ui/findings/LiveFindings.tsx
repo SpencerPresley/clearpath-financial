@@ -2,14 +2,33 @@ import { useId } from 'react';
 
 import type { LiveChecks } from '../copy/useLiveChecks';
 import { plural } from '../labels';
+import { applyFix } from './applyFix';
+import type { FixableFinding } from './applyFix';
 import { FindingSummary } from './FindingSummary';
 import { groupFindings } from './groupFindings';
+
+export interface LiveEditor {
+  text: string;
+  onChange: (text: string) => void;
+}
+
+/** Apply for one finding against the editor's text, or undefined when its suggestion isn't literal. */
+export function applyHandler(editor: LiveEditor, finding: FixableFinding): (() => void) | undefined {
+  const next = applyFix(editor.text, finding);
+  return next === null
+    ? undefined
+    : () => {
+        editor.onChange(next);
+      };
+}
 
 export interface LiveFindingsProps {
   checks: LiveChecks;
   /** Shown while idle (no request): why nothing is checked yet. */
   idleMessage?: string;
   className?: string;
+  /** The editor these checks are for: findings with a literal suggestion get Apply, which edits it. */
+  editor?: LiveEditor;
 }
 
 /**
@@ -21,6 +40,7 @@ export function LiveFindings({
   checks,
   idleMessage = 'Checks run as you type.',
   className,
+  editor,
 }: LiveFindingsProps) {
   const titleId = useId();
   const { status, findings } = checks;
@@ -29,6 +49,8 @@ export function LiveFindings({
     findings.map((finding, index) => ({ ...finding, state: 'open' as const, index })),
   );
   const blocking = findings.filter((finding) => finding.severity === 'blocking').length;
+  // Spans are only good for the text that was checked: while a newer text is in flight, nothing applies.
+  const current = editor !== undefined && status === 'ready' && checks.checkedText === editor.text;
 
   let body: React.ReactNode;
   if (status === 'idle') {
@@ -55,6 +77,7 @@ export function LiveFindings({
                 citation={finding.citation}
                 quote={finding.quote}
                 suggestedFix={finding.suggested_fix}
+                onApply={current ? applyHandler(editor, finding) : undefined}
               />
             </li>
           ))}

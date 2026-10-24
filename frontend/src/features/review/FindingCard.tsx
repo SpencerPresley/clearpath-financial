@@ -3,6 +3,8 @@ import { useState } from 'react';
 import type { FindingOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { FindingSummary } from '../../ui/findings/FindingSummary';
+import { applyHandler } from '../../ui/findings/LiveFindings';
+import type { LiveEditor } from '../../ui/findings/LiveFindings';
 import { TextAreaField } from '../../ui/forms/fields';
 import { Kbd } from '../../ui/Kbd';
 import { RelativeAge } from '../../ui/RelativeAge';
@@ -16,6 +18,8 @@ export interface FindingCardProps {
   canTriage: boolean;
   dismissing: boolean;
   pending: boolean;
+  /** Approve with edits is open: Apply puts a literal suggestion into the edit. */
+  editor?: LiveEditor;
   onActivate: () => void;
   onAccept: () => void;
   onStartDismiss: () => void;
@@ -121,6 +125,7 @@ export function FindingCard({
   canTriage,
   dismissing,
   pending,
+  editor,
   onActivate,
   onAccept,
   onStartDismiss,
@@ -151,6 +156,9 @@ export function FindingCard({
         // Accepted = must change: the fix is still the point. Dismissed: no longer relevant.
         suggestedFix={finding.state === 'dismissed' ? undefined : finding.suggested_fix}
         quiet={finding.state !== 'open'}
+        onApply={
+          editor === undefined || finding.state === 'dismissed' ? undefined : applyHandler(editor, finding)
+        }
       />
       <StateLine finding={finding} />
       {canTriage && finding.state === 'open' && !dismissing && (

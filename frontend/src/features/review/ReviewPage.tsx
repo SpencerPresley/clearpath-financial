@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
 import { useGetItemDrift } from '../../api/generated/drift/drift';
@@ -100,7 +100,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [nextPending, setNextPending] = useState(false);
   /** The status a decision was recorded from: once the refetched item has moved on, focus goes to Next item. */
-  const [decidedFrom, setDecidedFrom] = useState<ItemDetailOut['status'] | null>(null);
+  const decidedFrom = useRef<ItemDetailOut['status'] | null>(null);
 
   const tab: ReviewTab = search.tab ?? 'findings';
   const findings: FindingOut[] = useMemo(() => data.findings.data ?? [], [data.findings.data]);
@@ -158,11 +158,11 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
   // the keyboard loop goes on instead of dropping to <body>.
   const status = item?.status;
   useEffect(() => {
-    if (decidedFrom === null || status === undefined || status === decidedFrom) return;
-    setDecidedFrom(null);
+    if (decidedFrom.current === null || status === undefined || status === decidedFrom.current) return;
+    decidedFrom.current = null;
     const target = document.getElementById(NEXT_ITEM_ID) ?? document.getElementById(REVIEW_TITLE_ID);
     target?.focus();
-  }, [decidedFrom, status]);
+  }, [status]);
 
   /** The next row of the view the reviewer came from (ui/queueTrail.ts), or back to that view when it's done. */
   const openNext = async () => {
@@ -171,7 +171,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
     const params = { ...trail.params, cursor: undefined, limit: NEXT_ITEM_WINDOW };
     setNextPending(true);
     try {
-      const page = await queryClient.fetchQuery({
+      const page = await queryClient.query({
         queryKey: getListItemsQueryKey(params),
         queryFn: ({ signal }) => listItems(params, { signal }),
         staleTime: 0,
@@ -239,7 +239,8 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
       A: (event) => {
         if (!event.shiftKey) return;
         if (deciding && gate.approve.enabled && mode !== 'approved') openMode('approved');
-        else if (!deciding && rereview.includes('fast_track') && mode !== 'fast_track') openMode('fast_track');
+        else if (!deciding && rereview.includes('fast_track') && mode !== 'fast_track')
+          openMode('fast_track');
       },
       R: (event) => {
         if (event.shiftKey && deciding && mode !== 'changes_requested') openMode('changes_requested');
@@ -353,7 +354,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
               setMode(null);
             }}
             onDone={() => {
-              setDecidedFrom(item.status);
+              decidedFrom.current = item.status;
               setMode(null);
               onSearchChange({ v: undefined, compare: undefined, live: undefined });
             }}
@@ -410,6 +411,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
                     marks: live.marks,
                     findings: live.findings,
                     checking: live.status === 'checking',
+                    checkedText: live.checkedText,
                     showDiff: showEditDiff,
                     onShowDiffChange: setShowEditDiff,
                   }
@@ -458,6 +460,7 @@ export function ReviewPage({ itemId, search, onSearchChange }: ReviewPageProps) 
               canTriage={canTriage}
               isDecider={isDecider}
               isMarketer={isMarketer}
+              editor={editing ? { text: editText, onChange: setEditText } : undefined}
               activeId={activeId}
               dismissingId={dismissingId}
               pendingId={triage.pendingId}

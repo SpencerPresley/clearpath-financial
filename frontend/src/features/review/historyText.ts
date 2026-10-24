@@ -75,7 +75,9 @@ export const EVENT_SENTENCES: Sentences = {
   'item.reopened': (e) => {
     const failed = e.payload.failed_snapshot_ids ?? [];
     const why =
-      failed.length > 0 ? ` (page couldn’t be fetched on ${plural(failed.length, 'daily check')} in a row)` : '';
+      failed.length > 0
+        ? ` (page couldn’t be fetched on ${plural(failed.length, 'daily check')} in a row)`
+        : '';
     return `Sent to re-review: ${REOPEN_REASON_LABELS[e.payload.reason]}${why}`;
   },
   'item.expired': (e) => `Expired: ${REOPEN_REASON_LABELS[e.payload.reason]}`,
@@ -94,17 +96,23 @@ export const EVENT_SENTENCES: Sentences = {
   'llm_check.succeeded': (e, { v }) =>
     `AI check finished on ${v(e.payload.version_id)} · ${plural(e.payload.findings_count, 'suggestion')}`,
   'llm_check.failed': (e, { v }) => `AI check failed on ${v(e.payload.version_id)}`,
-  'finding.accepted': (e, { v, finding }) => `Accepted ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
+  'finding.accepted': (e, { v, finding }) =>
+    `Accepted ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
   'finding.dismissed': (e, { v, finding }) =>
     e.payload.carried
       ? `Dismissal of ${finding(e.payload.finding_id)} carried to ${v(e.payload.version_id)}: ${e.payload.reason}`
       : `Dismissed ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}: ${e.payload.reason}`,
-  'finding.reopened': (e, { v, finding }) => `Reopened ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
+  'finding.reopened': (e, { v, finding }) =>
+    `Reopened ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
   'comment.added': (e, { v }) => `Commented on ${v(e.payload.version_id)}`,
   'decision.recorded': (e, { v }) => {
     const outcome = OUTCOME_LABELS[e.payload.outcome];
     const lane =
-      e.payload.lane === 'standard' ? '' : e.payload.lane === 'fast_track' ? ' (fast-track)' : ' (reaffirmed)';
+      e.payload.lane === 'standard'
+        ? ''
+        : e.payload.lane === 'fast_track'
+          ? ' (fast-track)'
+          : ' (reaffirmed)';
     const on = e.payload.outcome === 'changes_requested' || e.payload.outcome === 'rejected' ? ' on' : '';
     return `${outcome}${lane}${on} ${v(e.payload.version_id)}: ${firstLine(e.payload.reason)}`;
   },

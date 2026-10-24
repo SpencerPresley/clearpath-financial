@@ -1003,6 +1003,21 @@
   .app-finding-fix-label {
     @apply font-medium text-base-content;
   }
+  /* Suggested fix + Apply (walkthrough S11): the button sits at the line's end and never wraps under it. */
+  .app-finding-fix-row {
+    @apply flex items-start gap-2;
+  }
+  .app-finding-fix-row > .app-finding-fix {
+    @apply min-w-0 flex-1 pt-1;
+  }
+  /* Dense 28px control; the pseudo-element brings the hit area to 40px without growing the visible button. */
+  .app-btn.app-finding-apply {
+    @apply relative -my-0.5 shrink-0;
+  }
+  .app-btn.app-finding-apply::after {
+    content: '';
+    @apply absolute -inset-x-1 -inset-y-1.5;
+  }
 
   /* ---- Review screen (features/review) ----------------------------------------------------------- */
   /* The screen owns the main area edge to edge: bar on top, copy and side panel scroll independently. */
@@ -1327,6 +1342,48 @@
   }
   .app-evidence-list {
     @apply flex flex-col;
+  }
+  /* The decision record (Details, and expanded from History): the approval as one unit (walkthrough S3). */
+  .app-decision-record .app-hash {
+    @apply block;
+  }
+  .app-decision-record-reason {
+    @apply whitespace-pre-wrap;
+  }
+  .app-record-toggle {
+    @apply mt-1;
+  }
+  .app-record-toggle > summary {
+    @apply relative -mx-1 inline-flex min-h-8 cursor-pointer items-center rounded-sm px-1 text-meta font-medium text-primary;
+  }
+  .app-record-toggle > summary::after {
+    content: '';
+    @apply absolute -inset-y-1 inset-x-0;
+  }
+  .app-record-toggle > summary:hover {
+    @apply bg-hover;
+  }
+  .app-record-toggle > summary:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+  .app-record-toggle > summary::-webkit-details-marker {
+    display: none;
+  }
+  .app-record-caret {
+    @apply mr-1 -rotate-90;
+    transition-property: rotate;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-record-toggle[open] .app-record-caret {
+    @apply rotate-0;
+  }
+  .app-record-toggle[open] > summary {
+    @apply mb-1.5;
+  }
+  .app-record-toggle > .app-details {
+    @apply rounded-md border border-base-300 bg-base-100 p-2.5;
   }
   .app-evidence {
     @apply flex flex-col gap-0.5 border-b border-base-300 py-2 last:border-b-0;
@@ -2058,6 +2115,16 @@
   }
   .app-bulk-count {
     @apply pr-1 pl-1 font-medium text-primary;
+  }
+  .app-bulk-action {
+    @apply inline-flex items-center gap-0.5;
+  }
+  .app-bulk-action .app-pack-why {
+    @apply relative;
+  }
+  .app-bulk-action .app-pack-why::after {
+    content: '';
+    @apply absolute -inset-2;
   }
 
   /* ---- Modal (shortcuts help, bulk fast-track reason) ------------------------------------------ */

@@ -57,7 +57,9 @@ describe('describeEvent', () => {
       'Dismissal of “Credit-impact claims need evidence of the pull type” carried to v2: Limited to rate check',
     );
     // Before the finding's version has loaded: still no rule id on screen.
-    expect(describeEvent(dismissed, { versions, users })).toBe('Dismissed a finding on v2: Limited to rate check');
+    expect(describeEvent(dismissed, { versions, users })).toBe(
+      'Dismissed a finding on v2: Limited to rate check',
+    );
   });
 
   it('never shows a rule id, enum value or event type', () => {
@@ -72,7 +74,13 @@ describe('describeEvent', () => {
     const risk: Entry = { ...base('item.risk_tier_overridden'), payload: { before: 'low', after: 'high' } };
     const checked: Entry = {
       ...base('placement.drift_checked'),
-      payload: { placement_id: 3, snapshot_id: 9, status: 'succeeded', result: 'modified', compared_version_id: 501 },
+      payload: {
+        placement_id: 3,
+        snapshot_id: 9,
+        status: 'succeeded',
+        result: 'modified',
+        compared_version_id: 501,
+      },
     };
     const failedCheck: Entry = {
       ...base('placement.drift_checked'),

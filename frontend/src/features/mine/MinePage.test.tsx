@@ -104,6 +104,22 @@ describe('MinePage', () => {
     expect(fetched).toEqual([]);
   });
 
+  it('puts changes requested first in Waiting on you, ahead of newer withdrawn and expired items', async () => {
+    const changes = itemRowFixture({ id: 1, key: 'CP-1', status: 'changes_requested' });
+    const pulled = itemRowFixture({ id: 4, key: 'CP-4', status: 'withdrawn' });
+    const expired = itemRowFixture({ id: 5, key: 'CP-5', status: 'expired' });
+    // The list arrives most recently updated first.
+    server.use(listHandler([pulled, expired, changes]));
+    await renderMine();
+    const you = await screen.findByRole('region', { name: 'Waiting on you, 3 items' });
+    const actions = within(you).getAllByRole('link', { name: /^(Resubmit|Start new round) CP-/ });
+    expect(actions.map((link) => link.getAttribute('aria-label'))).toEqual([
+      'Resubmit CP-1',
+      'Start new round CP-4',
+      'Start new round CP-5',
+    ]);
+  });
+
   it('offers a first submission when there is nothing yet', async () => {
     server.use(listHandler([]));
     await renderMine();

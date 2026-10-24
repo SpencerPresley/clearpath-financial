@@ -27,7 +27,8 @@ const SHORT_HASH = 12;
 export function aiReviewLine(d: DecisionOut): string | null {
   if (!isApproval(d)) return null;
   if (d.llm_override_reason !== null && d.llm_override_reason !== '') {
-    const carried = d.ai_review_carried_from_n === null ? '' : ` (carried from v${String(d.ai_review_carried_from_n)})`;
+    const carried =
+      d.ai_review_carried_from_n === null ? '' : ` (carried from v${String(d.ai_review_carried_from_n)})`;
     return `Overridden${carried}: ${d.llm_override_reason}`;
   }
   if (d.ai_review_carried_from_n !== null) return `Carried from v${String(d.ai_review_carried_from_n)}`;

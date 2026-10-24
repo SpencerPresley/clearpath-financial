@@ -17,10 +17,11 @@ import {
   resubmitItem,
   startNewRound,
   useGetItem,
+  useGetItemHistory,
   useListItemAttachments,
 } from '../../api/generated/items/items';
 import { ResubmitItemBody } from '../../api/generated/items/items.zod';
-import type { CheckPreviewIn, ItemDetailOut } from '../../api/generated/model';
+import type { CheckPreviewIn, ItemDetailOut, ItemHistoryOut } from '../../api/generated/model';
 import { ApiError } from '../../api/mutator';
 import { Button } from '../../ui/Button';
 import { CopyEditor } from '../../ui/copy/CopyEditor';
@@ -34,7 +35,7 @@ import { apiErrorMessage, fieldErrorsFrom } from '../../ui/forms/apiErrors';
 import { TextAreaField } from '../../ui/forms/fields';
 import { fieldErrorText } from '../../ui/forms/formErrors';
 import { ItemKey } from '../../ui/ItemKey';
-import { formatDate, plural } from '../../ui/labels';
+import { PRODUCT_LABELS, REOPEN_REASON_LABELS, formatDate, plural } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
 import { showToast } from '../../ui/toast';
@@ -83,7 +84,11 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
   const decision = item.latest_decision;
   const versionN = decision?.version_n ?? item.current_version_n ?? undefined;
   const findings = useListFindings(item.id, { version_n: versionN });
-  const accepted = (findings.data ?? []).filter((finding) => finding.state === 'accepted');
+  const allAccepted = (findings.data ?? []).filter((finding) => finding.state === 'accepted');
+  // Code findings are re-run live beside the editor (with Apply where the fix is literal), so each shows once:
+  // here only the AI suggestions and checklist items the reviewer accepted.
+  const accepted = allAccepted.filter((finding) => finding.source !== 'code');
+  const codeCount = allAccepted.length - accepted.length;
 
   return (
     <section aria-labelledby="requested-title" className="app-requested">
@@ -98,7 +103,7 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
           <p className="app-requested-reason">{decision.reason}</p>
         </div>
       )}
-      {decision?.outcome !== 'changes_requested' && accepted.length === 0 && findings.isSuccess && (
+      {decision?.outcome !== 'changes_requested' && allAccepted.length === 0 && findings.isSuccess && (
         <p className="app-muted">No reason recorded. The item&apos;s comments may say more.</p>
       )}
       {accepted.length > 0 && (
@@ -117,18 +122,66 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
           ))}
         </ul>
       )}
+      {codeCount > 0 && (
+        <p className="app-muted">
+          {codeCount === 1
+            ? 'The accepted code finding is under Code checks while it still applies.'
+            : `The ${String(codeCount)} accepted code findings are under Code checks while they still apply.`}
+        </p>
+      )}
     </section>
   );
 }
 
+type ExpiredEvent = Extract<ItemHistoryOut['entries'][number], { type: 'item.expired' }>;
+
+/**
+ * Why and when an expired approval ended, from the record (walkthrough B3): the latest `item.expired` event
+ * carries the reason, its date, and for an offer-terms change the terms version that replaced the quoted one.
+ * `approval_expires_at` is only the end date for an approval that ran out; after a terms change it's still the
+ * date the approval would have lasted to.
+ */
+export function expiredContext(item: ItemDetailOut, expired: ExpiredEvent | undefined): string {
+  const next = `round ${String(item.round + 1)}`;
+  const reason = expired?.payload.reason ?? item.reopen_reason;
+  if (reason === 'terms_changed') {
+    const when = expired === undefined ? '' : ` ${formatDate(expired.at)}`;
+    const terms = item.current_version?.terms_refs.find(
+      (ref) => ref.offer_terms.id === expired?.payload.offer_terms_id,
+    )?.offer_terms;
+    const replaced =
+      terms === undefined
+        ? 'the offer terms it quoted changed'
+        : `${PRODUCT_LABELS[terms.product].toLowerCase()} offer terms v${String(terms.version)} took effect`;
+    const generated = item.current_version?.origin === 'fast_track';
+    return generated
+      ? `Expired${when} when ${replaced}. v${String(item.current_version_n)} has the new numbers; check them and start ${next}.`
+      : `Expired${when} when ${replaced}. Update the numbers and start ${next}.`;
+  }
+  if (reason === 'approval_expired' || reason === null) {
+    const date = item.approval_expires_at ?? expired?.at;
+    return `Approval expired${date === undefined ? '' : ` ${formatDate(date)}`}. Start ${next} to have it reviewed again.`;
+  }
+  const when = expired === undefined ? '' : ` ${formatDate(expired.at)}`;
+  return `Expired${when}: ${REOPEN_REASON_LABELS[reason].toLowerCase()}. Start ${next} to have it reviewed again.`;
+}
+
 function RoundContext({ item }: { item: ItemDetailOut }) {
-  const text =
-    item.status === 'withdrawn'
-      ? `Pulled from where it ran. Fix the copy and start round ${String(item.round + 1)}.`
-      : `Approval expired${
-          item.approval_expires_at === null ? '' : ` ${formatDate(item.approval_expires_at)}`
-        }. Start round ${String(item.round + 1)} to have it reviewed again.`;
-  return <p className="app-resubmit-context">{text}</p>;
+  const history = useGetItemHistory(item.id, { query: { enabled: item.status === 'expired' } });
+  if (item.status === 'withdrawn') {
+    return (
+      <p className="app-resubmit-context">
+        Pulled from where it ran. Fix the copy and start round {String(item.round + 1)}.
+      </p>
+    );
+  }
+  if (history.isPending) {
+    return <SkeletonText width="28rem" />;
+  }
+  const expired = (history.data?.entries ?? [])
+    .filter((entry): entry is ExpiredEvent => entry.type === 'item.expired')
+    .sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id)[0];
+  return <p className="app-resubmit-context">{expiredContext(item, expired)}</p>;
 }
 
 function ResubmitForm({
@@ -309,7 +362,16 @@ function ResubmitForm({
       </div>
 
       <aside className="app-resubmit-live">
-        <LiveFindings checks={checks} className="app-live" />
+        <LiveFindings
+          checks={checks}
+          className="app-live"
+          editor={{
+            text: draft,
+            onChange: (text) => {
+              form.setFieldValue('content_text', text);
+            },
+          }}
+        />
       </aside>
     </form>
   );

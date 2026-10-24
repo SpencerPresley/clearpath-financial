@@ -311,7 +311,8 @@ describe('ReviewPage', () => {
       item: itemFixture({
         llm_check_status: 'failed',
         llm_check_failure_code: 'provider_unavailable',
-        llm_check_failure_reason: "The AI service didn't answer after 4 tries. The model provider returned 529.",
+        llm_check_failure_reason:
+          "The AI service didn't answer after 4 tries. The model provider returned 529.",
       }),
       findings: dismissedAll(FINDINGS_OPEN),
     });
@@ -768,7 +769,12 @@ describe('ReviewPage after the walkthrough', () => {
         current_version_n: 4,
         current_version: versionFixture(2, { id: 504, n: 4, origin: 'fast_track', based_on_n: 3 }),
         versions: [summary(1), summary(2), summary(3), summary(4, { origin: 'fast_track' })],
-        latest_decision: { ...DECISION_APPROVED, version_n: 4, lane: 'fast_track', ai_review_carried_from_n: 3 },
+        latest_decision: {
+          ...DECISION_APPROVED,
+          version_n: 4,
+          lane: 'fast_track',
+          ai_review_carried_from_n: 3,
+        },
       }),
       findings: [],
     });
@@ -792,7 +798,8 @@ describe('ReviewPage after the walkthrough', () => {
       findings: [],
     });
     const section = (await screen.findByRole('heading', { name: 'Decision record' })).closest('section');
-    const record = within(section as HTMLElement);
+    if (section === null) throw new Error('no decision record section');
+    const record = within(section);
     expect(record.getByText('Approved v2')).toBeInTheDocument();
     expect(record.getByText('Overridden: Provider outage; read by hand')).toBeInTheDocument();
     expect(record.getByText('Personal loan v12')).toBeInTheDocument();
@@ -834,7 +841,9 @@ describe('ReviewPage after the walkthrough', () => {
       },
     });
     expect(
-      await screen.findByText('Dismissed “Rate claim needs the full APR range” on v2: Range is in the footer'),
+      await screen.findByText(
+        'Dismissed “Rate claim needs the full APR range” on v2: Range is in the footer',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/pricing\.as_low_as_range/)).not.toBeInTheDocument();
   });
@@ -921,7 +930,11 @@ describe('ReviewPage after the walkthrough', () => {
   it('after a decision, focuses Next item, which opens the next row of the reviewer’s view (S8)', async () => {
     sessionStorage.setItem(
       'clearpath.queueTrail',
-      JSON.stringify({ params: { mine: true, sort: 'queue' }, ids: [1041, 1042, 1043], href: '/queue?view=mine' }),
+      JSON.stringify({
+        params: { mine: true, sort: 'queue' },
+        ids: [1041, 1042, 1043],
+        href: '/queue?view=mine',
+      }),
     );
     const shown = itemFixture();
     let decided = false;
@@ -929,7 +942,9 @@ describe('ReviewPage after the walkthrough', () => {
     const { router } = renderReview({ item: shown, findings: dismissedAll(FINDINGS_OPEN) });
     server.use(
       http.get('*/api/items/:id', () =>
-        HttpResponse.json(decided ? { ...shown, status: 'approved', latest_decision: DECISION_APPROVED } : shown),
+        HttpResponse.json(
+          decided ? { ...shown, status: 'approved', latest_decision: DECISION_APPROVED } : shown,
+        ),
       ),
       http.post('*/api/items/:id/decisions', () => {
         decided = true;
@@ -1032,6 +1047,31 @@ describe('ReviewPage after the walkthrough', () => {
     await waitFor(() => {
       expect(router.state.location.search).toMatchObject({ live: true });
     });
+  });
+
+  it('applies a finding’s literal suggestion into the reviewer’s edit (S11)', async () => {
+    const credit = {
+      ...FINDING_CREDIT,
+      state: 'accepted' as const,
+      suggested_fix: '"Checking your rate won’t affect your credit score."',
+    };
+    renderReview({ findings: [credit] });
+    await screen.findByRole('heading', { name: /Fall personal loan/ });
+    // Nothing to apply into until there's an edit.
+    expect(screen.queryByRole('button', { name: /^Apply suggestion/ })).not.toBeInTheDocument();
+    await userEvent.keyboard('e');
+    const editor = await screen.findByLabelText('Edited copy (v3)');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Apply suggestion: "Checking your rate won’t affect your credit score."',
+      }),
+    );
+    expect(editor).toHaveValue(
+      versionFixture(2).content_text.replace(
+        'no impact on your credit score',
+        'Checking your rate won’t affect your credit score.',
+      ),
+    );
   });
 
   it('prefills the fast-track reason so the step is one click (nit 4)', async () => {

@@ -4,6 +4,7 @@ import type { FindingOut, ItemDetailOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { groupFindings } from '../../ui/findings/groupFindings';
+import type { LiveEditor } from '../../ui/findings/LiveFindings';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { SkeletonBadge, SkeletonText } from '../../ui/Skeleton';
 import { FindingCard } from './FindingCard';
@@ -18,6 +19,8 @@ export interface FindingsPanelProps {
   /** Reviewer or lead: gets the copy about approving. */
   isDecider: boolean;
   isMarketer: boolean;
+  /** Approve with edits is open: findings with a literal fix offer Apply into the reviewer's edit. */
+  editor?: LiveEditor;
   activeId: number | null;
   dismissingId: number | null;
   pendingId: number | undefined;
@@ -116,6 +119,7 @@ export function FindingsPanel(props: FindingsPanelProps) {
                     canTriage={canTriage}
                     dismissing={finding.id === dismissingId}
                     pending={finding.id === pendingId}
+                    editor={props.editor}
                     onActivate={() => {
                       props.onActivate(finding.id);
                     }}

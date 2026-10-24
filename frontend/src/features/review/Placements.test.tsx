@@ -164,7 +164,10 @@ describe('PlacementsSection', () => {
     serve({
       item_id: 1042,
       placements: [
-        placement({ placement_id: 3, latest: snapshot({ findings: [finding(1, false), finding(2, false)] }) }),
+        placement({
+          placement_id: 3,
+          latest: snapshot({ findings: [finding(1, false), finding(2, false)] }),
+        }),
         placement({
           placement_id: 4,
           latest: snapshot({ id: 8, findings: [finding(3, true), finding(4, false), finding(5, false)] }),
@@ -173,7 +176,9 @@ describe('PlacementsSection', () => {
     });
     renderSection();
 
-    expect(await screen.findByText('2 code findings on the page, also in the approved copy')).toBeInTheDocument();
+    expect(
+      await screen.findByText('2 code findings on the page, also in the approved copy'),
+    ).toBeInTheDocument();
     expect(screen.getByText('3 code findings on the page, 1 not in the approved copy')).toBeInTheDocument();
   });
 

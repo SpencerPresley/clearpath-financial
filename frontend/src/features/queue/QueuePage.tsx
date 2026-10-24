@@ -121,7 +121,7 @@ function EmptyQueue({
     waiting: ['Nothing waiting more than 3 days', 'Every queued item was submitted in the last 3 days.'],
     rereview: [
       'No re-reviews',
-      'Approved content comes back here when offer terms change, an approval expires, or drift is found.',
+      'Approved content comes back here when offer terms change, an approval expires, or live copy changes.',
     ],
     queue: ['Nothing in the queue', 'Nothing is submitted, in review, or up for re-review.'],
     active: ['No active items', 'Nothing is submitted, in review, waiting on changes, or up for re-review.'],

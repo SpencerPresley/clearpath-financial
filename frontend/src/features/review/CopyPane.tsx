@@ -14,6 +14,7 @@ import { CopyEditor } from '../../ui/copy/CopyEditor';
 import { DiffText, countChanges } from '../../ui/copy/DiffText';
 import { HighlightedText } from '../../ui/copy/HighlightedText';
 import { FindingSummary } from '../../ui/findings/FindingSummary';
+import { applyHandler } from '../../ui/findings/LiveFindings';
 import { marksFromFindings } from '../../ui/copy/marks';
 import type { SpanMark } from '../../ui/copy/segments';
 import { wordDiff } from '../../ui/copy/wordDiff';
@@ -32,6 +33,8 @@ export interface EditState {
   /** Live code findings on the edited text: open ones on the new version block the approval. */
   findings: FindingDraftOut[];
   checking: boolean;
+  /** The text the live findings were computed for; Apply only uses spans that match the editor. */
+  checkedText: string | null;
   showDiff: boolean;
   onShowDiffChange: (show: boolean) => void;
 }
@@ -228,6 +231,11 @@ export function CopyPane({
                     citation={finding.citation}
                     quote={finding.quote}
                     suggestedFix={finding.suggested_fix}
+                    onApply={
+                      !edit.checking && edit.checkedText === edit.text
+                        ? applyHandler({ text: edit.text, onChange: edit.onChange }, finding)
+                        : undefined
+                    }
                   />
                 ))}
               </section>

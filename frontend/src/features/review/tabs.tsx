@@ -29,6 +29,7 @@ import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { SelectField, TextAreaField } from '../../ui/forms/fields';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
+import { Icon } from '../../ui/Icon';
 import {
   ATTACHMENT_KIND_LABELS,
   CHANNEL_LABELS,
@@ -487,7 +488,10 @@ export function HistoryTab({ item }: { item: ItemDetailOut }) {
             </p>
             {record !== undefined && (
               <details className="app-record-toggle">
-                <summary>Decision record</summary>
+                <summary>
+                  <Icon name="action.expand" size={12} className="app-record-caret" />
+                  Decision record
+                </summary>
                 <DecisionRecord decision={record} />
               </details>
             )}
