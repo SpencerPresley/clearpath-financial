@@ -10,14 +10,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { getGetItemHistoryQueryKey, getGetItemQueryKey } from '../../api/generated/items/items';
+import {
+  getGetItemHistoryQueryKey,
+  getGetItemQueryKey,
+  useListPlacements,
+} from '../../api/generated/items/items';
 import {
   getGetItemDriftQueryKey,
   useCheckPlacementDrift,
   useGetItemDrift,
 } from '../../api/generated/drift/drift';
 import { useSetDemoPageEdited } from '../../api/generated/demo/demo';
-import type { ItemDriftOut, PlacementDriftOut, SnapshotOut } from '../../api/generated/model';
+import type { ItemDriftOut, PlacementDriftOut, PlacementOut, SnapshotOut } from '../../api/generated/model';
 import type { Tone } from '../../ui/badges';
 import { SeverityBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
@@ -29,6 +33,12 @@ import { DRIFT_RESULT_LABELS, plural } from '../../ui/labels';
 import { useViewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
+import {
+  ConfirmTakedownButton,
+  PlacementFormButton,
+  useCanConfirmTakedown,
+  useCanEditPlacements,
+} from './PlacementActions';
 
 /** While a check is queued or running, the drift read is polled so the result arrives without a reload. */
 export const DRIFT_POLL_MS = 2000;
@@ -215,17 +225,70 @@ function PageFindings({ snapshot }: { snapshot: SnapshotOut }) {
   );
 }
 
+function RecordActions({
+  itemId,
+  record,
+  canEdit,
+  canConfirm,
+}: {
+  itemId: number;
+  record: PlacementOut | undefined;
+  canEdit: boolean;
+  canConfirm: boolean;
+}) {
+  if (record === undefined) return null;
+  return (
+    <>
+      {canEdit && <PlacementFormButton itemId={itemId} placement={record} />}
+      {canConfirm && record.takedown_state === 'requested' && (
+        <ConfirmTakedownButton itemId={itemId} placement={record} />
+      )}
+    </>
+  );
+}
+
+/** A placement without a web address: nothing to check, so it has no drift row. */
+function PlainPlacementRow({
+  itemId,
+  record,
+  canEdit,
+  canConfirm,
+}: {
+  itemId: number;
+  record: PlacementOut;
+  canEdit: boolean;
+  canConfirm: boolean;
+}) {
+  return (
+    <li className="app-placement">
+      <div className="app-placement-head">
+        <p className="app-placement-location">{record.location}</p>
+        <p className="app-timeline-meta">{record.is_live ? 'Live' : 'Not live'} · No web address</p>
+      </div>
+      <div className="app-placement-actions">
+        <RecordActions itemId={itemId} record={record} canEdit={canEdit} canConfirm={canConfirm} />
+      </div>
+    </li>
+  );
+}
+
 function PlacementRow({
   itemId,
   placement,
   canCheck,
   canSimulate,
+  record,
+  canEdit,
+  canConfirm,
   onShowLiveDiff,
 }: {
   itemId: number;
   placement: PlacementDriftOut;
   canCheck: boolean;
   canSimulate: boolean;
+  record: PlacementOut | undefined;
+  canEdit: boolean;
+  canConfirm: boolean;
   onShowLiveDiff?: ShowLiveDiff;
 }) {
   const queryClient = useQueryClient();
@@ -280,8 +343,9 @@ function PlacementRow({
           {error}
         </p>
       )}
-      {(canCheck || (demo !== null && canSimulate)) && (
+      {(canCheck || (demo !== null && canSimulate) || record !== undefined) && (
         <div className="app-placement-actions">
+          <RecordActions itemId={itemId} record={record} canEdit={canEdit} canConfirm={canConfirm} />
           {canCheck && (
             <Button
               size="sm"
@@ -324,10 +388,13 @@ function PlacementRow({
 export function PlacementsSection({
   itemId,
   ownerId,
+  itemStatus,
   onShowLiveDiff,
 }: {
   itemId: number;
   ownerId: number | null;
+  /** Placements are recorded only while the item is approved. */
+  itemStatus: string;
   /** A drift re-review: "Live page vs approved vN" opens in the center pane; this panel keeps the metadata. */
   onShowLiveDiff?: ShowLiveDiff;
 }) {
@@ -351,12 +418,23 @@ export function PlacementsSection({
   const canCheck =
     viewer.id === ownerId || viewer.roles.some((r) => r === 'reviewer' || r === 'lead' || r === 'admin');
   const canSimulate = viewer.roles.some((r) => r === 'lead' || r === 'admin');
+  const canEdit = useCanEditPlacements(ownerId);
+  const canConfirm = useCanConfirmTakedown(ownerId);
+  const records = useListPlacements(itemId);
+  const recordById = new Map((records.data ?? []).map((r) => [r.id, r]));
+  const driftIds = new Set((drift.data?.placements ?? []).map((p) => p.placement_id));
+  const plainRecords = (records.data ?? []).filter((r) => !driftIds.has(r.id));
 
   return (
     <section aria-labelledby="placements-title">
       <h3 id="placements-title" className="app-panel-heading">
         Where it runs
       </h3>
+      {canEdit && itemStatus === 'approved' && (
+        <div className="app-placement-actions">
+          <PlacementFormButton itemId={itemId} />
+        </div>
+      )}
       {drift.isPending ? (
         <div role="status" aria-label="Loading placements" className="app-panel-skeleton">
           <SkeletonText width="60%" />
@@ -369,8 +447,8 @@ export function PlacementsSection({
             Retry
           </Button>
         </div>
-      ) : drift.data.placements.length === 0 ? (
-        <p className="app-muted">No placements with a web address. Placements are recorded after approval.</p>
+      ) : drift.data.placements.length === 0 && plainRecords.length === 0 ? (
+        <p className="app-muted">No placements yet. Placements are recorded after approval.</p>
       ) : (
         <ul className="app-placement-list">
           {drift.data.placements.map((placement) => (
@@ -380,7 +458,19 @@ export function PlacementsSection({
               placement={placement}
               canCheck={canCheck}
               canSimulate={canSimulate}
+              record={recordById.get(placement.placement_id)}
+              canEdit={canEdit}
+              canConfirm={canConfirm}
               onShowLiveDiff={onShowLiveDiff}
+            />
+          ))}
+          {plainRecords.map((record) => (
+            <PlainPlacementRow
+              key={record.id}
+              itemId={itemId}
+              record={record}
+              canEdit={canEdit}
+              canConfirm={canConfirm}
             />
           ))}
         </ul>
