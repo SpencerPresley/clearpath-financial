@@ -4,7 +4,7 @@ from datetime import datetime
 from django.db.models import QuerySet
 
 from checks.models import Finding
-from core.domain import FindingSource, FindingState, Severity
+from core.domain import FindingSource, FindingState, FixKind, Severity
 from core.errors import NotFound
 from reviews.models import ReviewItem
 from reviews.records import Span
@@ -24,6 +24,8 @@ class FindingRow:
     quote: str | None
     message: str
     suggested_fix: str
+    fix_kind: FixKind | None  # None: unknown (recorded before fix kinds) or no fix
+    replacement_text: str | None
     reason: str
     resolved_by: PartyRef | None
     resolved_at: datetime | None
@@ -48,6 +50,8 @@ def _row(f: Finding) -> FindingRow:
         quote=f.quote,
         message=f.message,
         suggested_fix=f.suggested_fix,
+        fix_kind=FixKind(f.fix_kind) if f.fix_kind else None,
+        replacement_text=f.replacement_text,
         reason=f.reason,
         resolved_by=PartyRef(id=f.resolved_by.pk, name=f.resolved_by.display_name or f.resolved_by.email)
         if f.resolved_by

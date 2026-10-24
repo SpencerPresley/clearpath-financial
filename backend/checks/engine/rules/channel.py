@@ -15,6 +15,7 @@ from checks.engine.rule import (
     URL_7704,
     Hit,
     Rule,
+    instruct,
     make_spec,
 )
 from checks.engine.text import QUOTE_OPEN, compile_i
@@ -132,7 +133,7 @@ _DISCLOSURE = compile_i(
 
 def _sms_consent(ctx: RuleContext, _a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if AttachmentKind.CONSENT_RECORD not in ctx.attachment_kinds:
-        yield Hit(
+        yield instruct(
             None,
             'Attach the consent record: signed written consent naming the number, with "not a condition of '
             'purchase" language.',
@@ -142,12 +143,12 @@ def _sms_consent(ctx: RuleContext, _a: Analysis, _c: EngineConfig) -> Iterable[H
 
 def _sms_opt_out(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if not _STOP.search(a.text):
-        yield Hit(None, "Tell recipients how to stop texts.", '"Reply STOP to opt out."')
+        yield instruct(None, "Tell recipients how to stop texts.", '"Reply STOP to opt out."')
 
 
 def _email_opt_out(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if not _EMAIL_OPT_OUT.search(a.text):
-        yield Hit(None, "Add an unsubscribe link or opt-out instructions.", '"Unsubscribe"')
+        yield instruct(None, "Add an unsubscribe link or opt-out instructions.", '"Unsubscribe"')
 
 
 def _has_postal_address(text: str) -> bool:
@@ -159,7 +160,7 @@ def _has_postal_address(text: str) -> bool:
 
 def _email_address(_ctx: RuleContext, a: Analysis, c: EngineConfig) -> Iterable[Hit]:
     if not _has_postal_address(a.text):
-        yield Hit(
+        yield instruct(
             None,
             "Add a valid physical postal address (street address or registered PO box).",
             f'"{c.postal_address}"',
@@ -168,7 +169,7 @@ def _email_address(_ctx: RuleContext, a: Analysis, c: EngineConfig) -> Iterable[
 
 def _email_ad_id(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if not _AD_ID.search(a.text):
-        yield Hit(
+        yield instruct(
             None,
             "Identify the email as an advertisement, unless recipients gave prior affirmative consent.",
             '"This is an advertisement."',
@@ -187,7 +188,7 @@ def _email_subject(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable
 def _material_connection(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     partner_content = ctx.partner_type is not None or ctx.channel is Channel.AFFILIATE_PAGE
     if partner_content and not _DISCLOSURE.search(a.text):
-        yield Hit(
+        yield instruct(
             None,
             "Disclose the paid relationship clearly, near the top.",
             '"#ad" or "Advertiser disclosure: we receive compensation from ClearPath."',

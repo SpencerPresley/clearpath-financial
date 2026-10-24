@@ -58,6 +58,17 @@ class FindingSource(StrEnum):
     HUMAN = "human"
 
 
+class FixKind(StrEnum):
+    """What a finding's suggested fix does to the copy, so Apply never guesses. `replace` puts `replacement_text`
+    in place of the finding's span; `insert` puts it right after the span (the text carries its own leading space
+    or punctuation); `instruction` is advice for a person, with no literal text to apply. Null on a finding means
+    unknown (rows from before the field existed)."""
+
+    REPLACE = "replace"
+    INSERT = "insert"
+    INSTRUCTION = "instruction"
+
+
 class AttachmentKind(StrEnum):
     CREATIVE = "creative"
     SUBSTANTIATION = "substantiation"

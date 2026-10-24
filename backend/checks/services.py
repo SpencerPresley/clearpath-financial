@@ -192,6 +192,8 @@ def persist_findings(*, version: Version, drafts: Sequence[FindingDraft], clock:
             quote=quote,
             message=draft.message,
             suggested_fix=draft.suggested_fix or "",
+            fix_kind=draft.fix_kind,
+            replacement_text=draft.replacement_text,
             created_at=now,
             **(
                 {

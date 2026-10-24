@@ -3,8 +3,25 @@ from datetime import datetime
 from ninja import Schema
 from pydantic import Field
 
-from core.domain import AttachmentKind, Channel, FindingSource, FindingState, Market, Product, Severity, TermsField
+from core.domain import (
+    AttachmentKind,
+    Channel,
+    FindingSource,
+    FindingState,
+    FixKind,
+    Market,
+    Product,
+    Severity,
+    TermsField,
+)
 from reviews.schemas import PartyRefOut, SpanOut
+
+_FIX_KIND = (
+    "What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right "
+    "after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before "
+    "fix kinds) or there is no suggestion."
+)
+_REPLACEMENT_TEXT = "The literal text for replace and insert, used verbatim (an insert carries its own leading space)."
 
 
 class FindingOut(Schema):
@@ -19,6 +36,8 @@ class FindingOut(Schema):
     quote: str | None
     message: str
     suggested_fix: str
+    fix_kind: FixKind | None = Field(description=_FIX_KIND)
+    replacement_text: str | None = Field(description=_REPLACEMENT_TEXT)
     reason: str
     resolved_by: PartyRefOut | None
     resolved_at: datetime | None
@@ -53,6 +72,8 @@ class FindingDraftOut(Schema):
     severity: Severity
     message: str
     suggested_fix: str
+    fix_kind: FixKind | None = Field(description=_FIX_KIND)
+    replacement_text: str | None = Field(description=_REPLACEMENT_TEXT)
     span: SpanOut | None
     quote: str | None
 

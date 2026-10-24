@@ -6,10 +6,12 @@ the partner page still shows something else: fast-tracking would approve content
 """
 
 import pytest
+from django.db import transaction
 
 from accounts.models import User
 from core.clock import FixedClock
 from core.domain import ItemStatus, ReopenReason, VersionOrigin
+from core.errors import Conflict
 from drift import services
 from drift.tests.conftest import page_with
 from drift.tests.test_services import EDITED, check
@@ -18,7 +20,7 @@ from reviews.errors import DriftNotRestored
 from reviews.models import Decision, Placement, ReviewItem
 from reviews.records import get_item_detail
 from reviews.rereview import send_back
-from reviews.selectors import DriftRereview
+from reviews.selectors import DriftRereview, get_item_row
 from reviews.versions import create_version
 from terms.fast_track import bulk_fast_track_approve, fast_track_approve
 
@@ -100,3 +102,52 @@ def test_a_terms_rereview_whose_page_then_changed_is_refused_too(
     )
     with pytest.raises(DriftNotRestored):
         fast_track_approve(actor=reviewer, item_id=item_id, version_n=n, reason="Only numbers changed", clock=clock)
+
+
+# --- the row flag: fast_track_eligible, the same rule as the lane --------------------------------------------------
+
+
+def _eligible(item_id: int, clock: FixedClock) -> bool:
+    return get_item_row(item_id=item_id, clock=clock).fast_track_eligible
+
+
+def _lane_allows(item_id: int, n: int, reviewer: User, clock: FixedClock) -> bool:
+    """Whether the fast-track lane accepts the item, without keeping the decision."""
+    try:
+        with transaction.atomic():
+            fast_track_approve(actor=reviewer, item_id=item_id, version_n=n, reason="probe", clock=clock)
+            transaction.set_rollback(True)
+    except (DriftNotRestored, Conflict):
+        return False
+    return True
+
+
+def test_the_row_flag_matches_the_lane_through_drift_and_restore(
+    drifted: ReviewItem, placement: Placement, reviewer: User, lead: User, clock: FixedClock
+) -> None:
+    current = drifted.current_version.n  # pyrefly: ignore[missing-attribute]
+    assert _eligible(drifted.pk, clock) is _lane_allows(drifted.pk, current, reviewer, clock) is False  # not generated
+
+    n = _generate(drifted.pk, lead, clock)
+    assert _eligible(drifted.pk, clock) is _lane_allows(drifted.pk, n, reviewer, clock) is False  # page differs
+
+    services.complete(claim=check(placement, clock), page=page_with(), clock=clock)
+    assert _eligible(drifted.pk, clock) is _lane_allows(drifted.pk, n, reviewer, clock) is True  # restored
+
+
+def test_the_row_flag_is_off_for_a_terms_rereview_whose_page_changed(
+    placement: Placement, reviewer: User, lead: User, clock: FixedClock, enqueued: list[int]
+) -> None:
+    item_id = placement.item_id  # pyrefly: ignore[missing-attribute]
+    send_back(item_id=item_id, reason=ReopenReason.TERMS_CHANGED, clock=clock)
+    n = _generate(item_id, lead, clock)
+    assert _eligible(item_id, clock) is _lane_allows(item_id, n, reviewer, clock) is True
+
+    services.complete(claim=check(placement, clock), page=page_with(EDITED), clock=clock)
+    assert _eligible(item_id, clock) is _lane_allows(item_id, n, reviewer, clock) is False
+
+
+def test_only_a_rereview_can_be_eligible(placement: Placement, clock: FixedClock) -> None:
+    item_id = placement.item_id  # pyrefly: ignore[missing-attribute]
+    assert ReviewItem.objects.get(pk=item_id).status == ItemStatus.APPROVED
+    assert _eligible(item_id, clock) is False

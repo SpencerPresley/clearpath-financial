@@ -2,13 +2,24 @@
 bait pricing under Reg Z 1026.24(a) / 1026.16(a)).
 """
 
+import re
 from collections.abc import Iterable, Iterator
 from decimal import Decimal
 
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
 from checks.engine.format import apr_bounds, money, pct
-from checks.engine.rule import ALL_PRODUCTS, REGZ_1026_16, URL_1026_24, URL_SH24, Hit, Rule, make_spec
+from checks.engine.rule import (
+    ALL_PRODUCTS,
+    REGZ_1026_16,
+    URL_1026_24,
+    URL_SH24,
+    Hit,
+    Rule,
+    instruct,
+    make_spec,
+    replace_with,
+)
 from checks.engine.text import compile_i
 from checks.engine.types import RuleContext, Span
 from core.domain import CreditCardTerms, PersonalLoanTerms, Product, Severity
@@ -76,14 +87,14 @@ def _as_low_as_range(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterabl
     bounds = apr_bounds(ctx.terms)
     fix = f'"APRs from {pct(bounds[0])} to {pct(bounds[1])}"' if bounds is not None else None
     for span in _lowest_rate_claims(a, standalone=True):
-        yield Hit(span, "Show the full rate range next to this lowest rate.", fix)
+        yield instruct(span, "Show the full rate range next to this lowest rate.", fix)
 
 
 def _creditworthiness(_ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if _QUALIFIER.search(a.text):
         return
     for span in _lowest_rate_claims(a, standalone=False):
-        yield Hit(
+        yield instruct(
             span,
             "Say that the lowest rates go to the most creditworthy applicants.",
             '"Your rate depends on your creditworthiness; the lowest rates are for the most qualified applicants."',
@@ -94,18 +105,26 @@ def _outside(value: Decimal, lo: Decimal, hi: Decimal) -> bool:
     return not lo <= value <= hi
 
 
+def _nearest(value: Decimal, lo: Decimal, hi: Decimal) -> Decimal:
+    """The offered value closest to one that isn't offered: the bound it overshoots."""
+    return min(max(value, lo), hi)
+
+
 def _pl_rates(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
     apr_range = f"{pct(t.apr_min)}\u2013{pct(t.apr_max)}"
     for p in a.rates:
         if _outside(p.value, t.apr_min, t.apr_max):
-            yield Hit(p.span, f"This APR isn't offered; current APRs are {apr_range}.", apr_range)
+            nearest = pct(_nearest(p.value, t.apr_min, t.apr_max))
+            yield replace_with(p.span, f"This APR isn't offered; current APRs are {apr_range}.", nearest, shown=nearest)
 
 
 def _pl_amounts_and_terms(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
     amount_range = f"{money(t.amount_min)}\u2013{money(t.amount_max)}"
     for m in a.moneys:
         if m.role == "amount" and _outside(m.value, t.amount_min, t.amount_max):
-            yield Hit(m.span, f"This loan amount isn't offered; current amounts are {amount_range}.", amount_range)
+            nearest = money(_nearest(m.value, t.amount_min, t.amount_max))
+            message = f"This loan amount isn't offered; current amounts are {amount_range}."
+            yield replace_with(m.span, message, nearest, shown=nearest)
     offered = ", ".join(str(n) for n in t.term_months)
     for term in a.credit_terms:
         if term.months not in t.term_months:
@@ -120,7 +139,9 @@ def _pl_fees(a: Analysis, t: PersonalLoanTerms) -> Iterator[Hit]:
             and p.origination
             and _outside(p.value, t.origination_fee_min_pct, t.origination_fee_max_pct)
         ):
-            yield Hit(p.span, f"This origination fee isn't current; fees are {fee_range}.", fee_range)
+            nearest = pct(_nearest(p.value, t.origination_fee_min_pct, t.origination_fee_max_pct))
+            message = f"This origination fee isn't current; fees are {fee_range}."
+            yield replace_with(p.span, message, nearest, shown=nearest)
     for c in a.claims:
         if c.field == "origination_fee_max_pct" and c.value == 0 and t.origination_fee_max_pct > 0:
             yield Hit(c.span, f"Origination fees currently run {fee_range}, so this claim isn't accurate.", None)
@@ -141,9 +162,12 @@ def _card_rates(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:
             if t.intro_apr is None:
                 yield Hit(p.span, "There's no intro APR in the current card terms.", None)
             elif p.value != t.intro_apr:
-                yield Hit(p.span, f"The current intro APR is {pct(t.intro_apr)}.", pct(t.intro_apr))
+                intro = pct(t.intro_apr)
+                yield replace_with(p.span, f"The current intro APR is {intro}.", intro, shown=intro)
         elif _outside(p.value, t.purchase_apr_min, t.purchase_apr_max):
-            yield Hit(p.span, f"This APR isn't offered; current purchase APRs are {apr_range}.", apr_range)
+            nearest = pct(_nearest(p.value, t.purchase_apr_min, t.purchase_apr_max))
+            message = f"This APR isn't offered; current purchase APRs are {apr_range}."
+            yield replace_with(p.span, message, nearest, shown=nearest)
 
 
 def _card_claims(a: Analysis, t: CreditCardTerms) -> Iterator[Hit]:
@@ -205,7 +229,30 @@ def _terms_current(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[
             continue
         if within and c.value != bound:
             which = "lowest" if c.role == "min" else "highest"
-            yield Hit(c.span, f"The current {which} value is {bound}; update this to match.", str(bound))
+            shown = _formatted(c.field, bound)
+            message = f"The current {which} value is {shown}; update this to match."
+            quote = a.text[c.span.start : c.span.end]
+            if _same_shape(quote, shown):
+                yield replace_with(c.span, message, shown, shown=shown)
+            else:
+                yield instruct(c.span, message, shown)
+
+
+def _formatted(field: str, value: Decimal) -> str:
+    """A terms value as copy writes it: "11.11%", "$44,000", "60 months"."""
+    if field == "term_months":
+        return f"{value} months"
+    return money(value) if field.startswith("amount") else pct(value)
+
+
+_FIGURE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?")
+
+
+def _same_shape(quote: str, literal: str) -> bool:
+    """Whether the claim's span is a bare figure of the same kind as the literal ("$25,000" for "$44,000"), so
+    swapping one for the other leaves the sentence intact."""
+    same_kind = quote.startswith("$") == literal.startswith("$") and quote.endswith("%") == literal.endswith("%")
+    return _FIGURE.fullmatch(quote) is not None and _FIGURE.fullmatch(literal) is not None and same_kind
 
 
 RULES: tuple[Rule, ...] = (

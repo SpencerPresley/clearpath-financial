@@ -62,7 +62,7 @@ from reviews.models import (
     Version,
 )
 from reviews.months import add_months
-from reviews.selectors import drift_rereview, live_placements_q
+from reviews.selectors import drift_rereview, fast_track_check, live_placements_q
 from reviews.transitions import Action, apply_transition, require_transition, start_review
 from reviews.versions import create_version
 
@@ -173,9 +173,11 @@ def _require_fast_trackable(item: ReviewItem, version: Version, clock: Clock) ->
     """Fast-track approves only a generated terms-change version, and only while the live page shows the approved
     copy: it is for re-reviews where only the numbers changed, never a way to clear drift (walkthrough B1). Bulk
     skips a refused item with its code."""
-    if VersionOrigin(version.origin) is not VersionOrigin.FAST_TRACK:
+    check = fast_track_check(item_id=item.pk, version_origin=VersionOrigin(version.origin), today=clock.today())
+    if not check.generated:
         raise Conflict("Only a generated terms-change version can be fast-tracked.", details={"version_n": version.n})
-    _require_page_matches(item, clock)
+    if check.drift is not None:
+        raise DriftNotRestored(placement_id=check.drift.placement_id)
 
 
 def _open_summaries(version: Version) -> list[FindingSummary]:

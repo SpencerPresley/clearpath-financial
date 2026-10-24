@@ -4,6 +4,7 @@ offered). The shared fixtures use 7.49% / 19.99%-29.99%, the same values the old
 runs with terms nobody would type by accident."""
 
 import re
+from collections.abc import Iterable
 from dataclasses import replace
 from decimal import Decimal
 
@@ -11,7 +12,7 @@ import pytest
 
 from checks.engine import RULES, FindingDraft, run_code_checks
 from checks.engine.config import DEFAULT_CONFIG
-from core.domain import Channel, CreditCardTerms, PersonalLoanTerms, Product
+from core.domain import Channel, CreditCardTerms, FixKind, PersonalLoanTerms, Product
 
 from .conftest import cc_terms, make_ctx, pl_terms
 from .samples import SAMPLES, Sample
@@ -161,3 +162,111 @@ def test_arm_suggestions_take_the_fixed_period_from_the_named_arm() -> None:
         '"10/6 ARM: rate fixed for the first 10 years, then may adjust"'
     )
     assert _fix("Adjustable-rate mortgage. The rate is fixed.", "mortgage.arm_fixed", **mtg) is None
+
+
+# --- what Apply does (fix_kind) -----------------------------------------------------------------------------------
+
+# Copy built so every literal fix has something to land on: card rates without labels or "variable", a bare intro
+# rate, fee and transfer triggers, out-of-range personal-loan numbers, a miscomputed example, mortgage wording.
+_APPLY_CASES: tuple[tuple[str, dict[str, object]], ...] = (
+    (
+        "Transfer your balance and pay 0% for 9 months. Purchase rates of 30.99%. No annual fee.",
+        {"product": Product.CREDIT_CARD, "terms": CC},
+    ),
+    ("Pay 0% APR for 9 months, then 21.21% APR. $95 annual fee.", {"product": Product.CREDIT_CARD, "terms": CC}),
+    ("Borrow up to $50,000 with APRs from 7.49% to 35.99%, plus a 9% origination fee.", {"terms": PL}),
+    ("Example: borrow $10,000 at 12.99% APR for 36 months and pay $300 a month.", {"terms": PL}),
+    ("Borrow $5,000. Rates from 12.99%.", {"terms": PL}),
+    ("1% foreign transaction fee. 21.21% variable APR.", {"product": Product.CREDIT_CARD, "terms": CC}),
+    (
+        "Get pre-approved for a mortgage today. Talk to a ClearPath Counselors team.",
+        {"product": Product.MORTGAGE_PREQUAL, "terms": None, "channel": Channel.DISPLAY},
+    ),
+)
+
+
+def _applied(text: str, f: FindingDraft) -> str:
+    assert f.span is not None
+    assert f.replacement_text is not None
+    if f.fix_kind is FixKind.REPLACE:
+        return text[: f.span.start] + f.replacement_text + text[f.span.end :]
+    return text[: f.span.end] + f.replacement_text + text[f.span.end :]
+
+
+def _literal(findings: Iterable[FindingDraft]) -> list[FindingDraft]:
+    return [f for f in findings if f.fix_kind in (FixKind.REPLACE, FixKind.INSERT)]
+
+
+@pytest.mark.parametrize(("text", "kwargs"), _APPLY_CASES)
+def test_applying_a_literal_fix_clears_its_finding(text: str, kwargs: dict[str, object]) -> None:
+    """The contract the review screen's Apply relies on: put `replacement_text` where `fix_kind` says and that
+    finding is gone."""
+    findings = run_code_checks(make_ctx(text, **kwargs)).findings  # pyrefly: ignore[bad-argument-type]
+    literal = _literal(findings)
+    assert literal, findings
+    for f in literal:
+        fixed = _applied(text, f)
+        after = run_code_checks(make_ctx(fixed, **kwargs)).findings  # pyrefly: ignore[bad-argument-type]
+        same = [g for g in after if g.rule_id == f.rule_id]
+        assert len(same) < len([g for g in findings if g.rule_id == f.rule_id]), (f.rule_id, fixed, same)
+
+
+def test_the_apply_cases_cover_every_rule_with_a_literal_fix() -> None:
+    covered = {
+        f.rule_id
+        for text, kwargs in _APPLY_CASES
+        for f in _literal(run_code_checks(make_ctx(text, **kwargs)).findings)  # pyrefly: ignore[bad-argument-type]
+    }
+    assert covered >= {
+        "card.apr_label",
+        "card.apr_variable",
+        "card.intro_label",
+        "card.trigger_apr",
+        "card.trigger_annual_fee",
+        "card.trigger_transaction_fees",
+        "pricing.terms_available",
+        "closed_end.apr_label",
+        "closed_end.example_payment",
+        "mortgage.counselor",
+        "mortgage.preapproval_offer",
+    }
+
+
+def test_fix_kinds_say_where_the_text_goes() -> None:
+    card = {"product": Product.CREDIT_CARD, "terms": CC}
+    found = run_code_checks(make_ctx(_APPLY_CASES[1][0], **card)).findings  # pyrefly: ignore[bad-argument-type]
+    by_rule = {f.rule_id: f for f in found}
+    variable = by_rule["card.apr_variable"]  # "21.21% APR": " variable" goes between the rate and its label
+    assert (variable.fix_kind, variable.quote, variable.replacement_text) == (FixKind.INSERT, "21.21%", " variable")
+    assert variable.suggested_fix == '"variable APR"'
+    intro = by_rule["card.intro_label"]
+    assert (intro.fix_kind, intro.quote, intro.replacement_text) == (FixKind.INSERT, "0%", " intro")
+
+    pl = {f.quote: f for f in run_code_checks(make_ctx(_APPLY_CASES[2][0], terms=PL)).findings}
+    assert (pl["7.49%"].fix_kind, pl["7.49%"].replacement_text) == (FixKind.REPLACE, "11.11%")  # the nearest offered
+    assert (pl["35.99%"].fix_kind, pl["35.99%"].replacement_text) == (FixKind.REPLACE, "33.33%")
+    assert (pl["$50,000"].fix_kind, pl["$50,000"].replacement_text) == (FixKind.REPLACE, "$44,000")
+
+
+def test_a_missing_disclosure_is_an_instruction_even_when_it_quotes_the_words() -> None:
+    """No span: nowhere to put the text, so the reviewer places it (no Apply)."""
+    card = run_code_checks(make_ctx("$95 annual fee.", product=Product.CREDIT_CARD, terms=CC)).findings
+    [f] = [f for f in card if f.rule_id == "card.issuer_line"]
+    assert (f.span, f.fix_kind, f.replacement_text) == (None, FixKind.INSTRUCTION, None)
+
+
+def test_advice_written_for_a_person_is_an_instruction() -> None:
+    found = run_code_checks(make_ctx("Borrow $5,000 over 36 months.", terms=PL)).findings
+    [f] = [f for f in found if f.rule_id == "closed_end.trigger_apr"]
+    assert (f.fix_kind, f.replacement_text) == (FixKind.INSTRUCTION, None)
+
+
+@pytest.mark.parametrize("sample", SAMPLES, ids=lambda s: s.name)
+def test_every_suggestion_says_what_apply_does(sample: Sample) -> None:
+    for f in _with_odd_terms(sample):
+        assert (f.suggested_fix is None) == (f.fix_kind is None), f
+        if f.fix_kind in (FixKind.REPLACE, FixKind.INSERT):
+            assert f.span is not None, f
+            assert f.replacement_text, f
+        else:
+            assert f.replacement_text is None, f

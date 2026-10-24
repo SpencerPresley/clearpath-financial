@@ -11,6 +11,7 @@ from accounts.models import User
 from audit.models import Event
 from checks.engine import ENGINE_VERSION, RULESET_VERSION, FindingDraft, Span
 from checks.models import CheckRun, Finding, TermsRef
+from checks.selectors import list_findings
 from checks.services import (
     PreviewInput,
     persist_findings,
@@ -27,6 +28,7 @@ from core.domain import (
     EventType,
     FindingSource,
     FindingState,
+    FixKind,
     Market,
     Product,
     Severity,
@@ -254,6 +256,34 @@ def test_persist_findings_dedupes_on_the_unique_key(marketer: User, clock: Fixed
 
     assert created == 1
     assert Finding.objects.get(version=version).message == "one"
+
+
+@pytest.mark.django_db
+def test_a_findings_fix_kind_and_text_are_kept_and_read_back(marketer: User, clock: FixedClock) -> None:
+    item = make_item(marketer)
+    version = make_version(item, "Talk to a counselor.")
+    draft = FindingDraft(
+        rule_id="mortgage.counselor",
+        source=FindingSource.CODE,
+        severity=Severity.WARNING,
+        message="m",
+        citation="c",
+        suggested_fix='"loan officer"',
+        span=Span(10, 19),
+        quote="counselor",
+        fix_kind=FixKind.REPLACE,
+        replacement_text="loan officer",
+    )
+    unknown = replace(draft, rule_id="claims.guaranteed", fix_kind=None, replacement_text=None)
+    with transaction.atomic():
+        persist_findings(version=version, drafts=[draft, unknown], clock=clock)
+
+    rows = {f.rule_id: f for f in list_findings(item_id=item.pk)}
+    assert (rows["mortgage.counselor"].fix_kind, rows["mortgage.counselor"].replacement_text) == (
+        FixKind.REPLACE,
+        "loan officer",
+    )
+    assert (rows["claims.guaranteed"].fix_kind, rows["claims.guaranteed"].replacement_text) == (None, None)
 
 
 @pytest.mark.django_db

@@ -27,7 +27,7 @@ RULES: Mapping[str, RuleSpec] = _index(ALL_RULES)
 RULESET_VERSION = max(spec.effective_from for spec in RULES.values())
 # Bump on ANY change to engine behavior (a regex, a severity, a message). RULESET_VERSION only moves when the law
 # does, so a check-result cache keyed on content hash must include this too or it serves stale findings.
-ENGINE_VERSION = "2026-10-24.4"
+ENGINE_VERSION = "2026-10-24.5"
 
 
 def _sort_key(f: FindingDraft) -> tuple[int, int, str, str]:

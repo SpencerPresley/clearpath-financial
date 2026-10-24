@@ -1,7 +1,7 @@
 import pytest
 
 from checks.engine import run_code_checks
-from core.domain import Channel, Product, Severity
+from core.domain import Channel, FixKind, Product, Severity
 
 from .conftest import codes, make_ctx, quotes
 
@@ -108,20 +108,21 @@ def test_mortgage_rules_do_not_run_on_personal_loans() -> None:
 
 
 @pytest.mark.parametrize(
-    ("text", "quote"),
+    ("text", "quote", "replacement"),
     [
-        ("Get pre-approved for a mortgage in minutes.", "Get pre-approved"),
-        ("Get preapproved today.", "Get preapproved"),
-        ("Be pre approved before you house-hunt.", "Be pre approved"),
-        ("Start your mortgage pre-approval online.", "pre-approval"),
+        ("Get pre-approved for a mortgage in minutes.", "Get pre-approved", "Get prequalified"),
+        ("Get preapproved today.", "Get preapproved", "Get prequalified"),
+        ("Be pre approved before you house-hunt.", "Be pre approved", "Be prequalified"),
+        ("Start your mortgage pre-approval online.", "pre-approval", "prequalification"),
     ],
 )
-def test_preapproval_invitation_on_a_prequal_product_is_a_warning(text: str, quote: str) -> None:
+def test_preapproval_invitation_on_a_prequal_product_is_a_warning(text: str, quote: str, replacement: str) -> None:
     result = run_code_checks(make_ctx(text, product=MTG))
     (finding,) = [f for f in result.findings if f.rule_id == "mortgage.preapproval_offer"]
     assert finding.quote == quote
     assert finding.severity == Severity.WARNING
-    assert finding.suggested_fix == '"Get prequalified"'
+    assert (finding.fix_kind, finding.replacement_text) == (FixKind.REPLACE, replacement)  # the copy's own wording
+    assert finding.suggested_fix == f'"{replacement}"'
     assert "claims.preapproved" not in codes(result)
 
 

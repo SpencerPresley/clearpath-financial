@@ -6,7 +6,7 @@ from checks.llm.rules import LLM_RULES_BY_ID, applicable_rules
 from checks.llm.schema import DropReason, RawFinding
 from checks.llm.screen import Adjustment, screen
 from checks.llm.tests.fakes import finding
-from core.domain import Channel, FindingSource, PartnerType, Product, Severity
+from core.domain import Channel, FindingSource, FixKind, PartnerType, Product, Severity
 
 TEXT = "Free money for everyone! Free money, no hidden fees. Act now before rates go up."
 
@@ -178,6 +178,28 @@ def test_suggested_fix_kept_and_stripped():
     item = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix="  Origination fee 0%\N{EN DASH}8%.  ")
     (kept,) = _screen(TEXT, item).findings
     assert kept.suggested_fix == "Origination fee 0%\N{EN DASH}8%."
+
+
+def test_an_ai_suggestion_is_literal_only_when_the_model_says_replace():
+    wording = "no origination fee"
+    literal = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix=wording, fix_kind="replace")
+    (kept,) = _screen(TEXT, literal).findings
+    assert (kept.fix_kind, kept.replacement_text) == (FixKind.REPLACE, wording)
+
+    advice = finding(
+        TEXT, "llm.net_impression", "no hidden fees", suggested_fix="Name the fees.", fix_kind="instruction"
+    )
+    unlabeled = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix="Name the fees.")
+    for item in (advice, unlabeled):  # an output without the field reads as advice
+        (kept,) = _screen(TEXT, item).findings
+        assert (kept.fix_kind, kept.replacement_text) == (FixKind.INSTRUCTION, None)
+
+
+def test_a_replace_with_nothing_to_change_is_no_apply():
+    same = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix="no hidden fees", fix_kind="replace")
+    empty = finding(TEXT, "llm.net_impression", "no hidden fees", suggested_fix="  ", fix_kind="replace")
+    assert [(f.fix_kind, f.replacement_text) for f in _screen(TEXT, same).findings] == [(FixKind.INSTRUCTION, None)]
+    assert [(f.fix_kind, f.replacement_text) for f in _screen(TEXT, empty).findings] == [(None, None)]
 
 
 def test_findings_sorted_by_position_then_rule():

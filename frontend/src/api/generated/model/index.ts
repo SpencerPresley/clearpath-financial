@@ -104,6 +104,7 @@ export * from './findingReopenedEventOut';
 export * from './findingReopenedPayload';
 export * from './findingSource';
 export * from './findingState';
+export * from './fixKind';
 export * from './getMetricSeriesChannelItem';
 export * from './getMetricSeriesMetric';
 export * from './getMetricSeriesParams';

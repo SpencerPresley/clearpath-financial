@@ -6,6 +6,7 @@
  */
 import type { FindingSource } from './findingSource';
 import type { FindingState } from './findingState';
+import type { FixKind } from './fixKind';
 import type { PartyRefOut } from './partyRefOut';
 import type { Severity } from './severity';
 import type { SpanOut } from './spanOut';
@@ -15,10 +16,14 @@ export interface FindingOut {
   carried_from_id: number | null;
   citation: string;
   created_at: string;
+  /** What Apply does with the suggestion: replace (put replacement_text in place of the span), insert (put it right after the span), or instruction (advice for a person; no Apply). Null when unknown (findings recorded before fix kinds) or there is no suggestion. */
+  fix_kind: FixKind | null;
   id: number;
   message: string;
   quote: string | null;
   reason: string;
+  /** The literal text for replace and insert, used verbatim (an insert carries its own leading space). */
+  replacement_text: string | null;
   resolved_at: string | null;
   resolved_by: PartyRefOut | null;
   rule_id: string;

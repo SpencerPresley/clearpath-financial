@@ -56,6 +56,8 @@ def _finding_out(f: FindingDraft) -> FindingDraftOut:
         severity=f.severity,
         message=f.message,
         suggested_fix=f.suggested_fix or "",
+        fix_kind=f.fix_kind,
+        replacement_text=f.replacement_text,
         span=SpanOut(start=f.span.start, end=f.span.end) if f.span is not None else None,
         quote=f.quote,
     )

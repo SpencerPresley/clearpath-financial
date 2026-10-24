@@ -54,6 +54,7 @@ def _system_text() -> str:
 # prompt change. (The cross-item identity of the cached prefix is tested in test_review.py.)
 PROMPT_FINGERPRINTS = {
     "2026-10-24.1": "9b9df12f77dde8ce0cf71253bb1f4b7c5dcaf81df9582fb27e639c2333b88ee5",
+    "2026-10-24.2": "839ab2022ace4f9c29046ed903df5e9a6753216aecfb2cec9f5f6eb337826af8",  # fix_kind in the tool
 }
 
 

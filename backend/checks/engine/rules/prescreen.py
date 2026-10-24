@@ -17,6 +17,7 @@ from checks.engine.rule import (
     URL_1022_54,
     Hit,
     Rule,
+    instruct,
     make_spec,
 )
 from checks.engine.text import QUOTE_CLOSE, QUOTE_OPEN, compile_i, first_span
@@ -84,7 +85,7 @@ def _criteria_on_file(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterab
     if AttachmentKind.PRESCREEN_CRITERIA in ctx.attachment_kinds:
         return
     if span := first_span(_PRESCREEN_WORDING, a.text):
-        yield Hit(
+        yield instruct(
             span,
             "This reads as a prescreened offer. Attach the selection criteria, which must be kept with the offer.",
             "Attach the prescreen criteria (kind: prescreen_criteria).",
@@ -93,7 +94,7 @@ def _criteria_on_file(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterab
 
 def _short_notice(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if is_prescreen(ctx) and not _has_short_notice(a):
-        yield Hit(
+        yield instruct(
             None,
             "Add the short prescreen notice: the opt-out right, the toll-free number, and where to find the "
             '"PRESCREEN & OPT-OUT NOTICE".',
@@ -104,7 +105,7 @@ def _short_notice(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[H
 
 def _long_notice(ctx: RuleContext, a: Analysis, _c: EngineConfig) -> Iterable[Hit]:
     if is_prescreen(ctx) and not _HEADING_LINE.search(a.text):
-        yield Hit(
+        yield instruct(
             None,
             'Add the long prescreen notice under its own heading line, "PRESCREEN & OPT-OUT NOTICE", in capitals.',
             "PRESCREEN & OPT-OUT NOTICE",

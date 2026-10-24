@@ -8,7 +8,7 @@ from typing import Literal
 from checks.engine.config import EngineConfig
 from checks.engine.extract import Analysis
 from checks.engine.types import FindingDraft, RuleContext, RuleSpec, Span
-from core.domain import Channel, FindingSource, Market, Product, Severity
+from core.domain import Channel, FindingSource, FixKind, Market, Product, Severity
 
 ALL_PRODUCTS = frozenset(Product)
 CLOSED_END = frozenset({Product.PERSONAL_LOAN, Product.MORTGAGE_PREQUAL})
@@ -50,11 +50,43 @@ URL_COMPANY_FACTS = (
 
 @dataclass(frozen=True)
 class Hit:
-    """One thing a check found. `span` is None when the finding is about something missing from the copy."""
+    """One thing a check found. `span` is None when the finding is about something missing from the copy.
+
+    `suggested_fix` is what the reviewer reads; `fix_kind` says what Apply does with it (`core.domain.FixKind`) and
+    `replacement_text` is the literal text for `replace` and `insert`. A missing-from-the-copy finding has no span
+    to put text at, so its fix is an instruction even when it quotes the words to add. Build fixes with
+    `replace_with`, `insert_after` and `instruct`; the checks here make an unclassified fix a bug, not a guess.
+    """
 
     span: Span | None
     message: str
     suggested_fix: str | None = None
+    fix_kind: FixKind | None = None
+    replacement_text: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.suggested_fix is None) != (self.fix_kind is None):
+            raise ValueError(f"a suggested fix needs a fix kind, and only a fix has one: {self!r}")
+        literal = self.fix_kind in (FixKind.REPLACE, FixKind.INSERT)
+        if literal and (self.span is None or not self.replacement_text):
+            raise ValueError(f"{self.fix_kind} needs a span and the literal text: {self!r}")
+        if not literal and self.replacement_text is not None:
+            raise ValueError(f"only replace and insert carry replacement text: {self!r}")
+
+
+def replace_with(span: Span, message: str, literal: str, *, shown: str | None = None) -> Hit:
+    """Apply puts `literal` in place of `span`. The reviewer reads `shown`, by default the literal in quotes."""
+    return Hit(span, message, shown if shown is not None else f'"{literal}"', FixKind.REPLACE, literal)
+
+
+def insert_after(span: Span, message: str, literal: str, *, shown: str | None = None) -> Hit:
+    """Apply puts `literal` right after `span`; it carries its own leading space or punctuation."""
+    return Hit(span, message, shown if shown is not None else f'"{literal.strip(" (),")}"', FixKind.INSERT, literal)
+
+
+def instruct(span: Span | None, message: str, advice: str | None) -> Hit:
+    """A fix for a person to make (no Apply); `advice` None means no suggestion at all."""
+    return Hit(span, message, advice, FixKind.INSTRUCTION if advice is not None else None)
 
 
 CheckFn = Callable[[RuleContext, Analysis, EngineConfig], Iterable[Hit]]
@@ -113,6 +145,8 @@ def to_finding(spec: RuleSpec, hit: Hit, text: str) -> FindingDraft:
         message=hit.message,
         citation=spec.citation,
         suggested_fix=hit.suggested_fix,
+        fix_kind=hit.fix_kind,
+        replacement_text=hit.replacement_text,
         span=hit.span,
         quote=text[hit.span.start : hit.span.end] if hit.span is not None else None,
     )

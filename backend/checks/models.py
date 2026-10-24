@@ -32,6 +32,10 @@ class Finding(models.Model):
     quote = models.TextField(null=True, blank=True)  # noqa: DJ001  # null iff span is null
     message = models.TextField()
     suggested_fix = models.TextField(blank=True)
+    # What Apply does with the fix (core.domain.FixKind) and the literal text for replace/insert. Null = unknown:
+    # findings recorded before these fields existed, which offer no Apply.
+    fix_kind = models.CharField(max_length=12, null=True, blank=True)  # noqa: DJ001  # null is "unknown", not ""
+    replacement_text = models.TextField(null=True, blank=True)  # noqa: DJ001  # null unless replace/insert
     reason = models.TextField(blank=True)  # why it was dismissed (or a note on acceptance)
     resolved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"

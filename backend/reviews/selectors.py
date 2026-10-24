@@ -28,6 +28,7 @@ from django.db.models import (
 )
 from django.db.models.fields.tuple_lookups import Tuple, TupleGreaterThan, TupleLessThan
 from django.db.models.functions import Coalesce, Lower, NullIf
+from django.utils import timezone
 
 from accounts.models import User
 from core.clock import SYSTEM_CLOCK, Clock
@@ -42,6 +43,7 @@ from core.domain import (
     ReopenReason,
     RiskTier,
     TakedownState,
+    VersionOrigin,
 )
 from core.errors import InvalidInput, NotFound
 from reviews.filters import ItemFilter, ItemSort
@@ -138,6 +140,29 @@ def drift_rereview(*, item_id: int, today: date) -> DriftRereview | None:
         .first()
     )
     return DriftRereview(placement_id=reopening, restored=latest == DriftResult.UNCHANGED.value)
+
+
+@dataclass(frozen=True)
+class FastTrackCheck:
+    """Whether the fast-track lane takes an item's current version: it must be a generated terms-change version
+    (`generated`) and no live page may show something other than the approved copy (`drift` is the unresolved drift
+    re-review, if any). `reviews.decisions` raises on this; the queue rows show it as `fast_track_eligible`."""
+
+    generated: bool
+    drift: DriftRereview | None
+
+    @property
+    def eligible(self) -> bool:
+        return self.generated and self.drift is None
+
+
+def fast_track_check(*, item_id: int, version_origin: VersionOrigin, today: date) -> FastTrackCheck:
+    """The fast-track lane's rule for an item at a version of `version_origin` (walkthrough B1). No query unless
+    the version is generated; then up to four (`drift_rereview`)."""
+    if version_origin is not VersionOrigin.FAST_TRACK:
+        return FastTrackCheck(generated=False, drift=None)
+    drift = drift_rereview(item_id=item_id, today=today)
+    return FastTrackCheck(generated=True, drift=drift if drift is not None and not drift.restored else None)
 
 
 # --- filtering -------------------------------------------------------------------------------------------------
@@ -264,6 +289,10 @@ class ItemRow:
     partner: PartyRef | None
     owner: PartyRef | None
     assignee: PartyRef | None
+    # The fast-track lane would take it now (`fast_track_check`): a re-review whose current version the terms
+    # fan-out generated, with no live page showing other copy. Open findings and the AI check still gate the
+    # approval itself, as in every lane.
+    fast_track_eligible: bool
 
 
 @dataclass(frozen=True)
@@ -324,7 +353,17 @@ def item_row(item: ReviewItem, *, now: datetime) -> ItemRow:
         partner=PartyRef(id=partner.pk, name=partner.name) if partner is not None else None,
         owner=_person(item.owner),
         assignee=_person(item.assignee),
+        fast_track_eligible=_fast_track_eligible(item, now),
     )
+
+
+def _fast_track_eligible(item: ReviewItem, now: datetime) -> bool:
+    """Queries only for a re-review at a generated version, which few rows are."""
+    origin = getattr(item, "current_version_origin", None)
+    if item.status != ItemStatus.NEEDS_REREVIEW.value or origin is None:
+        return False
+    check = fast_track_check(item_id=item.pk, version_origin=VersionOrigin(origin), today=timezone.localdate(now))
+    return check.eligible
 
 
 def _display_name(user: str) -> Coalesce:
@@ -345,6 +384,7 @@ def row_queryset(qs: QuerySet[ReviewItem]) -> QuerySet[ReviewItem]:
     `decision_item_idx`, evaluated for the rows returned."""
     return qs.select_related("partner", "owner", "assignee").annotate(
         current_version_n=F("current_version__n"),
+        current_version_origin=F("current_version__origin"),
         latest_decision_outcome=_latest_decision_field("outcome"),
         latest_decision_reason=_latest_decision_field("reason"),
         latest_decision_at=_latest_decision_field("decided_at"),

@@ -27,7 +27,7 @@ from core.domain import CreditCardTerms, PersonalLoanTerms
 
 # Bump on ANY change to the system text, a rule's guidance, the item message layout, or the tool schema. A cached
 # LLM result keyed on content + rule set must include this, or a prompt fix keeps serving old findings.
-PROMPT_VERSION = "2026-10-24.1"
+PROMPT_VERSION = "2026-10-24.2"
 
 # Titles stay out of the catalog: several contain double quotes, which would break the attribute. The item message
 # lists the applicable rules with their titles.
@@ -74,6 +74,8 @@ count is enough. The quote is what gets checked, and a quote that appears exactl
 "non-compliant", "illegal" or "unlawful", and do not cite regulations; the citation is added from the rule.
 - suggested_fix: replacement wording for the quoted passage when you can write one, otherwise a short concrete \
 edit, or "" if neither.
+- fix_kind: "replace" when suggested_fix is the exact wording to put in place of the quote, word for word, so it \
+can be applied as is; otherwise "instruction".
 </writing>
 
 <untrusted_copy>
