@@ -91,6 +91,15 @@ export function SourceTag({ source }: { source: FindingSource }) {
   );
 }
 
-export function RiskTierBadge({ tier }: { tier: RiskTier }) {
-  return <Badge meta={{ ...RISK_META[tier], tone: 'neutral' }} className="app-badge app-badge-outline" />;
+const RISK_SHORT: Record<RiskTier, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+
+/** `short` drops "risk" from the label where a column header already says Risk (dense tables). */
+export function RiskTierBadge({ tier, short = false }: { tier: RiskTier; short?: boolean }) {
+  const meta = { ...RISK_META[tier], tone: 'neutral' as const };
+  return (
+    <Badge
+      meta={short ? { ...meta, label: RISK_SHORT[tier] } : meta}
+      className="app-badge app-badge-outline"
+    />
+  );
 }

@@ -72,12 +72,19 @@ export const COLUMN_LABELS: Record<Exclude<ColumnId, 'select'>, string> = {
   tags: 'Tags',
 };
 
-/** Hidden until chosen: they fit 1280px with the drawer closed only when these are off. */
+/**
+ * Hidden until chosen, so the default set fits 1280px without sideways scrolling. Product and channel are in
+ * the preview drawer; re-review reason is implied by the Re-review status badge.
+ */
 export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
+  product: false,
   channel: false,
   reopen_reason: false,
   tags: false,
 };
+
+/** Title takes whatever width the other columns leave (never below this), so it isn't resizable itself. */
+export const TITLE_MIN_WIDTH = 180;
 
 /** Clicking a sortable header moves to the next server order; the last step returns to queue order. */
 export const SORT_CYCLES: Partial<Record<ColumnId, readonly ItemSort[]>> = {
@@ -153,15 +160,16 @@ export const queueColumns = helper.columns([
   helper.accessor('key', {
     id: 'key',
     header: COLUMN_LABELS.key,
-    size: 84,
+    size: 76,
     minSize: 72,
     cell: ({ row }) => <ItemKey value={row.original.key} copyable={false} />,
   }),
   helper.accessor('title', {
     id: 'title',
     header: COLUMN_LABELS.title,
-    size: 320,
-    minSize: 160,
+    size: TITLE_MIN_WIDTH,
+    minSize: TITLE_MIN_WIDTH,
+    enableResizing: false,
     cell: ({ row }) => (
       <span className="app-cell-title" title={row.original.title}>
         {row.original.title}
@@ -171,15 +179,15 @@ export const queueColumns = helper.columns([
   helper.accessor('status', {
     id: 'status',
     header: COLUMN_LABELS.status,
-    size: 150,
+    size: 172,
     minSize: 44,
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
   }),
   helper.accessor('risk_tier', {
     id: 'risk_tier',
     header: COLUMN_LABELS.risk_tier,
-    size: 112,
-    minSize: 80,
+    size: 96,
+    minSize: 72,
     cell: ({ row }) => <RiskCell row={row.original} />,
   }),
   helper.accessor('product', {
@@ -199,35 +207,35 @@ export const queueColumns = helper.columns([
   helper.accessor('partner', {
     id: 'partner',
     header: COLUMN_LABELS.partner,
-    size: 132,
+    size: 120,
     minSize: 72,
     cell: ({ row }) => row.original.partner?.name ?? <Muted>—</Muted>,
   }),
   helper.accessor('assignee', {
     id: 'assignee',
     header: COLUMN_LABELS.assignee,
-    size: 136,
+    size: 128,
     minSize: 80,
     cell: ({ row }) => row.original.assignee?.name ?? <Muted>Unassigned</Muted>,
   }),
   helper.accessor('open_findings_count', {
     id: 'open_findings',
     header: COLUMN_LABELS.open_findings,
-    size: 84,
+    size: 76,
     minSize: 64,
     cell: ({ row }) => <FindingsCount count={row.original.open_findings_count} />,
   }),
   helper.accessor('submitted_at', {
     id: 'age',
     header: COLUMN_LABELS.age,
-    size: 72,
+    size: 56,
     minSize: 56,
     cell: ({ row }) => <AgeCell at={row.original.submitted_at} />,
   }),
   helper.accessor('round', {
     id: 'round',
     header: COLUMN_LABELS.round,
-    size: 68,
+    size: 56,
     minSize: 52,
     cell: ({ row }) => <span className="app-figure">{roundLabel(row.original.round)}</span>,
   }),

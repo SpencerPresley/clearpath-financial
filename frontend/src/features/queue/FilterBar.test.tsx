@@ -7,7 +7,7 @@ import { getListPartnersMockHandler } from '../../api/generated/partners/partner
 import { getListUsersMockHandler } from '../../api/generated/users/users.msw';
 import { server } from '../../test/server';
 import { renderWithQuery } from '../../test/render';
-import { FilterBar } from './FilterBar';
+import { FilterBar, SortMenu } from './FilterBar';
 import { PARTNERS, USERS } from './fixtures';
 import { parseQueueSearch, viewSearch } from './search';
 import type { QueueSearch } from './search';
@@ -101,11 +101,11 @@ describe('FilterBar', () => {
   });
 
   it('changes the server sort from the sort menu', async () => {
-    const spy = vi.fn();
-    renderWithQuery(<Harness initial={viewSearch('mine')} spy={spy} />);
+    const onChange = vi.fn();
+    renderWithQuery(<SortMenu sort="queue" onChange={onChange} />);
     await userEvent.click(screen.getByRole('button', { name: 'Sort: Queue order' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Oldest first' }));
-    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'oldest' }));
+    expect(onChange).toHaveBeenLastCalledWith('oldest');
   });
 
   it('offers Clear filters only when filters beyond the view are set, and resets to the view', async () => {

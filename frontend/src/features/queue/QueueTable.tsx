@@ -104,9 +104,12 @@ export function QueueTable({
       <table className="app-table" aria-label="Queue" style={{ minWidth: table.getTotalSize() }}>
         <colgroup>
           {headers.map((header) => (
-            <col key={header.id} style={{ width: header.getSize() }} />
+            // Title has no fixed width: it takes the space the other columns leave (table-layout: fixed).
+            <col
+              key={header.id}
+              style={header.column.id === 'title' ? undefined : { width: header.getSize() }}
+            />
           ))}
-          <col />
         </colgroup>
         <thead>
           <tr>
@@ -165,7 +168,6 @@ export function QueueTable({
                 </th>
               );
             })}
-            <th aria-hidden="true" className="app-th app-th-filler" />
           </tr>
         </thead>
         <tbody>
@@ -194,7 +196,6 @@ export function QueueTable({
                     <table.FlexRender cell={cell} />
                   </td>
                 ))}
-                <td aria-hidden="true" className="app-td" />
               </tr>
             );
           })}

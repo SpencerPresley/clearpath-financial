@@ -196,7 +196,7 @@ export function BulkBar({ viewer, selectedIds, rows, onSelectionChange }: BulkBa
             setReasonOpen(true);
           }}
         >
-          {`Fast-track approve ${String(rereviewIds.length)}…`}
+          {`Fast-track ${String(rereviewIds.length)} ${rereviewIds.length === 1 ? 're-review' : 're-reviews'}…`}
         </Button>
       )}
       <Button

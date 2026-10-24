@@ -111,7 +111,7 @@ describe('BulkBar', () => {
       }),
     );
     setup(LEAD);
-    await userEvent.click(screen.getByRole('button', { name: 'Fast-track approve 1…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Fast-track 1 re-review…' }));
     const confirm = await screen.findByRole('button', { name: 'Fast-track approve' });
     expect(confirm).toBeDisabled();
     await userEvent.type(

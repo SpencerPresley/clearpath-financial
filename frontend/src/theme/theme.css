@@ -2005,10 +2005,10 @@
     @apply grid h-screen grid-rows-[var(--spacing-topbar)_minmax(0,1fr)] bg-base-200 text-base-content;
   }
   .app-signin-main {
-    @apply overflow-auto px-6 py-10;
+    @apply flex items-start justify-center overflow-auto px-6 py-10;
   }
   .app-signin-form {
-    @apply mx-auto flex w-full max-w-sm flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-5;
+    @apply flex w-full max-w-sm flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-5;
   }
   .app-field-label {
     @apply mb-1 block text-meta font-medium text-base-content;

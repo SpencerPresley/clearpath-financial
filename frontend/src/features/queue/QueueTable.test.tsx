@@ -54,6 +54,7 @@ describe('QueueTable', () => {
   it('renders one row per item with the queue columns', () => {
     render(
       <Harness
+        visibility={{ ...DEFAULT_COLUMN_VISIBILITY, product: true }}
         rows={[
           makeRow(
             {
@@ -79,7 +80,7 @@ describe('QueueTable', () => {
     expect(r.getByText('CP-1044')).toBeInTheDocument();
     expect(r.getByText('LendStack marketplace tile')).toBeInTheDocument();
     expect(r.getByText('Submitted')).toBeInTheDocument();
-    expect(r.getByText('High risk')).toBeInTheDocument();
+    expect(r.getByText('High')).toBeInTheDocument();
     expect(r.getByText('Personal loan')).toBeInTheDocument();
     expect(r.getByText('LendStack')).toBeInTheDocument();
     expect(r.getByText('Unassigned')).toBeInTheDocument();
@@ -124,9 +125,16 @@ describe('QueueTable', () => {
   });
 
   it('hides columns turned off in visibility', () => {
-    render(<Harness visibility={{ ...DEFAULT_COLUMN_VISIBILITY, product: false }} />);
-    expect(screen.queryByRole('columnheader', { name: 'Product' })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: 'Partner' })).toBeInTheDocument();
+    render(<Harness visibility={{ ...DEFAULT_COLUMN_VISIBILITY, partner: false }} />);
+    expect(screen.queryByRole('columnheader', { name: 'Partner' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Assignee' })).toBeInTheDocument();
+  });
+
+  it('hides product, channel, re-review reason, and tags by default', () => {
+    render(<Harness />);
+    for (const name of ['Product', 'Channel', 'Re-review reason', 'Tags']) {
+      expect(screen.queryByRole('columnheader', { name })).toBeNull();
+    }
   });
 
   it('selects with the checkbox without opening the item', async () => {

@@ -31,7 +31,7 @@ import {
 } from './ColumnChooser';
 import { queueColumns } from './columns';
 import type { ColumnVisibility, RowSelection } from './columns';
-import { FilterBar } from './FilterBar';
+import { FilterBar, SortMenu } from './FilterBar';
 import { queueKeyAction } from './keyboard';
 import { PreviewDrawer } from './PreviewDrawer';
 import { QueueFooter } from './QueueFooter';
@@ -354,6 +354,12 @@ export function QueuePage() {
           }}
         />
         <div className="app-toolbar-end">
+          <SortMenu
+            sort={search.sort}
+            onChange={(sort) => {
+              update({ sort });
+            }}
+          />
           {search.layout === 'table' && <ColumnChooser visibility={columns} onChange={setColumnsAndSave} />}
           <LayoutToggle
             layout={search.layout}

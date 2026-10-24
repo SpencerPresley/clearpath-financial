@@ -298,13 +298,6 @@ export function FilterBar({ search, onChange, onClear, isModified, hideStatus = 
           Clear filters
         </Button>
       )}
-      <span className="ml-auto" />
-      <SortMenu
-        sort={search.sort}
-        onChange={(sort) => {
-          onChange({ sort });
-        }}
-      />
     </div>
   );
 }

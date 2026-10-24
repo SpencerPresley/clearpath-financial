@@ -77,13 +77,13 @@ describe('inline edits', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Low risk' }));
 
     const trigger = () => screen.getByRole('button', { name: /Risk tier for CP-1042/ });
-    expect(trigger()).toHaveTextContent('Low risk');
+    expect(trigger()).toHaveTextContent('Low');
     await waitFor(() => {
       expect(bodies).toEqual([{ risk_tier: 'low' }]);
     });
     release();
     await waitFor(() => {
-      expect(trigger()).toHaveTextContent('Low risk');
+      expect(trigger()).toHaveTextContent('Low');
     });
   });
 
@@ -105,14 +105,14 @@ describe('inline edits', () => {
     expect(await screen.findByText('Only reviewers can change risk tier.')).toBeInTheDocument();
     expect(screen.getByText("Couldn't save CP-1042")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Risk tier for CP-1042/ })).toHaveTextContent('Medium risk');
+      expect(screen.getByRole('button', { name: /Risk tier for CP-1042/ })).toHaveTextContent('Medium');
     });
   });
 
   it('shows risk as a plain badge to a marketer', async () => {
     serveRow(ROW);
     renderWithQuery(<Harness viewer={MARKETER} />);
-    expect(await screen.findByText('Medium risk')).toBeInTheDocument();
+    expect(await screen.findByText('Medium')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Risk tier for/ })).toBeNull();
   });
 

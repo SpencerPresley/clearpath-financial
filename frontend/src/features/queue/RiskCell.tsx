@@ -10,7 +10,7 @@ import { stopRowClick } from './stopRowClick';
 /** Risk tier: an inline picker for reviewers and leads (the server records an override event). */
 export function RiskCell({ row }: { row: ItemRowOut }) {
   const { canEditRisk, save, activeId } = useQueueCell();
-  if (!canEditRisk(row)) return <RiskTierBadge tier={row.risk_tier} />;
+  if (!canEditRisk(row)) return <RiskTierBadge tier={row.risk_tier} short />;
 
   return (
     <span className="app-cell-control" onClick={stopRowClick}>
@@ -22,7 +22,7 @@ export function RiskCell({ row }: { row: ItemRowOut }) {
         }}
       >
         <AriaButton className="app-cell-edit" excludeFromTabOrder={row.id !== activeId}>
-          <RiskTierBadge tier={row.risk_tier} />
+          <RiskTierBadge tier={row.risk_tier} short />
           <Icon name="action.expand" size={12} className="app-cell-edit-caret" />
         </AriaButton>
         <Popover className="app-popover min-w-40" placement="bottom start" offset={4}>
