@@ -2360,6 +2360,67 @@
   }
   .app-metric-table tbody tr:last-child > * {
     @apply border-b-0;
+/* ---- Outbox (workstream K): sent demo mail, a dense table beside the selected message. ----------- */
+@layer components {
+  .app-outbox {
+    @apply flex max-w-[96rem] flex-col gap-4;
+  }
+  .app-outbox-split {
+    @apply flex min-h-0 items-start gap-3;
+  }
+  .app-outbox-table {
+    @apply min-w-0 flex-1;
+  }
+  .app-outbox-head > th {
+    @apply h-8 border-b border-base-300 px-3 text-left align-middle text-meta font-medium text-muted;
+  }
+  .app-outbox-row > td {
+    @apply h-row truncate border-b border-base-300 px-3 align-middle text-ui;
+  }
+  .app-outbox-row:last-child > td {
+    @apply border-b-0;
+  }
+  .app-outbox-row:hover > td {
+    @apply bg-hover;
+  }
+  .app-outbox-row[data-selected] > td {
+    @apply bg-selected;
+  }
+  .app-outbox-row[data-selected] > td:first-child {
+    box-shadow: inset 2px 0 0 var(--color-primary);
+  }
+  .app-outbox-sent {
+    @apply text-muted tabular-nums;
+  }
+  .app-outbox-to {
+    @apply text-muted;
+  }
+  .app-outbox-subject {
+    @apply max-w-full cursor-default truncate rounded-xs text-left font-medium text-base-content underline-offset-2 hover:underline;
+  }
+  .app-outbox-item {
+    @apply rounded-xs font-mono text-meta text-primary underline-offset-2 hover:underline;
+  }
+  .app-outbox-person {
+    @apply text-base-content;
+  }
+  .app-outbox-detail {
+    @apply sticky top-0 flex max-h-[calc(100vh-var(--spacing-topbar)-3rem)] w-[34rem] shrink-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-outbox-detail-title {
+    @apply truncate;
+  }
+  .app-outbox-detail-body {
+    @apply flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3;
+  }
+  .app-outbox-recipients {
+    @apply flex flex-col;
+  }
+  .app-outbox-text {
+    @apply font-sans text-sm whitespace-pre-wrap text-base-content;
+  }
+  .app-outbox-frame {
+    @apply h-[28rem] w-full shrink-0 rounded-md border border-base-300 bg-white;
   }
 }
 
