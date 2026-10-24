@@ -19,6 +19,8 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | F offer terms (#7) | agent (worktree) | PR #31 merged | done | worked example end to end; per-item transactions (deadlock control test); optimistic publish (based_on_terms_id); seen_versions on bulk |
 | G import/export (#8) | agent (worktree) | PR #24 merged | done | sample imports to exact oracle totals (178 items); xlsx export with formula-injection guard; evidence pack zip + sha256 manifest |
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
+| L demo seed (#13) | agent (worktree `wsL/demo-seed`) | — | in progress | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
+| M drift + fetch-URL (#14) | agent (worktree `wsM/drift`) | — | in progress | SSRF-guarded fetch, drift snapshots/reopen, self-hosted demo partner pages |
 | K assistant (#12) | agent (worktree `wsK/assistant`) | — | in progress | spike first (useStream wire format), then agent + tools + HITL email + panel + Outbox |
 | J screens + metrics (#11) | agent (worktree `wsJ/screens`) | — | in progress | metrics backend+page, library, import, offer terms, partners; 2–3 PRs |
 | Fast-track/review polish | agent (worktree) | PR #33 merged | done | exact-version fast-track, bulk Lead-only, AI status polling + failure reason, Numbers unchanged, Needs re-review label |
