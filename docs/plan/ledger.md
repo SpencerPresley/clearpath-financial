@@ -21,7 +21,7 @@ Rulings use: `Ruling: <decision> — <why> — <cost if wrong>`.
 | H2 queue (#9, part 2) | agent (worktree) | PR #29 merged | done; claim/assign not yet exercised against real endpoints | UI review: 13 should-fix fixed; verified against real backend; added minimal sign-in page |
 | L demo seed (#13) | agent (worktree) | PR #39 | follow-ups (hosted password, seed on start, tracker go-live split, role landing) | seed through services, backdated history, every rule family + status, Reset demo, docs/demo.md |
 | M drift + fetch-URL (#14) | agent (worktree) | PR #37 merged `0c03a43` | done | security review: no SSRF path; fixed two CPU-exhaustion DoS (punycode charset, nested-div extraction 73 s → 0.37 s) |
-| M drift follow-ups | agent (worktree) | PR #40 | one change (only scheduled checks count toward 3 failures) | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
+| M drift follow-ups | agent (worktree) | PR #40 merged | done | attention notify on new blocking findings; missing after 3 failures; reaffirm only when restored |
 | Notifications inbox | agent (worktree `feat/notifications-ui`) | — | in progress | gap found: backend notifications had no UI; bell + popover inbox, polling |
 | K assistant (#12) | agent (worktree) | PR #38 merged | done; live: 2 model calls, cache_read 4647 tokens on the 2nd call (prompt caching works) | live smoke passed (orchestrator); request-scoped runs, custom useStream adapter; injection test; duplicate-send bug found via real-server test and fixed |
 | J screens + metrics (#11) | agent (worktree) | #34, #35, #36 merged | done | per-source metric figures (no blended numbers); every number drills to its items |
