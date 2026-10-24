@@ -98,6 +98,9 @@ function RequestedChanges({ item }: { item: ItemDetailOut }) {
           <p className="app-requested-reason">{decision.reason}</p>
         </div>
       )}
+      {decision?.outcome !== 'changes_requested' && accepted.length === 0 && findings.isSuccess && (
+        <p className="app-muted">No reason recorded. The item&apos;s comments may say more.</p>
+      )}
       {accepted.length > 0 && (
         <ul className="app-requested-list" aria-label="Accepted findings">
           {accepted.map((finding) => (
