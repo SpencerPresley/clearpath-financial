@@ -161,6 +161,10 @@ failed naming `status.rejected` + `action.close`).
 | `nav.import` | TrayArrowDown | regular |
 | `nav.outbox` | EnvelopeSimple | regular |
 | `nav.user` | UserCircle | regular |
+| `nav.notifications` | Bell | regular |
+| `notify.mention` | At | regular |
+| `notify.expiring` | ClockCountdown | regular |
+| `action.mark_all_read` | Checks | regular |
 | `system.api_offline` | Plugs | bold |
 | `feedback.error` | WarningCircle | regular |
 | `feedback.info` | Info | regular |

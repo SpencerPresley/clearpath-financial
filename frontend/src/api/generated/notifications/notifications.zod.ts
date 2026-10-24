@@ -23,12 +23,37 @@ export const ListNotificationsQueryParams = zod.object({
 
 export const ListNotificationsResponse = zod.object({
   "rows": zod.array(zod.object({
+  "actor": zod.union([zod.object({
+  "id": zod.int(),
+  "name": zod.string()
+}).describe('A person or partner shown in a cell.'),zod.null()]).describe('Who caused it; null for system actions (sweeps, pool fan-out).'),
   "created_at": zod.iso.datetime({"offset":true}),
+  "detail": zod.union([zod.union([zod.object({
+  "kind": zod.literal("assignment").meta({ title: 'Kind' }),
+  "mode": zod.enum(['sticky', 'lowest_load', 'pool', 'manual', 'claim', 'handoff']).describe('Which assignment rule placed an item (decisions.md "Reviewer assignment"); recorded on the event.')
+}),zod.object({
+  "kind": zod.literal("decision").meta({ title: 'Kind' }),
+  "outcome": zod.enum(['approved', 'approved_with_edits', 'changes_requested', 'rejected'])
+}),zod.object({
+  "kind": zod.literal("rereview").meta({ title: 'Kind' }),
+  "reason": zod.enum(['terms_changed', 'approval_expired', 'drift_detected']).describe('Why an approved item came back: the reason carried by needs_rereview / expired.')
+}),zod.object({
+  "comment_id": zod.int(),
+  "kind": zod.literal("mention").meta({ title: 'Kind' }),
+  "version_n": zod.int().describe('The version the comment is on (the review screen\'s `v`).')
+}),zod.object({
+  "expires_at": zod.iso.datetime({"offset":true}),
+  "kind": zod.literal("expiry_warning").meta({ title: 'Kind' })
+}),zod.object({
+  "kind": zod.literal("page_findings").meta({ title: 'Kind' }),
+  "new_blocking_count": zod.int().describe('Blocking rules on the partner page that don\'t fire on the copy.')
+})]),zod.null()]).describe('What the source event says, for phrasing the row; null when there\'s no event to read.'),
   "id": zod.int(),
   "item_id": zod.union([zod.int(),zod.null()]),
   "item_key": zod.union([zod.string(),zod.null()]),
+  "item_title": zod.union([zod.string(),zod.null()]),
   "kind": zod.enum(['assignment', 'decision', 'rereview', 'mention', 'expiry_warning', 'page_findings']),
-  "message": zod.string(),
+  "message": zod.string().describe('The one-liner stored when it was created; the fallback when detail is null.'),
   "read_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()])
 })),
   "unread_count": zod.int()

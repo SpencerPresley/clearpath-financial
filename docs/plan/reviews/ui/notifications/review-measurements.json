@@ -1,0 +1,278 @@
+{
+  "keyboard": [
+    "tab 1: a \"Skip to content\" [focus-visible]",
+    "tab 2: button \"Collapse navigation\" [focus-visible]",
+    "tab 3: a \"ClearPath Compliance Review\" [focus-visible]",
+    "tab 4: button \"Notifications, 3 unread\" [focus-visible]",
+    "tabs to bell: 4 -> button \"Notifications, 3 unread\" [focus-visible]",
+    "Enter -> dialog \"Notifications\" [focus-visible]; dialog=1",
+    "Tab -> button \"Mark all read\" [focus-visible]",
+    "Tab -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "Tab -> button \"Mark all read\" [focus-visible]",
+    "Shift+Tab -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "Tab -> button \"Mark all read\" [focus-visible]",
+    "ArrowDown -> button \"Mark all read\" [focus-visible]",
+    "ArrowDown -> button \"Mark all read\" [focus-visible]",
+    "End -> button \"Mark all read\" [focus-visible]",
+    "ArrowDown at end -> button \"Mark all read\" [focus-visible]",
+    "Home -> button \"Mark all read\" [focus-visible]",
+    "Escape -> button \"Notifications, 3 unread\" [focus-visible]; dialog visible=false",
+    "reopen + Tab Tab -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "ArrowDown -> option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo\" [focus-visible]",
+    "Enter -> url /items/1042?tab=comments&v=2; active button \"Notifications, 2 unread\" [focus-visible]",
+    "next Tab -> button \"Assistant\" [focus-visible]"
+  ],
+  "markAll": {
+    "enabledColor": "oklch(0.25 0.025 258) op 1",
+    "before": "button \"Mark all read\" [focus-visible]",
+    "after": "dialog \"Notifications\" [focus-visible]",
+    "disabledColor": "oklch(0.47 0.022 258) op 1",
+    "nextTab": "option \"Dana Reyes requested changes on CP-1038 · Spring balance transfer emai\" [focus-visible]",
+    "dialogStillOpen": true
+  },
+  "bellBox": {
+    "x": 1198.28125,
+    "y": 8,
+    "width": 32,
+    "height": 32
+  },
+  "countBox": {
+    "x": 1215.796875,
+    "y": 10,
+    "width": 14.484375,
+    "height": 14
+  },
+  "popoverBox": {
+    "x": 718.28125,
+    "y": 46,
+    "width": 512,
+    "height": 682
+  },
+  "popoverStyle": {
+    "inline": "position: absolute; z-index: 100000; max-height: 842px; --trigger-anchor-point: 512px 0px; --trigger-width: 32px; left: 718.281px; top: 46px;",
+    "computedMaxHeight": "842px"
+  },
+  "markAllBox": {
+    "x": 1108.703125,
+    "y": 52.5,
+    "width": 116.578125,
+    "height": 28
+  },
+  "rows": [
+    {
+      "text": "Dana Reyes requested changes on CP-1038 · Spring balance tra",
+      "h": 36,
+      "lineVisible": 414,
+      "lineFull": 414,
+      "titleVisible": 136,
+      "titleFull": 182,
+      "titleChars": 29
+    },
+    {
+      "text": "Sam Okafor mentioned you on CP-1042 · Fall personal loan pro",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 174,
+      "titleFull": 239,
+      "titleChars": 38
+    },
+    {
+      "text": "Lee Chen assigned CP-1051 · LendRight comparison page to you",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 175,
+      "titleFull": 175,
+      "titleChars": 25
+    },
+    {
+      "text": "Partner page carrying CP-1012 · Personal loan rates, LendRig",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 50,
+      "titleFull": 258,
+      "titleChars": 40
+    },
+    {
+      "text": "CP-1063 · Holiday debt consolidation search ads with the ful",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 220,
+      "titleFull": 610,
+      "titleChars": 99
+    },
+    {
+      "text": "Dana Reyes rejected CP-1059 · Spring promo display ads",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 158,
+      "titleFull": 158,
+      "titleChars": 24
+    },
+    {
+      "text": "CP-1007 · Debt consolidation landing page needs re-review · ",
+      "h": 36,
+      "lineVisible": 417,
+      "lineFull": 417,
+      "titleVisible": 116,
+      "titleFull": 198,
+      "titleChars": 31
+    },
+    {
+      "text": "Approval for CP-988 · Home improvement loan banner expires N",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 195,
+      "titleFull": 197,
+      "titleChars": 28
+    },
+    {
+      "text": "Dana Reyes approved CP-1003 · Card rewards social post",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 152,
+      "titleFull": 152,
+      "titleChars": 24
+    },
+    {
+      "text": "Sam Okafor approved CP-900 · Credit builder card landing pag",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 170,
+      "titleFull": 197,
+      "titleChars": 32
+    },
+    {
+      "text": "Dana Reyes mentioned you on CP-901 · Personal loan compariso",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 181,
+      "titleFull": 277,
+      "titleChars": 43
+    },
+    {
+      "text": "Dana Reyes approved CP-902 · Refinance your car loan email, ",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 233,
+      "titleFull": 273,
+      "titleChars": 43
+    },
+    {
+      "text": "Sam Okafor mentioned you on CP-903 · Student loan refi affil",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 181,
+      "titleFull": 197,
+      "titleChars": 34
+    },
+    {
+      "text": "Dana Reyes approved CP-904 · Back-to-school personal loan pu",
+      "h": 36,
+      "lineVisible": 425,
+      "lineFull": 425,
+      "titleVisible": 170,
+      "titleFull": 287,
+      "titleChars": 46
+    },
+    {
+      "text": "Dana Reyes mentioned you on CP-905 · Home improvement loan T",
+      "h": 36,
+      "lineVisible": 417,
+      "lineFull": 417,
+      "titleVisible": 173,
+      "titleFull": 209,
+      "titleChars": 31
+    },
+    {
+      "text": "Sam Okafor approved CP-906 · Balance transfer card partner r",
+      "h": 36,
+      "lineVisible": 417,
+      "lineFull": 417,
+      "titleVisible": 224,
+      "titleFull": 224,
+      "titleChars": 36
+    }
+  ],
+  "colors": {
+    "popoverBg": "oklch(0.995 0.002 250)",
+    "readLine": "oklch(0.47 0.022 258)",
+    "readKey": "oklch(0.47 0.022 258)",
+    "unreadLine": "oklch(0.25 0.025 258)",
+    "age": "oklch(0.47 0.022 258)",
+    "group": "oklch(0.47 0.022 258)",
+    "dot": "oklch(0.3 0.085 262)",
+    "count": "oklch(0.3 0.085 262)",
+    "countBg": "oklch(0.985 0.005 262)",
+    "countFont": "10px",
+    "pageFindingsIcon": [
+      "warning oklch(0.44 0.095 62)",
+      "error oklch(0.45 0.17 26)",
+      "error oklch(0.45 0.17 26)",
+      "alert oklch(0.47 0.13 42)",
+      "success oklch(0.41 0.1 152)",
+      "success oklch(0.41 0.1 152)",
+      "success oklch(0.41 0.1 152)",
+      "success oklch(0.41 0.1 152)",
+      "success oklch(0.41 0.1 152)"
+    ]
+  },
+  "hoverBg": "oklch(0.25 0.025 258 / 0.06)",
+  "namedNotifications": [
+    "button label=\"Notifications, 6 unread\" labelledby=-",
+    "dialog label=\"Notifications\" labelledby=-",
+    "listbox label=\"Notifications\" labelledby=-"
+  ],
+  "dialogAria": "- dialog \"Notifications\":\n  - heading \"Notifications\" [level=2]\n  - text: 6 unread\n  - button \"Mark all read\"\n  - listbox \"Notifications\":\n    - group \"Today\":\n      - text: Today\n      - 'option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance transfer email , Oct 24, 2026, 2:48 PM\"':\n        - text: \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance transfer email\"\n        - time: \", Oct 24, 2026, 2:48 PM\"\n      - 'option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social , Oct 24, 2026, 1:05 PM\"':\n        - text: \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social\"\n        - time: \", Oct 24, 2026, 1:05 PM\"\n      - 'option \"Unread: Lee Chen assigned CP-1051 · LendRight comparison page to you , Oct 24, 2026, 9:30 AM\"':\n        - text: \"Unread: Lee Chen assigned CP-1051 · LendRight comparison page to you\"\n        - time: \", Oct 24, 2026, 9:30 AM\"\n      - 'option \"Unread: Partner page carrying CP-1012 · Personal loan rates, LendRight placement has 2 new blocking findings , Oct 24, 2026, 8:10 AM\"':\n        - text: \"Unread: Partner page carrying CP-1012 · Personal loan rates, LendRight placement has 2 new blocking findings\"\n        - time: \", Oct 24, 2026, 8:10 AM\"\n      - 'option \"Unread: CP-1063 · Holiday debt consolidation search ads with the full APR range and the California license disclosure is back for your review , Oct 24, 2026, 7:45 AM\"':\n        - text: \"Unread: CP-1063 · Holiday debt consolidation search ads with the full APR range and the California license disclosure is back for your review\"\n        - time: \", Oct 24, 2026, 7:45 AM\"\n      - 'option \"Unread: Dana Reyes rejected CP-1059 · Spring promo display ads , Oct 24, 2026, 7:02 AM\"':\n        - text: \"Unread: Dana Reyes rejected CP-1059 · Spring promo display ads\"\n        - time: \", Oct 24, 2026, 7:02 AM\"\n    - group \"Earlier\":\n      - text: Earlier\n      - option \"CP-1007 · Debt consolidation landing page needs re-review · offer terms changed , Oct 23, 2026, 4:20 PM\":\n        - text: CP-1007 · Debt consolidation landing page needs re-review · offer terms changed\n        - time: \", Oct 23, 2026, 4:20 PM\"\n      - option \"Approval for CP-988 · Home improvement loan banner expires Nov 23 , Oct 22, 2026, 6:00 AM\":\n        - text: Approval for CP-988 · Home improvement loan banner expires Nov 23\n        - time: \", Oct 22, 2026, 6:00 AM\"\n      - option \"Dana Reyes approved CP-1003 · Card rewards social post , Oct 20, 2026, 11:10 AM\":\n        - text: Dana Reyes approved CP-1003 · Card rewards social post\n        - time: \", Oct 20, 2026, 11:10 AM\"\n      - option \"Sam Okafor approved CP-900 · Credit builder card landing page with edits , Oct 19, 2026, 2:00 PM\":\n        - text: Sam Okafor approved CP-900 · Credit builder card landing page with edits\n        - time: \", Oct 19, 2026, 2:00 PM\"\n      - option \"Dana Reyes mentioned you on CP-901 · Personal loan comparison table on BestRates , Oct 18, 2026, 2:00 PM\":\n        - text: Dana Reyes mentioned you on CP-901 · Personal loan comparison table on BestRates\n        - time: \", Oct 18, 2026, 2:00 PM\"\n      - option \"Dana Reyes approved CP-902 · Refinance your car loan email, October send , Oct 17, 2026, 2:00 PM\":\n        - text: Dana Reyes approved CP-902 · Refinance your car loan email, October send\n        - time: \", Oct 17, 2026, 2:00 PM\"\n      - option \"Sam Okafor mentioned you on CP-903 · Student loan refi affiliate banner , Oct 16, 2026, 2:00 PM\":\n        - text: Sam Okafor mentioned you on CP-903 · Student loan refi affiliate banner\n        - time: \", Oct 16, 2026, 2:00 PM\"\n      - option \"Dana Reyes approved CP-904 · Back-to-school personal loan push notification with edits , Oct 15, 2026, 2:00 PM\":\n        - text: Dana Reyes approved CP-904 · Back-to-school personal loan push notification with edits\n        - time: \", Oct 15, 2026, 2:00 PM\"\n      - option \"Dana Reyes mentioned you on CP-905 · Home improvement loan TV script , Oct 14, 2026, 2:00 PM\":\n        - text: Dana Reyes mentioned you on CP-905 · Home improvement loan TV script\n        - time: \", Oct 14, 2026, 2:00 PM\"\n      - option \"Sam Okafor approved CP-906 · Balance transfer card partner review , Oct 13, 2026, 2:00 PM\":\n        - text: Sam Okafor approved CP-906 · Balance transfer card partner review\n        - time: \", Oct 13, 2026, 2:00 PM\"",
+  "landmarks": "- link \"Skip to content\":\n  - /url: \"#main\"\n- banner:\n  - button \"Collapse navigation\" [expanded]\n  - link \"ClearPath Compliance Review\":\n    - /url: /\n  - searchbox \"Search items\" [disabled]\n  - text: Server connected\n  - button \"Notifications, 6 unread\" [expanded]\n  - button \"Assistant\"\n  - button \"Priya Natarajan, account\"\n- navigation \"Primary\":\n  - group \"Work\":\n    - link \"Queue\":\n      - /url: /\n    - link \"My submissions\":\n      - /url: /mine\n    - link \"New submission\":\n      - /url: /submit\n  - group \"Reference\":\n    - link \"Library\":\n      - /url: /library\n    - link \"Offer terms\":\n      - /url: /terms\n    - link \"Partners\":\n      - /url: /partners\n  - group \"Operations\":\n    - link \"Outbox\":\n      - /url: /outbox\n- main:\n  - region \"Queue\":\n    - heading \"Queue\" [level=1]\n    - group \"Queue counts\":\n      - button \"In queue\" [disabled]\n      - button \"My queue\" [disabled]\n      - button \"Unassigned\" [disabled]\n      - button \"Waiting >3 days\" [disabled]\n      - button \"Needs re-review\" [disabled]\n    - group \"Views\":\n      - button \"My queue\" [pressed]\n      - button \"Unassigned\"\n      - button \"Waiting >3 days\"\n      - button \"Needs re-review\"\n      - button \"All active\"\n    - 'button \"Sort: Queue order\"': Queue order\n    - button \"Columns\"\n    - radiogroup \"Layout\":\n      - radio \"Table\" [checked]\n      - radio \"Board\"\n    - button \"Keyboard shortcuts (?)\"\n    - group \"Filters\":\n      - searchbox \"Search the queue\"\n      - 'button \"Status: Submitted, In review +1\"'\n      - button \"Clear Status filter\"\n      - button \"Risk\"\n      - 'button \"Assignee: Me\"'\n      - button \"Clear Assignee filter\"\n      - button \"Partner\"\n      - button \"More filters\"\n    - table \"Queue\":\n      - rowgroup:\n        - row \"Select all loaded items Item Title Status Risk Partner Assignee Findings Age Round\":\n          - columnheader \"Select all loaded items\":\n            - checkbox \"Select all loaded items\"\n          - columnheader \"Item\"\n          - columnheader \"Title\":\n            - button \"Title\"\n          - columnheader \"Status\":\n            - button \"Status\"\n          - columnheader \"Risk\":\n            - button \"Risk\"\n          - columnheader \"Partner\":\n            - button \"Partner\"\n          - columnheader \"Assignee\":\n            - button \"Assignee\"\n          - columnheader \"Findings\":\n            - button \"Findings\"\n          - columnheader \"Age\":\n            - button \"Age\"\n          - columnheader \"Round\":\n            - button \"Round\"\n      - rowgroup:\n        - row \"Select CP-1042 CP-1042 Fall personal loan promo — paid social In review Risk tier for CP-1042 — Dana Reyes 3 open findings 4d R2\":\n          - cell \"Select CP-1042\":\n            - checkbox \"Select CP-1042\"\n          - cell \"CP-1042\"\n          - cell \"Fall personal loan promo — paid social\"\n          - cell \"In review\"\n          - cell \"Risk tier for CP-1042\":\n            - button \"Risk tier for CP-1042\": Medium\n          - cell \"—\"\n          - cell \"Dana Reyes\"\n          - cell \"3 open findings\"\n          - cell \"4d\":\n            - time: 4d\n          - cell \"R2\"\n    - text: All 1 item loaded\n- button \"Dismiss\"\n- dialog \"Notifications\":\n  - heading \"Notifications\" [level=2]\n  - text: 6 unread\n  - button \"Mark all read\"\n  - listbox \"Notifications\":\n    - group \"Today\":\n      - text: Today\n      - 'option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance transfer email , Oct 24, 2026, 2:48 PM\"':\n        - text: \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance transfer email\"\n        - time: \", Oct 24, 2026, 2:48 PM\"\n      - 'option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social , Oct 24, 2026, 1:05 PM\"':\n        - text: \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo — paid social\"\n        - time: \", Oct 24, 2026, 1:05 PM\"\n      - 'option \"Unread: Lee Chen assigned CP-1051 · LendRight comparison page to you , Oct 24, 2026, 9:30 AM\"':\n        - text: \"Unread: Lee Chen assigned CP-1051 · LendRight comparison page to you\"\n        - time: \", Oct 24, 2026, 9:30 AM\"\n      - 'option \"Unread: Partner page carrying CP-1012 · Personal loan rates, LendRight placement has 2 new blocking findings , Oct 24, 2026, 8:10 AM\"':\n        - text: \"Unread: Partner page carrying CP-1012 · Personal loan rates, LendRight placement has 2 new blocking findings\"\n        - time: \", Oct 24, 2026, 8:10 AM\"\n      - 'option \"Unread: CP-1063 · Holiday debt consolidation search ads with the full APR range and the California license disclosure is back for your review , Oct 24, 2026, 7:45 AM\"':\n        - text: \"Unread: CP-1063 · Holiday debt consolidation search ads with the full APR range and the California license disclosure is back for your review\"\n        - time: \", Oct 24, 2026, 7:45 AM\"\n      - 'option \"Unread: Dana Reyes rejected CP-1059 · Spring promo display ads , Oct 24, 2026, 7:02 AM\"':\n        - text: \"Unread: Dana Reyes rejected CP-1059 · Spring promo display ads\"\n        - time: \", Oct 24, 2026, 7:02 AM\"\n    - group \"Earlier\":\n      - text: Earlier\n      - option \"CP-1007 · Debt consolidation landing page needs re-review · offer terms changed , Oct 23, 2026, 4:20 PM\":\n        - text: CP-1007 · Debt consolidation landing page needs re-review · offer terms changed\n        - time: \", Oct 23, 2026, 4:20 PM\"\n      - option \"Approval for CP-988 · Home improvement loan banner expires Nov 23 , Oct 22, 2026, 6:00 AM\":\n        - text: Approval for CP-988 · Home improvement loan banner expires Nov 23\n        - time: \", Oct 22, 2026, 6:00 AM\"\n      - option \"Dana Reyes approved CP-1003 · Card rewards social post , Oct 20, 2026, 11:10 AM\":\n        - text: Dana Reyes approved CP-1003 · Card rewards social post\n        - time: \", Oct 20, 2026, 11:10 AM\"\n      - option \"Sam Okafor approved CP-900 · Credit builder card landing page with edits , Oct 19, 2026, 2:00 PM\":\n        - text: Sam Okafor approved CP-900 · Credit builder card landing page with edits\n        - time: \", Oct 19, 2026, 2:00 PM\"\n      - option \"Dana Reyes mentioned you on CP-901 · Personal loan comparison table on BestRates , Oct 18, 2026, 2:00 PM\":\n        - text: Dana Reyes mentioned you on CP-901 · Personal loan comparison table on BestRates\n        - time: \", Oct 18, 2026, 2:00 PM\"\n      - option \"Dana Reyes approved CP-902 · Refinance your car loan email, October send , Oct 17, 2026, 2:00 PM\":\n        - text: Dana Reyes approved CP-902 · Refinance your car loan email, October send\n        - time: \", Oct 17, 2026, 2:00 PM\"\n      - option \"Sam Okafor mentioned you on CP-903 · Student loan refi affiliate banner , Oct 16, 2026, 2:00 PM\":\n        - text: Sam Okafor mentioned you on CP-903 · Student loan refi affiliate banner\n        - time: \", Oct 16, 2026, 2:00 PM\"\n      - option \"Dana Reyes approved CP-904 · Back-to-school personal loan push notification with edits , Oct 15, 2026, 2:00 PM\":\n        - text: Dana Reyes approved CP-904 · Back-to-school personal loan push notification with edits\n        - time: \", Oct 15, 2026, 2:00 PM\"\n      - option \"Dana Reyes mentioned you on CP-905 · Home improvement loan TV script , Oct 14, 2026, 2:00 PM\":\n        - text: Dana Reyes mentioned you on CP-905 · Home improvement loan TV script\n        - time: \", Oct 14, 2026, 2:00 PM\"\n      - option \"Sam Okafor approved CP-906 · Balance transfer card partner review , Oct 13, 2026, 2:00 PM\":\n        - text: Sam Okafor approved CP-906 · Balance transfer card partner review\n        - time: \", Oct 13, 2026, 2:00 PM\"\n- button \"Dismiss\"",
+  "popover1280": {
+    "x": 558.28125,
+    "y": 46,
+    "width": 512,
+    "height": 682
+  },
+  "body1280": {
+    "client": 640,
+    "scroll": 640
+  },
+  "clickOutsideCloses": true,
+  "pollWhileOpen": {
+    "before": "option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo\" [focus-visible]",
+    "after": "option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo\" [focus-visible]",
+    "urlAfterEnter": "/items/1042"
+  },
+  "count99": {
+    "bell": {
+      "x": 1198.28125,
+      "y": 8,
+      "width": 32,
+      "height": 32
+    },
+    "count": {
+      "x": 1202.859375,
+      "y": 10,
+      "width": 27.421875,
+      "height": 14
+    }
+  },
+  "listKeys": [
+    "Tab Tab -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "ArrowDown x3 -> option \"Unread: Partner page carrying CP-1012 · Personal loan rates, LendRight\" [focus-visible]",
+    "End -> option \"Sam Okafor approved CP-906 · Balance transfer card partner review11d, \" [focus-visible]",
+    "Home -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "ArrowUp at top -> option \"Unread: Dana Reyes requested changes on CP-1038 · Spring balance trans\" [focus-visible]",
+    "type S -> option \"Unread: Sam Okafor mentioned you on CP-1042 · Fall personal loan promo\" [focus-visible]",
+    "Enter -> button \"Notifications, 5 unread\" [focus-visible]",
+    "tabs from bell to first comment-area control: 17 -> tab \"Comments\" [focus-visible]"
+  ]
+}

@@ -193,6 +193,24 @@
         "title": "AssignIn",
         "type": "object"
       },
+      "AssignmentDetailOut": {
+        "properties": {
+          "kind": {
+            "const": "assignment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AssignmentMode"
+          }
+        },
+        "required": [
+          "kind",
+          "mode"
+        ],
+        "title": "AssignmentDetailOut",
+        "type": "object"
+      },
       "AssignmentMode": {
         "description": "Which assignment rule placed an item (decisions.md \"Reviewer assignment\"); recorded on the event.",
         "enum": [
@@ -1290,6 +1308,24 @@
           "issuing_bank"
         ],
         "title": "CreditCardTerms",
+        "type": "object"
+      },
+      "DecisionDetailOut": {
+        "properties": {
+          "kind": {
+            "const": "decision",
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          }
+        },
+        "required": [
+          "kind",
+          "outcome"
+        ],
+        "title": "DecisionDetailOut",
         "type": "object"
       },
       "DecisionIn": {
@@ -2605,6 +2641,26 @@
           "generated_at"
         ],
         "title": "EvidencePackOut",
+        "type": "object"
+      },
+      "ExpiryWarningDetailOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "kind": {
+            "const": "expiry_warning",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "expires_at"
+        ],
+        "title": "ExpiryWarningDetailOut",
         "type": "object"
       },
       "ExportCreatedEventOut": {
@@ -7506,6 +7562,31 @@
         "title": "MeUpdateIn",
         "type": "object"
       },
+      "MentionDetailOut": {
+        "properties": {
+          "comment_id": {
+            "title": "Comment Id",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "mention",
+            "title": "Kind",
+            "type": "string"
+          },
+          "version_n": {
+            "description": "The version the comment is on (the review screen's `v`).",
+            "title": "Version N",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "comment_id",
+          "version_n"
+        ],
+        "title": "MentionDetailOut",
+        "type": "object"
+      },
       "MetricBucket": {
         "enum": [
           "week",
@@ -7987,10 +8068,63 @@
       },
       "NotificationOut": {
         "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who caused it; null for system actions (sweeps, pool fan-out)."
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "assignment": "#/components/schemas/AssignmentDetailOut",
+                    "decision": "#/components/schemas/DecisionDetailOut",
+                    "expiry_warning": "#/components/schemas/ExpiryWarningDetailOut",
+                    "mention": "#/components/schemas/MentionDetailOut",
+                    "page_findings": "#/components/schemas/PageFindingsDetailOut",
+                    "rereview": "#/components/schemas/RereviewDetailOut"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AssignmentDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DecisionDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RereviewDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MentionDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExpiryWarningDetailOut"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PageFindingsDetailOut"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the source event says, for phrasing the row; null when there's no event to read.",
+            "title": "Detail"
           },
           "id": {
             "title": "Id",
@@ -8018,10 +8152,22 @@
             ],
             "title": "Item Key"
           },
+          "item_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Title"
+          },
           "kind": {
             "$ref": "#/components/schemas/NotificationKind"
           },
           "message": {
+            "description": "The one-liner stored when it was created; the fallback when detail is null.",
             "title": "Message",
             "type": "string"
           },
@@ -8043,6 +8189,9 @@
           "kind",
           "item_id",
           "item_key",
+          "item_title",
+          "actor",
+          "detail",
           "message",
           "read_at",
           "created_at"
@@ -8411,6 +8560,26 @@
           "new"
         ],
         "title": "PageFindingOut",
+        "type": "object"
+      },
+      "PageFindingsDetailOut": {
+        "properties": {
+          "kind": {
+            "const": "page_findings",
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_blocking_count": {
+            "description": "Blocking rules on the partner page that don't fire on the copy.",
+            "title": "New Blocking Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "new_blocking_count"
+        ],
+        "title": "PageFindingsDetailOut",
         "type": "object"
       },
       "PageFindingsFlaggedEventOut": {
@@ -9910,6 +10079,24 @@
           "last_seen_at"
         ],
         "title": "RepeatIssueOut",
+        "type": "object"
+      },
+      "RereviewDetailOut": {
+        "properties": {
+          "kind": {
+            "const": "rereview",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ReopenReason"
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "title": "RereviewDetailOut",
         "type": "object"
       },
       "ResubmitIn": {

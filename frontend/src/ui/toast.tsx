@@ -40,7 +40,7 @@ export function showToast(content: ToastContent, timeout?: number): string {
 
 export function ToastHost() {
   return (
-    <AriaToastRegion queue={toastQueue} className="app-toast-region" aria-label="Notifications">
+    <AriaToastRegion queue={toastQueue} className="app-toast-region" aria-label="Messages">
       {({ toast }) => (
         <AriaToast toast={toast} className="app-toast" data-tone={toast.content.tone ?? 'neutral'}>
           <Icon
