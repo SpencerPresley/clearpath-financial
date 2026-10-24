@@ -132,6 +132,15 @@ Runtime is about 11 s on a laptop, from both the command and the UI button with 
   (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, from `assistant/0002_checkpointer`) keyed by the
   `AssistantThread` rows a reset truncates. `domain_tables()` now adds them, but keeps `checkpoint_migrations`
   (the library's schema record); a test pins both. A future non-model table would need the same treatment.
+- **Deploy ordering: apply `edge.tf` before the first seeding deploy (blocking for the hosted demo).**
+  - The three seeded monitored placements point at `<FRONTEND_BASE_URL>/demo-partners/<slug>/`, and the
+    `/demo-partners/*` CloudFront behavior from #37 isn't applied yet.
+  - Until it is, those paths fall to the default S3 behavior. There, `infra/main/functions/spa-rewrite.js` serves
+    `/index.html` for any extensionless path: a 200 with no partner copy.
+  - The next `drift-sweep` (07:00, `CELERY_BEAT_SCHEDULE`) would then record *missing*. That reopens CP-23 and
+    CP-32 and overwrites CP-7's seeded state.
+  - So the deploy-wave `terraform apply` of `edge.tf` (and the `DEMO_USER_PASSWORD` parameter) has to precede the
+    first deploy that seeds, or at least that deploy's first 07:00 sweep.
 - **The reset holds an advisory lock and truncates every domain table for ~10 s.** Requests in that window wait
   on the lock. Fine for a demo, and the reason it's admin-only.
 

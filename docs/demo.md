@@ -106,6 +106,10 @@ uv run python manage.py seed_demo          # no-op if items exist
 uv run python manage.py seed_demo --reset  # wipe and reseed
 ```
 
+Under `make up`, set `DEMO_PARTNERS_BASE_URL=http://web:8000` before the first boot: the worker container can't
+reach the default (`FRONTEND_BASE_URL`), so **Check now** on the partner pages would fail, and the seeded
+placements keep the address they were created with.
+
 Containers seed on start: `compose.yaml`'s web service and `deploy/deploy.sh` run `seed_demo` after
 `migrate`, which does nothing once items exist. `seed_demo` keeps user accounts and sessions; it wipes items,
 partners, offer terms, imports, findings, drift checks, events and notifications. People are upserted from `backend/demo/content/people.py`, and the password changes only if it
