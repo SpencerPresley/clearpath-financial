@@ -29,7 +29,7 @@ export function UserMenu() {
             {viewer.name}
           </Heading>
           <p className="text-meta text-muted">{roles}</p>
-          {viewer.isDemo && (
+          {viewer.isDemo === true && (
             <p className="mt-2 max-w-60 text-meta text-muted">
               No sign-in yet. This is a demo session with every role, so every section is visible.
             </p>

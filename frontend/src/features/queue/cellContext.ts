@@ -9,6 +9,8 @@ import type { ItemRowOut, ItemUpdateIn } from '../../api/generated/model';
 export interface QueueCellContextValue {
   /** One reference time for every age in the list; defaults to render time. */
   now?: Date;
+  /** Inline-edit controls are tab stops only in the active row, so Tab doesn't walk every row's buttons. */
+  activeId?: number | null;
   canEditRisk: (row: ItemRowOut) => boolean;
   canEditTags: (row: ItemRowOut) => boolean;
   save: (row: ItemRowOut, patch: ItemUpdateIn) => void;

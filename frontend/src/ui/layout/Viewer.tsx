@@ -12,13 +12,17 @@ import { ROLES } from '../domain';
 import type { Role } from '../domain';
 
 export interface Viewer {
+  /** User id; null only for the demo fallback. */
+  id: number | null;
   name: string;
+  email: string;
+  /** Effective roles (granted plus implied: a lead is also a reviewer). */
   roles: readonly Role[];
-  /** True until real sign-in exists; the user menu shows it. */
-  isDemo: boolean;
+  /** True only for the fallback viewer; the user menu shows it. */
+  isDemo?: boolean;
 }
 
-export const DEMO_VIEWER: Viewer = { name: 'Demo user', roles: ROLES, isDemo: true };
+export const DEMO_VIEWER: Viewer = { id: null, name: 'Demo user', email: '', roles: ROLES, isDemo: true };
 
 const ViewerContext = createContext<Viewer>(DEMO_VIEWER);
 

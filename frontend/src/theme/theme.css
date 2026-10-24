@@ -1655,6 +1655,64 @@
     @apply inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border border-base-300 bg-base-200 px-1.5 text-meta text-base-content;
   }
 
+  /* ---- Inline edits: the value is the control; a caret and hover fill say it's editable. ------- */
+  .app-cell-control {
+    @apply inline-flex max-w-full;
+  }
+  .app-cell-edit {
+    @apply -mx-1 inline-flex h-7 max-w-full min-w-0 cursor-default items-center gap-1 rounded-md px-1 outline-none;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-cell-edit[data-hovered],
+  .app-cell-edit[data-pressed] {
+    @apply bg-hover;
+  }
+  .app-cell-edit-wide {
+    @apply w-full justify-start;
+  }
+  .app-cell-edit-caret {
+    @apply text-muted opacity-0;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-cell-edit[data-hovered] .app-cell-edit-caret,
+  .app-cell-edit[data-focus-visible] .app-cell-edit-caret,
+  .app-tr[data-active] .app-cell-edit-caret {
+    opacity: 1;
+  }
+  .app-cell-edit-hint {
+    @apply text-muted opacity-0;
+  }
+  .app-cell-edit[data-hovered] .app-cell-edit-hint,
+  .app-cell-edit[data-focus-visible] .app-cell-edit-hint {
+    opacity: 1;
+  }
+  .app-tag-editor {
+    @apply flex flex-col gap-2;
+  }
+  .app-tag-remove.app-btn {
+    @apply size-4 w-4 rounded-xs;
+  }
+  .app-input {
+    @apply h-8 w-full rounded-md border border-base-300 bg-base-100 px-2 text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-input[data-focused] {
+    @apply border-focus;
+  }
+  .app-input[data-invalid] {
+    @apply border-status-error;
+  }
+  .app-field-error {
+    @apply text-meta text-status-error-soft-content;
+  }
+  .app-textarea {
+    @apply min-h-16 w-full resize-y rounded-md border border-base-300 bg-base-100 px-2 py-1.5 text-ui text-base-content outline-none placeholder:text-muted;
+  }
+  .app-textarea[data-focused] {
+    @apply border-focus;
+  }
+
   .app-table-footer {
     @apply flex h-10 items-center gap-3 px-3 text-meta text-muted;
   }

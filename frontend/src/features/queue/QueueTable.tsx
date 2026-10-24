@@ -55,7 +55,7 @@ export interface QueueTableProps {
   columnVisibility: ColumnVisibility;
   /** Shared clock for ages; defaults to render time. */
   now?: Date;
-  cells?: Omit<QueueCellContextValue, 'now'>;
+  cells?: Omit<QueueCellContextValue, 'now' | 'activeId'>;
 }
 
 const noop = () => undefined;
@@ -95,9 +95,9 @@ export function QueueTable({
     columnResizeMode: 'onChange',
   });
 
-  const cellContext = useMemo(() => ({ ...cells, now }), [cells, now]);
   const headers = table.getHeaderGroups()[0]?.headers ?? [];
   const tabStop = activeId !== null && rows.some((r) => r.id === activeId) ? activeId : rows[0]?.id;
+  const cellContext = useMemo(() => ({ ...cells, now, activeId: tabStop }), [cells, now, tabStop]);
 
   return (
     <QueueCellContext value={cellContext}>

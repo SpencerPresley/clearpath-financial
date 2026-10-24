@@ -25,7 +25,7 @@ function renderApp({ roles, path = '/' }: { roles?: readonly Role[]; path?: stri
       {roles === undefined ? (
         app
       ) : (
-        <ViewerProvider viewer={{ name: 'Test User', roles, isDemo: false }}>{app}</ViewerProvider>
+        <ViewerProvider viewer={{ id: 1, name: 'Test User', email: 'test@x', roles }}>{app}</ViewerProvider>
       )}
     </QueryClientProvider>,
   );
