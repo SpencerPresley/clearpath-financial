@@ -1,4 +1,5 @@
 import { Button as AriaButton } from 'react-aria-components';
+import type { Ref } from 'react';
 import type { ButtonProps as AriaButtonProps } from 'react-aria-components';
 
 import { cx } from './cx';
@@ -15,6 +16,8 @@ export interface ButtonProps extends Omit<AriaButtonProps, 'className' | 'style'
   /** Leading icon from the registry; decorative, the label names the button. */
   icon?: IconKey;
   className?: string;
+  /** React 19 passes ref as a prop; it reaches the DOM button (e.g. to return focus to it). */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({

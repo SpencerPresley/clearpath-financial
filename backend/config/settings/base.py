@@ -243,3 +243,14 @@ LOGGING = {
 # (config/settings/dev.py), where the local stack fetches its own demo partner pages.
 DRIFT_FETCH_PRIVATE_ORIGINS: list[str] = []
 DEMO_PARTNERS_BASE_URL = env.demo_partners_base_url or env.frontend_base_url
+
+# --- Assistant (workstream K) ---
+ASSISTANT_MODEL = env.anthropic_model
+ASSISTANT_ANTHROPIC_API_KEY = env.anthropic_api_key.get_secret_value() if env.anthropic_api_key else None
+# Every recipient must be at exactly this domain AND be an active user or a team alias (decisions.md).
+ASSISTANT_EMAIL_DOMAIN = "clearpath.demo"
+ASSISTANT_TEAM_ADDRESSES = ("compliance@clearpath.demo", "marketing@clearpath.demo", "legal@clearpath.demo")
+# The demo's mail lands in the Outbox table; real delivery would be a backend swap (decisions.md).
+EMAIL_BACKEND = "notifications.email_backend.OutboxEmailBackend"
+DEFAULT_FROM_EMAIL = "ClearPath Assistant <assistant@clearpath.demo>"
+FRONTEND_BASE_URL = env.frontend_base_url  # item links in emails

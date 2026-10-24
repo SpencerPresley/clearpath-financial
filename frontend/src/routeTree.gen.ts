@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as MetricsRouteImport } from './routes/metrics'
+import { Route as OutboxRouteImport } from './routes/outbox'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DevDesignRouteImport } from './routes/dev/design'
@@ -40,6 +41,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const MetricsRoute = MetricsRouteImport.update({
   id: '/metrics',
   path: '/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OutboxRoute = OutboxRouteImport.update({
+  id: '/outbox',
+  path: '/outbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubmitRoute = SubmitRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/import': typeof ImportRoute
   '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
+  '/outbox': typeof OutboxRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/import': typeof ImportRoute
   '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
+  '/outbox': typeof OutboxRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/import': typeof ImportRoute
   '/library': typeof LibraryRoute
   '/metrics': typeof MetricsRoute
+  '/outbox': typeof OutboxRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
   '/dev/design': typeof DevDesignRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/library'
     | '/metrics'
+    | '/outbox'
     | '/submit'
     | '/terms'
     | '/dev/design'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/library'
     | '/metrics'
+    | '/outbox'
     | '/submit'
     | '/terms'
     | '/dev/design'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/library'
     | '/metrics'
+    | '/outbox'
     | '/submit'
     | '/terms'
     | '/dev/design'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   ImportRoute: typeof ImportRoute
   LibraryRoute: typeof LibraryRoute
   MetricsRoute: typeof MetricsRoute
+  OutboxRoute: typeof OutboxRoute
   SubmitRoute: typeof SubmitRoute
   TermsRoute: typeof TermsRoute
   DevDesignRoute: typeof DevDesignRoute
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/metrics'
       fullPath: '/metrics'
       preLoaderRoute: typeof MetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/outbox': {
+      id: '/outbox'
+      path: '/outbox'
+      fullPath: '/outbox'
+      preLoaderRoute: typeof OutboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/submit': {
@@ -280,6 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportRoute: ImportRoute,
   LibraryRoute: LibraryRoute,
   MetricsRoute: MetricsRoute,
+  OutboxRoute: OutboxRoute,
   SubmitRoute: SubmitRoute,
   TermsRoute: TermsRoute,
   DevDesignRoute: DevDesignRoute,

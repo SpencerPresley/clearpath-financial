@@ -19,6 +19,7 @@ import { errorMessage } from '../../ui/errorMessage';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { useViewer } from '../../ui/layout/Viewer';
+import { useMainNarrowerThan } from '../../ui/layout/useMainWidth';
 import { Board } from './Board';
 import { BulkBar } from './BulkBar';
 import {
@@ -255,9 +256,11 @@ export function QueuePage() {
 
   const visibleIds = useMemo(() => visibleColumnIds(columns), [columns]);
   const showBulk = search.layout === 'table' && selectedIds.length > 0;
+  // The same columns step aside when the page itself is narrow (e.g. beside the assistant panel).
+  const narrowMain = useMainNarrowerThan(1000);
   const tableColumns = useMemo(
-    () => (search.item === undefined ? columns : { ...columns, ...DRAWER_HIDDEN }),
-    [columns, search.item],
+    () => (search.item === undefined && !narrowMain ? columns : { ...columns, ...DRAWER_HIDDEN }),
+    [columns, search.item, narrowMain],
   );
 
   let region;

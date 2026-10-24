@@ -19,7 +19,7 @@ export interface NavSection {
   group: NavGroupId;
   /** Roles that see this section; 'everyone' includes users with no roles. */
   roles: readonly Role[] | 'everyone';
-  to?: LinkProps['to'];
+  to: LinkProps['to'];
 }
 
 export const NAV_GROUPS: readonly { id: NavGroupId; label: string }[] = [
@@ -79,7 +79,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     to: '/metrics',
   },
   { id: 'import', label: 'Import', icon: 'nav.import', group: 'operations', roles: ['admin'], to: '/import' },
-  { id: 'outbox', label: 'Outbox', icon: 'nav.outbox', group: 'operations', roles: 'everyone' },
+  {
+    id: 'outbox',
+    label: 'Outbox',
+    icon: 'nav.outbox',
+    group: 'operations',
+    roles: 'everyone',
+    to: '/outbox',
+  },
 ];
 
 export function navSectionsFor(roles: readonly Role[]): NavSection[] {

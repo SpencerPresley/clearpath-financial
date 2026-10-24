@@ -16,56 +16,46 @@ import type {
   RequestHandlerOptions
 } from 'msw';
 
-import {
-  AssistantRole
-} from '../model';
 import type {
-  ApprovalRequiredEventOut,
   AssistantThreadOut,
-  DoneEventOut,
-  ErrorEventOut,
-  TokenEventOut,
-  ToolCallEventOut,
-  ToolResultEventOut
+  AssistantThreadStateOut
 } from '../model';
 
 
-export const getCreateAssistantThreadResponseMock = (overrideResponse: Partial<Extract<AssistantThreadOut, object>> = {}): AssistantThreadOut => ({created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.alpha({length: {min: 10, max: 20}}), messages: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({content: faker.string.alpha({length: {min: 10, max: 20}}), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.alpha({length: {min: 10, max: 20}}), role: faker.helpers.arrayElement(Object.values(AssistantRole)), tool_name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,])})), pending_approval: faker.helpers.arrayElement([{draft: {body: faker.string.alpha({length: {min: 10, max: 20}}), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, interrupt_id: faker.string.alpha({length: {min: 10, max: 20}}), tool: "send_email"},null,]), ...overrideResponse})
+export const getListAssistantThreadsResponseMock = (): AssistantThreadOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({awaiting_approval: faker.datatype.boolean(), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.uuid(), title: faker.string.alpha({length: {min: 10, max: 20}}), updated_at: faker.date.past().toISOString().slice(0, 19) + 'Z'})))
 
-export const getGetAssistantThreadResponseMock = (overrideResponse: Partial<Extract<AssistantThreadOut, object>> = {}): AssistantThreadOut => ({created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.alpha({length: {min: 10, max: 20}}), messages: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({content: faker.string.alpha({length: {min: 10, max: 20}}), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.alpha({length: {min: 10, max: 20}}), role: faker.helpers.arrayElement(Object.values(AssistantRole)), tool_name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,])})), pending_approval: faker.helpers.arrayElement([{draft: {body: faker.string.alpha({length: {min: 10, max: 20}}), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, interrupt_id: faker.string.alpha({length: {min: 10, max: 20}}), tool: "send_email"},null,]), ...overrideResponse})
+export const getCreateAssistantThreadResponseMock = (overrideResponse: Partial<Extract<AssistantThreadOut, object>> = {}): AssistantThreadOut => ({awaiting_approval: faker.datatype.boolean(), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.uuid(), title: faker.string.alpha({length: {min: 10, max: 20}}), updated_at: faker.date.past().toISOString().slice(0, 19) + 'Z', ...overrideResponse})
 
-export const getResolveAssistantApprovalResponseTokenEventOutMock = (overrideResponse: Partial<TokenEventOut> = {}): TokenEventOut => ({...{text: faker.string.alpha({length: {min: 10, max: 20}}), type: "token"}, ...overrideResponse});
+export const getGetAssistantThreadResponseMock = (overrideResponse: Partial<Extract<AssistantThreadOut, object>> = {}): AssistantThreadOut => ({awaiting_approval: faker.datatype.boolean(), created_at: faker.date.past().toISOString().slice(0, 19) + 'Z', id: faker.string.uuid(), title: faker.string.alpha({length: {min: 10, max: 20}}), updated_at: faker.date.past().toISOString().slice(0, 19) + 'Z', ...overrideResponse})
 
-export const getResolveAssistantApprovalResponseToolCallEventOutMock = (overrideResponse: Partial<ToolCallEventOut> = {}): ToolCallEventOut => ({...{args: {
+export const getGetAssistantThreadHistoryResponseMock = (): AssistantThreadStateOut[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({checkpoint: faker.helpers.arrayElement([{checkpoint_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,])},null,]), created_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), metadata: faker.helpers.arrayElement([{step: faker.helpers.arrayElement([faker.number.int(),null,])},null,]), next: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}}))), tasks: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), interrupts: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), value: {args: {body: faker.string.alpha({length: {min: 10, max: 20}}), item_key: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, description: faker.string.alpha({length: {min: 10, max: 20}}), name: "send_email", tool_call_id: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_approval"}})), name: faker.string.alpha({length: {min: 10, max: 20}})})), values: {messages: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({artifact: faker.helpers.arrayElement([{}, undefined]), content: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({
         [faker.string.alphanumeric(5)]: {}
-      }, call_id: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_call"}, ...overrideResponse});
-
-export const getResolveAssistantApprovalResponseToolResultEventOutMock = (overrideResponse: Partial<ToolResultEventOut> = {}): ToolResultEventOut => ({...{call_id: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), summary: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_result"}, ...overrideResponse});
-
-export const getResolveAssistantApprovalResponseApprovalRequiredEventOutMock = (overrideResponse: Partial<ApprovalRequiredEventOut> = {}): ApprovalRequiredEventOut => ({...{approval: {draft: {body: faker.string.alpha({length: {min: 10, max: 20}}), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, interrupt_id: faker.string.alpha({length: {min: 10, max: 20}}), tool: "send_email"}, type: "approval_required"}, ...overrideResponse});
-
-export const getResolveAssistantApprovalResponseDoneEventOutMock = (overrideResponse: Partial<DoneEventOut> = {}): DoneEventOut => ({...{message_id: faker.string.alpha({length: {min: 10, max: 20}}), type: "done"}, ...overrideResponse});
-
-export const getResolveAssistantApprovalResponseErrorEventOutMock = (overrideResponse: Partial<ErrorEventOut> = {}): ErrorEventOut => ({...{code: faker.string.alpha({length: {min: 10, max: 20}}), message: faker.string.alpha({length: {min: 10, max: 20}}), type: "error"}, ...overrideResponse});
-
-export const getResolveAssistantApprovalResponseMock = (): TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut => (faker.helpers.arrayElement([{...getResolveAssistantApprovalResponseTokenEventOutMock()},{...getResolveAssistantApprovalResponseToolCallEventOutMock()},{...getResolveAssistantApprovalResponseToolResultEventOutMock()},{...getResolveAssistantApprovalResponseApprovalRequiredEventOutMock()},{...getResolveAssistantApprovalResponseDoneEventOutMock()},{...getResolveAssistantApprovalResponseErrorEventOutMock()},]))
-
-export const getStreamAssistantReplyResponseTokenEventOutMock = (overrideResponse: Partial<TokenEventOut> = {}): TokenEventOut => ({...{text: faker.string.alpha({length: {min: 10, max: 20}}), type: "token"}, ...overrideResponse});
-
-export const getStreamAssistantReplyResponseToolCallEventOutMock = (overrideResponse: Partial<ToolCallEventOut> = {}): ToolCallEventOut => ({...{args: {
+      })),]), id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['success','error'] as const),null,]), tool_call_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), tool_calls: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({args: {
         [faker.string.alphanumeric(5)]: {}
-      }, call_id: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_call"}, ...overrideResponse});
+      }, id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_call"})), undefined]), type: faker.helpers.arrayElement(['human','ai','tool','system'] as const)}))}})))
 
-export const getStreamAssistantReplyResponseToolResultEventOutMock = (overrideResponse: Partial<ToolResultEventOut> = {}): ToolResultEventOut => ({...{call_id: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), summary: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_result"}, ...overrideResponse});
+export const getRespondToAssistantInterruptResponseMock = (): string => (faker.word.sample())
 
-export const getStreamAssistantReplyResponseApprovalRequiredEventOutMock = (overrideResponse: Partial<ApprovalRequiredEventOut> = {}): ApprovalRequiredEventOut => ({...{approval: {draft: {body: faker.string.alpha({length: {min: 10, max: 20}}), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, interrupt_id: faker.string.alpha({length: {min: 10, max: 20}}), tool: "send_email"}, type: "approval_required"}, ...overrideResponse});
+export const getStartAssistantRunResponseMock = (): string => (faker.word.sample())
 
-export const getStreamAssistantReplyResponseDoneEventOutMock = (overrideResponse: Partial<DoneEventOut> = {}): DoneEventOut => ({...{message_id: faker.string.alpha({length: {min: 10, max: 20}}), type: "done"}, ...overrideResponse});
+export const getGetAssistantThreadStateResponseMock = (overrideResponse: Partial<Extract<AssistantThreadStateOut, object>> = {}): AssistantThreadStateOut => ({checkpoint: faker.helpers.arrayElement([{checkpoint_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,])},null,]), created_at: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z',null,]), metadata: faker.helpers.arrayElement([{step: faker.helpers.arrayElement([faker.number.int(),null,])},null,]), next: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}}))), tasks: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), interrupts: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({id: faker.string.alpha({length: {min: 10, max: 20}}), value: {args: {body: faker.string.alpha({length: {min: 10, max: 20}}), item_key: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), subject: faker.string.alpha({length: {min: 10, max: 20}}), to: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, description: faker.string.alpha({length: {min: 10, max: 20}}), name: "send_email", tool_call_id: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_approval"}})), name: faker.string.alpha({length: {min: 10, max: 20}})})), values: {messages: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({artifact: faker.helpers.arrayElement([{}, undefined]), content: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({
+        [faker.string.alphanumeric(5)]: {}
+      })),]), id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['success','error'] as const),null,]), tool_call_id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), tool_calls: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({args: {
+        [faker.string.alphanumeric(5)]: {}
+      }, id: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}),null,]), name: faker.string.alpha({length: {min: 10, max: 20}}), type: "tool_call"})), undefined]), type: faker.helpers.arrayElement(['human','ai','tool','system'] as const)}))}, ...overrideResponse})
 
-export const getStreamAssistantReplyResponseErrorEventOutMock = (overrideResponse: Partial<ErrorEventOut> = {}): ErrorEventOut => ({...{code: faker.string.alpha({length: {min: 10, max: 20}}), message: faker.string.alpha({length: {min: 10, max: 20}}), type: "error"}, ...overrideResponse});
 
-export const getStreamAssistantReplyResponseMock = (): TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut => (faker.helpers.arrayElement([{...getStreamAssistantReplyResponseTokenEventOutMock()},{...getStreamAssistantReplyResponseToolCallEventOutMock()},{...getStreamAssistantReplyResponseToolResultEventOutMock()},{...getStreamAssistantReplyResponseApprovalRequiredEventOutMock()},{...getStreamAssistantReplyResponseDoneEventOutMock()},{...getStreamAssistantReplyResponseErrorEventOutMock()},]))
+export const getListAssistantThreadsMockHandler = (overrideResponse?: AssistantThreadOut[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<AssistantThreadOut[]> | AssistantThreadOut[]), options?: RequestHandlerOptions) => {
+  return http.get('*/api/assistant/threads', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListAssistantThreadsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 
 export const getCreateAssistantThreadMockHandler = (overrideResponse?: AssistantThreadOut | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<AssistantThreadOut> | AssistantThreadOut), options?: RequestHandlerOptions) => {
   return http.post('*/api/assistant/threads', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
@@ -91,32 +81,61 @@ export const getGetAssistantThreadMockHandler = (overrideResponse?: AssistantThr
   }, options)
 }
 
-export const getResolveAssistantApprovalMockHandler = (overrideResponse?: TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut> | TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut), options?: RequestHandlerOptions) => {
-  return http.post('*/api/assistant/threads/:threadId/approvals/:interruptId', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+export const getGetAssistantThreadHistoryMockHandler = (overrideResponse?: AssistantThreadStateOut[] | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<AssistantThreadStateOut[]> | AssistantThreadStateOut[]), options?: RequestHandlerOptions) => {
+  return http.post('*/api/assistant/threads/:threadId/history', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
-    : getResolveAssistantApprovalResponseMock(),
+    : getGetAssistantThreadHistoryResponseMock(),
       { status: 200
       })
   }, options)
 }
 
-export const getStreamAssistantReplyMockHandler = (overrideResponse?: TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut> | TokenEventOut | ToolCallEventOut | ToolResultEventOut | ApprovalRequiredEventOut | DoneEventOut | ErrorEventOut), options?: RequestHandlerOptions) => {
-  return http.post('*/api/assistant/threads/:threadId/messages', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+export const getRespondToAssistantInterruptMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
+  return http.post('*/api/assistant/threads/:threadId/interrupts/:interruptId', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+  const resolvedBody = overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getRespondToAssistantInterruptResponseMock();
+    const textBody = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody ?? null);
+    return HttpResponse.text(textBody,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' }
+      })
+  }, options)
+}
+
+export const getStartAssistantRunMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
+  return http.post('*/api/assistant/threads/:threadId/runs', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+  const resolvedBody = overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getStartAssistantRunResponseMock();
+    const textBody = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody ?? null);
+    return HttpResponse.text(textBody,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' }
+      })
+  }, options)
+}
+
+export const getGetAssistantThreadStateMockHandler = (overrideResponse?: AssistantThreadStateOut | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<AssistantThreadStateOut> | AssistantThreadStateOut), options?: RequestHandlerOptions) => {
+  return http.get('*/api/assistant/threads/:threadId/state', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
-    : getStreamAssistantReplyResponseMock(),
+    : getGetAssistantThreadStateResponseMock(),
       { status: 200
       })
   }, options)
 }
 export const getAssistantMock = () => [
+  getListAssistantThreadsMockHandler(),
   getCreateAssistantThreadMockHandler(),
   getGetAssistantThreadMockHandler(),
-  getResolveAssistantApprovalMockHandler(),
-  getStreamAssistantReplyMockHandler()
+  getGetAssistantThreadHistoryMockHandler(),
+  getRespondToAssistantInterruptMockHandler(),
+  getStartAssistantRunMockHandler(),
+  getGetAssistantThreadStateMockHandler()
 ]

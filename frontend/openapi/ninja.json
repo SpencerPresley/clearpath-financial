@@ -59,15 +59,6 @@
         "title": "AffectedPartnerOut",
         "type": "object"
       },
-      "ApprovalDecision": {
-        "enum": [
-          "approve",
-          "edit",
-          "reject"
-        ],
-        "title": "ApprovalDecision",
-        "type": "string"
-      },
       "ApprovalExpiringEventOut": {
         "properties": {
           "actor": {
@@ -161,22 +152,18 @@
         "title": "ApprovalExpiringPayload",
         "type": "object"
       },
-      "ApprovalRequiredEventOut": {
+      "ApproveIn": {
         "properties": {
-          "approval": {
-            "$ref": "#/components/schemas/PendingApprovalOut"
-          },
           "type": {
-            "const": "approval_required",
+            "const": "approve",
             "title": "Type",
             "type": "string"
           }
         },
         "required": [
-          "type",
-          "approval"
+          "type"
         ],
-        "title": "ApprovalRequiredEventOut",
+        "title": "ApproveIn",
         "type": "object"
       },
       "AssignIn": {
@@ -219,43 +206,28 @@
         "title": "AssignmentMode",
         "type": "string"
       },
-      "AssistantApprovalIn": {
+      "AssistantHistoryIn": {
+        "description": "The SDK's `threads.getHistory` body; only `limit` is read, other keys are ignored.",
         "properties": {
-          "decision": {
-            "$ref": "#/components/schemas/ApprovalDecision"
-          },
-          "edited": {
+          "limit": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EmailDraftIn"
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Required when decision is edit."
-          },
-          "reason": {
-            "default": "",
-            "maxLength": 2000,
-            "title": "Reason",
-            "type": "string"
+            "title": "Limit"
           }
         },
-        "required": [
-          "decision"
-        ],
-        "title": "AssistantApprovalIn",
+        "title": "AssistantHistoryIn",
         "type": "object"
       },
-      "AssistantMessageIn": {
+      "AssistantRunIn": {
         "properties": {
-          "content": {
-            "maxLength": 8000,
-            "minLength": 1,
-            "title": "Content",
-            "type": "string"
-          },
           "item_id": {
             "anyOf": [
               {
@@ -267,19 +239,39 @@
             ],
             "description": "The item open in the review screen, as context.",
             "title": "Item Id"
+          },
+          "message": {
+            "$ref": "#/components/schemas/AssistantUserMessageIn"
           }
         },
         "required": [
-          "content"
+          "message"
         ],
-        "title": "AssistantMessageIn",
+        "title": "AssistantRunIn",
         "type": "object"
       },
-      "AssistantMessageOut": {
+      "AssistantStateValuesOut": {
         "properties": {
-          "content": {
-            "title": "Content",
-            "type": "string"
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/WireMessageOut"
+            },
+            "title": "Messages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "title": "AssistantStateValuesOut",
+        "type": "object"
+      },
+      "AssistantThreadOut": {
+        "properties": {
+          "awaiting_approval": {
+            "description": "The last run paused on an email that needs your approval.",
+            "title": "Awaiting Approval",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -287,78 +279,116 @@
             "type": "string"
           },
           "id": {
+            "format": "uuid",
             "title": "Id",
             "type": "string"
           },
-          "role": {
-            "$ref": "#/components/schemas/AssistantRole"
+          "title": {
+            "description": "First message of the thread, trimmed; \"\" until the first run.",
+            "title": "Title",
+            "type": "string"
           },
-          "tool_name": {
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "awaiting_approval"
+        ],
+        "title": "AssistantThreadOut",
+        "type": "object"
+      },
+      "AssistantThreadStateOut": {
+        "properties": {
+          "checkpoint": {
             "anyOf": [
               {
+                "$ref": "#/components/schemas/CheckpointRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tool Name"
-          }
-        },
-        "required": [
-          "id",
-          "role",
-          "content",
-          "created_at"
-        ],
-        "title": "AssistantMessageOut",
-        "type": "object"
-      },
-      "AssistantRole": {
-        "enum": [
-          "user",
-          "assistant",
-          "tool"
-        ],
-        "title": "AssistantRole",
-        "type": "string"
-      },
-      "AssistantThreadOut": {
-        "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
+            "title": "Created At"
           },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "messages": {
-            "items": {
-              "$ref": "#/components/schemas/AssistantMessageOut"
-            },
-            "title": "Messages",
-            "type": "array"
-          },
-          "pending_approval": {
+          "metadata": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PendingApprovalOut"
+                "$ref": "#/components/schemas/StateMetadataOut"
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "next": {
+            "description": "Non-empty while a run is paused (approval pending).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Next",
+            "type": "array"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PendingTaskOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "values": {
+            "$ref": "#/components/schemas/AssistantStateValuesOut"
+          }
+        },
+        "required": [
+          "values",
+          "next",
+          "tasks",
+          "checkpoint",
+          "metadata",
+          "created_at"
+        ],
+        "title": "AssistantThreadStateOut",
+        "type": "object"
+      },
+      "AssistantUserMessageIn": {
+        "properties": {
+          "content": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "id": {
+            "description": "Client-minted id; the checkpoint keeps it.",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
           }
         },
         "required": [
           "id",
-          "created_at",
-          "messages",
-          "pending_approval"
+          "content"
         ],
-        "title": "AssistantThreadOut",
+        "title": "AssistantUserMessageIn",
         "type": "object"
       },
       "AttachmentAddedEventOut": {
@@ -767,6 +797,26 @@
         ],
         "title": "CheckStatus",
         "type": "string"
+      },
+      "CheckpointRefOut": {
+        "properties": {
+          "checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Id"
+          }
+        },
+        "required": [
+          "checkpoint_id"
+        ],
+        "title": "CheckpointRefOut",
+        "type": "object"
       },
       "ChecksCompletedEventOut": {
         "properties": {
@@ -1838,25 +1888,6 @@
         "title": "DiffSegmentOut",
         "type": "object"
       },
-      "DoneEventOut": {
-        "properties": {
-          "message_id": {
-            "title": "Message Id",
-            "type": "string"
-          },
-          "type": {
-            "const": "done",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "message_id"
-        ],
-        "title": "DoneEventOut",
-        "type": "object"
-      },
       "DriftCheckRequestedEventOut": {
         "properties": {
           "actor": {
@@ -2200,6 +2231,42 @@
         "title": "DurationStatOut",
         "type": "object"
       },
+      "EditIn": {
+        "properties": {
+          "edited_action": {
+            "$ref": "#/components/schemas/EditedActionIn"
+          },
+          "type": {
+            "const": "edit",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "edited_action"
+        ],
+        "title": "EditIn",
+        "type": "object"
+      },
+      "EditedActionIn": {
+        "properties": {
+          "args": {
+            "$ref": "#/components/schemas/EmailDraftIn"
+          },
+          "name": {
+            "const": "send_email",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "args"
+        ],
+        "title": "EditedActionIn",
+        "type": "object"
+      },
       "EmailDraftIn": {
         "properties": {
           "body": {
@@ -2207,6 +2274,19 @@
             "minLength": 1,
             "title": "Body",
             "type": "string"
+          },
+          "item_key": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "CP-<id> the email is about, if any.",
+            "title": "Item Key"
           },
           "subject": {
             "maxLength": 300,
@@ -2237,6 +2317,17 @@
           "body": {
             "title": "Body",
             "type": "string"
+          },
+          "item_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Key"
           },
           "subject": {
             "title": "Subject",
@@ -2382,30 +2473,6 @@
         ],
         "title": "EntityType",
         "type": "string"
-      },
-      "ErrorEventOut": {
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "const": "error",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "code",
-          "message"
-        ],
-        "title": "ErrorEventOut",
-        "type": "object"
       },
       "ErrorOut": {
         "description": "Every non-2xx response body. `code` is stable; switch on it, not on `message`.",
@@ -4371,6 +4438,23 @@
         ],
         "title": "ImportValueField",
         "type": "string"
+      },
+      "InterruptOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/ToolApprovalOut"
+          }
+        },
+        "required": [
+          "id",
+          "value"
+        ],
+        "title": "InterruptOut",
+        "type": "object"
       },
       "ItemAssignedEventOut": {
         "properties": {
@@ -8126,10 +8210,23 @@
       "OutboxEmailOut": {
         "properties": {
           "approved_by": {
-            "$ref": "#/components/schemas/PartyRefOut"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for system mail."
           },
           "body": {
             "title": "Body",
+            "type": "string"
+          },
+          "html_body": {
+            "description": "HTML alternative; render only in a sandboxed iframe.",
+            "title": "Html Body",
             "type": "string"
           },
           "id": {
@@ -8148,12 +8245,24 @@
             "title": "Item Id"
           },
           "requested_by": {
-            "$ref": "#/components/schemas/PartyRefOut"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for system mail."
           },
           "sent_at": {
             "format": "date-time",
             "title": "Sent At",
             "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/OutboxSource",
+            "description": "assistant: approved by a person. system: the app's own mail (admins only)."
           },
           "subject": {
             "title": "Subject",
@@ -8176,7 +8285,9 @@
           "to",
           "subject",
           "body",
+          "html_body",
           "item_id",
+          "source",
           "requested_by",
           "approved_by",
           "thread_id",
@@ -8184,6 +8295,15 @@
         ],
         "title": "OutboxEmailOut",
         "type": "object"
+      },
+      "OutboxSource": {
+        "description": "Who wrote an Outbox email: the assistant (after a person approved it), or the app itself (allauth mail\nsuch as password resets, which only admins see).",
+        "enum": [
+          "assistant",
+          "system"
+        ],
+        "title": "OutboxSource",
+        "type": "string"
       },
       "PageFindingOut": {
         "description": "A code finding on the fetched page's text (not stored as a Finding: it belongs to no version).",
@@ -8876,27 +8996,30 @@
         "title": "PartyRefOut",
         "type": "object"
       },
-      "PendingApprovalOut": {
+      "PendingTaskOut": {
         "properties": {
-          "draft": {
-            "$ref": "#/components/schemas/EmailDraftOut"
-          },
-          "interrupt_id": {
-            "title": "Interrupt Id",
+          "id": {
+            "title": "Id",
             "type": "string"
           },
-          "tool": {
-            "const": "send_email",
-            "title": "Tool",
+          "interrupts": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptOut"
+            },
+            "title": "Interrupts",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
             "type": "string"
           }
         },
         "required": [
-          "interrupt_id",
-          "tool",
-          "draft"
+          "id",
+          "name",
+          "interrupts"
         ],
-        "title": "PendingApprovalOut",
+        "title": "PendingTaskOut",
         "type": "object"
       },
       "PersonalLoanTerms": {
@@ -9555,6 +9678,27 @@
         "title": "ReaffirmIn",
         "type": "object"
       },
+      "RejectIn": {
+        "properties": {
+          "message": {
+            "default": "",
+            "description": "Why, for the assistant. Optional.",
+            "maxLength": 2000,
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "const": "reject",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RejectIn",
+        "type": "object"
+      },
       "ReopenReason": {
         "description": "Why an approved item came back: the reason carried by needs_rereview / expired.",
         "enum": [
@@ -10178,6 +10322,26 @@
         "title": "SpanOut",
         "type": "object"
       },
+      "StateMetadataOut": {
+        "properties": {
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StateMetadataOut",
+        "type": "object"
+      },
       "StatusCountOut": {
         "properties": {
           "count": {
@@ -10796,85 +10960,39 @@
         "title": "ThroughputOut",
         "type": "object"
       },
-      "TokenEventOut": {
-        "properties": {
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "type": {
-            "const": "token",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "text"
-        ],
-        "title": "TokenEventOut",
-        "type": "object"
-      },
-      "ToolCallEventOut": {
+      "ToolApprovalOut": {
+        "description": "HumanInTheLoopMiddleware's per-call interrupt value.",
         "properties": {
           "args": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Args",
-            "type": "object"
+            "$ref": "#/components/schemas/EmailDraftOut"
           },
-          "call_id": {
-            "title": "Call Id",
+          "description": {
+            "title": "Description",
             "type": "string"
           },
           "name": {
+            "const": "send_email",
             "title": "Name",
             "type": "string"
           },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
           "type": {
-            "const": "tool_call",
+            "const": "tool_approval",
             "title": "Type",
             "type": "string"
           }
         },
         "required": [
           "type",
-          "call_id",
+          "tool_call_id",
           "name",
-          "args"
+          "args",
+          "description"
         ],
-        "title": "ToolCallEventOut",
-        "type": "object"
-      },
-      "ToolResultEventOut": {
-        "properties": {
-          "call_id": {
-            "title": "Call Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "summary": {
-            "description": "One line for the panel, e.g. '12 items match'.",
-            "title": "Summary",
-            "type": "string"
-          },
-          "type": {
-            "const": "tool_result",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "call_id",
-          "name",
-          "summary"
-        ],
-        "title": "ToolResultEventOut",
+        "title": "ToolApprovalOut",
         "type": "object"
       },
       "UnmappedValueOut": {
@@ -11733,6 +11851,150 @@
         ],
         "title": "WaitingCountOut",
         "type": "object"
+      },
+      "WireMessageOut": {
+        "description": "A LangChain message as `BaseMessage.model_dump()` gives it, minus provider metadata.",
+        "properties": {
+          "artifact": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              }
+            ],
+            "description": "tool messages, set by app code: {\"item_keys\": [...]} for links. send_email adds what happened: {\"outcome\": \"sent\", \"outbox_id\", \"to\", \"item_keys\"} | {\"outcome\": \"declined\", \"to\", \"item_keys\"} (the user rejected it) | {\"outcome\": \"blocked\", \"refused\", \"reason\", \"to\", \"item_keys\"} (refused before approval: outside recipients, or an invalid draft with refused = [])."
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/JsonValue"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "success",
+                  "error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "tool messages only.",
+            "title": "Status"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "tool messages only.",
+            "title": "Tool Call Id"
+          },
+          "tool_calls": {
+            "description": "ai messages only.",
+            "items": {
+              "$ref": "#/components/schemas/WireToolCallOut"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          },
+          "type": {
+            "enum": [
+              "human",
+              "ai",
+              "tool",
+              "system"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "content"
+        ],
+        "title": "WireMessageOut",
+        "type": "object"
+      },
+      "WireToolCallOut": {
+        "properties": {
+          "args": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Args",
+            "type": "object"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_call",
+            "default": "tool_call",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "args"
+        ],
+        "title": "WireToolCallOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -12075,8 +12337,97 @@
       }
     },
     "/api/assistant/threads": {
+      "get": {
+        "description": "Your assistant threads, most recent activity first.",
+        "operationId": "listAssistantThreads",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssistantThreadOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "List Threads",
+        "tags": [
+          "assistant"
+        ]
+      },
       "post": {
-        "description": "[workstream K]",
         "operationId": "createAssistantThread",
         "parameters": [],
         "responses": {
@@ -12149,16 +12500,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12174,7 +12515,6 @@
     },
     "/api/assistant/threads/{thread_id}": {
       "get": {
-        "description": "[workstream K]",
         "operationId": "getAssistantThread",
         "parameters": [
           {
@@ -12182,6 +12522,7 @@
             "name": "thread_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Thread Id",
               "type": "string"
             }
@@ -12257,16 +12598,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12280,16 +12611,130 @@
         ]
       }
     },
-    "/api/assistant/threads/{thread_id}/approvals/{interrupt_id}": {
+    "/api/assistant/threads/{thread_id}/history": {
       "post": {
-        "description": "Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.",
-        "operationId": "resolveAssistantApproval",
+        "description": "Checkpoint history isn't exposed; always empty. The SDK asks for it on hydrate.",
+        "operationId": "getAssistantThreadHistory",
         "parameters": [
           {
             "in": "path",
             "name": "thread_id",
             "required": true,
             "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantHistoryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssistantThreadStateOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Get Thread History",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/assistant/threads/{thread_id}/interrupts/{interrupt_id}": {
+      "post": {
+        "description": "Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.",
+        "operationId": "respondToAssistantInterrupt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
               "title": "Thread Id",
               "type": "string"
             }
@@ -12308,7 +12753,26 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssistantApprovalIn"
+                "discriminator": {
+                  "mapping": {
+                    "approve": "#/components/schemas/ApproveIn",
+                    "edit": "#/components/schemas/EditIn",
+                    "reject": "#/components/schemas/RejectIn"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ApproveIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EditIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RejectIn"
+                  }
+                ],
+                "title": "Body"
               }
             }
           },
@@ -12317,44 +12781,13 @@
         "responses": {
           "200": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
-                  "discriminator": {
-                    "mapping": {
-                      "approval_required": "#/components/schemas/ApprovalRequiredEventOut",
-                      "done": "#/components/schemas/DoneEventOut",
-                      "error": "#/components/schemas/ErrorEventOut",
-                      "token": "#/components/schemas/TokenEventOut",
-                      "tool_call": "#/components/schemas/ToolCallEventOut",
-                      "tool_result": "#/components/schemas/ToolResultEventOut"
-                    },
-                    "propertyName": "type"
-                  },
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/TokenEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ToolCallEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ToolResultEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ApprovalRequiredEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/DoneEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ErrorEventOut"
-                    }
-                  ],
-                  "title": "Response"
+                  "type": "string"
                 }
               }
             },
-            "description": "OK"
+            "description": "Protocol events."
           },
           "400": {
             "content": {
@@ -12415,16 +12848,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12432,22 +12855,23 @@
             "SessionAuth": []
           }
         ],
-        "summary": "Resolve Approval",
+        "summary": "Respond To Interrupt",
         "tags": [
           "assistant"
         ]
       }
     },
-    "/api/assistant/threads/{thread_id}/messages": {
+    "/api/assistant/threads/{thread_id}/runs": {
       "post": {
-        "description": "Server-sent events (`text/event-stream`). Each `data:` line is one AssistantStreamEventOut as JSON; the stream ends after a `done` or `error` event.",
-        "operationId": "streamAssistantReply",
+        "description": "Streams the run as Server-Sent Events (`text/event-stream`): each `data:` line is one LangChain Agent Streaming Protocol event (`lifecycle`, `messages`, `tools`, `values`, `input.requested`); `: keepalive` comments every 15 s. Ends after a root `lifecycle` event of `completed`, `interrupted` (an email awaits approval) or `failed`. Errors before the stream starts are JSON. Closing the connection cancels the run.",
+        "operationId": "startAssistantRun",
         "parameters": [
           {
             "in": "path",
             "name": "thread_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Thread Id",
               "type": "string"
             }
@@ -12457,7 +12881,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssistantMessageIn"
+                "$ref": "#/components/schemas/AssistantRunIn"
               }
             }
           },
@@ -12466,40 +12890,108 @@
         "responses": {
           "200": {
             "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Protocol events."
+          },
+          "400": {
+            "content": {
               "application/json": {
                 "schema": {
-                  "discriminator": {
-                    "mapping": {
-                      "approval_required": "#/components/schemas/ApprovalRequiredEventOut",
-                      "done": "#/components/schemas/DoneEventOut",
-                      "error": "#/components/schemas/ErrorEventOut",
-                      "token": "#/components/schemas/TokenEventOut",
-                      "tool_call": "#/components/schemas/ToolCallEventOut",
-                      "tool_result": "#/components/schemas/ToolResultEventOut"
-                    },
-                    "propertyName": "type"
-                  },
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/TokenEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ToolCallEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ToolResultEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ApprovalRequiredEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/DoneEventOut"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ErrorEventOut"
-                    }
-                  ],
-                  "title": "Response"
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Start Run",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/assistant/threads/{thread_id}/state": {
+      "get": {
+        "description": "The checkpointed conversation and any pending approval (hydrates the panel).",
+        "operationId": "getAssistantThreadState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantThreadStateOut"
                 }
               }
             },
@@ -12564,16 +13056,6 @@
               }
             },
             "description": "Unprocessable Content"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Not Implemented"
           }
         },
         "security": [
@@ -12581,7 +13063,7 @@
             "SessionAuth": []
           }
         ],
-        "summary": "Stream Reply",
+        "summary": "Get Thread State",
         "tags": [
           "assistant"
         ]
@@ -20302,7 +20784,7 @@
     },
     "/api/outbox": {
       "get": {
-        "description": "Emails the assistant sent after a human approved them (the demo's stand-in for real mail).",
+        "description": "The demo's stand-in for real mail: emails the assistant sent after a person approved them, and, for admins,\nthe app's own mail (`source=system`, e.g. password resets).",
         "operationId": "listOutboxEmails",
         "parameters": [],
         "responses": {

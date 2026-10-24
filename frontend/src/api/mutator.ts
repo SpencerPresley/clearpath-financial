@@ -30,7 +30,7 @@ async function parseBody(response: Response): Promise<unknown> {
   return contentType.includes('application/json') ? response.json() : response.text();
 }
 
-export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+function sameOriginFetch(url: string, options: RequestInit): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase();
   const headers = new Headers(options.headers);
   if (UNSAFE_METHODS.has(method)) {
@@ -39,11 +39,27 @@ export async function customFetch<T>(url: string, options: RequestInit = {}): Pr
       headers.set('X-CSRFToken', csrfToken);
     }
   }
+  return fetch(url, { ...options, method, headers, credentials: 'same-origin' });
+}
 
-  const response = await fetch(url, { ...options, method, headers, credentials: 'same-origin' });
+export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const response = await sameOriginFetch(url, options);
   const body = await parseBody(response);
   if (!response.ok) {
     throw new ApiError(response.status, body);
   }
   return body as T;
+}
+
+/**
+ * For streaming responses (the assistant's SSE runs): same auth as customFetch, but resolves with the
+ * Response once headers arrive and leaves a 2xx body unread for the caller to stream. Non-2xx bodies are
+ * JSON errors sent before the stream starts, so they still throw ApiError with the parsed body.
+ */
+export async function streamFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const response = await sameOriginFetch(url, init);
+  if (!response.ok) {
+    throw new ApiError(response.status, await parseBody(response));
+  }
+  return response;
 }
