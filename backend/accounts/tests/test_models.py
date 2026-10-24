@@ -21,11 +21,15 @@ def test_email_is_normalized_and_case_insensitive_unique(user_factory: UserFacto
 
 
 @pytest.mark.django_db
-def test_roles_check_rejects_unknown_role(user_factory: UserFactory) -> None:
+def test_a_new_role_needs_no_migration(user_factory: UserFactory) -> None:
+    # product-spec "Roles": a future partner role is an addition, not a migration.
     user = user_factory(roles=[Role.REVIEWER])
 
-    with pytest.raises(IntegrityError), transaction.atomic(), connection.cursor() as cursor:
-        cursor.execute("UPDATE accounts_user SET roles = ARRAY['partner'] WHERE id = %s", [user.pk])
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE accounts_user SET roles = ARRAY['reviewer', 'partner'] WHERE id = %s", [user.pk])
+
+    user.refresh_from_db()
+    assert user.roles == ["reviewer", "partner"]
 
 
 @pytest.mark.django_db

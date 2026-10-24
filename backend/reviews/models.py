@@ -18,20 +18,13 @@ from django.db.models import Case, F, Q, Value, When
 from django.db.models.functions import Length, Trim
 from django.db.models.lookups import GreaterThan
 
-from core.db import enum_choices
 from core.domain import (
     PARTNER_CHANNELS,
-    AttachmentKind,
-    Channel,
     CheckStatus,
     DecisionLane,
     DecisionOutcome,
-    DriftResult,
     ExpiryRule,
     ItemStatus,
-    Market,
-    Product,
-    ReopenReason,
     RiskTier,
     TakedownState,
     VersionOrigin,
@@ -70,12 +63,12 @@ class ReviewItem(models.Model):
     """One piece of marketing content moving through review. Shown as `CP-<id>`."""
 
     title = models.CharField(max_length=300)
-    product = models.CharField(max_length=30, choices=enum_choices(Product))
-    channel = models.CharField(max_length=30, choices=enum_choices(Channel))
+    product = models.CharField(max_length=30)
+    channel = models.CharField(max_length=30)
     partner = models.ForeignKey(
         "partners.Partner", null=True, blank=True, on_delete=models.PROTECT, related_name="items"
     )
-    markets = ArrayField(models.CharField(max_length=20, choices=enum_choices(Market)), default=list)
+    markets = ArrayField(models.CharField(max_length=20), default=list)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="owned_items"
     )
@@ -84,17 +77,15 @@ class ReviewItem(models.Model):
     )
     assigned_at = models.DateTimeField(null=True, blank=True)
 
-    status = models.CharField(max_length=30, choices=enum_choices(ItemStatus), default=ItemStatus.DRAFT.value)
+    status = models.CharField(max_length=30, default=ItemStatus.DRAFT.value)
     round = models.PositiveIntegerField(default=1)
     # Derived at intake (spec §4.2 ruling 5); reviewers and leads may override, which records an event.
-    risk_tier = models.CharField(max_length=10, choices=enum_choices(RiskTier))
+    risk_tier = models.CharField(max_length=10)
     risk_tier_overridden = models.BooleanField(default=False)
     # A prescreened firm offer (FCRA): drives risk tier and the "pre-approved" rule's evidence requirement.
     is_prescreen = models.BooleanField(default=False)
-    reopen_reason = models.CharField(max_length=30, choices=enum_choices(ReopenReason), null=True, blank=True)  # noqa: DJ001  # null = not reopened
-    llm_check_status = models.CharField(
-        max_length=20, choices=enum_choices(CheckStatus), default=CheckStatus.PENDING.value
-    )
+    reopen_reason = models.CharField(max_length=30, null=True, blank=True)  # noqa: DJ001  # null = not reopened
+    llm_check_status = models.CharField(max_length=20, default=CheckStatus.PENDING.value)
 
     # Legacy imports are metadata-only (spec §4.2 ruling 7): no versions, excluded from sweeps and fan-out.
     is_legacy = models.BooleanField(default=False)
@@ -197,9 +188,7 @@ class Version(models.Model):
     content_text = models.TextField()
     content_sha256 = models.CharField(max_length=64)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
-    origin = models.CharField(
-        max_length=20, choices=enum_choices(VersionOrigin), default=VersionOrigin.SUBMISSION.value
-    )
+    origin = models.CharField(max_length=20, default=VersionOrigin.SUBMISSION.value)
     # Fast-track and reviewer-edit versions record what they were derived from ("AI review carried from vN").
     based_on = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField()
@@ -253,8 +242,8 @@ class Decision(models.Model):
 
     item = models.ForeignKey(ReviewItem, on_delete=models.PROTECT, related_name="decisions")
     version = models.ForeignKey(Version, on_delete=models.PROTECT, related_name="decisions")
-    outcome = models.CharField(max_length=30, choices=enum_choices(DecisionOutcome))
-    lane = models.CharField(max_length=20, choices=enum_choices(DecisionLane), default=DecisionLane.STANDARD.value)
+    outcome = models.CharField(max_length=30)
+    lane = models.CharField(max_length=20, default=DecisionLane.STANDARD.value)
     approver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     reason = models.TextField()
     ruleset_date = models.DateField()
@@ -307,7 +296,7 @@ class Attachment(models.Model):
         "partners.Partner", null=True, blank=True, on_delete=models.PROTECT, related_name="attachments"
     )
     decision = models.ForeignKey(Decision, null=True, blank=True, on_delete=models.PROTECT, related_name="attachments")
-    kind = models.CharField(max_length=30, choices=enum_choices(AttachmentKind))
+    kind = models.CharField(max_length=30)
     file = models.FileField(upload_to="attachments/%Y/%m/", max_length=500)
     original_name = models.CharField(max_length=255)
     content_type = models.CharField(max_length=150)
@@ -357,7 +346,7 @@ class Placement(models.Model):
     first_run = models.DateField()
     last_run = models.DateField(null=True, blank=True)  # null: open-ended
     monitored = models.BooleanField(default=False)  # drift monitor (stretch)
-    takedown_state = models.CharField(max_length=20, choices=enum_choices(TakedownState), null=True, blank=True)  # noqa: DJ001  # null = no takedown
+    takedown_state = models.CharField(max_length=20, null=True, blank=True)  # noqa: DJ001  # null = no takedown
     takedown_requested_at = models.DateTimeField(null=True, blank=True)
     takedown_confirmed_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
@@ -387,7 +376,7 @@ class Snapshot(models.Model):
     placement = models.ForeignKey(Placement, on_delete=models.PROTECT, related_name="snapshots")
     fetched_at = models.DateTimeField()
     text = models.TextField()
-    result = models.CharField(max_length=20, choices=enum_choices(DriftResult))
+    result = models.CharField(max_length=20)
     diff = models.TextField(blank=True)
 
     class Meta:
@@ -400,8 +389,8 @@ class Snapshot(models.Model):
 class ExpiryPolicy(models.Model):
     """How long an approval lasts per channel; company policy, editable (decisions.md "Approval expiry")."""
 
-    channel = models.CharField(max_length=30, choices=enum_choices(Channel), unique=True)
-    rule = models.CharField(max_length=20, choices=enum_choices(ExpiryRule))
+    channel = models.CharField(max_length=30, unique=True)
+    rule = models.CharField(max_length=20)
     months = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:

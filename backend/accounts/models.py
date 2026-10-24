@@ -7,8 +7,6 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 
 from accounts.managers import UserManager
-from core.db import enum_choices
-from core.domain import Role
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -16,7 +14,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(max_length=254, unique=True)
     display_name = models.CharField(max_length=120, blank=True)
-    roles = ArrayField(models.CharField(max_length=20, choices=enum_choices(Role)), default=list, blank=True)
+    roles = ArrayField(models.CharField(max_length=20), default=list, blank=True)
     # Out-of-office reviewers are skipped by auto-assignment (decisions.md "Reviewer assignment").
     is_available = models.BooleanField(default=True)
     # Assignment tie-break: whoever has gone longest without a new assignment.
@@ -36,10 +34,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         constraints = [
             # Stored lower-cased, so the unique index is case-insensitive.
             models.CheckConstraint(condition=models.Q(email=Lower("email")), name="user_email_lowercase"),
-            models.CheckConstraint(
-                condition=models.Q(roles__contained_by=[r.value for r in Role]),
-                name="user_roles_known",
-            ),
         ]
 
     def __str__(self) -> str:

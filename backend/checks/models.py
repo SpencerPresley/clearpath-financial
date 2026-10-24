@@ -10,8 +10,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Length, Trim
 from django.db.models.lookups import GreaterThan
 
-from core.db import enum_choices
-from core.domain import CheckStatus, FindingSource, FindingState, Severity, TermsField
+from core.domain import CheckStatus, FindingState
 
 
 def _span_valid() -> Q:
@@ -25,9 +24,9 @@ class Finding(models.Model):
     version = models.ForeignKey("reviews.Version", on_delete=models.PROTECT, related_name="findings")
     rule_id = models.CharField(max_length=100)
     citation = models.CharField(max_length=200)
-    source = models.CharField(max_length=10, choices=enum_choices(FindingSource))
-    severity = models.CharField(max_length=10, choices=enum_choices(Severity))
-    state = models.CharField(max_length=10, choices=enum_choices(FindingState), default=FindingState.OPEN.value)
+    source = models.CharField(max_length=10)
+    severity = models.CharField(max_length=10)
+    state = models.CharField(max_length=10, default=FindingState.OPEN.value)
     span_start = models.PositiveIntegerField(null=True, blank=True)
     span_end = models.PositiveIntegerField(null=True, blank=True)
     quote = models.TextField(null=True, blank=True)  # noqa: DJ001  # null iff span is null
@@ -88,7 +87,7 @@ class TermsRef(models.Model):
 
     version = models.ForeignKey("reviews.Version", on_delete=models.PROTECT, related_name="terms_refs")
     offer_terms = models.ForeignKey("terms.OfferTerms", on_delete=models.PROTECT, related_name="terms_refs")
-    field = models.CharField(max_length=40, choices=enum_choices(TermsField))
+    field = models.CharField(max_length=40)
     span_start = models.PositiveIntegerField()
     span_end = models.PositiveIntegerField()
     quote = models.TextField()
@@ -112,8 +111,8 @@ class CheckRun(models.Model):
     cache key is (content_sha256, source, ruleset_key) (spec §7 Cost)."""
 
     version = models.ForeignKey("reviews.Version", on_delete=models.PROTECT, related_name="check_runs")
-    source = models.CharField(max_length=10, choices=enum_choices(FindingSource))
-    status = models.CharField(max_length=20, choices=enum_choices(CheckStatus), default=CheckStatus.PENDING.value)
+    source = models.CharField(max_length=10)
+    status = models.CharField(max_length=20, default=CheckStatus.PENDING.value)
     content_sha256 = models.CharField(max_length=64)
     ruleset_key = models.CharField(max_length=100)
     started_at = models.DateTimeField()

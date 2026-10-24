@@ -1,7 +1,5 @@
 """Small Postgres/Django helpers shared by every app's models and migrations."""
 
-from enum import StrEnum
-
 from django.db import IntegrityError, migrations, models
 
 
@@ -10,11 +8,6 @@ class CurrentTransactionId(models.Func):
 
     template = "(pg_current_xact_id()::text::bigint)"
     output_field = models.BigIntegerField()
-
-
-def enum_choices(enum: type[StrEnum]) -> list[tuple[str, str]]:
-    """Django `choices` for a `core.domain` StrEnum: value plus a readable label."""
-    return [(member.value, member.value.replace("_", " ").capitalize()) for member in enum]
 
 
 def constraint_name(exc: IntegrityError) -> str | None:

@@ -7,8 +7,7 @@ from django.db import models
 from django.db.models.fields.json import KT
 from pydantic import TypeAdapter
 
-from core.db import enum_choices
-from core.domain import CreditCardTerms, OfferTermsValues, PersonalLoanTerms, Product
+from core.domain import CreditCardTerms, OfferTermsValues, PersonalLoanTerms
 
 TERMS_VALUES: Final[TypeAdapter[PersonalLoanTerms | CreditCardTerms]] = TypeAdapter(OfferTermsValues)
 
@@ -21,7 +20,7 @@ class OfferTerms(models.Model):
     instant. `values` is JSONB validated through `core.domain.OfferTermsValues` on every save.
     """
 
-    product = models.CharField(max_length=30, choices=enum_choices(Product))
+    product = models.CharField(max_length=30)
     version = models.PositiveIntegerField()
     effective_range = DateTimeRangeField()
     values = models.JSONField()
