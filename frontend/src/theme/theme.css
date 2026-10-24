@@ -441,7 +441,284 @@
   /* ==== Review, intake, My submissions (workstream I) ============================================ */
 
   /* ---- Marketer screens: New submission, My submissions, Resubmit (features/submit, features/mine) */
-  /* (marketer-screen classes go here) */
+  /* New submission. One column below 1280px (fields, copy, live checks, files); at 1280px+ the live checks
+     sit in a 22rem column beside everything and stay in view while the marketer scrolls the form. */
+  .app-submit {
+    @apply grid max-w-[80rem] gap-x-6 gap-y-5;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'title' 'fields' 'copy' 'live' 'files' 'actions';
+  }
+  @media (width >= 80rem) {
+    .app-submit {
+      grid-template-columns: minmax(0, 1fr) 22rem;
+      grid-template-areas: 'title title' 'fields live' 'copy live' 'files live' 'actions live';
+      grid-template-rows: auto auto auto auto 1fr;
+    }
+    .app-submit-live {
+      @apply sticky top-0 self-start;
+    }
+  }
+  .app-submit-title {
+    grid-area: title;
+    @apply mb-0;
+  }
+  .app-submit-fields {
+    grid-area: fields;
+    @apply grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-3;
+  }
+  .app-submit-wide {
+    @apply md:col-span-3;
+  }
+  .app-submit-prescreen {
+    @apply md:col-span-3;
+  }
+  .app-submit-slot {
+    @apply hidden md:block;
+  }
+  .app-submit-copy {
+    grid-area: copy;
+    @apply flex min-w-0 flex-col gap-3;
+  }
+  .app-submit-live {
+    grid-area: live;
+  }
+  .app-submit-files {
+    grid-area: files;
+    @apply grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-2;
+  }
+  .app-submit-actions {
+    grid-area: actions;
+    @apply flex flex-wrap items-center gap-3 self-start border-t border-base-300 pt-4;
+  }
+
+  /* Fetch from a URL: its own field under the editor, so Enter fetches instead of submitting. */
+  .app-fetch-url {
+    @apply flex max-w-xl flex-col gap-1;
+  }
+  .app-fetch-url-field {
+    @apply flex flex-col gap-1;
+  }
+  .app-fetch-url-row {
+    @apply flex gap-2;
+  }
+
+  /* Queued files: name, size, kind, remove. Rows on rules, not cards. */
+  .app-file-list {
+    @apply flex flex-col divide-y divide-base-300 rounded-md border border-base-300 bg-base-100;
+  }
+  .app-file-row {
+    @apply flex min-h-10 items-center gap-3 py-1.5 pr-1 pl-2.5;
+  }
+  .app-file-name {
+    @apply min-w-0 flex-1 truncate text-ui text-base-content;
+  }
+  .app-file-size {
+    @apply shrink-0 text-meta text-muted tabular-nums;
+  }
+  .app-file-kind {
+    @apply w-44 shrink-0;
+  }
+  .app-file-empty {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1;
+  }
+
+  /* Submit with open findings: an inline strip in place of the Submit button (no modal, spec §5.7). */
+  .app-confirm-strip {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-base-300 bg-base-100 py-1.5 pr-1.5 pl-3;
+  }
+  .app-confirm-text {
+    @apply flex items-center gap-1.5 text-ui text-base-content tabular-nums;
+  }
+  .app-confirm-text [data-severity='blocking'] {
+    @apply text-status-error-soft-content;
+  }
+  .app-confirm-text [data-severity='warning'] {
+    @apply text-status-warning-soft-content;
+  }
+  .app-form-error {
+    @apply basis-full text-ui font-medium text-status-error-soft-content;
+  }
+
+  /* Live code checks beside a copy editor (ui/findings/LiveFindings). A flat panel on a rule, no shadow. */
+  .app-live {
+    @apply flex flex-col rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-live-head {
+    @apply flex h-10 items-center gap-2 border-b border-base-300 px-3;
+  }
+  .app-live-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-live-count {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-live-status {
+    @apply ml-auto text-meta text-muted;
+  }
+  .app-live-body {
+    @apply flex flex-col gap-4 p-3;
+  }
+  .app-live-body[aria-busy='true'] .app-live-list {
+    opacity: 0.6;
+  }
+  .app-live-group {
+    @apply flex flex-col gap-2;
+  }
+  .app-live-group-label {
+    @apply text-meta font-medium text-muted;
+  }
+  .app-live-list {
+    @apply flex flex-col;
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+  .app-live-item {
+    @apply border-b border-base-300 py-2.5 first:pt-0 last:border-b-0 last:pb-0;
+  }
+  .app-live-empty {
+    @apply text-ui text-muted;
+  }
+  .app-live-note {
+    @apply border-t border-base-300 px-3 py-2 text-meta text-muted;
+  }
+
+  /* My submissions: one dense table per section, same columns in every section so they line up. */
+  .app-mine {
+    @apply flex max-w-[80rem] flex-col gap-6;
+  }
+  .app-mine-header {
+    @apply flex items-center justify-between gap-4;
+  }
+  .app-mine-header .app-page-title {
+    @apply mb-0;
+  }
+  .app-mine-section {
+    @apply flex flex-col gap-2;
+  }
+  .app-mine-heading {
+    @apply flex items-baseline gap-2 text-ui font-semibold text-base-content;
+  }
+  .app-mine-count {
+    @apply font-normal text-muted tabular-nums;
+  }
+  .app-mine-table {
+    @apply w-full table-fixed border-separate border-spacing-0 rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-mine-row > td {
+    @apply h-row border-b border-base-300 px-3 align-middle text-ui;
+  }
+  .app-mine-row:last-child > td {
+    @apply border-b-0;
+  }
+  .app-mine-row {
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-mine-row:hover {
+    @apply bg-hover;
+  }
+  .app-mine-title {
+    @apply truncate;
+  }
+  .app-mine-row .app-item-key {
+    @apply whitespace-nowrap;
+  }
+  .app-mine-link {
+    @apply rounded-xs font-medium text-base-content underline-offset-2 hover:underline;
+  }
+  .app-mine-why {
+    @apply truncate text-muted;
+  }
+  .app-mine-age,
+  .app-mine-action {
+    @apply text-right;
+  }
+  .app-mine-error {
+    @apply flex flex-col items-start gap-2 py-2;
+  }
+  .app-mine-error-title {
+    @apply text-ui font-medium text-base-content;
+  }
+
+  /* Resubmit / new round: the request and the editor in one column, live checks beside at 1280px+. */
+  .app-resubmit {
+    @apply flex max-w-[80rem] flex-col gap-4;
+  }
+  .app-resubmit-header .app-page-title {
+    @apply mb-0.5;
+  }
+  .app-resubmit-subtitle {
+    @apply text-ui;
+  }
+  .app-resubmit-context {
+    @apply text-ui text-base-content;
+  }
+  .app-resubmit-loading {
+    @apply flex flex-col gap-3 py-2;
+  }
+  .app-resubmit-form {
+    @apply grid grid-cols-1 items-start gap-x-6 gap-y-5 xl:grid-cols-[minmax(0,1fr)_22rem];
+  }
+  .app-resubmit-main {
+    @apply flex min-w-0 flex-col gap-4;
+  }
+  .app-resubmit-live {
+    @apply xl:sticky xl:top-0;
+  }
+  .app-requested {
+    @apply flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3;
+  }
+  .app-requested-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-requested-decision {
+    @apply flex flex-col gap-1;
+  }
+  .app-requested-by {
+    @apply text-meta text-muted;
+  }
+  .app-requested-reason {
+    @apply max-w-prose text-ui whitespace-pre-wrap text-base-content;
+    text-wrap: pretty;
+  }
+  .app-requested-list {
+    @apply flex flex-col divide-y divide-base-300 border-t border-base-300;
+  }
+  .app-requested-list > li {
+    @apply py-2.5 last:pb-0;
+  }
+  .app-resubmit-toolbar {
+    @apply flex items-center gap-3;
+  }
+  .app-resubmit-summary {
+    @apply text-meta text-muted tabular-nums;
+  }
+  .app-resubmit-diff {
+    @apply min-h-48 rounded-md border border-base-300 bg-base-100 px-3 py-2.5;
+  }
+  .app-resubmit-actions {
+    @apply border-t-0 pt-0;
+  }
+
+  /* Segmented control (Edit / Changes vs v2): a pressed segment sits raised on a rule, no shadow. */
+  .app-segmented {
+    @apply inline-flex rounded-md border border-base-300 bg-base-200 p-0.5;
+  }
+  .app-segment {
+    @apply inline-flex h-7 cursor-default items-center rounded-sm border border-transparent px-2.5 text-ui font-medium text-muted outline-none;
+    transition-property: background-color, border-color, color;
+    transition-duration: 120ms;
+  }
+  .app-segment[data-hovered] {
+    @apply text-base-content;
+  }
+  .app-segment[data-selected] {
+    @apply border-base-300 bg-base-100 text-base-content;
+  }
+  .app-segment[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
 
   /* ---- Form fields (ui/forms/fields.tsx) -------------------------------------------------------- */
   .app-field {
