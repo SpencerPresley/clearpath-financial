@@ -247,6 +247,19 @@ def test_series_value_is_the_median_for_durations(two_round_item: ReviewItem, le
 
     october = next(p for p in result.points if p.period_start == date(2026, 10, 1))
     assert (october.count, october.value) == (2, 6)
+    assert (october.native_value, october.imported_value) == (6, None)
+
+
+def test_series_points_carry_each_source_value(two_round_item: ReviewItem, lead: User, clock: FixedClock) -> None:
+    import_row("MCR-26-020", submitted=date(2026, 10, 5), first_reviewed=date(2026, 10, 9), clock=clock)
+    flt = MetricsFilter(period_from=date(2026, 10, 1), period_to=clock.today())
+
+    result = selectors.series(
+        viewer=lead, metric=M.TIME_TO_FIRST_REVIEW, bucket=MetricBucket.MONTH, flt=flt, clock=clock
+    )
+
+    (october,) = result.points
+    assert (october.native_value, october.imported_value, october.value) == (5, 96, 50.5)
 
 
 def test_marketers_cannot_read_metrics(marketer: User, clock: FixedClock) -> None:

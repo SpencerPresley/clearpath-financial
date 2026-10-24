@@ -2233,10 +2233,13 @@
     @apply flex flex-wrap items-center gap-x-3 text-meta text-muted;
   }
   .app-metric-legend {
-    @apply ml-auto flex items-center gap-1.5 text-base-content;
+    @apply ml-auto flex items-center gap-3 text-base-content;
+  }
+  .app-metric-legend-item {
+    @apply flex items-center gap-1.5;
   }
   .app-metric-swatch {
-    @apply ml-2 inline-block size-2.5 rounded-xs;
+    @apply inline-block size-2.5 rounded-xs;
   }
   .app-metric-swatch[data-series='native'] {
     background: var(--color-chart-native);

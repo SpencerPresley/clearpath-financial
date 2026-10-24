@@ -76,7 +76,9 @@ export const GetMetricSeriesResponse = zod.object({
   "count": zod.int(),
   "from_date": zod.iso.date().describe('The bucket clipped to the period; pass as the drill-down period.'),
   "imported_count": zod.int(),
+  "imported_value": zod.union([zod.number(),zod.null()]).describe('The same over imported measurements only.'),
   "native_count": zod.int(),
+  "native_value": zod.union([zod.number(),zod.null()]).describe('The same over native measurements only.'),
   "period_start": zod.iso.date(),
   "to_date": zod.iso.date(),
   "value": zod.union([zod.number(),zod.null()]).describe('Median hours (durations), mean rounds, or the decision count.')

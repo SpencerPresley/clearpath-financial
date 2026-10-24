@@ -121,6 +121,8 @@ export const SERIES: MetricSeriesOut = {
       from_date: '2026-10-05',
       to_date: '2026-10-11',
       value: 6,
+      native_value: 4,
+      imported_value: 2,
       count: 6,
       native_count: 4,
       imported_count: 2,
@@ -130,6 +132,8 @@ export const SERIES: MetricSeriesOut = {
       from_date: '2026-10-12',
       to_date: '2026-10-18',
       value: 0,
+      native_value: 0,
+      imported_value: 0,
       count: 0,
       native_count: 0,
       imported_count: 0,
@@ -139,6 +143,8 @@ export const SERIES: MetricSeriesOut = {
       from_date: '2026-10-19',
       to_date: '2026-10-24',
       value: 11,
+      native_value: 11,
+      imported_value: 0,
       count: 11,
       native_count: 11,
       imported_count: 0,
@@ -148,7 +154,15 @@ export const SERIES: MetricSeriesOut = {
 
 export const EMPTY_SERIES: MetricSeriesOut = {
   ...SERIES,
-  points: SERIES.points.map((p) => ({ ...p, value: 0, count: 0, native_count: 0, imported_count: 0 })),
+  points: SERIES.points.map((p) => ({
+    ...p,
+    value: 0,
+    native_value: 0,
+    imported_value: 0,
+    count: 0,
+    native_count: 0,
+    imported_count: 0,
+  })),
 };
 
 export const ITEMS: MetricItemsOut = {

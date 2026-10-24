@@ -75,6 +75,8 @@ class MetricPointOut(Schema):
     from_date: date = Field(description="The bucket clipped to the period; pass as the drill-down period.")
     to_date: date
     value: float | None = Field(description="Median hours (durations), mean rounds, or the decision count.")
+    native_value: float | None = Field(description="The same over native measurements only.")
+    imported_value: float | None = Field(description="The same over imported measurements only.")
     count: int
     native_count: int
     imported_count: int

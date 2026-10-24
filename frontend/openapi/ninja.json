@@ -7145,9 +7145,33 @@
             "title": "Imported Count",
             "type": "integer"
           },
+          "imported_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same over imported measurements only.",
+            "title": "Imported Value"
+          },
           "native_count": {
             "title": "Native Count",
             "type": "integer"
+          },
+          "native_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same over native measurements only.",
+            "title": "Native Value"
           },
           "period_start": {
             "format": "date",
@@ -7177,6 +7201,8 @@
           "from_date",
           "to_date",
           "value",
+          "native_value",
+          "imported_value",
           "count",
           "native_count",
           "imported_count"

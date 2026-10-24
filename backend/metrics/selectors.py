@@ -249,6 +249,8 @@ class SeriesPoint:
     from_date: date  # the bucket clipped to the period: the drill-down range for this point
     to_date: date
     value: float | None  # median hours (durations), mean rounds, or the decision count
+    native_value: float | None  # the same, per source
+    imported_value: float | None
     count: int
     native_count: int
     imported_count: int
@@ -264,8 +266,11 @@ class MetricSeries:
 
 
 def _point_value(metric: MetricName, ms: Sequence[Measurement]) -> float | None:
+    """Nothing measured is no value (a gap), except for throughput, where it is zero decisions."""
     if metric is MetricName.THROUGHPUT:
         return float(len(ms))
+    if not ms:
+        return None
     if metric in DURATION_METRICS:
         return duration_stat(ms).median_hours
     return count_stat(ms).mean
@@ -281,13 +286,17 @@ def series(
         end = next_bucket(start, bucket) - timedelta(days=1)
         lo, hi = max(start, flt.period_from), min(end, flt.period_to)
         inside = [m for m in measured if lo <= timezone.localdate(m.end) <= hi]
-        native = sum(1 for m in inside if m.source is MetricSource.NATIVE)
+        native_ms = [m for m in inside if m.source is MetricSource.NATIVE]
+        imported_ms = [m for m in inside if m.source is MetricSource.IMPORTED]
+        native = len(native_ms)
         points.append(
             SeriesPoint(
                 period_start=start,
                 from_date=lo,
                 to_date=hi,
-                value=_point_value(metric, inside) if inside or metric is MetricName.THROUGHPUT else None,
+                value=_point_value(metric, inside),
+                native_value=_point_value(metric, native_ms),
+                imported_value=_point_value(metric, imported_ms),
                 count=len(inside),
                 native_count=native,
                 imported_count=len(inside) - native,
