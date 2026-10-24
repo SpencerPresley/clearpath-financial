@@ -4,7 +4,7 @@ spreadsheet says "Needs re-review" where the queue does (spec §5.4: one term pe
 from collections.abc import Mapping
 from typing import Final
 
-from core.domain import Channel, DecisionLane, DecisionOutcome, ItemStatus, Product, RiskTier
+from core.domain import Channel, DecisionLane, DecisionOutcome, DriftResult, ItemStatus, Product, ReopenReason, RiskTier
 
 STATUS_LABELS: Final[Mapping[ItemStatus, str]] = {
     ItemStatus.DRAFT: "Draft",
@@ -51,3 +51,17 @@ CHANNEL_LABELS: Final[Mapping[Channel, str]] = {
 }
 
 RISK_LABELS: Final[Mapping[RiskTier, str]] = {RiskTier.HIGH: "High", RiskTier.MEDIUM: "Medium", RiskTier.LOW: "Low"}
+
+# Why approved content came back, and what a drift check found: the UI's words (frontend/src/ui/labels.ts
+# REOPEN_REASON_LABELS, DRIFT_RESULT_LABELS). Drift has one name everywhere: "Live copy changed".
+REOPEN_REASON_LABELS: Final[Mapping[ReopenReason, str]] = {
+    ReopenReason.TERMS_CHANGED: "Offer terms changed",
+    ReopenReason.APPROVAL_EXPIRED: "Approval expired",
+    ReopenReason.DRIFT_DETECTED: "Live copy changed",
+}
+
+DRIFT_RESULT_LABELS: Final[Mapping[DriftResult, str]] = {
+    DriftResult.UNCHANGED: "Unchanged",
+    DriftResult.MODIFIED: "Changed",
+    DriftResult.MISSING: "Missing",
+}

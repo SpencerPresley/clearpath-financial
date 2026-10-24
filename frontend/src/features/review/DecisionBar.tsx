@@ -2,12 +2,13 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { getGetItemDriftQueryKey, useCheckPlacementDrift } from '../../api/generated/drift/drift';
 import { getGetItemHistoryQueryKey, getGetItemQueryKey, useClaimItem } from '../../api/generated/items/items';
-import type { ItemDetailOut } from '../../api/generated/model';
+import type { DecisionOutcome, ItemDetailOut, ItemStatus } from '../../api/generated/model';
 import { RiskTierBadge, StatusBadge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { IconButton } from '../../ui/IconButton';
 import { ItemKey } from '../../ui/ItemKey';
+import { Kbd } from '../../ui/Kbd';
 import { OUTCOME_LABELS, formatDate } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { showToast } from '../../ui/toast';
@@ -25,20 +26,54 @@ export interface DecisionBarProps {
   onShortcuts: () => void;
   /** A drift re-review's Check now was queued: show where the result lands (the Details tab's placements). */
   onCheckQueued: () => void;
+  /** The next row of the reviewer's queue view (j). */
+  onNextItem: () => void;
+  nextPending: boolean;
+}
+
+/** Focus targets after a decision: the Next item button, else the title. */
+export const NEXT_ITEM_ID = 'review-next-item';
+export const REVIEW_TITLE_ID = 'review-title';
+
+/** The status a decision leaves the item in; any other status means the item has moved on since. */
+const DECIDED_STATUS: Record<DecisionOutcome, ItemStatus> = {
+  approved: 'approved',
+  approved_with_edits: 'approved',
+  changes_requested: 'changes_requested',
+  rejected: 'rejected',
+};
+
+/**
+ * The latest decision, worded by whether it's still the item's state. Once the item has moved on it reads as
+ * history, so the header never shows two current states ("Submitted" beside "Changes requested v2"): after a
+ * resubmission or a new round it's the last round's outcome; after a pull or an expiry it's what the item
+ * was. During a re-review the approval is still in force, so it reads as current.
+ */
+export function latestDecisionText(item: ItemDetailOut): string | null {
+  const decision = item.latest_decision;
+  if (decision === null) return null;
+  const outcome = OUTCOME_LABELS[decision.outcome];
+  const n = `v${String(decision.version_n)}`;
+  // A re-review's approval is still the one in force while the content runs: current, not history.
+  const inForce = item.status === 'needs_rereview' && DECIDED_STATUS[decision.outcome] === 'approved';
+  if (item.status === DECIDED_STATUS[decision.outcome] || inForce) {
+    return `${outcome} ${n} by ${decision.approver.name}`;
+  }
+  if (item.status === 'submitted' || item.status === 'in_review') {
+    return `Last round: ${outcome.toLowerCase()} on ${n} by ${decision.approver.name}`;
+  }
+  return `Was ${outcome.toLowerCase()} ${n} by ${decision.approver.name}`;
 }
 
 function LatestDecision({ item }: { item: ItemDetailOut }) {
   const decision = item.latest_decision;
-  if (decision === null) {
+  const text = latestDecisionText(item);
+  if (decision === null || text === null) {
     return null;
   }
-  // A pulled or expired item's last decision is history, not its state ("Withdrawn" beside "Approved v2").
-  const past = item.status === 'withdrawn' || item.status === 'expired';
-  const outcome = OUTCOME_LABELS[decision.outcome];
   return (
     <span className="app-decision-summary">
-      {past ? `Was ${outcome.toLowerCase()}` : outcome} v{decision.version_n} by {decision.approver.name}{' '}
-      <RelativeAge at={decision.decided_at} />
+      {text} <RelativeAge at={decision.decided_at} />
       {decision.expires_at !== null && item.status === 'approved' && (
         <> · expires {formatDate(decision.expires_at)}</>
       )}
@@ -67,6 +102,8 @@ export function DecisionBar({
   onMode,
   onShortcuts,
   onCheckQueued,
+  onNextItem,
+  nextPending,
 }: DecisionBarProps) {
   const pressed = (m: DecisionMode) => (mode === m ? true : undefined);
   const showDecisions = isDecider && gate.canDecide;
@@ -110,7 +147,7 @@ export function DecisionBar({
   return (
     <header className="app-decision-bar">
       <div className="app-decision-bar-heading">
-        <h1 className="app-decision-bar-title" title={item.title}>
+        <h1 id={REVIEW_TITLE_ID} className="app-decision-bar-title" title={item.title} tabIndex={-1}>
           {item.title}
         </h1>
         <div className="app-decision-bar-meta">
@@ -241,6 +278,14 @@ export function DecisionBar({
             </>
           )}
           {!showDecisions && !showRereview && <LatestDecision item={item} />}
+          {isDecider && !showDecisions && !showRereview && (
+            <Button id={NEXT_ITEM_ID} icon="action.open" isPending={nextPending} onPress={onNextItem}>
+              Next item
+              <span aria-hidden="true">
+                <Kbd keys={['J']} />
+              </span>
+            </Button>
+          )}
           <IconButton icon="action.shortcuts" aria-label="Keyboard shortcuts (?)" onPress={onShortcuts} />
         </div>
         {note !== null && (

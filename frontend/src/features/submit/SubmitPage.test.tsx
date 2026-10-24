@@ -180,6 +180,61 @@ describe('SubmitPage', () => {
     });
   });
 
+  it('applies a literal suggestion to the copy, and the checks run again (S11)', async () => {
+    const requests: CheckPreviewIn[] = [];
+    server.use(
+      http.post('*/api/checks/preview', async ({ request }) => {
+        const body = (await request.json()) as CheckPreviewIn;
+        requests.push(body);
+        const stale = body.content_text.includes('4.99%');
+        const out: CheckPreviewOut = {
+          ruleset_key: 'k',
+          terms_refs: [],
+          findings: stale
+            ? [
+                {
+                  rule_id: 'pricing.terms_current',
+                  citation: 'Reg Z 12 CFR 1026.24(a)',
+                  source: 'code',
+                  severity: 'blocking',
+                  message: "This APR isn't offered; current APRs are 9.99%–35.99%.",
+                  suggested_fix: '9.99%–35.99%',
+                  span: spanOf(body.content_text, '4.99%'),
+                  quote: '4.99%',
+                },
+                {
+                  rule_id: 'closed_end.apr_with_trigger',
+                  citation: 'Reg Z 12 CFR 1026.24(d)',
+                  source: 'code',
+                  severity: 'warning',
+                  message: 'This payment needs the APR stated with it.',
+                  suggested_fix: 'Add the APR, e.g. "12.99% APR".',
+                  span: spanOf(body.content_text, 'Personal'),
+                  quote: 'Personal',
+                },
+              ]
+            : [],
+        };
+        return HttpResponse.json(out);
+      }),
+    );
+    const user = userEvent.setup();
+    await renderSubmit();
+    await fillValid(user, '💸 Personal loans at 4.99% APR.');
+
+    const panel = screen.getByRole('region', { name: 'Code checks' });
+    const apply = await within(panel).findByRole('button', { name: 'Apply suggestion: 9.99%–35.99%' });
+    // An instruction isn't text to paste: no Apply on it.
+    expect(within(panel).getAllByRole('button', { name: /^Apply/ })).toHaveLength(1);
+    await user.click(apply);
+
+    expect(screen.getByLabelText('Copy')).toHaveValue('💸 Personal loans at 9.99%–35.99% APR.');
+    await waitFor(() => {
+      expect(requests.at(-1)?.content_text).toBe('💸 Personal loans at 9.99%–35.99% APR.');
+    });
+    expect(await within(panel).findByText('No code findings.')).toBeInTheDocument();
+  });
+
   it('says when live checks are unavailable or missing context, and keeps the form usable', async () => {
     server.use(
       http.post('*/api/checks/preview', () =>

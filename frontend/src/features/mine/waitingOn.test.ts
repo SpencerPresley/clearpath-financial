@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DECISION_APPROVED, DECISION_CHANGES, REVIEWER, itemRowFixture } from '../../test/fixtures/review';
-import { waitingOn } from './waitingOn';
+import { byNextAction, waitingOn } from './waitingOn';
 
 describe('waitingOn', () => {
   it('changes requested: on you, with who asked and the first line of why (from the row alone)', () => {
@@ -29,9 +29,35 @@ describe('waitingOn', () => {
     });
     expect(waitingOn(itemRowFixture({ status: 'expired' }))).toEqual({
       bucket: 'you',
-      why: 'Approval expired. Start a new round to run it again.',
+      why: 'Expired. Start a new round to run it again.',
       action: 'new_round',
     });
+  });
+
+  it('expired: says why, from the reopen reason (B3)', () => {
+    expect(waitingOn(itemRowFixture({ status: 'expired', reopen_reason: 'terms_changed' })).why).toBe(
+      'Offer terms changed. Check the new numbers and start a new round.',
+    );
+    expect(
+      waitingOn(
+        itemRowFixture({
+          status: 'expired',
+          reopen_reason: 'approval_expired',
+          approval_expires_at: '2026-10-01T12:00:00Z',
+        }),
+      ).why,
+    ).toBe('Approval expired Oct 1, 2026. Start a new round to run it again.');
+  });
+
+  it('orders Waiting on you by the action it needs: changes requested first (nit 15)', () => {
+    const rows = [
+      itemRowFixture({ id: 1, status: 'withdrawn' }),
+      itemRowFixture({ id: 2, status: 'expired' }),
+      itemRowFixture({ id: 3, status: 'changes_requested' }),
+      itemRowFixture({ id: 4, status: 'draft' }),
+      itemRowFixture({ id: 5, status: 'changes_requested' }),
+    ];
+    expect([...rows].sort(byNextAction).map((r) => r.id)).toEqual([3, 5, 1, 2, 4]);
   });
 
   it('draft: on you, nothing to do from here', () => {

@@ -1,121 +1,171 @@
 /*
  * One sentence per audit event for the History tab (the event log, rendered; product-spec "Review screen").
- * Payloads carry database ids; `versions` maps version id → n and `users` maps user id → name.
+ * Payloads carry database ids; `versions` maps version id → n, `users` maps user id → name, and `findings` maps
+ * finding id → its message, so no rule id, enum value or snake_case field name reaches the screen (spec §5.4).
+ *
+ * `EVENT_SENTENCES` is keyed by every event type in the generated history union: a new backend event type fails
+ * typecheck here (and historyText.test.ts) instead of rendering its raw type.
  */
 import type { ItemHistoryOut } from '../../api/generated/model';
-import { OUTCOME_LABELS, REOPEN_REASON_LABELS, plural } from '../../ui/labels';
+import {
+  ATTACHMENT_KIND_LABELS,
+  DRIFT_RESULT_LABELS,
+  OUTCOME_LABELS,
+  REOPEN_REASON_LABELS,
+  RISK_TIER_LABELS,
+  formatDate,
+  plural,
+} from '../../ui/labels';
 
 type Entry = ItemHistoryOut['entries'][number];
+export type HistoryEventType = Entry['type'];
 
 export interface HistoryLookups {
   versions: ReadonlyMap<number, number>;
   users: ReadonlyMap<number, string>;
+  /** Finding id → message, for the versions loaded so far. */
+  findings?: ReadonlyMap<number, string>;
 }
 
 const firstLine = (text: string) => text.split('\n')[0]?.trim() ?? '';
 
-export function describeEvent(entry: Entry, { versions, users }: HistoryLookups): string {
-  const v = (versionId: number) => {
-    const n = versions.get(versionId);
-    return n === undefined ? 'a version' : `v${String(n)}`;
-  };
-  const who = (userId: number | null) => (userId === null ? 'nobody' : (users.get(userId) ?? 'a reviewer'));
+const MAX_QUOTED = 72;
 
-  switch (entry.type) {
-    case 'item.submitted':
-      return `Submitted v${String(entry.payload.version_n)}`;
-    case 'item.resubmitted':
-      return `Resubmitted v${String(entry.payload.version_n)} (round ${String(entry.payload.round)})`;
-    case 'item.new_round_started':
-      return `Started round ${String(entry.payload.round)} with v${String(entry.payload.version_n)}`;
-    case 'item.assigned': {
-      const reason = entry.payload.reason === '' ? '' : ` · ${entry.payload.reason}`;
-      return entry.payload.assignee_id === null
-        ? `Unassigned${reason}`
-        : `Assigned to ${who(entry.payload.assignee_id)}${reason}`;
+/** A finding's message, quoted and kept to one short line. */
+function quoted(message: string): string {
+  const line = firstLine(message).replace(/\.$/, '');
+  return `“${line.length > MAX_QUOTED ? `${line.slice(0, MAX_QUOTED - 1).trimEnd()}…` : line}”`;
+}
+
+/** Item fields a PATCH records (reviews.services: tags, notes). */
+const FIELD_LABELS: Record<string, string> = { tags: 'tags', notes: 'notes', monitored: 'monitoring' };
+const fieldName = (field: string) => FIELD_LABELS[field] ?? field.replaceAll('_', ' ');
+
+/** The drift fetch's failure codes that have a plainer reading than "couldn't be fetched". */
+const DRIFT_FAILURES: Record<string, string> = {
+  timeout: 'the page took too long to load',
+  no_approved_version: 'there was no approved version to compare',
+};
+
+type Sentences = {
+  [K in HistoryEventType]: (entry: Extract<Entry, { type: K }>, h: Helpers) => string;
+};
+
+interface Helpers {
+  v: (versionId: number) => string;
+  who: (userId: number | null) => string;
+  finding: (findingId: number) => string;
+}
+
+export const EVENT_SENTENCES: Sentences = {
+  'item.submitted': (e) => `Submitted v${String(e.payload.version_n)}`,
+  'item.resubmitted': (e) => `Resubmitted v${String(e.payload.version_n)} (round ${String(e.payload.round)})`,
+  'item.new_round_started': (e) =>
+    `Started round ${String(e.payload.round)} with v${String(e.payload.version_n)}`,
+  'item.assigned': (e, { who }) => {
+    const reason = e.payload.reason === '' ? '' : ` · ${e.payload.reason}`;
+    return e.payload.assignee_id === null
+      ? `Unassigned${reason}`
+      : `Assigned to ${who(e.payload.assignee_id)}${reason}`;
+  },
+  'item.review_started': () => 'Started review',
+  'item.fields_updated': (e) => `Updated ${e.payload.changes.map((c) => fieldName(c.field)).join(', ')}`,
+  'item.risk_tier_overridden': (e) =>
+    `Risk tier changed from ${RISK_TIER_LABELS[e.payload.before]} to ${RISK_TIER_LABELS[e.payload.after]}`,
+  'item.reopened': (e) => {
+    const failed = e.payload.failed_snapshot_ids ?? [];
+    const why =
+      failed.length > 0
+        ? ` (page couldn’t be fetched on ${plural(failed.length, 'daily check')} in a row)`
+        : '';
+    return `Sent to re-review: ${REOPEN_REASON_LABELS[e.payload.reason]}${why}`;
+  },
+  'item.expired': (e) => `Expired: ${REOPEN_REASON_LABELS[e.payload.reason]}`,
+  'item.approval_expiring': (e) => `Approval expires soon (${formatDate(e.payload.expires_at)})`,
+  'item.withdrawn': (e) => `Withdrawn: ${firstLine(e.payload.reason)}`,
+  'item.imported': (e) => `Imported from the legacy tracker (${e.payload.legacy_ref})`,
+  'version.created': (e) => `Created v${String(e.payload.version_n)}`,
+  'checks.completed': (e, { v }) =>
+    `${e.payload.source === 'llm' ? 'AI' : 'Code'} checks on ${v(e.payload.version_id)}: ${plural(e.payload.findings_count, 'finding')}`,
+  'llm_check.requested': (e, { v }) => `AI check requested on ${v(e.payload.version_id)}`,
+  'llm_check.started': (e, { v }) =>
+    e.payload.attempt > 1
+      ? `AI check started on ${v(e.payload.version_id)} (try ${String(e.payload.attempt)})`
+      : `AI check started on ${v(e.payload.version_id)}`,
+  'llm_check.retry_scheduled': (e, { v }) => `AI check on ${v(e.payload.version_id)} will try again`,
+  'llm_check.succeeded': (e, { v }) =>
+    `AI check finished on ${v(e.payload.version_id)} · ${plural(e.payload.findings_count, 'suggestion')}`,
+  'llm_check.failed': (e, { v }) => `AI check failed on ${v(e.payload.version_id)}`,
+  'finding.accepted': (e, { v, finding }) =>
+    `Accepted ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
+  'finding.dismissed': (e, { v, finding }) =>
+    e.payload.carried
+      ? `Dismissal of ${finding(e.payload.finding_id)} carried to ${v(e.payload.version_id)}: ${e.payload.reason}`
+      : `Dismissed ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}: ${e.payload.reason}`,
+  'finding.reopened': (e, { v, finding }) =>
+    `Reopened ${finding(e.payload.finding_id)} on ${v(e.payload.version_id)}`,
+  'comment.added': (e, { v }) => `Commented on ${v(e.payload.version_id)}`,
+  'decision.recorded': (e, { v }) => {
+    const outcome = OUTCOME_LABELS[e.payload.outcome];
+    const lane =
+      e.payload.lane === 'standard'
+        ? ''
+        : e.payload.lane === 'fast_track'
+          ? ' (fast-track)'
+          : ' (reaffirmed)';
+    const on = e.payload.outcome === 'changes_requested' || e.payload.outcome === 'rejected' ? ' on' : '';
+    return `${outcome}${lane}${on} ${v(e.payload.version_id)}: ${firstLine(e.payload.reason)}`;
+  },
+  'placement.recorded': (e) => `Placement recorded: ${e.payload.location}`,
+  'placement.updated': (e) =>
+    e.payload.changes.length === 0
+      ? 'Placement updated'
+      : `Placement updated: ${e.payload.changes.map((c) => fieldName(c.field)).join(', ')}`,
+  'placement.takedown_requested': (e) => `Takedown requested: ${firstLine(e.payload.reason)}`,
+  'placement.takedown_confirmed': () => 'Takedown confirmed',
+  'placement.drift_check_requested': (e) =>
+    e.payload.trigger === 'manual' ? 'Placement check requested' : 'Daily placement check started',
+  'placement.drift_checked': (e, { v }) => {
+    if (e.payload.status === 'failed') {
+      const why = DRIFT_FAILURES[e.payload.error_code ?? ''] ?? 'the page couldn’t be fetched';
+      return `Placement check failed: ${why}`;
     }
-    case 'item.review_started':
-      return 'Started review';
-    case 'item.fields_updated':
-      return `Updated ${entry.payload.changes.map((c) => c.field).join(', ')}`;
-    case 'item.risk_tier_overridden':
-      return `Risk tier changed from ${entry.payload.before} to ${entry.payload.after}`;
-    case 'item.reopened': {
-      const failed = entry.payload.failed_snapshot_ids ?? [];
-      const why =
-        failed.length > 0
-          ? ` (page couldn’t be fetched on ${plural(failed.length, 'daily check')} in a row)`
-          : '';
-      return `Sent to re-review: ${REOPEN_REASON_LABELS[entry.payload.reason]}${why}`;
-    }
-    case 'item.expired':
-      return `Expired: ${REOPEN_REASON_LABELS[entry.payload.reason]}`;
-    case 'item.withdrawn':
-      return `Withdrawn: ${firstLine(entry.payload.reason)}`;
-    case 'item.imported':
-      return `Imported from the legacy tracker (${entry.payload.legacy_ref})`;
-    case 'version.created':
-      return `Created v${String(entry.payload.version_n)}`;
-    case 'checks.completed':
-      return `${entry.payload.source === 'llm' ? 'AI' : 'Code'} checks on ${v(entry.payload.version_id)}: ${plural(entry.payload.findings_count, 'finding')}`;
-    case 'llm_check.requested':
-      return `AI check requested on ${v(entry.payload.version_id)}`;
-    case 'llm_check.succeeded':
-      return `AI check finished on ${v(entry.payload.version_id)} · ${plural(entry.payload.findings_count, 'suggestion')}`;
-    case 'llm_check.failed':
-      return `AI check failed on ${v(entry.payload.version_id)}`;
-    case 'finding.accepted':
-      return `Accepted ${entry.payload.rule_id} on ${v(entry.payload.version_id)}`;
-    case 'finding.dismissed':
-      return entry.payload.carried
-        ? `Dismissal of ${entry.payload.rule_id} carried to ${v(entry.payload.version_id)}: ${entry.payload.reason}`
-        : `Dismissed ${entry.payload.rule_id} on ${v(entry.payload.version_id)}: ${entry.payload.reason}`;
-    case 'finding.reopened':
-      return `Reopened ${entry.payload.rule_id} on ${v(entry.payload.version_id)}`;
-    case 'comment.added':
-      return `Commented on ${v(entry.payload.version_id)}`;
-    case 'decision.recorded': {
-      const outcome = OUTCOME_LABELS[entry.payload.outcome];
-      const lane =
-        entry.payload.lane === 'standard'
-          ? ''
-          : entry.payload.lane === 'fast_track'
-            ? ' (fast-track)'
-            : ' (reaffirmed)';
-      const on =
-        entry.payload.outcome === 'changes_requested' || entry.payload.outcome === 'rejected' ? ' on' : '';
-      return `${outcome}${lane}${on} ${v(entry.payload.version_id)}: ${firstLine(entry.payload.reason)}`;
-    }
-    case 'placement.recorded':
-      return `Placement recorded: ${entry.payload.location}`;
-    case 'placement.updated':
-      return 'Placement updated';
-    case 'placement.takedown_requested':
-      return `Takedown requested: ${firstLine(entry.payload.reason)}`;
-    case 'placement.takedown_confirmed':
-      return 'Takedown confirmed';
-    case 'placement.drift_check_requested':
-      return entry.payload.trigger === 'manual'
-        ? 'Placement check requested'
-        : 'Daily placement check started';
-    case 'placement.drift_checked': {
-      if (entry.payload.status === 'failed') {
-        const why = entry.payload.error_code ?? '';
-        return why === '' ? 'Placement check failed' : `Placement check failed (${why.replaceAll('_', ' ')})`;
-      }
-      const compared = entry.payload.compared_version_id;
-      const against = compared === undefined || compared === null ? '' : ` against ${v(compared)}`;
-      if (entry.payload.result === 'unchanged') return `Placement checked${against}: copy unchanged`;
-      if (entry.payload.result === 'modified') return `Placement checked${against}: copy changed on the page`;
-      return `Placement checked${against}: approved copy missing from the page`;
-    }
-    case 'placement.page_findings_flagged':
-      return `Placement checked: copy unchanged, ${plural(entry.payload.rule_ids.length, 'new blocking finding')} beside it`;
-    case 'attachment.added':
-      return 'Evidence added';
-    case 'terms.published':
-      return `Offer terms v${String(entry.payload.version)} published`;
-    default:
-      return entry.type;
-  }
+    const compared = e.payload.compared_version_id;
+    const against = compared === undefined || compared === null ? '' : ` against ${v(compared)}`;
+    const result = e.payload.result ?? 'missing';
+    return `Placement checked${against}: ${DRIFT_RESULT_LABELS[result]}`;
+  },
+  'placement.page_findings_flagged': (e) =>
+    `Placement checked: ${DRIFT_RESULT_LABELS.unchanged}, ${plural(e.payload.rule_ids.length, 'new blocking finding')} beside it`,
+  'attachment.added': (e) => `Evidence added: ${ATTACHMENT_KIND_LABELS[e.payload.kind]}`,
+  'terms.published': (e) => `Offer terms v${String(e.payload.version)} published`,
+  // Events about other entities; the item history doesn't normally carry them, but every type has a sentence.
+  'partner.created': (e) => `Partner added: ${e.payload.name}`,
+  'partner.updated': () => 'Partner updated',
+  'user.availability_changed': (e, { who }) =>
+    `${who(e.payload.user_id)} is ${e.payload.is_available ? 'available' : 'away'}`,
+  'user.created': (e) => `Account created for ${e.payload.email}`,
+  'user.roles_changed': (e, { who }) => `Roles changed for ${who(e.payload.user_id)}`,
+  'user.active_changed': (e, { who }) =>
+    `${who(e.payload.user_id)} ${e.payload.is_active ? 'reactivated' : 'deactivated'}`,
+  'import.committed': (e) => `Import committed: ${plural(e.payload.created_count, 'item')}`,
+  'export.created': (e) => `Export created: ${plural(e.payload.item_count, 'item')}`,
+  'email.sent': (e) => `Email sent: ${e.payload.subject}`,
+  'demo.reset': () => 'Demo reset',
+};
+
+export function describeEvent(entry: Entry, { versions, users, findings }: HistoryLookups): string {
+  const helpers: Helpers = {
+    v: (versionId) => {
+      const n = versions.get(versionId);
+      return n === undefined ? 'a version' : `v${String(n)}`;
+    },
+    who: (userId) => (userId === null ? 'nobody' : (users.get(userId) ?? 'a reviewer')),
+    finding: (findingId) => {
+      const message = findings?.get(findingId);
+      return message === undefined ? 'a finding' : quoted(message);
+    },
+  };
+  const sentence = EVENT_SENTENCES[entry.type] as (e: Entry, h: Helpers) => string;
+  return sentence(entry, helpers);
 }

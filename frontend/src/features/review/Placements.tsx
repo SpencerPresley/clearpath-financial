@@ -25,7 +25,7 @@ import { DiffText } from '../../ui/copy/DiffText';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { Icon } from '../../ui/Icon';
 import type { IconKey } from '../../ui/icons';
-import { plural } from '../../ui/labels';
+import { DRIFT_RESULT_LABELS, plural } from '../../ui/labels';
 import { useViewer } from '../../ui/layout/Viewer';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonText } from '../../ui/Skeleton';
@@ -55,11 +55,11 @@ export function checkOutcome(snapshot: SnapshotOut): Outcome {
   if (snapshot.status === 'failed') return { label: 'Check failed', tone: 'error', icon: 'feedback.error' };
   switch (snapshot.result) {
     case 'unchanged':
-      return { label: 'Unchanged', tone: 'success', icon: 'drift.unchanged' };
+      return { label: DRIFT_RESULT_LABELS.unchanged, tone: 'success', icon: 'drift.unchanged' };
     case 'modified':
-      return { label: 'Changed on the page', tone: 'alert', icon: 'drift.modified' };
+      return { label: DRIFT_RESULT_LABELS.modified, tone: 'alert', icon: 'drift.modified' };
     default:
-      return { label: 'Copy missing', tone: 'alert', icon: 'drift.missing' };
+      return { label: DRIFT_RESULT_LABELS.missing, tone: 'alert', icon: 'drift.missing' };
   }
 }
 
@@ -105,7 +105,18 @@ function FailedNote({ snapshot, failureStreak }: { snapshot: SnapshotOut; failur
   );
 }
 
-function LastCheck({ snapshot, failureStreak }: { snapshot: SnapshotOut; failureStreak: number }) {
+/** Present while the item is a drift re-review: the diff is read in the center pane, not squeezed in here. */
+type ShowLiveDiff = (placementId: number) => void;
+
+function LastCheck({
+  snapshot,
+  failureStreak,
+  onShowLiveDiff,
+}: {
+  snapshot: SnapshotOut;
+  failureStreak: number;
+  onShowLiveDiff?: ShowLiveDiff;
+}) {
   const outcome = checkOutcome(snapshot);
   const attention = needsAttention(snapshot);
   const against =
@@ -148,7 +159,21 @@ function LastCheck({ snapshot, failureStreak }: { snapshot: SnapshotOut; failure
           .
         </p>
       )}
-      {snapshot.result === 'modified' && (
+      {snapshot.result === 'modified' && onShowLiveDiff !== undefined && (
+        <div>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="drift.modified"
+            onPress={() => {
+              onShowLiveDiff(snapshot.placement_id);
+            }}
+          >
+            Show live page vs approved v{String(snapshot.compared_version_n ?? '')}
+          </Button>
+        </div>
+      )}
+      {snapshot.result === 'modified' && onShowLiveDiff === undefined && (
         <div className="app-drift-diff">
           <p className="app-field-label">
             Approved v{String(snapshot.compared_version_n ?? '')} compared with the page
@@ -161,14 +186,19 @@ function LastCheck({ snapshot, failureStreak }: { snapshot: SnapshotOut; failure
   );
 }
 
+/** "1 code finding on the page, not in the approved copy" / "3 code findings on the page, 1 not in the approved copy". */
+export function pageFindingsSummary(total: number, fresh: number): string {
+  const count = plural(total, 'code finding');
+  if (fresh === 0) return `${count} on the page, also in the approved copy`;
+  if (fresh === total) return `${count} on the page, not in the approved copy`;
+  return `${count} on the page, ${String(fresh)} not in the approved copy`;
+}
+
 function PageFindings({ snapshot }: { snapshot: SnapshotOut }) {
   const fresh = snapshot.findings.filter((f) => f.new).length;
   return (
     <details className="app-drift-findings" open={fresh > 0}>
-      <summary>
-        Code checks on the whole page: {snapshot.findings.length}
-        {fresh > 0 ? `, ${String(fresh)} not on the approved copy` : ''}
-      </summary>
+      <summary>{pageFindingsSummary(snapshot.findings.length, fresh)}</summary>
       <ul className="app-plain-list">
         {snapshot.findings.map((finding, index) => (
           <li key={`${finding.rule_id}-${String(index)}`} className="app-drift-finding">
@@ -190,11 +220,13 @@ function PlacementRow({
   placement,
   canCheck,
   canSimulate,
+  onShowLiveDiff,
 }: {
   itemId: number;
   placement: PlacementDriftOut;
   canCheck: boolean;
   canSimulate: boolean;
+  onShowLiveDiff?: ShowLiveDiff;
 }) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -237,7 +269,11 @@ function PlacementRow({
       {placement.latest === null ? (
         <p className="app-muted">Not checked yet.</p>
       ) : (
-        <LastCheck snapshot={placement.latest} failureStreak={placement.failure_streak} />
+        <LastCheck
+          snapshot={placement.latest}
+          failureStreak={placement.failure_streak}
+          onShowLiveDiff={onShowLiveDiff}
+        />
       )}
       {error !== null && (
         <p className="app-field-error" role="alert">
@@ -285,7 +321,16 @@ function PlacementRow({
   );
 }
 
-export function PlacementsSection({ itemId, ownerId }: { itemId: number; ownerId: number | null }) {
+export function PlacementsSection({
+  itemId,
+  ownerId,
+  onShowLiveDiff,
+}: {
+  itemId: number;
+  ownerId: number | null;
+  /** A drift re-review: "Live page vs approved vN" opens in the center pane; this panel keeps the metadata. */
+  onShowLiveDiff?: ShowLiveDiff;
+}) {
   const viewer = useViewer();
   const queryClient = useQueryClient();
   const drift = useGetItemDrift(itemId, {
@@ -335,6 +380,7 @@ export function PlacementsSection({ itemId, ownerId }: { itemId: number; ownerId
               placement={placement}
               canCheck={canCheck}
               canSimulate={canSimulate}
+              onShowLiveDiff={onShowLiveDiff}
             />
           ))}
         </ul>

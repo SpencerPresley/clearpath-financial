@@ -297,6 +297,12 @@ export function SubmitPage() {
         <LiveFindings
           checks={checks}
           className="app-live"
+          editor={{
+            text: values.content_text,
+            onChange: (text) => {
+              form.setFieldValue('content_text', text);
+            },
+          }}
           idleMessage={
             missingContext
               ? 'Choose a product, channel, and market to run checks.'

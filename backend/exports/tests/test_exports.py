@@ -18,14 +18,14 @@ from accounts.models import User
 from audit.models import Event
 from conftest import UserFactory
 from core.clock import FixedClock
-from core.domain import AttachmentKind, EventType, ItemStatus, Role
+from core.domain import AttachmentKind, EventType, ItemStatus, ReopenReason, Role
 from core.errors import Conflict, InvalidInput, NotPermitted
 from exports import evidence, services
 from exports.domain import ExportStatus
 from exports.models import ExportJob
 from exports.tests.conftest import APPROVED_TEXT, Approved
 from reviews.filters import ItemFilter, ItemSort
-from reviews.models import Attachment, DecisionEvidence
+from reviews.models import Attachment, DecisionEvidence, ReviewItem
 from reviews.services import AttachmentOwner, add_attachment
 from reviews.tests.factories import make_item, make_partner
 
@@ -216,6 +216,20 @@ def test_evidence_pack_zip_verifies(
     summary = zf.read("summary.txt").decode()
     assert "Decision:         Approve (Standard review) by Dana Kim" in summary
     assert ExportJob.objects.get(pk=job_id).filename == f"CP-{approved.item.pk}-evidence-pack-2026-10-24.zip"
+
+
+def test_evidence_pack_summary_names_why_live_content_came_back(
+    approved: Approved, clock: FixedClock, django_capture_on_commit_callbacks: OnCommit
+) -> None:
+    # Test setup, not a transition: the summary only reads the item's current status and reopen reason.
+    ReviewItem.objects.filter(pk=approved.item.pk).update(
+        status=ItemStatus.NEEDS_REREVIEW, reopen_reason=ReopenReason.DRIFT_DETECTED
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        job_id = services.request_evidence_pack(actor=approved.reviewer, item_id=approved.item.pk, clock=clock)
+
+    summary = zipfile.ZipFile(io.BytesIO(_file(job_id))).read("summary.txt").decode()
+    assert "Status now:       Needs re-review (Live copy changed)" in summary
 
 
 def test_evidence_pack_flags_a_file_that_changed_since_the_decision(

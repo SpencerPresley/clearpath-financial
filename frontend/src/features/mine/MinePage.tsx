@@ -15,7 +15,7 @@ import { ItemKey } from '../../ui/ItemKey';
 import { plural } from '../../ui/labels';
 import { RelativeAge } from '../../ui/RelativeAge';
 import { SkeletonTable } from '../../ui/Skeleton';
-import { BUCKETS, waitingOn } from './waitingOn';
+import { BUCKETS, byNextAction, waitingOn } from './waitingOn';
 import type { WaitingBucket, WaitingOn } from './waitingOn';
 
 export const MINE_PARAMS = { submitted_by_me: true, sort: 'updated', limit: 200 } as const;
@@ -144,7 +144,10 @@ export function MinePage() {
     );
   } else {
     body = BUCKETS.map((bucket) => {
-      const bucketRows = grouped.get(bucket.id) ?? [];
+      const listed = grouped.get(bucket.id) ?? [];
+      // Waiting on you: by the action needed, then most recent; other sections keep the list's order.
+      const bucketRows =
+        bucket.id === 'you' ? [...listed].sort((a, b) => byNextAction(a.item, b.item)) : listed;
       return bucketRows.length === 0 ? null : (
         <MineSection key={bucket.id} label={bucket.label} rows={bucketRows} now={now} />
       );

@@ -30,6 +30,30 @@ function firstLine(text: string): string {
   );
 }
 
+/** Why an approval ended, from the row's reopen reason (the review screen's Start new round says when). */
+function expiredWhy(row: ItemRowOut): string {
+  if (row.reopen_reason === 'terms_changed') {
+    return 'Offer terms changed. Check the new numbers and start a new round.';
+  }
+  if (row.reopen_reason === 'approval_expired' && row.approval_expires_at !== null) {
+    return `Approval expired ${formatDate(row.approval_expires_at)}. Start a new round to run it again.`;
+  }
+  return 'Expired. Start a new round to run it again.';
+}
+
+/** Within Waiting on you: what the marketer acts on first. Changes requested is a reviewer waiting on them. */
+const ACTION_ORDER: Partial<Record<ItemRowOut['status'], number>> = {
+  changes_requested: 0,
+  withdrawn: 1,
+  expired: 2,
+  draft: 3,
+};
+
+/** A stable sort key for rows in one bucket: by next action, keeping the list's order (most recent) within one. */
+export function byNextAction(a: ItemRowOut, b: ItemRowOut): number {
+  return (ACTION_ORDER[a.status] ?? 9) - (ACTION_ORDER[b.status] ?? 9);
+}
+
 /** Everything comes from the row (its latest decision and approval expiry), so the page makes one request. */
 export function waitingOn(row: ItemRowOut): WaitingOn {
   const assignee = row.assignee?.name;
@@ -55,11 +79,7 @@ export function waitingOn(row: ItemRowOut): WaitingOn {
         action: 'new_round',
       };
     case 'expired':
-      return {
-        bucket: 'you',
-        why: 'Approval expired. Start a new round to run it again.',
-        action: 'new_round',
-      };
+      return { bucket: 'you', why: expiredWhy(row), action: 'new_round' };
     case 'draft':
       return { bucket: 'you', why: 'Not submitted yet' };
     case 'submitted':

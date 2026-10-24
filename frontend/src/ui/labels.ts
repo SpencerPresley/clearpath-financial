@@ -6,12 +6,16 @@ import type {
   AttachmentKind,
   Channel,
   DecisionOutcome,
+  DriftResult,
   FindingState,
+  LlmFailureCode,
   Market,
   PartnerStatus,
   PartnerType,
   Product,
   ReopenReason,
+  RiskTier,
+  TermsField,
   VersionOrigin,
 } from '../api/generated/model';
 
@@ -110,3 +114,57 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/*
+ * Drift (product-spec "Drift monitoring"): one name everywhere (spec §5.4). The concept and the reopen reason are
+ * "Live copy changed"; a check's result is Unchanged / Changed / Missing. The exports use the same words
+ * (backend/exports/labels.py).
+ */
+export const DRIFT_CONCEPT_LABEL = REOPEN_REASON_LABELS.drift_detected;
+
+export const DRIFT_RESULT_LABELS: Record<DriftResult, string> = {
+  unchanged: 'Unchanged',
+  modified: 'Changed',
+  missing: 'Missing',
+};
+
+export const RISK_TIER_LABELS: Record<RiskTier, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+
+/** The Offer terms screen's field names (features/terms/termsForm.ts), for quotes and decision records. */
+export const TERMS_FIELD_LABELS: Record<TermsField, string> = {
+  apr_min: 'APR min',
+  apr_max: 'APR max',
+  amount_min: 'Amount min',
+  amount_max: 'Amount max',
+  term_months: 'Loan terms (months)',
+  origination_fee_min_pct: 'Origination fee min',
+  origination_fee_max_pct: 'Origination fee max',
+  purchase_apr_min: 'Purchase APR min',
+  purchase_apr_max: 'Purchase APR max',
+  intro_apr: 'Intro APR',
+  intro_months: 'Intro period',
+  balance_transfer_fee_pct: 'Balance transfer fee',
+  annual_fee: 'Annual fee',
+  example_amount: 'Example amount',
+  example_term_months: 'Example term',
+  example_apr: 'Example APR',
+  example_payment: 'Example payment',
+};
+
+/**
+ * Why an AI pre-review failed, in plain words (spec §5.4). The server's `llm_check_failure_reason` can carry
+ * provider detail ("The model provider returned 529."), which means nothing to a compliance reviewer.
+ */
+export const LLM_FAILURE_LABELS: Record<LlmFailureCode, string> = {
+  not_configured: 'AI review isn’t configured on this server.',
+  provider_unavailable: 'The AI service was overloaded and didn’t answer after several tries.',
+  provider_refused: 'The AI service refused the request.',
+  invalid_output: 'The AI’s answer couldn’t be read.',
+  stuck: 'The AI check stopped without finishing.',
+  timeout: 'The AI check took too long and was stopped.',
+  error: 'The AI check hit an unexpected error.',
+};

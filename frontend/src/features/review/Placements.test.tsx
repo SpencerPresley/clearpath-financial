@@ -81,7 +81,7 @@ describe('checkOutcome', () => {
       icon: 'drift.unchanged',
     });
     expect(checkOutcome(snapshot({ result: 'modified' })).tone).toBe('alert');
-    expect(checkOutcome(snapshot({ result: 'missing' })).label).toBe('Copy missing');
+    expect(checkOutcome(snapshot({ result: 'missing' })).label).toBe('Missing');
     expect(checkOutcome(snapshot({ status: 'failed', result: null })).label).toBe('Check failed');
     expect(checkOutcome(snapshot({ status: 'pending', result: null })).label).toBe('Checking the page…');
   });
@@ -141,16 +141,82 @@ describe('PlacementsSection', () => {
     });
     renderSection();
 
-    expect(await screen.findByText('Changed on the page')).toBeInTheDocument();
+    expect(await screen.findByText('Changed')).toBeInTheDocument();
     expect(screen.getByText('This check sent the item to re-review.')).toBeInTheDocument();
     const label = screen.getByText('Approved v1 compared with the page');
     const diff = label.parentElement ?? label;
     expect(within(diff).getByText('7.49').closest('del')).not.toBeNull();
     expect(within(diff).getByText('5.99').closest('ins')).not.toBeNull();
-    expect(
-      screen.getByText(/Code checks on the whole page: 1, 1 not on the approved copy/),
-    ).toBeInTheDocument();
+    expect(screen.getByText('1 code finding on the page, not in the approved copy')).toBeInTheDocument();
     expect(screen.getByText('New on the page')).toBeInTheDocument();
+  });
+
+  it('words page findings by how many are new', async () => {
+    const finding = (n: number, isNew: boolean) => ({
+      rule_id: `claims.r${String(n)}`,
+      citation: '12 CFR 1026',
+      severity: 'warning' as const,
+      message: `Finding ${String(n)}`,
+      suggested_fix: null,
+      quote: null,
+      new: isNew,
+    });
+    serve({
+      item_id: 1042,
+      placements: [
+        placement({
+          placement_id: 3,
+          latest: snapshot({ findings: [finding(1, false), finding(2, false)] }),
+        }),
+        placement({
+          placement_id: 4,
+          latest: snapshot({ id: 8, findings: [finding(3, true), finding(4, false), finding(5, false)] }),
+        }),
+      ],
+    });
+    renderSection();
+
+    expect(
+      await screen.findByText('2 code findings on the page, also in the approved copy'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('3 code findings on the page, 1 not in the approved copy')).toBeInTheDocument();
+  });
+
+  it('points to the center pane for a drift re-review instead of squeezing the diff in', async () => {
+    serve({
+      item_id: 1042,
+      placements: [
+        placement({
+          latest: snapshot({
+            result: 'modified',
+            reopened_item: true,
+            diff: [
+              { op: 'delete', text: '7.49' },
+              { op: 'insert', text: '5.99' },
+            ],
+          }),
+        }),
+      ],
+    });
+    const shown: number[] = [];
+    const user = userEvent.setup();
+    renderWithQuery(
+      <ViewerProvider viewer={{ id: 99, name: 'Viewer', email: 'v@clearpath.demo', roles: ['reviewer'] }}>
+        <PlacementsSection
+          itemId={1042}
+          ownerId={OWNER_ID}
+          onShowLiveDiff={(placementId) => {
+            shown.push(placementId);
+          }}
+        />
+      </ViewerProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Show live page vs approved v1' }));
+    expect(shown).toEqual([3]);
+    // The check metadata stays here; the diff itself is in the center.
+    expect(screen.getByText('Changed')).toBeInTheDocument();
+    expect(screen.queryByText('7.49')).not.toBeInTheDocument();
   });
 
   it('says why a check failed and that nothing changed', async () => {
@@ -299,7 +365,7 @@ describe('PlacementsSection', () => {
     expect(screen.getByRole('button', { name: 'Check now' })).toHaveAttribute('data-pending', 'true');
     await waitFor(
       () => {
-        expect(screen.getByText('Copy missing')).toBeInTheDocument();
+        expect(screen.getByText('Missing')).toBeInTheDocument();
       },
       { timeout: 5000 },
     );

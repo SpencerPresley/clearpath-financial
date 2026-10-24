@@ -4,6 +4,7 @@ import type { FindingOut, ItemDetailOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { groupFindings } from '../../ui/findings/groupFindings';
+import type { LiveEditor } from '../../ui/findings/LiveFindings';
 import { apiErrorMessage } from '../../ui/forms/apiErrors';
 import { SkeletonBadge, SkeletonText } from '../../ui/Skeleton';
 import { FindingCard } from './FindingCard';
@@ -15,6 +16,13 @@ export interface FindingsPanelProps {
   shownN: number;
   viewingCurrent: boolean;
   canTriage: boolean;
+  /** Reviewer or lead: gets the copy about approving. */
+  isDecider: boolean;
+  /** The decision bar offers Approve / Request changes / Reject on this version. */
+  canDecide: boolean;
+  isMarketer: boolean;
+  /** Approve with edits is open: findings with a literal fix offer Apply into the reviewer's edit. */
+  editor?: LiveEditor;
   activeId: number | null;
   dismissingId: number | null;
   pendingId: number | undefined;
@@ -51,6 +59,8 @@ export function FindingsPanel(props: FindingsPanelProps) {
       item={item}
       aiCount={(findings.data ?? []).filter((f) => f.source === 'llm').length}
       canRetry={canTriage}
+      isDecider={props.isDecider}
+      isMarketer={props.isMarketer}
     />
   ) : null;
 
@@ -88,8 +98,8 @@ export function FindingsPanel(props: FindingsPanelProps) {
       {groups.length === 0 ? (
         <EmptyState icon="entity.finding" title={`No findings on v${String(shownN)}`}>
           Code checks found nothing to flag
-          {item.llm_check_status === 'succeeded' ? ' and the AI check had no suggestions' : ''}. Review the
-          copy and decide.
+          {item.llm_check_status === 'succeeded' ? ' and the AI check had no suggestions' : ''}.
+          {props.canDecide ? ' Review the copy and decide.' : ''}
         </EmptyState>
       ) : (
         <div className="app-findings">
@@ -111,6 +121,7 @@ export function FindingsPanel(props: FindingsPanelProps) {
                     canTriage={canTriage}
                     dismissing={finding.id === dismissingId}
                     pending={finding.id === pendingId}
+                    editor={props.editor}
                     onActivate={() => {
                       props.onActivate(finding.id);
                     }}

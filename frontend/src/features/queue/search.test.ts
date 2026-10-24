@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SavedViewOut } from '../../api/generated/model';
+import { DEFAULT_TRAIL } from '../../ui/queueTrail';
 import { STAT_FILTERS } from './fixtures';
 import {
   BUILT_IN_VIEWS,
@@ -232,5 +233,11 @@ describe('views', () => {
     );
     expect(search.status).toEqual(['approved']);
     expect(search).not.toHaveProperty('market');
+  });
+});
+
+describe("the review screen's default queue order", () => {
+  it('is My queue, exactly as the queue defines it', () => {
+    expect(DEFAULT_TRAIL.params).toEqual(toListParams(viewSearch('mine')));
   });
 });

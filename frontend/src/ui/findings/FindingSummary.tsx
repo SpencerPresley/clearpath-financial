@@ -1,4 +1,5 @@
 import { SeverityBadge, SourceTag } from '../badges';
+import { Button } from '../Button';
 import type { FindingSource, Severity } from '../domain';
 
 export interface FindingSummaryProps {
@@ -12,6 +13,8 @@ export interface FindingSummaryProps {
   id?: string;
   /** Triaged: the severity pill drops its alarm color (red/amber means "still open"). */
   quiet?: boolean;
+  /** Present when the suggestion is literal text for the flagged span: Apply puts it in the editor. */
+  onApply?: () => void;
 }
 
 /**
@@ -28,6 +31,7 @@ export function FindingSummary({
   suggestedFix,
   id,
   quiet = false,
+  onApply,
 }: FindingSummaryProps) {
   return (
     <div className="app-finding-summary" data-quiet={quiet ? 'true' : undefined}>
@@ -41,9 +45,21 @@ export function FindingSummary({
       </p>
       {quote != null && quote !== '' && <q className="app-finding-quote">{quote}</q>}
       {suggestedFix !== undefined && suggestedFix !== '' && (
-        <p className="app-finding-fix">
-          <span className="app-finding-fix-label">Suggested:</span> {suggestedFix}
-        </p>
+        <div className="app-finding-fix-row">
+          <p className="app-finding-fix">
+            <span className="app-finding-fix-label">Suggested:</span> {suggestedFix}
+          </p>
+          {onApply !== undefined && (
+            <Button
+              size="sm"
+              className="app-finding-apply"
+              aria-label={`Apply suggestion: ${suggestedFix}`}
+              onPress={onApply}
+            >
+              Apply
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

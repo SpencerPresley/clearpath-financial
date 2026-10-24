@@ -6,13 +6,13 @@
  * Every region fails on its own (spec §5.5 partial state): stats, saved views, and later pages show inline
  * errors while the rest keeps working.
  */
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 import type { Key } from 'react-aria-components';
 
 import { useGetQueueStats, useListSavedViews } from '../../api/generated/items/items';
-import type { SavedViewOut } from '../../api/generated/model';
+import type { ListItemsParams, SavedViewOut } from '../../api/generated/model';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
 import { errorMessage } from '../../ui/errorMessage';
@@ -20,6 +20,7 @@ import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { useViewer } from '../../ui/layout/Viewer';
 import { useMainNarrowerThan } from '../../ui/layout/useMainWidth';
+import { rememberQueueTrail } from '../../ui/queueTrail';
 import { Board } from './Board';
 import { BulkBar } from './BulkBar';
 import {
@@ -120,7 +121,7 @@ function EmptyQueue({
     waiting: ['Nothing waiting more than 3 days', 'Every queued item was submitted in the last 3 days.'],
     rereview: [
       'No re-reviews',
-      'Approved content comes back here when offer terms change, an approval expires, or drift is found.',
+      'Approved content comes back here when offer terms change, an approval expires, or live copy changes.',
     ],
     queue: ['Nothing in the queue', 'Nothing is submitted, in review, or up for re-review.'],
     active: ['No active items', 'Nothing is submitted, in review, waiting on changes, or up for re-review.'],
@@ -158,6 +159,12 @@ export function QueuePage() {
   const selectedIds = Object.keys(rowSelection).map(Number);
 
   const { rows, query } = useQueueItems(search, { enabled: search.layout === 'table' });
+  // The review screen's "Next item" follows this view's order (ui/queueTrail.ts).
+  const href = useLocation({ select: (location) => location.href });
+  useEffect(() => {
+    if (search.layout !== 'table' || query.isPlaceholderData) return;
+    rememberQueueTrail({ params: JSON.parse(listKey) as ListItemsParams, ids: rows.map((r) => r.id), href });
+  }, [listKey, rows, href, search.layout, query.isPlaceholderData]);
   const savedViews = useListSavedViews();
   const view = activeView(search, savedViews.data ?? NO_VIEWS);
 
