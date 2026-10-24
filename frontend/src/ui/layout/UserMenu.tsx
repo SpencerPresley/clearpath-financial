@@ -9,6 +9,7 @@ import { Button } from '../Button';
 import { Icon } from '../Icon';
 import { forgetQueueTrail } from '../queueTrail';
 import { showToast } from '../toast';
+import { AvailabilityToggle } from './AvailabilityToggle';
 import { signOut } from './session';
 import { landingFor } from './landing';
 import { ResetDemoDialog } from './ResetDemo';
@@ -78,6 +79,7 @@ export function UserMenu() {
             </Heading>
             <p className="text-meta text-muted">{viewer.email}</p>
             <p className="text-meta text-muted">{roles || 'No roles'}</p>
+            <AvailabilityToggle />
             <div className="mt-2 flex gap-2">
               <Button size="sm" icon="action.sign_out" isDisabled={pending} onPress={doSignOut}>
                 Sign out

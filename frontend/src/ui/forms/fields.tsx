@@ -52,7 +52,7 @@ export interface TextInputProps extends FieldBase {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
-  type?: 'text' | 'url' | 'date';
+  type?: 'text' | 'url' | 'date' | 'email' | 'password';
   placeholder?: string;
   autoFocus?: boolean;
 }

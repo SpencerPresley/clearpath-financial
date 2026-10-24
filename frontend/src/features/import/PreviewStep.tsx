@@ -1,9 +1,14 @@
 /*
  * Step 3: what commit will do. Counts first, then every problem grouped by severity, each with its sheet row
- * number and the row's outcome (imported or skipped). Severity alone doesn't say that: the importer files some
- * skipped rows (duplicates, notes, already imported) as warnings or info. Commit skips error rows
- * (skip_rows_with_problems) and says how many before the admin presses it.
+ * number and its outcome: how an imported row was adjusted ("Imported, date from last round"), or why the row
+ * is skipped. Severity alone doesn't say that: the importer files some skipped rows (duplicates, notes) as
+ * warnings or info. Commit skips error rows (skip_rows_with_problems) and says how many before the admin presses it.
+ *
+ * Rows already in the app collapse into one line naming the import they came from: after a seed that's every
+ * row, and their notes belong to that import, whose read-only preview shows what each became. A committed job's
+ * preview is that record: what commit did, with no commit button.
  */
+import { Link } from '@tanstack/react-router';
 import { Button as AriaButton, Disclosure, DisclosurePanel, Heading } from 'react-aria-components';
 
 import type {
@@ -16,8 +21,8 @@ import type {
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import type { IconKey } from '../../ui/icons';
-import { plural } from '../../ui/labels';
-import { SEVERITY_GROUPS } from './labels';
+import { formatDate, plural } from '../../ui/labels';
+import { problemOutcome, SEVERITY_GROUPS } from './labels';
 
 export function Counts({ items }: { items: readonly { label: string; value: number; tone?: 'error' }[] }) {
   return (
@@ -32,9 +37,9 @@ export function Counts({ items }: { items: readonly { label: string; value: numb
   );
 }
 
-function previewCounts(c: ImportCountsOut) {
+function previewCounts(c: ImportCountsOut, committed: boolean) {
   return [
-    { label: 'Ready to import', value: c.ready },
+    { label: committed ? 'Items created' : 'Ready to import', value: c.ready },
     { label: 'Blocked by errors', value: c.blocked, tone: c.blocked > 0 ? ('error' as const) : undefined },
     { label: 'Duplicates', value: c.duplicates },
     { label: 'Already imported', value: c.already_imported },
@@ -53,19 +58,13 @@ export function ProblemTable({
   rows: readonly ImportPreviewRowOut[];
 }) {
   const actions = new Map(rows.map((r) => [r.row_number, r.action]));
-  const outcome = (row: number | null) => {
-    if (row === null) return '—';
-    const action = actions.get(row);
-    if (action === undefined) return '—';
-    return action === 'create' ? 'Imported' : 'Skipped';
-  };
   return (
     <table className="app-table app-import-table" aria-label={label}>
       <colgroup>
         <col style={{ width: '4.5rem' }} />
-        <col style={{ width: '13rem' }} />
         <col style={{ width: '12rem' }} />
-        <col style={{ width: '6.5rem' }} />
+        <col style={{ width: '11rem' }} />
+        <col style={{ width: '14rem' }} />
         <col />
       </colgroup>
       <thead>
@@ -79,7 +78,8 @@ export function ProblemTable({
       </thead>
       <tbody>
         {problems.map((p, i) => {
-          const result = outcome(p.row_number);
+          const action = p.row_number === null ? undefined : actions.get(p.row_number);
+          const result = problemOutcome(p.kind, action);
           return (
             <tr key={`${String(p.row_number)}-${p.kind}-${String(i)}`} className="app-tr">
               <td className="app-td app-figure">{p.row_number ?? 'Sheet'}</td>
@@ -90,7 +90,10 @@ export function ProblemTable({
                 {p.value ?? '—'}
               </td>
               <td className="app-td">
-                <span className="app-import-outcome" data-outcome={result}>
+                <span
+                  className="app-import-outcome"
+                  data-skipped={action !== undefined && action !== 'create' ? 'true' : undefined}
+                >
                   {result}
                 </span>
               </td>
@@ -168,6 +171,37 @@ export function ProblemGroups({
   );
 }
 
+/** "178 rows already imported from this tracker", with the import they came from when there's one. */
+function AlreadyImported({ preview }: { preview: ImportPreviewOut }) {
+  const n = preview.counts.already_imported;
+  const source = preview.already_imported_from;
+  return (
+    <p className="app-import-info-line" role="status">
+      <Icon name="feedback.info" size={16} className="app-import-info-icon" />
+      <span>
+        {plural(n, 'row')} already imported from this tracker
+        {source !== null && (
+          <>
+            {' '}
+            by <span className="app-import-file">{source.filename}</span>
+            {source.committed_at !== null && ` on ${formatDate(source.committed_at)}`}
+          </>
+        )}
+        . {n === 1 ? 'It isn’t' : 'They aren’t'} imported again.
+      </span>
+      {source !== null && (
+        <Link
+          to="/import"
+          search={{ job: source.job_id, step: 'preview' }}
+          className="app-library-link app-import-info-link"
+        >
+          See how each row was imported
+        </Link>
+      )}
+    </p>
+  );
+}
+
 export function PreviewStep({
   job,
   preview,
@@ -186,14 +220,20 @@ export function PreviewStep({
 }) {
   const { counts } = preview;
   const failed = job.status === 'failed';
+  const committed = job.status === 'committed';
   const unmapped = preview.unmapped.length;
+  const already = new Set(
+    preview.rows.filter((r) => r.action === 'skip_already_imported').map((r) => r.row_number),
+  );
+  const problems = preview.problems.filter((p) => p.row_number === null || !already.has(p.row_number));
   return (
     <div className="app-import-step">
       <header className="app-import-step-head">
         <h2 className="app-import-step-title">Preview</h2>
         <p className="app-import-step-detail">
-          What importing does with each row. Imported rows become legacy items that keep their Request ID and
-          history.
+          {committed
+            ? `What the import did with each row${job.committed_at === null ? '' : ` on ${formatDate(job.committed_at)}`}. Imported rows became legacy items that keep their Request ID and history.`
+            : 'What importing does with each row. Imported rows become legacy items that keep their Request ID and history.'}
         </p>
       </header>
       {failed && job.error !== null && (
@@ -202,32 +242,39 @@ export function PreviewStep({
           {job.error}
         </p>
       )}
-      <Counts items={previewCounts(counts)} />
-      <ProblemGroups problems={preview.problems} rows={preview.rows} />
-      <footer className="app-import-actions">
-        <Button variant="primary" isDisabled={committing || counts.ready === 0} onPress={onCommit}>
-          {committing
-            ? 'Starting…'
-            : failed
-              ? 'Try the import again'
-              : `Import ${plural(counts.ready, 'item')}`}
-        </Button>
-        {unmapped > 0 && <Button onPress={onMapValues}>Map {plural(unmapped, 'value')}</Button>}
-        {commitError !== null ? (
-          <p className="app-import-error-text" role="alert">
-            <Icon name="feedback.error" size={14} />
-            {commitError}
-          </p>
-        ) : counts.ready === 0 ? (
-          <p className="app-import-note">Nothing to import: fix the mapping or the sheet first.</p>
-        ) : (
-          counts.blocked > 0 && (
-            <p className="app-import-note">
-              {plural(counts.blocked, 'row')} with errors {counts.blocked === 1 ? 'is' : 'are'} skipped.
+      <Counts items={previewCounts(counts, committed)} />
+      {counts.already_imported > 0 && !committed && <AlreadyImported preview={preview} />}
+      <ProblemGroups problems={problems} rows={preview.rows} />
+      {!committed && (
+        <footer className="app-import-actions">
+          <Button variant="primary" isDisabled={committing || counts.ready === 0} onPress={onCommit}>
+            {committing
+              ? 'Starting…'
+              : failed
+                ? 'Try the import again'
+                : `Import ${plural(counts.ready, 'item')}`}
+          </Button>
+          {unmapped > 0 && <Button onPress={onMapValues}>Map {plural(unmapped, 'value')}</Button>}
+          {commitError !== null ? (
+            <p className="app-import-error-text" role="alert">
+              <Icon name="feedback.error" size={14} />
+              {commitError}
             </p>
-          )
-        )}
-      </footer>
+          ) : counts.ready === 0 ? (
+            <p className="app-import-note">
+              {counts.already_imported > 0 && counts.blocked === 0 && unmapped === 0
+                ? 'Nothing new to import.'
+                : 'Nothing to import: fix the mapping or the sheet first.'}
+            </p>
+          ) : (
+            counts.blocked > 0 && (
+              <p className="app-import-note">
+                {plural(counts.blocked, 'row')} with errors {counts.blocked === 1 ? 'is' : 'are'} skipped.
+              </p>
+            )
+          )}
+        </footer>
+      )}
     </div>
   );
 }

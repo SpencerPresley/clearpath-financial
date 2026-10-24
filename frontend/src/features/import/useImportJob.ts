@@ -63,11 +63,13 @@ export function useSaveMapping(jobId: number, onSaved: (preview: ImportPreviewOu
   };
 }
 
-export function useCommit(jobId: number) {
+/** `onStarted` runs once the server accepts the commit (the view drops its chosen step, so it ends on Done). */
+export function useCommit(jobId: number, onStarted: () => void) {
   const queryClient = useQueryClient();
   const mutation = useCommitImport({
     mutation: {
       onSuccess: (job: ImportJobOut) => {
+        onStarted();
         queryClient.setQueryData(getGetImportQueryKey(jobId), job);
         void queryClient.invalidateQueries({ queryKey: getGetImportPreviewQueryKey(jobId) });
       },

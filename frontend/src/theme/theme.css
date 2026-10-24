@@ -2942,7 +2942,7 @@
   .app-import-outcome {
     @apply text-ui text-base-content;
   }
-  .app-import-outcome[data-outcome='Skipped'] {
+  .app-import-outcome[data-skipped='true'] {
     @apply text-muted;
   }
   .app-import-group-icon {
@@ -3037,6 +3037,40 @@
   }
   .app-import-progress-text {
     @apply text-ui font-medium text-base-content tabular-nums;
+  }
+
+  /* ---- Walkthrough S15: rows already imported (one line), the inferred value mapping, read-only steps. */
+  /* Neutral, not info blue: info blue means someone is working on an item (§5.2). */
+  .app-import-info-line {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-base-300 bg-base-200 px-3 py-2 text-ui text-base-content tabular-nums;
+    text-wrap: pretty;
+  }
+  .app-import-info-icon {
+    @apply shrink-0 text-muted;
+  }
+  .app-import-info-line .app-import-file {
+    @apply text-ui text-base-content;
+  }
+  .app-import-info-link {
+    @apply ml-auto text-ui;
+  }
+  .app-import-fixed {
+    @apply block truncate px-2 text-ui text-base-content;
+  }
+  .app-import-how {
+    @apply inline-flex items-center gap-1.5 text-ui;
+  }
+  .app-import-how[data-unmapped='true'] {
+    @apply font-medium text-status-warning-soft-content;
+  }
+  .app-import-group-row {
+    @apply bg-base-200;
+  }
+  .app-import-group-cell {
+    @apply sticky top-0 h-8 px-3 text-left text-meta font-semibold tracking-wide text-base-content;
+  }
+  .app-import-group-count {
+    @apply ml-2 font-normal text-muted tabular-nums;
   }
 }
 
@@ -4026,5 +4060,199 @@
       animation: none;
       background-color: color-mix(in oklch, var(--color-focus) 8%, transparent);
     }
+  }
+}
+
+/* ---- Users, availability, workload (walkthrough S16: features/users, ui/Switch, queue WorkloadPanel) ------- */
+@layer components {
+  /* ---- Switch: navy when on (a control, not a status, §5.2); the hit area is the whole label. ----------- */
+  .app-switch {
+    @apply inline-flex min-h-6 cursor-default items-center gap-2 text-ui text-base-content outline-none;
+  }
+  .app-switch-track {
+    @apply relative inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-base-content/25;
+    transition-property: background-color;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-switch-thumb {
+    @apply absolute left-0.5 size-3 rounded-full bg-base-100;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+    transition-property: translate;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-switch[data-selected] .app-switch-track {
+    @apply bg-primary;
+  }
+  .app-switch[data-selected] .app-switch-thumb {
+    translate: 0.75rem 0;
+  }
+  .app-switch[data-disabled] {
+    @apply opacity-60;
+  }
+  .app-switch[data-focus-visible] .app-switch-track {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* ---- Out of office: glyph + words, neutral (an attribute of a person, not an item status). ------------- */
+  .app-away {
+    @apply inline-flex shrink-0 items-center gap-1 text-meta whitespace-nowrap text-muted;
+  }
+  .app-picker-name {
+    @apply flex min-w-0 items-center justify-between gap-3;
+  }
+  .app-availability {
+    @apply mt-2 flex flex-col gap-1 border-t border-base-300 pt-2;
+  }
+  .app-availability-label {
+    @apply text-ui;
+  }
+
+  /* ---- Users page -------------------------------------------------------------------------------------- */
+  .app-users {
+    @apply flex max-w-[72rem] flex-col gap-4;
+  }
+  .app-users-header {
+    @apply flex items-start justify-between gap-4;
+  }
+  .app-users-header .app-page-title {
+    @apply mb-0.5;
+  }
+  .app-users-detail {
+    @apply text-ui text-muted tabular-nums;
+  }
+  .app-users-create {
+    @apply rounded-lg border border-base-300 bg-base-100 px-4 py-3;
+  }
+  .app-users-form {
+    @apply grid grid-cols-3 items-start gap-x-4 gap-y-3;
+  }
+  .app-users-form > .app-field:nth-child(4) {
+    @apply col-span-2;
+  }
+  .app-users-form-actions {
+    @apply col-span-3 flex items-center gap-2;
+  }
+  .app-users-table .app-tr[data-inactive='true'] .app-users-name,
+  .app-users-table .app-tr[data-inactive='true'] .app-users-email {
+    @apply text-muted;
+  }
+  .app-users-table .app-tr[aria-busy='true'] {
+    @apply opacity-70;
+  }
+  .app-td.app-users-person {
+    @apply py-1.5 text-left font-normal;
+  }
+  .app-users-name {
+    @apply flex items-center gap-2 font-medium text-base-content;
+  }
+  .app-users-email {
+    @apply block truncate text-meta text-muted;
+  }
+  .app-users-roles {
+    @apply inline-flex gap-1;
+  }
+  .app-users-role {
+    @apply inline-flex h-6 cursor-default items-center rounded-sm border border-base-300 px-2 text-meta text-muted outline-none;
+    transition-property: background-color, border-color, color, scale;
+    transition-duration: 120ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-users-role[data-hovered] {
+    @apply border-base-content/30 text-base-content;
+  }
+  .app-users-role[data-pressed] {
+    scale: 0.96;
+  }
+  .app-users-role[data-selected] {
+    @apply border-primary/40 bg-nav-active font-medium text-primary;
+  }
+  .app-users-role[data-disabled] {
+    @apply opacity-50;
+  }
+  .app-users-availability,
+  .app-users-active {
+    @apply inline-flex items-center gap-2;
+  }
+  .app-users-deactivated {
+    @apply text-meta text-muted;
+  }
+
+  /* ---- Queue: workload by reviewer (leads), one quiet row under the stats strip. ------------------------- */
+  .app-workload {
+    @apply rounded-lg border border-base-300 bg-base-100;
+  }
+  .app-workload-head {
+    @apply flex h-9 items-center gap-3 pr-3;
+  }
+  .app-workload-toggle {
+    @apply flex h-full cursor-default items-center gap-2 rounded-l-lg pr-2 pl-3 outline-none;
+    transition-property: background-color;
+    transition-duration: 120ms;
+  }
+  .app-workload-toggle[data-hovered] {
+    @apply bg-hover;
+  }
+  .app-workload-toggle[data-focus-visible] {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
+  .app-workload-caret {
+    @apply -rotate-90 text-muted;
+    transition-property: rotate;
+    transition-duration: 120ms;
+  }
+  .app-workload[data-open] .app-workload-caret {
+    @apply rotate-0;
+  }
+  .app-workload-title {
+    @apply text-ui font-semibold text-base-content;
+  }
+  .app-workload-summary {
+    @apply truncate text-ui text-muted tabular-nums;
+  }
+  .app-workload-body {
+    @apply border-t border-base-300 px-3 py-2;
+  }
+  .app-workload-table {
+    @apply w-full max-w-[44rem] border-separate border-spacing-0 text-ui tabular-nums;
+  }
+  .app-workload-table th,
+  .app-workload-table td {
+    @apply h-7 pr-4 text-left whitespace-nowrap;
+  }
+  .app-workload-table thead th {
+    @apply text-meta font-medium text-muted;
+  }
+  .app-workload-table tbody th {
+    @apply font-medium text-base-content;
+  }
+  .app-workload-table .app-workload-num {
+    @apply w-16 text-right;
+  }
+  .app-workload-link {
+    @apply relative cursor-default rounded-xs px-1 font-medium text-primary underline-offset-2 outline-none;
+  }
+  /* A 40px-tall hit area around a one-digit link, without moving the row. */
+  .app-workload-link::after {
+    content: '';
+    @apply absolute -inset-x-2 -inset-y-2;
+  }
+  .app-workload-link[data-hovered] {
+    @apply underline;
+  }
+  .app-workload-load {
+    @apply inline-flex w-40 items-center gap-2;
+  }
+  .app-workload-figure {
+    @apply w-6 text-right font-medium text-base-content;
+  }
+  .app-workload-bar {
+    @apply relative h-1.5 flex-1 overflow-hidden rounded-full bg-base-200;
+  }
+  .app-workload-bar > span {
+    @apply absolute inset-y-0 left-0 rounded-full bg-base-content/35;
   }
 }

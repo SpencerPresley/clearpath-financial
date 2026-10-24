@@ -27,6 +27,7 @@ import {
   BellIcon,
   BookmarkSimpleIcon,
   BooksIcon,
+  CalendarSlashIcon,
   CalendarXIcon,
   CaretDoubleDownIcon,
   CaretDoubleUpIcon,
@@ -94,6 +95,7 @@ import {
   UserCircleIcon,
   UserIcon,
   UserPlusIcon,
+  UsersIcon,
   WarningCircleIcon,
   WarningIcon,
   WarningOctagonIcon,
@@ -225,6 +227,10 @@ export const icons = {
   'nav.import': regular(TrayArrowDownIcon),
   'nav.outbox': regular(EnvelopeSimpleIcon),
   'nav.user': regular(UserCircleIcon),
+  /** The admin's Users screen (people and their roles); nav.user is the signed-in account. */
+  'nav.users': regular(UsersIcon),
+  /** A reviewer marked out of office: auto-assignment skips them (assignee pickers, workload, Users). */
+  'availability.away': regular(CalendarSlashIcon),
   // The assistant panel: a speech bubble with text, not a sparkle or wand (spec §5.6); ChatCircle is comments.
   'nav.assistant': regular(ChatTeardropTextIcon),
   /** The notifications inbox in the topbar. */

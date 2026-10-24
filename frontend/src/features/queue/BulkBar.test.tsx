@@ -39,6 +39,7 @@ beforeEach(() => {
 });
 
 describe('BulkBar', () => {
+<<<<<<< HEAD
   it('turns fast-track off, and says why, when no selected re-review can take it (nit 16)', () => {
     const expiry = makeRow({ id: 16, status: 'needs_rereview', reopen_reason: 'approval_expired' });
     setup(LEAD, [1, 16], [ROWS[0] ?? expiry, expiry]);
@@ -56,6 +57,15 @@ describe('BulkBar', () => {
     setup(LEAD, [3, 16], [...ROWS, expiry]);
     expect(screen.getByRole('button', { name: 'Fast-track 2 re-reviews…' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Why fast-track is off' })).not.toBeInTheDocument();
+  });
+
+  it('marks reviewers who are out of office in the assign menu', async () => {
+    server.use(getListUsersMockHandler(USERS.map((u) => (u.id === 3 ? { ...u, is_available: false } : u))));
+    setup(LEAD);
+    await userEvent.click(screen.getByRole('button', { name: 'Assign…' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Sam Okafor, out of office' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Dana Whitfield' })).toBeInTheDocument();
   });
 
   it('assigns the selection to a reviewer and clears it', async () => {

@@ -43,6 +43,7 @@ import { StatsStrip } from './StatsStrip';
 import { useQueueCells } from './useItemPatch';
 import { useQueueItems } from './useQueueItems';
 import { SavedViewsError, ViewBar } from './ViewBar';
+import { WorkloadPanel } from './WorkloadPanel';
 
 const NO_VIEWS: SavedViewOut[] = [];
 
@@ -350,6 +351,7 @@ export function QueuePage() {
         </h1>
         <StatsStrip active={view.kind === 'builtin' && !view.modified ? view.id : undefined} onPick={go} />
       </div>
+      {viewer.roles.includes('lead') && <WorkloadPanel onPick={go} />}
       <div className="app-view-bar">
         <ViewBar
           search={search}

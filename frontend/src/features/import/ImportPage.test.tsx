@@ -15,6 +15,7 @@ import {
   importJob,
   importPreview,
   recentImports,
+  reimportPreview,
 } from '../../test/fixtures/imports';
 import { LIBRARY_PARTNERS, ME_ADMIN, ME_LIBRARY_REVIEWER } from '../../test/fixtures/library';
 import { renderApp, searchString } from '../../test/renderApp';
@@ -126,7 +127,7 @@ describe('Import: start', () => {
 });
 
 describe('Import: steps', () => {
-  it('saves the column mapping and moves to the preview when nothing is unmapped', async () => {
+  it('saves the column mapping, then shows the values it recognized even when nothing is unmapped', async () => {
     serveJob(importJob(), importPreview({ status: 'uploaded' }));
     server.use(
       http.put('*/api/imports/7/mapping', async ({ request }) => {
@@ -142,12 +143,58 @@ describe('Import: steps', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
 
     await waitFor(() => {
-      expect(router.state.location.search).toMatchObject({ step: 'preview' });
+      expect(router.state.location.search).toMatchObject({ step: 'values' });
     });
     const sent = mappings[0]?.columns ?? [];
     expect(sent).toHaveLength(17);
     expect(sent.find((c) => c.source === 'Live URL / Placement & Screenshot Link')?.target).toBe('ignore');
-    expect(await screen.findByRole('heading', { name: 'Preview' })).toBeInTheDocument();
+
+    const table = await screen.findByRole('table', { name: 'Value mapping' });
+    const pl = within(table).getByRole('row', { name: /“PL”/ });
+    expect(within(pl).getByRole('button', { name: /Imports as/ })).toHaveTextContent('Personal loan');
+    expect(within(pl).getByText('Built-in')).toBeInTheDocument();
+    const cardPerks = within(table).getByRole('row', { name: /“CardPerks”/ });
+    expect(within(cardPerks).getByRole('button', { name: /Imports as/ })).toHaveTextContent(
+      'CardPerks Weekly',
+    );
+    expect(within(cardPerks).getByText('Matched spelling')).toBeInTheDocument();
+    const approved = within(table).getByRole('row', { name: /“Approved”/ });
+    expect(within(approved).getByText('120 rows')).toBeInTheDocument();
+    expect(
+      within(within(table).getByRole('row', { name: /“\?”/ })).getByText('Unknown, left blank'),
+    ).toBeVisible();
+
+    // Nothing changed: the built-in readings aren't sent back as overrides.
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ step: 'preview' });
+    });
+    expect(mappings[1]).toEqual({ status_values: [], value_mappings: [] });
+  });
+
+  it('sends a changed built-in reading as the admin’s mapping', async () => {
+    serveJob(importJob({ status: 'mapped' }), importPreview());
+    server.use(
+      http.put('*/api/imports/7/mapping', async ({ request }) => {
+        mappings.push((await request.json()) as ImportMappingIn);
+        return HttpResponse.json(importPreview());
+      }),
+    );
+    renderApp(`/import${searchString({ job: 7, step: 'values' })}`);
+
+    const table = await screen.findByRole('table', { name: 'Value mapping' });
+    const pl = within(table).getByRole('row', { name: /“PL”/ });
+    await userEvent.click(within(pl).getByRole('button', { name: /Imports as/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Credit card' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and continue' }));
+
+    await waitFor(() => {
+      expect(mappings).toHaveLength(1);
+    });
+    expect(mappings[0]).toEqual({
+      status_values: [],
+      value_mappings: [{ field: 'product', source_value: 'PL', value: 'credit_card' }],
+    });
   });
 
   it('maps unmapped values, and puts a refused value on its own row', async () => {
@@ -178,7 +225,7 @@ describe('Import: steps', () => {
     );
     renderApp(`/import${searchString({ job: 7 })}`);
 
-    const table = await screen.findByRole('table', { name: 'Values to map' });
+    const table = await screen.findByRole('table', { name: 'Value mapping' });
     const status = within(table).getByRole('row', { name: /On Hold/ });
     expect(within(status).getByText('3 rows')).toBeInTheDocument();
     await userEvent.click(within(status).getByRole('button', { name: /Imports as/ }));
@@ -266,8 +313,8 @@ describe('Import: steps', () => {
       'href',
       '/items/400',
     );
-    // Two of the created rows are approved: those are what the library's approved view adds.
-    expect(screen.getByRole('link', { name: 'Approved legacy items (2)' })).toHaveAttribute(
+    // Four of the created rows are approved: those are what the library's approved view adds.
+    expect(screen.getByRole('link', { name: 'Approved legacy items (4)' })).toHaveAttribute(
       'href',
       '/library?legacy=only',
     );
@@ -307,15 +354,72 @@ describe('Import: steps', () => {
     await waitFor(() => {
       expect(router.state.location.search).toMatchObject({ job: 7, step: 'values' });
     });
-    expect(await screen.findByRole('table', { name: 'Values to map' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Value mapping' })).toBeInTheDocument();
   });
 
-  it('shows each problem row as imported or skipped, from the preview rows', async () => {
+  it('says what happened to each problem: how an imported row was adjusted, or why a row was skipped', async () => {
     serveJob(importJob({ status: 'mapped' }), importPreview());
     renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
-    await userEvent.click(await screen.findByRole('button', { name: /^Info · / }));
+
+    const warnings = await screen.findByRole('table', { name: 'Warnings' });
+    expect(within(warnings).getByRole('row', { name: /^41 .*Imported, date from last round/ })).toBeVisible();
+    expect(within(warnings).getByRole('row', { name: /^23 .*Imported, partner matched/ })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /^Info · / }));
     const info = screen.getByRole('table', { name: 'Info' });
-    expect(within(info).getByRole('row', { name: /^19 .*Skipped/ })).toBeInTheDocument();
+    expect(within(info).getByRole('row', { name: /^19 .*Skipped: not a tracker row/ })).toBeVisible();
+    expect(within(info).getByRole('row', { name: /^68 .*Skipped: duplicate/ })).toBeVisible();
+    expect(screen.queryByText(/^Skipped$/)).toBeNull();
+  });
+
+  it('collapses rows already imported into one line that opens the import they came from', async () => {
+    serveJob(importJob({ status: 'mapped' }), reimportPreview());
+    renderApp(`/import${searchString({ job: 7, step: 'preview' })}`);
+
+    const line = await screen.findByText(/178 rows already imported from this tracker/);
+    expect(line).toHaveTextContent('clearpath_review_tracker.xlsx');
+    expect(screen.getByRole('link', { name: 'See how each row was imported' })).toHaveAttribute(
+      'href',
+      '/import?job=1&step=preview',
+    );
+    // Their notes (an already-imported warning on each, row 41's derived date) live in that import, not here.
+    expect(screen.queryByRole('button', { name: /^Warnings/ })).toBeNull();
+    expect(screen.queryByText(/is already imported; skipped/)).toBeNull();
+    expect(screen.getByRole('button', { name: /^Info · 2$/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('table', { name: 'Info' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Import 0 items' })).toBeDisabled();
+  });
+
+  it('keeps a finished import’s steps viewable, read-only, with what each row became', async () => {
+    serveJob(
+      importJob({
+        status: 'committed',
+        committed_at: '2026-08-17T15:30:00Z',
+        summary: { created: 178, skipped: 2, partners_created: 0 },
+      }),
+      () => committedPreview(),
+    );
+    const { router } = renderApp(`/import${searchString({ job: 7 })}`);
+    await screen.findByRole('heading', { name: 'Imported 178 items' });
+
+    await userEvent.click(screen.getByRole('button', { name: /Preview/ }));
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ step: 'preview' });
+    });
+    expect((await screen.findByText('Items created')).closest('.app-import-count')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Import \d+ items$/ })).toBeNull();
+    const warnings = screen.getByRole('table', { name: 'Warnings' });
+    expect(within(warnings).getByRole('row', { name: /^41 .*Imported, date from last round/ })).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: /Values/ }));
+    const values = await screen.findByRole('table', { name: 'Value mapping' });
+    expect(
+      within(within(values).getByRole('row', { name: /“PL”/ })).getByText('Personal loan'),
+    ).toBeVisible();
+    expect(within(values).queryByRole('button', { name: /Imports as/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save and continue' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Done:\s*Done$/ }));
+    expect(await screen.findByRole('heading', { name: 'Imported 178 items' })).toBeInTheDocument();
   });
 
   it("shows the server's reason when commit is refused (409)", async () => {

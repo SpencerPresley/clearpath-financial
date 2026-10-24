@@ -17,6 +17,7 @@ import { Route as OutboxRouteImport } from './routes/outbox'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as DevDesignRouteImport } from './routes/dev/design'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 import { Route as MineIndexRouteImport } from './routes/mine.index'
@@ -64,6 +65,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevDesignRoute = DevDesignRouteImport.update({
   id: '/dev/design',
   path: '/dev/design',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/queue': typeof QueueRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
+  '/users': typeof UsersRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/partners/$partnerId': typeof PartnersPartnerIdRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/queue': typeof QueueRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
+  '/users': typeof UsersRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/partners/$partnerId': typeof PartnersPartnerIdRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/queue': typeof QueueRoute
   '/submit': typeof SubmitRoute
   '/terms': typeof TermsRoute
+  '/users': typeof UsersRoute
   '/dev/design': typeof DevDesignRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/partners/$partnerId': typeof PartnersPartnerIdRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/queue'
     | '/submit'
     | '/terms'
+    | '/users'
     | '/dev/design'
     | '/items/$itemId'
     | '/partners/$partnerId'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/queue'
     | '/submit'
     | '/terms'
+    | '/users'
     | '/dev/design'
     | '/items/$itemId'
     | '/partners/$partnerId'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/queue'
     | '/submit'
     | '/terms'
+    | '/users'
     | '/dev/design'
     | '/items/$itemId'
     | '/partners/$partnerId'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   QueueRoute: typeof QueueRoute
   SubmitRoute: typeof SubmitRoute
   TermsRoute: typeof TermsRoute
+  UsersRoute: typeof UsersRoute
   DevDesignRoute: typeof DevDesignRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   PartnersPartnerIdRoute: typeof PartnersPartnerIdRoute
@@ -270,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/design': {
       id: '/dev/design'
       path: '/dev/design'
@@ -324,6 +344,7 @@ const rootRouteChildren: RootRouteChildren = {
   QueueRoute: QueueRoute,
   SubmitRoute: SubmitRoute,
   TermsRoute: TermsRoute,
+  UsersRoute: UsersRoute,
   DevDesignRoute: DevDesignRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   PartnersPartnerIdRoute: PartnersPartnerIdRoute,

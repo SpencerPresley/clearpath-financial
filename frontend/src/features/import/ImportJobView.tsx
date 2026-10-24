@@ -4,7 +4,6 @@
  */
 import { Button as AriaButton } from 'react-aria-components';
 
-import type { ImportPreviewOut } from '../../api/generated/model';
 import { Badge } from '../../ui/badges';
 import { Button } from '../../ui/Button';
 import { cx } from '../../ui/cx';
@@ -23,22 +22,30 @@ import type { ImportStep } from './steps';
 import { useCommit, useImportJob } from './useImportJob';
 import { ValuesStep } from './ValuesStep';
 
+const isEditableStep = (id: ImportStep): id is EditableStep =>
+  id === 'columns' || id === 'values' || id === 'preview';
+
 function StepList({
   step,
   editable,
+  committed,
   onPick,
 }: {
   step: ImportStep;
   editable: boolean;
-  onPick: (step: EditableStep) => void;
+  /** Finished: every step is done, and all but Import can be opened (Done is the summary). */
+  committed: boolean;
+  onPick: (step: EditableStep | undefined) => void;
 }) {
   const index = STEP_ORDER.findIndex((s) => s.id === step);
   return (
     <ol className="app-import-steps" aria-label="Import steps">
       {STEP_ORDER.map((s, i) => {
-        const state = i < index ? 'done' : i === index ? 'current' : 'upcoming';
+        const state =
+          s.id === step ? 'current' : committed || i < index ? 'done' : i === index ? 'current' : 'upcoming';
         const pickable =
-          editable && (s.id === 'columns' || s.id === 'values' || s.id === 'preview') && s.id !== step;
+          s.id !== step &&
+          ((editable && isEditableStep(s.id)) || (committed && (isEditableStep(s.id) || s.id === 'summary')));
         const body = (
           <>
             <span className="app-import-step-num" aria-hidden="true">
@@ -59,7 +66,7 @@ function StepList({
               <AriaButton
                 className={cx('app-import-steps-btn', 'app-import-steps-pick')}
                 onPress={() => {
-                  onPick(s.id as EditableStep);
+                  onPick(isEditableStep(s.id) ? s.id : undefined);
                 }}
               >
                 {body}
@@ -97,7 +104,9 @@ export function ImportJobView({
   onBack: () => void;
 }) {
   const { job, preview } = useImportJob(jobId);
-  const commit = useCommit(jobId);
+  const commit = useCommit(jobId, () => {
+    onStep(undefined);
+  });
 
   if (job.isPending) {
     return <StepSkeleton />;
@@ -135,15 +144,17 @@ export function ImportJobView({
 
   const data = job.data;
   const editable = isEditable(data);
-  const step = currentStep(data, preview.data, editable ? requested : undefined);
+  const committed = data.status === 'committed';
+  const step = currentStep(data, preview.data, editable || committed ? requested : undefined);
   const meta = IMPORT_STATUS_META[data.status];
-  const saved = (next: ImportPreviewOut) => {
-    onStep(step === 'columns' && next.unmapped.length > 0 ? 'values' : 'preview');
+  // Columns always lead to Values: the admin sees the value mapping the importer inferred, even a complete one.
+  const saved = () => {
+    onStep(step === 'columns' ? 'values' : 'preview');
   };
 
   let body;
   if (step === 'columns') {
-    body = <ColumnsStep key={data.updated_at} job={data} onSaved={saved} />;
+    body = <ColumnsStep key={data.updated_at} job={data} onSaved={saved} readOnly={committed} />;
   } else if (step === 'commit') {
     body = <CommitProgress ready={preview.data?.counts.ready} />;
   } else if (step === 'summary') {
@@ -173,7 +184,15 @@ export function ImportJobView({
       </div>
     );
   } else if (step === 'values') {
-    body = <ValuesStep key={data.updated_at} job={data} preview={preview.data} onSaved={saved} />;
+    body = (
+      <ValuesStep
+        key={data.updated_at}
+        job={data}
+        preview={preview.data}
+        onSaved={saved}
+        readOnly={committed}
+      />
+    );
   } else {
     body = (
       <PreviewStep
@@ -203,7 +222,7 @@ export function ImportJobView({
           Start another import
         </Button>
       </div>
-      <StepList step={step} editable={editable} onPick={onStep} />
+      <StepList step={step} editable={editable} committed={committed} onPick={onStep} />
       {body}
     </div>
   );

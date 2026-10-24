@@ -7,7 +7,8 @@
  *   committing               -> commit (progress, polling)
  *   committed                -> summary
  *
- * Before commit the admin may step back to an earlier editable step (the URL's `step`).
+ * Before commit the admin may step back to an earlier editable step (the URL's `step`); after it, open any of
+ * them read-only. Saving columns always goes on to values, so the inferred value mapping is always seen.
  */
 import type { ImportJobOut, ImportPreviewOut } from '../../api/generated/model';
 import type { EditableStep } from './search';
@@ -28,7 +29,8 @@ export function currentStep(
   requested: EditableStep | undefined,
 ): ImportStep {
   if (job.status === 'committing') return 'commit';
-  if (job.status === 'committed') return 'summary';
+  // A finished import's earlier steps stay viewable, read-only: the record of what it did.
+  if (job.status === 'committed') return requested ?? 'summary';
   if (requested !== undefined) return requested;
   if (job.status === 'uploaded') return 'columns';
   return (preview?.unmapped.length ?? 0) > 0 ? 'values' : 'preview';

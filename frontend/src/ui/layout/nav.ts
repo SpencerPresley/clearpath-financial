@@ -82,10 +82,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'Metrics',
     icon: 'nav.metrics',
     group: 'operations',
-    roles: ['lead'],
+    // Admins read metrics too (the API allows reviewer, lead and admin; walkthrough S16).
+    roles: ['lead', 'admin'],
     to: '/metrics',
   },
   { id: 'import', label: 'Import', icon: 'nav.import', group: 'operations', roles: ['admin'], to: '/import' },
+  { id: 'users', label: 'Users', icon: 'nav.users', group: 'operations', roles: ['admin'], to: '/users' },
   {
     id: 'outbox',
     label: 'Outbox',

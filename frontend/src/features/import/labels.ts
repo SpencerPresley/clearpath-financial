@@ -3,11 +3,13 @@
  * messages use the same words); keyed by the generated enums so a new field fails typecheck here.
  */
 import type {
+  ImportProblemKind,
   ImportStatus,
   ImportTargetField,
   ImportValueField,
   ItemStatus,
   ProblemSeverity,
+  RowAction,
 } from '../../api/generated/model';
 import { Channel, Product, RiskTier } from '../../api/generated/model';
 import type { BadgeMeta } from '../../ui/badges';
@@ -64,6 +66,44 @@ export const SEVERITY_GROUPS: readonly { severity: ProblemSeverity; title: strin
   { severity: 'warning', title: 'Warnings' },
   { severity: 'info', title: 'Info' },
 ];
+
+/**
+ * What a problem did to a row that imports: the adjustment, in a few words. Keyed by every kind so a new one fails
+ * typecheck here. Kinds that only ever skip a row (errors, duplicates, notes) read from SKIP_OUTCOME instead.
+ */
+const IMPORTED_OUTCOME: Record<ImportProblemKind, string> = {
+  coerced_date: 'Imported, date read from text',
+  inferred_status: 'Imported, status inferred',
+  fuzzy_partner: 'Imported, partner matched',
+  derived_approval_date: 'Imported, date from last round',
+  missing_expiry: 'Imported, no expiry',
+  unknown_trigger_terms: 'Imported, trigger terms blank',
+  unresolved_approver: 'Imported, approver as typed',
+  reused_ref: 'Imported under a new ID',
+  unparseable_date: 'Imported, date left blank',
+  unknown_value: 'Imported, value left blank',
+  unknown_partner: 'Imported with a note',
+  unmapped_status: 'Imported with a note',
+  missing_value: 'Imported with a note',
+  missing_mapping: 'Imported with a note',
+  inconsistent_dates: 'Imported with a note',
+  duplicate_row: 'Imported with a note',
+  already_imported: 'Imported with a note',
+  not_data_row: 'Imported with a note',
+};
+
+const SKIP_OUTCOME: Record<Exclude<RowAction, 'create'>, string> = {
+  blocked: 'Skipped: errors',
+  skip_duplicate: 'Skipped: duplicate',
+  skip_already_imported: 'Already imported',
+  skip_not_data: 'Skipped: not a tracker row',
+};
+
+/** The Outcome cell for one problem: what its row's action did with it. A sheet-level problem has no row. */
+export function problemOutcome(kind: ImportProblemKind, action: RowAction | undefined): string {
+  if (action === undefined) return '—';
+  return action === 'create' ? IMPORTED_OUTCOME[kind] : SKIP_OUTCOME[action];
+}
 
 /** Statuses an imported row can take (backend IMPORTABLE_STATUSES). */
 const IMPORTABLE: readonly ItemStatus[] = [
