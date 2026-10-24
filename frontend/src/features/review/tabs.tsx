@@ -287,6 +287,7 @@ export function DetailsTab({
         <PlacementsSection
           itemId={item.id}
           ownerId={item.owner?.id ?? null}
+          itemStatus={item.status}
           onShowLiveDiff={onShowLiveDiff}
         />
       )}

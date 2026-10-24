@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
-import type { ItemDriftOut, PlacementDriftOut, SnapshotOut } from '../../api/generated/model';
+import type { ItemDriftOut, PlacementDriftOut, PlacementOut, SnapshotOut } from '../../api/generated/model';
 import type { Role } from '../../ui/domain';
 import { ViewerProvider } from '../../ui/layout/Viewer';
 import { renderWithQuery } from '../../test/render';
@@ -68,7 +68,7 @@ function serve(...responses: ItemDriftOut[]): { gets: () => number } {
 function renderSection(roles: Role[] = ['reviewer'], viewerId = 99) {
   return renderWithQuery(
     <ViewerProvider viewer={{ id: viewerId, name: 'Viewer', email: 'v@clearpath.demo', roles }}>
-      <PlacementsSection itemId={1042} ownerId={OWNER_ID} />
+      <PlacementsSection itemId={1042} ownerId={OWNER_ID} itemStatus="approved" />
     </ViewerProvider>,
   );
 }
@@ -205,6 +205,7 @@ describe('PlacementsSection', () => {
         <PlacementsSection
           itemId={1042}
           ownerId={OWNER_ID}
+          itemStatus="approved"
           onShowLiveDiff={(placementId) => {
             shown.push(placementId);
           }}
@@ -426,5 +427,73 @@ describe('PlacementsSection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Only the submitter or a reviewer can check a placement.',
     );
+  });
+});
+
+function record(overrides: Partial<PlacementOut> = {}): PlacementOut {
+  return {
+    id: 3,
+    approved_version_n: 1,
+    location: 'LendCompare: best personal loans',
+    url: 'https://lendcompare.example/best-loans',
+    first_run: '2026-10-01',
+    last_run: null,
+    monitored: true,
+    takedown_state: null,
+    takedown_requested_at: null,
+    takedown_confirmed_at: null,
+    is_live: true,
+    created_by: { id: OWNER_ID, name: 'Owner' },
+    created_at: NOW,
+    ...overrides,
+  };
+}
+
+describe('placement actions', () => {
+  it('adds a placement from the form', async () => {
+    serve({ item_id: 1042, placements: [] });
+    server.use(http.get('*/api/items/:id/placements', () => HttpResponse.json([])));
+    let body: unknown = null;
+    server.use(
+      http.post('*/api/items/:id/placements', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(record({ id: 9 }), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderSection(['lead']);
+    await user.click(await screen.findByRole('button', { name: 'Add placement' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Where it runs'), 'Email footer');
+    await user.type(within(dialog).getByLabelText('First run'), '2026-11-01');
+    await user.click(within(dialog).getByRole('button', { name: 'Add placement' }));
+    await waitFor(() => {
+      expect(body).toMatchObject({ location: 'Email footer', first_run: '2026-11-01', url: null });
+    });
+  });
+
+  it('confirms a requested takedown after asking', async () => {
+    serve({ item_id: 1042, placements: [placement({ is_live: true })] });
+    server.use(
+      http.get('*/api/items/:id/placements', () =>
+        HttpResponse.json([record({ takedown_state: 'requested' })]),
+      ),
+    );
+    let called = false;
+    server.use(
+      http.post('*/api/placements/:id/confirm-takedown', () => {
+        called = true;
+        return HttpResponse.json(record({ takedown_state: 'confirmed' }));
+      }),
+    );
+    const user = userEvent.setup();
+    renderSection(['reviewer']);
+    await user.click(await screen.findByRole('button', { name: 'Confirm takedown' }));
+    expect(called).toBe(false);
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm takedown' }));
+    await waitFor(() => {
+      expect(called).toBe(true);
+    });
   });
 });
